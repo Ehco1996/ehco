@@ -18,7 +18,7 @@ type Relay struct {
 	UDPDeadline int
 }
 
-func NewRelay(localAddr, remoteAddr string, tcpTimeout, tcpDeadline, udpDeadline int) (*Relay, error) {
+func NewRelay(localAddr, remoteAddr string, tcpDeadline, udpDeadline int) (*Relay, error) {
 	localTCPAddr, err := net.ResolveTCPAddr("tcp", localAddr)
 	if err != nil {
 		return nil, err
@@ -42,7 +42,6 @@ func NewRelay(localAddr, remoteAddr string, tcpTimeout, tcpDeadline, udpDeadline
 		RemoteTCPAddr: remoteTCPAddr,
 		RemoteUDPAddr: remoteUDPAddr,
 
-		TCPTimeout:  tcpTimeout,
 		TCPDeadline: tcpDeadline,
 		UDPDeadline: udpDeadline,
 	}
@@ -50,6 +49,7 @@ func NewRelay(localAddr, remoteAddr string, tcpTimeout, tcpDeadline, udpDeadline
 }
 
 func (relay *Relay) ListenAndServe() error {
+	log.Println("start relay server at:", relay.LocalTCPAddr)
 	errChan := make(chan error)
 	go func() {
 		errChan <- relay.RunLocalTCPServer()
@@ -80,6 +80,7 @@ func (relay *Relay) RunLocalTCPServer() error {
 					return
 				}
 			}
+			log.Println("HandleTCPConn:", c)
 			if err := relay.HandleTCPConn(c); err != nil {
 				log.Println(err)
 			}

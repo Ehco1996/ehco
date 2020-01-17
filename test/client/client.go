@@ -1,50 +1,45 @@
 package main
 
 import (
-	"flag"
+	"bufio"
 	"fmt"
+	"io"
 	"net"
 	"os"
-	"strconv"
 )
 
-var host = flag.String("host", "localhost", "host")
-var port = flag.String("port", "3333", "port")
+var port = "0.0.0.0:1234"
 
 func main() {
-	flag.Parse()
-	conn, err := net.Dial("tcp", *host+":"+*port)
+	conn, err := net.Dial("tcp", port)
 	if err != nil {
-		fmt.Println("Error connecting:", err)
+		fmt.Println("ERROR", err)
 		os.Exit(1)
 	}
-	defer conn.Close()
-	fmt.Println("Connecting to " + *host + ":" + *port)
-	done := make(chan string)
-	go handleWrite(conn, done)
-	go handleRead(conn, done)
-	fmt.Println(<-done)
-	fmt.Println(<-done)
-}
 
-func handleWrite(conn net.Conn, done chan string) {
-	for i := 10; i > 0; i-- {
-		_, e := conn.Write([]byte("hello " + strconv.Itoa(i) + "\r\n"))
-		if e != nil {
-			fmt.Println("Error to send message because of ", e.Error())
-			break
+	userInput := bufio.NewReader(os.Stdin)
+	response := bufio.NewReader(conn)
+	for {
+		userLine, err := userInput.ReadBytes(byte('\n'))
+		switch err {
+		case nil:
+			conn.Write(userLine)
+		case io.EOF:
+			os.Exit(0)
+		default:
+			fmt.Println("ERROR", err)
+			os.Exit(1)
+		}
+
+		serverLine, err := response.ReadBytes(byte('\n'))
+		switch err {
+		case nil:
+			fmt.Print(string(serverLine))
+		case io.EOF:
+			os.Exit(0)
+		default:
+			fmt.Println("ERROR", err)
+			os.Exit(2)
 		}
 	}
-	done <- "Sent"
-}
-
-func handleRead(conn net.Conn, done chan string) {
-	buf := make([]byte, 1024)
-	reqLen, err := conn.Read(buf)
-	if err != nil {
-		fmt.Println("Error to read message because of ", err)
-		return
-	}
-	fmt.Println("123", string(buf[:reqLen-1]))
-	done <- "Read"
 }

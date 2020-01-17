@@ -1,43 +1,52 @@
 package main
 
 import (
-	"flag"
+	"bufio"
 	"fmt"
 	"io"
 	"net"
 	"os"
 )
 
-var host = flag.String("host", "", "host")
-var port = flag.String("port", "3333", "port")
+var addr = "0.0.0.0:9001"
 
-func main() {
-	flag.Parse()
-	var l net.Listener
-	var err error
-	l, err = net.Listen("tcp", *host+":"+*port)
-	if err != nil {
-		fmt.Println("Error listening:", err)
-		os.Exit(1)
-	}
-	defer l.Close()
-	fmt.Println("Listening on " + *host + ":" + *port)
+func echo(conn net.Conn) {
+	r := bufio.NewReader(conn)
+	//conn.SetDeadline(time.Now().Add(time.Duration(1) * time.Second))
 	for {
-		conn, err := l.Accept()
-		if err != nil {
-			fmt.Println("Error accepting: ", err)
-			os.Exit(1)
+		line, err := r.ReadBytes(byte('\n'))
+		fmt.Println(line)
+		if len(line) == 0 {
+			break
 		}
-		//logs an incoming message
-		fmt.Printf("Received message %s -> %s \n", conn.RemoteAddr(), conn.LocalAddr())
-		// Handle connections in a new goroutine.
-		go handleRequest(conn)
+		switch err {
+		case nil:
+			break
+		case io.EOF:
+		default:
+			fmt.Println("ECHO ERROR", err)
+			break
+		}
+		conn.Write(line)
 	}
+	conn.Close()
 }
 
-func handleRequest(conn net.Conn) {
-	defer conn.Close()
+func main() {
+	l, err := net.Listen("tcp", addr)
+	fmt.Println("start echo server at:", addr)
+	if err != nil {
+		fmt.Println("ERROR", err)
+		os.Exit(1)
+	}
+
 	for {
-		io.Copy(conn, conn)
+		conn, err := l.Accept()
+		fmt.Println(conn)
+		if err != nil {
+			fmt.Println("ERROR", err)
+			continue
+		}
+		go echo(conn)
 	}
 }
