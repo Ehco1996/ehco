@@ -97,11 +97,13 @@ func (relay *Relay) RunLocalUDPServer() error {
 	}
 	defer relay.UDPConn.Close()
 	for {
-		b := make([]byte, 65536)
+		// NOTE  mtu一般是1500,设置为超过这个这个值就够用了
+		b := make([]byte, 1024*2)
 		n, addr, err := relay.UDPConn.ReadFromUDP(b)
 		if err != nil {
 			return err
 		}
+		log.Printf("receive", string(b[:n]), addr)
 		go func(addr *net.UDPAddr, b []byte) {
 			if err := relay.HandleUDP(addr, b); err != nil {
 				log.Println(err)
@@ -140,35 +142,35 @@ func (relay *Relay) HandleTCPConn(c *net.TCPConn) error {
 	}
 
 	go func() {
-		var bf [1024 * 2]byte
+		var buf [1024 * 2]byte
 		for {
 			if relay.TCPDeadline != 0 {
 				if err := rc.SetDeadline(time.Now().Add(time.Duration(relay.TCPDeadline) * time.Second)); err != nil {
 					return
 				}
 			}
-			i, err := rc.Read(bf[:])
+			i, err := rc.Read(buf[:])
 			if err != nil {
 				return
 			}
-			if _, err := c.Write(bf[0:i]); err != nil {
+			if _, err := c.Write(buf[0:i]); err != nil {
 				return
 			}
 		}
 	}()
 
-	var bf [1024 * 2]byte
+	var buf [1024 * 2]byte
 	for {
 		if relay.TCPDeadline != 0 {
 			if err := c.SetDeadline(time.Now().Add(time.Duration(relay.TCPDeadline) * time.Second)); err != nil {
 				return nil
 			}
 		}
-		i, err := c.Read(bf[:])
+		i, err := c.Read(buf[:])
 		if err != nil {
 			return nil
 		}
-		if _, err := rc.Write(bf[0:i]); err != nil {
+		if _, err := rc.Write(buf[0:i]); err != nil {
 			return nil
 		}
 	}
@@ -176,5 +178,26 @@ func (relay *Relay) HandleTCPConn(c *net.TCPConn) error {
 }
 
 func (relay *Relay) HandleUDP(addr *net.UDPAddr, b []byte) error {
+	rc, err := net.Dial("udp", relay.RemoteUDPAddr.String())
+	if err != nil {
+		return err
+	}
+	defer rc.Close()
+	if relay.UDPDeadline != 0 {
+		if err := rc.SetDeadline(time.Now().Add(time.Duration(relay.UDPDeadline) * time.Second)); err != nil {
+			return err
+		}
+	}
+	if _, err := rc.Write(b); err != nil {
+		return err
+	}
+	var buf [1024 * 2]byte
+	i, err := rc.Read(buf[:])
+	if err != nil {
+		return err
+	}
+	if _, err := relay.UDPConn.WriteToUDP(buf[0:i], addr); err != nil {
+		return err
+	}
 	return nil
 }

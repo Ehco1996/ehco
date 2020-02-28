@@ -4,8 +4,9 @@ import (
 	"log"
 	"os"
 
-	ehco "github.com/Ehco1996/ehco"
 	cli "github.com/urfave/cli/v2"
+
+	ehco "github.com/Ehco1996/ehco"
 )
 
 func main() {
