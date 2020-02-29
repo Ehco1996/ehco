@@ -23,7 +23,7 @@ func main() {
 }
 
 func start(ctx *cli.Context) error {
-	r, err := ehco.NewRelay("127.0.0.1:1234", "127.0.0.1:9001", 60, 60)
+	r, err := ehco.NewRelay("127.0.0.1:1234", "127.0.0.1:9001")
 	if err != nil {
 		log.Fatal(err)
 	}
