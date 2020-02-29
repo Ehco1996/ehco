@@ -63,7 +63,7 @@ func (relay *Relay) Shutdown() error {
 }
 
 func (relay *Relay) ListenAndServe() error {
-	log.Println("start relay server at:", relay.LocalTCPAddr)
+	log.Printf("start relay AT: %s TO: %s", relay.LocalTCPAddr, relay.RemoteTCPAddr)
 	errChan := make(chan error)
 	go func() {
 		errChan <- relay.RunLocalTCPServer()
@@ -86,11 +86,12 @@ func (relay *Relay) RunLocalTCPServer() error {
 		if err != nil {
 			return err
 		}
+		log.Printf("handle tcp con from: %s", c.RemoteAddr())
 		go func(c *net.TCPConn) {
 			defer c.Close()
 			relay.keepAliveAndSetNextTimeout(c)
 			if err := relay.handleTCPConn(c); err != nil {
-				log.Println(err)
+				log.Printf("handleTCPConn err %s", err)
 			}
 		}(c)
 	}
@@ -111,9 +112,10 @@ func (relay *Relay) RunLocalUDPServer() error {
 		if err != nil {
 			return err
 		}
+		log.Printf("handle udp package from %s", addr)
 		go func(addr *net.UDPAddr, b []byte) {
 			if err := relay.handleUDP(addr, b); err != nil {
-				log.Println(err)
+				log.Printf("handleUDP err %s", err)
 				return
 			}
 		}(addr, b[0:n])

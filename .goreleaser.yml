@@ -4,12 +4,10 @@ before:
   hooks:
     # you may remove this if you don't use vgo
     - go mod download
-    # you may remove this if you don't need go generate
-    - go generate ./...
 builds:
 - env:
   - CGO_ENABLED=0
-  main: ./cmd/main.go
+  main: ./cli/main.go
 archives:
 - replacements:
     darwin: Darwin

@@ -9,21 +9,41 @@ import (
 	ehco "github.com/Ehco1996/ehco"
 )
 
+var LOCAL_ADDR string
+var REMOTE_ADDR string
+
 func main() {
 	app := cli.NewApp()
 	app.Name = "ehco"
-	app.Version = "0.0.2"
+	app.Version = "0.0.3"
 	app.Usage = "A proxy used to relay tcp/udp traffic to anywhere"
-	app.Action = start
+	app.Flags = []cli.Flag{
+		&cli.StringFlag{
+			Name:        "l, local",
+			Value:       "0.0.0.0:1234",
+			Usage:       "监听地址",
+			EnvVars:     []string{"EHCO_LOCAL_ADDR"},
+			Destination: &LOCAL_ADDR,
+		},
+		&cli.StringFlag{
+			Name:        "r,remote",
+			Value:       "0.0.0.0:9001",
+			Usage:       "转发地址",
+			EnvVars:     []string{"EHCO_REMOTE_ADDR"},
+			Destination: &REMOTE_ADDR,
+		},
+	}
 
+	app.Action = start
 	err := app.Run(os.Args)
 	if err != nil {
 		log.Fatal(err)
 	}
+
 }
 
 func start(ctx *cli.Context) error {
-	r, err := ehco.NewRelay("127.0.0.1:1234", "127.0.0.1:9001")
+	r, err := ehco.NewRelay(LOCAL_ADDR, REMOTE_ADDR)
 	if err != nil {
 		log.Fatal(err)
 	}
