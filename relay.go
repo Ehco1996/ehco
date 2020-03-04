@@ -3,12 +3,15 @@ package ehco
 import (
 	"log"
 	"net"
+	"net/http"
+	_ "net/http/pprof"
 	"time"
 )
 
-const (
+var (
 	TCP_DEADLINE = 60 * time.Second
 	UDP_DEADLINE = 60 * time.Second
+	DEBUG        = false
 )
 
 type Relay struct {
@@ -44,6 +47,12 @@ func NewRelay(localAddr, remoteAddr string) (*Relay, error) {
 		LocalUDPAddr:  localUDPAddr,
 		RemoteTCPAddr: remoteTCPAddr,
 		RemoteUDPAddr: remoteUDPAddr,
+	}
+	if DEBUG {
+		go func() {
+			log.Printf("[DEBUG] start pprof server at 0.0.0.0:6060")
+			log.Println(http.ListenAndServe("0.0.0.0:6060", nil))
+		}()
 	}
 	return r, nil
 }

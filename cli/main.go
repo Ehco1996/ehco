@@ -15,7 +15,7 @@ var REMOTE_ADDR string
 func main() {
 	app := cli.NewApp()
 	app.Name = "ehco"
-	app.Version = "0.0.3"
+	app.Version = "0.0.5"
 	app.Usage = "A proxy used to relay tcp/udp traffic to anywhere"
 	app.Flags = []cli.Flag{
 		&cli.StringFlag{
@@ -31,6 +31,13 @@ func main() {
 			Usage:       "转发地址",
 			EnvVars:     []string{"EHCO_REMOTE_ADDR"},
 			Destination: &REMOTE_ADDR,
+		},
+		&cli.BoolFlag{
+			Name:        "d,debug",
+			Value:       false,
+			Usage:       "转发地址",
+			EnvVars:     []string{"EHCO_DEBUG"},
+			Destination: &ehco.DEBUG,
 		},
 	}
 
