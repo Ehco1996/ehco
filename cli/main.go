@@ -11,11 +11,12 @@ import (
 
 var LOCAL_ADDR string
 var REMOTE_ADDR string
+var CONFIG_PATH string
 
 func main() {
 	app := cli.NewApp()
 	app.Name = "ehco"
-	app.Version = "0.0.5"
+	app.Version = "0.0.6"
 	app.Usage = "A proxy used to relay tcp/udp traffic to anywhere"
 	app.Flags = []cli.Flag{
 		&cli.StringFlag{
@@ -39,6 +40,11 @@ func main() {
 			EnvVars:     []string{"EHCO_DEBUG"},
 			Destination: &ehco.DEBUG,
 		},
+		&cli.StringFlag{
+			Name:        "c,config",
+			Usage:       "配置文件地址",
+			Destination: &CONFIG_PATH,
+		},
 	}
 
 	app.Action = start
@@ -50,9 +56,23 @@ func main() {
 }
 
 func start(ctx *cli.Context) error {
-	r, err := ehco.NewRelay(LOCAL_ADDR, REMOTE_ADDR)
+	ch := make(chan error)
+	if CONFIG_PATH != "" {
+		config := ehco.NewConfig(CONFIG_PATH)
+		for _, cfg := range config.Configs {
+			go serveRelay(cfg.Listen, cfg.Remote, ch)
+		}
+	} else {
+		go serveRelay(LOCAL_ADDR, REMOTE_ADDR, ch)
+	}
+
+	return <-ch
+}
+
+func serveRelay(local string, remote string, ch chan error) {
+	r, err := ehco.NewRelay(local, remote)
 	if err != nil {
 		log.Fatal(err)
 	}
-	return r.ListenAndServe()
+	ch <- r.ListenAndServe()
 }
