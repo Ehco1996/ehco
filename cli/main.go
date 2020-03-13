@@ -59,6 +59,10 @@ func start(ctx *cli.Context) error {
 	ch := make(chan error)
 	if CONFIG_PATH != "" {
 		config := ehco.NewConfig(CONFIG_PATH)
+		if err := config.LoadConfig(); err != nil {
+			log.Fatal(err)
+		}
+
 		for _, cfg := range config.Configs {
 			go serveRelay(cfg.Listen, cfg.Remote, ch)
 		}
