@@ -9,9 +9,9 @@ import (
 )
 
 var (
-	TCP_DEADLINE = 60 * time.Second
-	UDP_DEADLINE = 60 * time.Second
-	DEBUG        = false
+	TcpDeadline = 60 * time.Second
+	UdpDeadline = 60 * time.Second
+	DEBUG       = false
 )
 
 type Relay struct {
@@ -135,12 +135,12 @@ func (relay *Relay) RunLocalUDPServer() error {
 func (relay *Relay) keepAliveAndSetNextTimeout(conn interface{}) error {
 	switch c := conn.(type) {
 	case *net.TCPConn:
-		if err := c.SetDeadline(time.Now().Add(TCP_DEADLINE)); err != nil {
+		if err := c.SetDeadline(time.Now().Add(TcpDeadline)); err != nil {
 			log.Printf("set tcp timout err %s", err)
 			return err
 		}
 	case *net.UDPConn:
-		if err := c.SetDeadline(time.Now().Add(UDP_DEADLINE)); err != nil {
+		if err := c.SetDeadline(time.Now().Add(UdpDeadline)); err != nil {
 			log.Printf("set udp timout err %s", err)
 			return err
 		}
@@ -157,6 +157,46 @@ func (relay *Relay) handleTCPConn(c *net.TCPConn) error {
 	}
 	defer rc.Close()
 
+	if err := relay.keepAliveAndSetNextTimeout(rc); err != nil {
+		return err
+	}
+
+	go func() {
+		var buf [1024 * 2]byte
+		for {
+			// NOTE may mem leak
+			relay.keepAliveAndSetNextTimeout(rc)
+			i, err := rc.Read(buf[:])
+			if err != nil {
+				return
+			}
+			if _, err := c.Write(buf[0:i]); err != nil {
+				return
+			}
+		}
+	}()
+
+	var buf [1024 * 2]byte
+	for {
+		// NOTE may mem leak
+		relay.keepAliveAndSetNextTimeout(c)
+		i, err := c.Read(buf[:])
+		if err != nil {
+			return nil
+		}
+		if _, err := rc.Write(buf[0:i]); err != nil {
+			return nil
+		}
+	}
+	return nil
+}
+
+func (relay *Relay) HandleConn(c net.Conn) error {
+	rc, err := net.Dial("tcp", relay.RemoteTCPAddr.String())
+	if err != nil {
+		return err
+	}
+	defer rc.Close()
 	if err := relay.keepAliveAndSetNextTimeout(rc); err != nil {
 		return err
 	}

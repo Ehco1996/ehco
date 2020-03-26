@@ -9,9 +9,9 @@ import (
 	ehco "github.com/Ehco1996/ehco"
 )
 
-var LOCAL_ADDR string
-var REMOTE_ADDR string
-var CONFIG_PATH string
+var LocalAddr string
+var RemoteAddr string
+var ConfigPath string
 
 func main() {
 	app := cli.NewApp()
@@ -24,14 +24,14 @@ func main() {
 			Value:       "0.0.0.0:1234",
 			Usage:       "监听地址",
 			EnvVars:     []string{"EHCO_LOCAL_ADDR"},
-			Destination: &LOCAL_ADDR,
+			Destination: &LocalAddr,
 		},
 		&cli.StringFlag{
 			Name:        "r,remote",
 			Value:       "0.0.0.0:9001",
 			Usage:       "转发地址",
 			EnvVars:     []string{"EHCO_REMOTE_ADDR"},
-			Destination: &REMOTE_ADDR,
+			Destination: &RemoteAddr,
 		},
 		&cli.BoolFlag{
 			Name:        "d,debug",
@@ -43,7 +43,7 @@ func main() {
 		&cli.StringFlag{
 			Name:        "c,config",
 			Usage:       "配置文件地址",
-			Destination: &CONFIG_PATH,
+			Destination: &ConfigPath,
 		},
 	}
 
@@ -57,8 +57,8 @@ func main() {
 
 func start(ctx *cli.Context) error {
 	ch := make(chan error)
-	if CONFIG_PATH != "" {
-		config := ehco.NewConfig(CONFIG_PATH)
+	if ConfigPath != "" {
+		config := ehco.NewConfig(ConfigPath)
 		if err := config.LoadConfig(); err != nil {
 			log.Fatal(err)
 		}
@@ -67,9 +67,8 @@ func start(ctx *cli.Context) error {
 			go serveRelay(cfg.Listen, cfg.Remote, ch)
 		}
 	} else {
-		go serveRelay(LOCAL_ADDR, REMOTE_ADDR, ch)
+		go serveRelay(LocalAddr, RemoteAddr, ch)
 	}
-
 	return <-ch
 }
 

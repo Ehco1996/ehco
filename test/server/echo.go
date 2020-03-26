@@ -9,7 +9,7 @@ import (
 )
 
 var host = "0.0.0.0"
-var port = 9001
+var port = 9002
 
 func echo(conn net.Conn) {
 	defer conn.Close()
