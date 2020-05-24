@@ -6,9 +6,9 @@ ENV CGO_ENABLED 0
 ENV GOOS linux
 
 WORKDIR /app
-COPY go.mod go.sum ./
+COPY ../go.mod go.sum ./
 RUN go mod download
-COPY . .
+COPY .. .
 
 # Build the Go app
 RUN go build -v -a -installsuffix cgo -o ehco cli/main.go

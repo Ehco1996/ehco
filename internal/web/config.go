@@ -1,4 +1,4 @@
-package ehco
+package web
 
 import (
 	"encoding/json"

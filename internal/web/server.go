@@ -1,12 +1,12 @@
-package ehco
+package web
 
 import (
 	"encoding/json"
+	"github.com/Ehco1996/ehco/internal/relay"
 	"github.com/soheilhy/cmux"
 	"log"
 	"net"
 	"net/http"
-	"strings"
 )
 
 type SimpleHTTPHandler struct{}
@@ -39,7 +39,7 @@ func serveHTTP(l net.Listener) {
 
 func serveRelay(l net.Listener) {
 	log.Println("[INFO] start relay server")
-	r, _ := NewRelay("0.0.0.0:1234", "0.0.0.0:9002")
+	r, _ := relay.NewRelay("0.0.0.0:1234", "0.0.0.0:9002")
 	for {
 		conn, err := l.Accept()
 		log.Println("coon", conn.RemoteAddr().String())
@@ -49,27 +49,4 @@ func serveRelay(l net.Listener) {
 		go r.HandleConn(conn)
 	}
 
-}
-
-func StartMuxServer() error {
-	l, err := net.Listen("tcp", "0.0.0.0:1234")
-	if err != nil {
-		log.Panic(err)
-	}
-	m := cmux.New(l)
-
-	httpListener := m.Match(cmux.HTTP1())
-	anyListener := m.Match(cmux.Any())
-	m.Match(cmux.TLS())
-	// register relay
-	go serveRelay(anyListener)
-
-	//register http
-	go serveHTTP(httpListener)
-
-	// start server
-	if err := m.Serve(); !strings.Contains(err.Error(), "use of closed network connection") {
-		return err
-	}
-	return nil
 }

@@ -6,7 +6,8 @@ import (
 
 	cli "github.com/urfave/cli/v2"
 
-	ehco "github.com/Ehco1996/ehco"
+	relay "github.com/Ehco1996/ehco/internal/relay"
+	web "github.com/Ehco1996/ehco/internal/web"
 )
 
 var LocalAddr string
@@ -38,7 +39,7 @@ func main() {
 			Value:       false,
 			Usage:       "转发地址",
 			EnvVars:     []string{"EHCO_DEBUG"},
-			Destination: &ehco.DEBUG,
+			Destination: &relay.DEBUG,
 		},
 		&cli.StringFlag{
 			Name:        "c,config",
@@ -58,7 +59,7 @@ func main() {
 func start(ctx *cli.Context) error {
 	ch := make(chan error)
 	if ConfigPath != "" {
-		config := ehco.NewConfig(ConfigPath)
+		config := web.NewConfig(ConfigPath)
 		if err := config.LoadConfig(); err != nil {
 			log.Fatal(err)
 		}
@@ -73,7 +74,7 @@ func start(ctx *cli.Context) error {
 }
 
 func serveRelay(local string, remote string, ch chan error) {
-	r, err := ehco.NewRelay(local, remote)
+	r, err := relay.NewRelay(local, remote)
 	if err != nil {
 		log.Fatal(err)
 	}

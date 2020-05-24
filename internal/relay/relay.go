@@ -1,4 +1,4 @@
-package ehco
+package relay
 
 import (
 	"log"
@@ -132,6 +132,45 @@ func (relay *Relay) RunLocalUDPServer() error {
 	return nil
 }
 
+func (relay *Relay) HandleConn(c net.Conn) error {
+	rc, err := net.Dial("tcp", relay.RemoteTCPAddr.String())
+	if err != nil {
+		return err
+	}
+	defer rc.Close()
+	if err := relay.keepAliveAndSetNextTimeout(rc); err != nil {
+		return err
+	}
+
+	go func() {
+		var buf [1024 * 2]byte
+		for {
+			// NOTE may mem leak
+			relay.keepAliveAndSetNextTimeout(rc)
+			i, err := rc.Read(buf[:])
+			if err != nil {
+				return
+			}
+			if _, err := c.Write(buf[0:i]); err != nil {
+				return
+			}
+		}
+	}()
+
+	var buf [1024 * 2]byte
+	for {
+		relay.keepAliveAndSetNextTimeout(c)
+		i, err := c.Read(buf[:])
+		if err != nil {
+			return nil
+		}
+		if _, err := rc.Write(buf[0:i]); err != nil {
+			return nil
+		}
+	}
+	return nil
+}
+
 func (relay *Relay) keepAliveAndSetNextTimeout(conn interface{}) error {
 	switch c := conn.(type) {
 	case *net.TCPConn:
@@ -164,7 +203,6 @@ func (relay *Relay) handleTCPConn(c *net.TCPConn) error {
 	go func() {
 		var buf [1024 * 2]byte
 		for {
-			// NOTE may mem leak
 			relay.keepAliveAndSetNextTimeout(rc)
 			i, err := rc.Read(buf[:])
 			if err != nil {
@@ -178,47 +216,6 @@ func (relay *Relay) handleTCPConn(c *net.TCPConn) error {
 
 	var buf [1024 * 2]byte
 	for {
-		// NOTE may mem leak
-		relay.keepAliveAndSetNextTimeout(c)
-		i, err := c.Read(buf[:])
-		if err != nil {
-			return nil
-		}
-		if _, err := rc.Write(buf[0:i]); err != nil {
-			return nil
-		}
-	}
-	return nil
-}
-
-func (relay *Relay) HandleConn(c net.Conn) error {
-	rc, err := net.Dial("tcp", relay.RemoteTCPAddr.String())
-	if err != nil {
-		return err
-	}
-	defer rc.Close()
-	if err := relay.keepAliveAndSetNextTimeout(rc); err != nil {
-		return err
-	}
-
-	go func() {
-		var buf [1024 * 2]byte
-		for {
-			// NOTE may mem leak
-			relay.keepAliveAndSetNextTimeout(rc)
-			i, err := rc.Read(buf[:])
-			if err != nil {
-				return
-			}
-			if _, err := c.Write(buf[0:i]); err != nil {
-				return
-			}
-		}
-	}()
-
-	var buf [1024 * 2]byte
-	for {
-		// NOTE may mem leak
 		relay.keepAliveAndSetNextTimeout(c)
 		i, err := c.Read(buf[:])
 		if err != nil {
