@@ -1,4 +1,4 @@
-package main
+package test
 
 import (
 	"fmt"
@@ -7,9 +7,6 @@ import (
 	"os"
 	"strconv"
 )
-
-var host = "0.0.0.0"
-var port = 9002
 
 func echo(conn net.Conn) {
 	defer conn.Close()
@@ -41,7 +38,7 @@ func echo(conn net.Conn) {
 	}
 }
 
-func serveTcp(l net.Listener) {
+func ServeTcp(l net.Listener) {
 	for {
 		conn, err := l.Accept()
 		fmt.Println(conn)
@@ -53,7 +50,7 @@ func serveTcp(l net.Listener) {
 	}
 }
 
-func serveUdp(conn *net.UDPConn) {
+func ServeUdp(conn *net.UDPConn) {
 
 	buf := make([]byte, 1500)
 	for {
@@ -77,7 +74,7 @@ func serveUdp(conn *net.UDPConn) {
 	fmt.Printf("Out of infinite loop\n")
 }
 
-func main() {
+func RunEchoServer(host string, port int) {
 	var err error
 	tcpAddr := host + ":" + strconv.Itoa(port)
 	l, err := net.Listen("tcp", tcpAddr)
@@ -95,7 +92,7 @@ func main() {
 
 	fmt.Println("start echo server at:", tcpAddr)
 	stop := make(chan error)
-	go serveTcp(l)
-	go serveUdp(udpConn)
+	go ServeTcp(l)
+	go ServeUdp(udpConn)
 	<-stop
 }
