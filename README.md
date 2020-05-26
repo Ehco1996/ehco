@@ -19,11 +19,11 @@ iperf:
 
 
 ```sh
-# run iperf server on 9001
-iperf3 -s -p 9001
+# run iperf server on 5201
+iperf3 -s
 
 # run relay server listen 1234 to 9001
-go run cmd/main.go -l 0.0.0:1234 -r 0.0.0.0:9001
+./ehco -l 0.0.0.0:1234 -r 0.0.0.0:5201
 
 # benchmark tcp
 iperf3 -c 0.0.0.0 -p 1234
