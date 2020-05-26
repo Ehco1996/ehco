@@ -3,36 +3,30 @@ package test
 import (
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"os"
 	"strconv"
+	"time"
 )
 
 func echo(conn net.Conn) {
 	defer conn.Close()
 	defer fmt.Println("conn closed", conn.RemoteAddr().String())
 
-	fmt.Printf("Connected to: %s\n", conn.RemoteAddr().String())
-
 	for {
 		buf := make([]byte, 512)
 		_, err := conn.Read(buf)
 		if err == io.EOF {
-			fmt.Println("Eof reading")
 			return
 		}
 		if err != nil {
-			fmt.Println("Error reading:")
 			fmt.Println(err)
 			continue
 		}
 
-		fmt.Println(fmt.Sprintf("[%s]", conn.RemoteAddr().String()), string(buf))
-
 		_, err = conn.Write(buf)
 		if err != nil {
-			fmt.Println("Error writing:")
-			fmt.Println(err)
 			continue
 		}
 	}
@@ -41,9 +35,7 @@ func echo(conn net.Conn) {
 func ServeTcp(l net.Listener) {
 	for {
 		conn, err := l.Accept()
-		fmt.Println(conn)
 		if err != nil {
-			fmt.Println("ERROR", err)
 			continue
 		}
 		go echo(conn)
@@ -54,24 +46,15 @@ func ServeUdp(conn *net.UDPConn) {
 
 	buf := make([]byte, 1500)
 	for {
-
 		number, remote, err := conn.ReadFromUDP(buf)
 		if err != nil {
 			fmt.Printf("net.ReadFromUDP() error: %s\n", err)
-		} else {
-			fmt.Printf("Read %d bytes from socket\n", number)
-			fmt.Printf("Bytes: %q\n", string(buf[:number]))
 		}
-		fmt.Printf("Remote address: %v\n", remote)
-
 		number, writeErr := conn.WriteTo(buf[0:number], remote)
 		if writeErr != nil {
 			fmt.Printf("net.WriteTo() error: %s\n", writeErr)
-		} else {
-			fmt.Printf("Wrote %d bytes to socket\n", number)
 		}
 	}
-	fmt.Printf("Out of infinite loop\n")
 }
 
 func RunEchoServer(host string, port int) {
@@ -95,4 +78,32 @@ func RunEchoServer(host string, port int) {
 	go ServeTcp(l)
 	go ServeUdp(udpConn)
 	<-stop
+}
+
+func SendTcpMsg(msg []byte, address string) []byte {
+	conn, err := net.Dial("tcp", address)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer conn.Close()
+	conn.Write(msg)
+	buf := make([]byte, len(msg))
+	time.Sleep(time.Second * 1)
+	n, _ := conn.Read(buf)
+	log.Printf("msg: %s", string(buf))
+	return buf[:n]
+}
+
+func SendUdpMsg(msg []byte, address string) []byte {
+	conn, err := net.Dial("udp", address)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer conn.Close()
+	conn.Write(msg)
+	buf := make([]byte, len(msg))
+	time.Sleep(time.Second * 1)
+	n, _ := conn.Read(buf)
+	log.Printf("msg: %s", string(buf))
+	return buf[:n]
 }

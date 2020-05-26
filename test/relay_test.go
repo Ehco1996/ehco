@@ -2,7 +2,6 @@ package test
 
 import (
 	"github.com/Ehco1996/ehco/internal/relay"
-	"net"
 	"strconv"
 	"testing"
 )
@@ -29,18 +28,26 @@ func init() {
 }
 
 func TestRelay(t *testing.T) {
-
+	msg := []byte("hello")
 	// test tcp
-	sendMsg := []byte("hello")
-	c, err := net.Dial("tcp", local)
-	if err != nil {
-		t.Fatal(err)
+	res := SendTcpMsg(msg, local)
+	if string(res) != string(msg) {
+		t.Fatal(res)
 	}
-	c.Write(sendMsg)
-	tcpRes := make([]byte, len(sendMsg))
-	c.Read(tcpRes)
 
-	if string(tcpRes) != string(sendMsg) {
-		t.Fatal(tcpRes)
+	// test udp
+	res = SendUdpMsg(msg, local)
+	if string(res) != string(msg) {
+		t.Fatal(res)
+	}
+}
+
+func BenchmarkTcpRelay(b *testing.B) {
+	msg := []byte("hello")
+	for i := 0; i <= b.N; i++ {
+		res := SendTcpMsg(msg, local)
+		if string(res) != string(msg) {
+			b.Fatal(res)
+		}
 	}
 }
