@@ -5,6 +5,7 @@ import (
 	"net"
 	"net/http"
 	_ "net/http/pprof"
+	"sync"
 	"time"
 )
 
@@ -116,57 +117,18 @@ func (relay *Relay) RunLocalUDPServer() error {
 	defer relay.UDPConn.Close()
 	for {
 		// NOTE  mtu一般是1500,设置为超过这个这个值就够用了
-		b := make([]byte, 1024*2)
-		n, addr, err := relay.UDPConn.ReadFromUDP(b)
+		buf := make([]byte, 1024*2)
+		n, addr, err := relay.UDPConn.ReadFromUDP(buf)
 		if err != nil {
 			return err
 		}
 		log.Printf("handle udp package from %s", addr)
 		go func(addr *net.UDPAddr, b []byte) {
-			if err := relay.handleUDP(addr, b); err != nil {
+			if err := relay.handleUDP(addr, buf); err != nil {
 				log.Printf("handleUDP err %s", err)
 				return
 			}
-		}(addr, b[0:n])
-	}
-	return nil
-}
-
-func (relay *Relay) HandleConn(c net.Conn) error {
-	rc, err := net.Dial("tcp", relay.RemoteTCPAddr.String())
-	if err != nil {
-		return err
-	}
-	defer rc.Close()
-	if err := relay.keepAliveAndSetNextTimeout(rc); err != nil {
-		return err
-	}
-
-	go func() {
-		var buf [1024 * 2]byte
-		for {
-			// NOTE may mem leak
-			relay.keepAliveAndSetNextTimeout(rc)
-			i, err := rc.Read(buf[:])
-			if err != nil {
-				return
-			}
-			if _, err := c.Write(buf[0:i]); err != nil {
-				return
-			}
-		}
-	}()
-
-	var buf [1024 * 2]byte
-	for {
-		relay.keepAliveAndSetNextTimeout(c)
-		i, err := c.Read(buf[:])
-		if err != nil {
-			return nil
-		}
-		if _, err := rc.Write(buf[0:i]); err != nil {
-			return nil
-		}
+		}(addr, buf[0:n])
 	}
 	return nil
 }
@@ -195,36 +157,15 @@ func (relay *Relay) handleTCPConn(c *net.TCPConn) error {
 		return err
 	}
 	defer rc.Close()
-
 	if err := relay.keepAliveAndSetNextTimeout(rc); err != nil {
 		return err
 	}
 
-	go func() {
-		var buf [1024 * 2]byte
-		for {
-			relay.keepAliveAndSetNextTimeout(rc)
-			i, err := rc.Read(buf[:])
-			if err != nil {
-				return
-			}
-			if _, err := c.Write(buf[0:i]); err != nil {
-				return
-			}
-		}
-	}()
-
-	var buf [1024 * 2]byte
-	for {
-		relay.keepAliveAndSetNextTimeout(c)
-		i, err := c.Read(buf[:])
-		if err != nil {
-			return nil
-		}
-		if _, err := rc.Write(buf[0:i]); err != nil {
-			return nil
-		}
-	}
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go doCopy(rc, c, inboundBufferPool, &wg)
+	go doCopy(c, rc, outboundBufferPool, &wg)
+	wg.Wait()
 	return nil
 }
 
@@ -237,11 +178,12 @@ func (relay *Relay) handleUDP(addr *net.UDPAddr, b []byte) error {
 	if err := relay.keepAliveAndSetNextTimeout(rc); err != nil {
 		return err
 	}
+
 	if _, err := rc.Write(b); err != nil {
 		return err
 	}
-	var buf [1024 * 2]byte
-	i, err := rc.Read(buf[:])
+	buf := make([]byte, 1500)
+	i, err := rc.Read(buf)
 	if err != nil {
 		return err
 	}

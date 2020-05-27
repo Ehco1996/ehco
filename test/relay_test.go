@@ -4,6 +4,7 @@ import (
 	"github.com/Ehco1996/ehco/internal/relay"
 	"strconv"
 	"testing"
+	"time"
 )
 
 var host = "0.0.0.0"
@@ -28,18 +29,23 @@ func init() {
 }
 
 func TestRelay(t *testing.T) {
+	// wait for  init
+	time.Sleep(time.Second)
+
 	msg := []byte("hello")
 	// test tcp
 	res := SendTcpMsg(msg, local)
 	if string(res) != string(msg) {
 		t.Fatal(res)
 	}
+	t.Log("test tcp down!")
 
 	// test udp
 	res = SendUdpMsg(msg, local)
 	if string(res) != string(msg) {
 		t.Fatal(res)
 	}
+	t.Log("test udp down!")
 }
 
 func BenchmarkTcpRelay(b *testing.B) {

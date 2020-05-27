@@ -36,5 +36,5 @@ iperf3 -c 0.0.0.0 -p 1234 -u -b 1G
 
 | iperf | raw | relay(ehco_row) |
 | ---- | ----  | ---- |
-| tcp  | 62.6 Gbits/sec | 3.04 Gbits/sec |
+| tcp  | 62.6 Gbits/sec | 23.9 Gbits/sec |
 | udp  | 15.0 Gbits/sec | 1.0 Gbits/sec |

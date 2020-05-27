@@ -2,7 +2,6 @@ package web
 
 import (
 	"encoding/json"
-	"github.com/Ehco1996/ehco/internal/relay"
 	"github.com/soheilhy/cmux"
 	"log"
 	"net"
@@ -35,18 +34,4 @@ func serveHTTP(l net.Listener) {
 	if err := simpleHttp.Serve(l); err != cmux.ErrListenerClosed {
 		panic(err)
 	}
-}
-
-func serveRelay(l net.Listener) {
-	log.Println("[INFO] start relay server")
-	r, _ := relay.NewRelay("0.0.0.0:1234", "0.0.0.0:9002")
-	for {
-		conn, err := l.Accept()
-		log.Println("coon", conn.RemoteAddr().String())
-		if err != nil {
-			panic(err)
-		}
-		go r.HandleConn(conn)
-	}
-
 }
