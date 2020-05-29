@@ -105,7 +105,6 @@ func (relay *Relay) RunLocalTCPServer() error {
 			}
 		}(c)
 	}
-	return nil
 }
 
 func (relay *Relay) RunLocalUDPServer() error {
@@ -130,7 +129,6 @@ func (relay *Relay) RunLocalUDPServer() error {
 			}
 		}(addr, buf[0:n])
 	}
-	return nil
 }
 
 func (relay *Relay) keepAliveAndSetNextTimeout(conn interface{}) error {
