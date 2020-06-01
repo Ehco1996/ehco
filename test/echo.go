@@ -16,8 +16,10 @@ func echo(conn net.Conn) {
 
 	for {
 		buf := make([]byte, 512)
-		_, err := conn.Read(buf)
+		i, err := conn.Read(buf)
+		log.Printf("recv echo msg: %s", string(buf))
 		if err == io.EOF {
+			log.Print("in eof")
 			return
 		}
 		if err != nil {
@@ -25,7 +27,8 @@ func echo(conn net.Conn) {
 			continue
 		}
 
-		_, err = conn.Write(buf)
+		_, err = conn.Write(buf[:i])
+		log.Printf("send echo msg: %s err: %s", string(buf), err)
 		if err != nil {
 			continue
 		}
@@ -61,6 +64,7 @@ func RunEchoServer(host string, port int) {
 	var err error
 	tcpAddr := host + ":" + strconv.Itoa(port)
 	l, err := net.Listen("tcp", tcpAddr)
+	defer l.Close()
 	if err != nil {
 		fmt.Println("ERROR", err)
 		os.Exit(1)
@@ -68,6 +72,7 @@ func RunEchoServer(host string, port int) {
 
 	udpAddr := net.UDPAddr{Port: port, IP: net.ParseIP(host)}
 	udpConn, err := net.ListenUDP("udp", &udpAddr)
+	defer udpConn.Close()
 	if err != nil {
 		fmt.Println("ERROR", err)
 		os.Exit(1)

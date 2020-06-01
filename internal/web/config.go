@@ -10,8 +10,10 @@ import (
 )
 
 type RelayConfig struct {
-	Listen string `json:"listen"`
-	Remote string `remote:"listen"`
+	Listen        string `json:"listen"`
+	ListenType    string `json:"listen_type"`
+	Remote        string `json:"remote"`
+	TransportType string `json:"transport_type"`
 }
 
 type Config struct {

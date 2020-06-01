@@ -5,6 +5,7 @@ import (
 	"net"
 	"net/http"
 	_ "net/http/pprof"
+	"os"
 	"sync"
 	"time"
 )
@@ -12,20 +13,34 @@ import (
 var (
 	TcpDeadline = 60 * time.Second
 	UdpDeadline = 60 * time.Second
-	DEBUG       = false
+	DEBUG       = os.Getenv("EHCO_DEBUG")
+)
+
+const (
+	Transport_RAW = "raw"
+	Transport_WS  = "ws"
+)
+
+const (
+	Listen_RAW = "raw"
+	Listen_WS  = "ws"
 )
 
 type Relay struct {
-	LocalTCPAddr  *net.TCPAddr
-	LocalUDPAddr  *net.UDPAddr
-	RemoteTCPAddr *net.TCPAddr
-	RemoteUDPAddr *net.UDPAddr
+	LocalTCPAddr *net.TCPAddr
+	LocalUDPAddr *net.UDPAddr
+
+	RemoteTCPAddr string
+	RemoteUDPAddr string
+
+	ListenType    string
+	TransportType string
 
 	TCPListener *net.TCPListener
 	UDPConn     *net.UDPConn
 }
 
-func NewRelay(localAddr, remoteAddr string) (*Relay, error) {
+func NewRelay(localAddr, listenType, remoteAddr, transportType string) (*Relay, error) {
 	localTCPAddr, err := net.ResolveTCPAddr("tcp", localAddr)
 	if err != nil {
 		return nil, err
@@ -34,22 +49,18 @@ func NewRelay(localAddr, remoteAddr string) (*Relay, error) {
 	if err != nil {
 		return nil, err
 	}
-	remoteTCPAddr, err := net.ResolveTCPAddr("tcp", remoteAddr)
-	if err != nil {
-		return nil, err
-	}
-	remoteUDPAddr, err := net.ResolveUDPAddr("udp", remoteAddr)
-	if err != nil {
-		return nil, err
-	}
 
 	r := &Relay{
-		LocalTCPAddr:  localTCPAddr,
-		LocalUDPAddr:  localUDPAddr,
-		RemoteTCPAddr: remoteTCPAddr,
-		RemoteUDPAddr: remoteUDPAddr,
+		LocalTCPAddr: localTCPAddr,
+		LocalUDPAddr: localUDPAddr,
+
+		RemoteTCPAddr: remoteAddr,
+		RemoteUDPAddr: remoteAddr,
+
+		ListenType:    listenType,
+		TransportType: transportType,
 	}
-	if DEBUG {
+	if DEBUG != "" {
 		go func() {
 			log.Printf("[DEBUG] start pprof server at 0.0.0.0:6060")
 			log.Println(http.ListenAndServe("0.0.0.0:6060", nil))
@@ -73,14 +84,24 @@ func (relay *Relay) Shutdown() error {
 }
 
 func (relay *Relay) ListenAndServe() error {
-	log.Printf("start relay AT: %s TO: %s", relay.LocalTCPAddr, relay.RemoteTCPAddr)
 	errChan := make(chan error)
-	go func() {
-		errChan <- relay.RunLocalTCPServer()
-	}()
-	go func() {
-		errChan <- relay.RunLocalUDPServer()
-	}()
+	log.Printf("start relay AT: %s Over: %s TO: %s Through %s",
+		relay.LocalTCPAddr, relay.ListenType, relay.RemoteTCPAddr, relay.TransportType)
+
+	if relay.ListenType == Listen_RAW {
+		go func() {
+			errChan <- relay.RunLocalTCPServer()
+		}()
+		go func() {
+			errChan <- relay.RunLocalUDPServer()
+		}()
+	} else if relay.ListenType == Listen_WS {
+		go func() {
+			errChan <- relay.RunLocalWsServer()
+		}()
+	} else {
+		log.Fatalf("unknown listen type: %s ", relay.ListenType)
+	}
 	return <-errChan
 }
 
@@ -93,19 +114,28 @@ func (relay *Relay) RunLocalTCPServer() error {
 	defer relay.TCPListener.Close()
 	for {
 		c, err := relay.TCPListener.AcceptTCP()
+		log.Printf("handle tcp con from: %s", c.RemoteAddr())
 		if err != nil {
 			return err
 		}
-		log.Printf("handle tcp con from: %s", c.RemoteAddr())
-		go func(c *net.TCPConn) {
-			defer c.Close()
-			relay.keepAliveAndSetNextTimeout(c)
-			if err := relay.handleTCPConn(c); err != nil {
-				log.Printf("handleTCPConn err %s", err)
-			}
-		}(c)
+
+		if relay.TransportType == Transport_WS {
+			go func(c *net.TCPConn) {
+				defer c.Close()
+				if err := relay.handleTcpOverWs(c); err != nil {
+					log.Printf("handleTcpOverWs err %s", err)
+				}
+			}(c)
+		} else {
+			go func(c *net.TCPConn) {
+				defer c.Close()
+				relay.keepAliveAndSetNextTimeout(c)
+				if err := relay.handleTCPConn(c); err != nil {
+					log.Printf("handleTCPConn err %s", err)
+				}
+			}(c)
+		}
 	}
-	return nil
 }
 
 func (relay *Relay) RunLocalUDPServer() error {
@@ -130,7 +160,6 @@ func (relay *Relay) RunLocalUDPServer() error {
 			}
 		}(addr, buf[0:n])
 	}
-	return nil
 }
 
 func (relay *Relay) keepAliveAndSetNextTimeout(conn interface{}) error {
@@ -152,7 +181,7 @@ func (relay *Relay) keepAliveAndSetNextTimeout(conn interface{}) error {
 }
 
 func (relay *Relay) handleTCPConn(c *net.TCPConn) error {
-	rc, err := net.Dial("tcp", relay.RemoteTCPAddr.String())
+	rc, err := net.Dial("tcp", relay.RemoteTCPAddr)
 	if err != nil {
 		return err
 	}
@@ -170,7 +199,7 @@ func (relay *Relay) handleTCPConn(c *net.TCPConn) error {
 }
 
 func (relay *Relay) handleUDP(addr *net.UDPAddr, b []byte) error {
-	rc, err := net.Dial("udp", relay.RemoteUDPAddr.String())
+	rc, err := net.Dial("udp", relay.RemoteUDPAddr)
 	if err != nil {
 		return err
 	}
