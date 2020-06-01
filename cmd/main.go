@@ -12,6 +12,7 @@ import (
 
 var LocalAddr string
 var RemoteAddr string
+var ListenType string
 var ConfigPath string
 
 func main() {
@@ -33,6 +34,13 @@ func main() {
 			Usage:       "转发地址",
 			EnvVars:     []string{"EHCO_REMOTE_ADDR"},
 			Destination: &RemoteAddr,
+		},
+		&cli.StringFlag{
+			Name:        "lt,listen_type",
+			Value:       "tcp",
+			Usage:       "监听类型",
+			EnvVars:     []string{"EHCO_LISTEN_TYPE"},
+			Destination: &ListenType,
 		},
 		&cli.BoolFlag{
 			Name:        "d,debug",
@@ -65,16 +73,16 @@ func start(ctx *cli.Context) error {
 		}
 
 		for _, cfg := range config.Configs {
-			go serveRelay(cfg.Listen, cfg.Remote, ch)
+			go serveRelay(cfg.Listen, cfg.Remote, cfg.ListenType, ch)
 		}
 	} else {
-		go serveRelay(LocalAddr, RemoteAddr, ch)
+		go serveRelay(LocalAddr, RemoteAddr, ListenType, ch)
 	}
 	return <-ch
 }
 
-func serveRelay(local string, remote string, ch chan error) {
-	r, err := relay.NewRelay(local, remote)
+func serveRelay(local, remote, listenType string, ch chan error) {
+	r, err := relay.NewRelay(local, remote, listenType)
 	if err != nil {
 		log.Fatal(err)
 	}

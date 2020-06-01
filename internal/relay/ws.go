@@ -1,42 +1,86 @@
 package relay
 
 import (
-	"flag"
 	"log"
+	"net"
 	"net/http"
 
 	"github.com/gorilla/websocket"
 )
 
-var addr = flag.String("addr", "localhost:8080", "http service address")
+// use default options
+var upgrader = websocket.Upgrader{}
 
-var upgrader = websocket.Upgrader{} // use default options
+func (relay *Relay) handleTcpOverWs(c *net.TCPConn) error {
+	rc, _, err := websocket.DefaultDialer.Dial(relay.RemoteTCPAddr, nil)
+	if err != nil {
+		log.Println("dial:", err)
+	}
+	defer rc.Close()
 
-func echo(w http.ResponseWriter, r *http.Request) {
+	go func() {
+		for {
+			_, msg, err := rc.ReadMessage()
+			if err != nil {
+				return
+			}
+			if _, err := c.Write(msg); err != nil {
+				return
+			}
+		}
+	}()
+
+	var buf [1024 * 2]byte
+	for {
+		relay.keepAliveAndSetNextTimeout(c)
+		i, err := c.Read(buf[:])
+		if err != nil {
+			return err
+		}
+		if err := rc.WriteMessage(websocket.BinaryMessage, buf[0:i]); err != nil {
+			log.Println(err)
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (relay *Relay) handleWsToTcp(w http.ResponseWriter, r *http.Request) {
+
 	c, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Print("upgrade:", err)
 		return
 	}
 	defer c.Close()
+
+	rc, _ := net.Dial("tcp", relay.RemoteTCPAddr)
+	defer rc.Close()
+
+	go func() {
+		var buf [1024 * 2]byte
+		for {
+			i, err := rc.Read(buf[:])
+			if err != nil {
+				log.Print(err)
+				return
+			}
+			c.WriteMessage(websocket.BinaryMessage, buf[0:i])
+		}
+	}()
+
 	for {
-		mt, message, err := c.ReadMessage()
+		_, message, err := c.ReadMessage()
 		if err != nil {
-			log.Println("read:", err)
+			log.Println("read error:", err)
 			break
 		}
-		log.Printf("recv: %s", message)
-		err = c.WriteMessage(mt, message)
-		if err != nil {
-			log.Println("write:", err)
-			break
-		}
+		rc.Write(message)
 	}
 }
 
-func main() {
-	flag.Parse()
-	log.SetFlags(0)
-	http.HandleFunc("/echo", echo)
-	log.Fatal(http.ListenAndServe(*addr, nil))
+func (relay *Relay) RunLocalWsServer() error {
+	http.HandleFunc("/", relay.handleWsToTcp)
+	return http.ListenAndServe(relay.LocalTCPAddr.String(), nil)
 }
