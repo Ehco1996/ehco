@@ -15,6 +15,7 @@ func (relay *Relay) handleTcpOverWs(c *net.TCPConn) error {
 	rc, _, err := websocket.DefaultDialer.Dial(relay.RemoteTCPAddr, nil)
 	if err != nil {
 		log.Println("dial:", err)
+		return err
 	}
 	defer rc.Close()
 
@@ -38,7 +39,6 @@ func (relay *Relay) handleTcpOverWs(c *net.TCPConn) error {
 			return err
 		}
 		if err := rc.WriteMessage(websocket.BinaryMessage, buf[0:i]); err != nil {
-			log.Println(err)
 			return err
 		}
 	}
@@ -56,6 +56,10 @@ func (relay *Relay) handleWsToTcp(w http.ResponseWriter, r *http.Request) {
 	defer c.Close()
 
 	rc, _ := net.Dial("tcp", relay.RemoteTCPAddr)
+	if err != nil {
+		log.Print("dail:", err)
+		return
+	}
 	defer rc.Close()
 
 	go func() {

@@ -5,7 +5,7 @@ import (
 	"net"
 	"net/http"
 	_ "net/http/pprof"
-	"strings"
+	"os"
 	"sync"
 	"time"
 )
@@ -13,7 +13,7 @@ import (
 var (
 	TcpDeadline = 60 * time.Second
 	UdpDeadline = 60 * time.Second
-	DEBUG       = false
+	DEBUG       = os.Getenv("EHCO_DEBUG")
 )
 
 const (
@@ -22,8 +22,8 @@ const (
 )
 
 const (
-	Listen_TCP = "tcp"
-	LisTen_WS  = "ws"
+	Listen_RAW = "raw"
+	Listen_WS  = "ws"
 )
 
 type Relay struct {
@@ -40,7 +40,7 @@ type Relay struct {
 	UDPConn     *net.UDPConn
 }
 
-func NewRelay(localAddr, remoteAddr, listenType string) (*Relay, error) {
+func NewRelay(localAddr, listenType, remoteAddr, transportType string) (*Relay, error) {
 	localTCPAddr, err := net.ResolveTCPAddr("tcp", localAddr)
 	if err != nil {
 		return nil, err
@@ -48,13 +48,6 @@ func NewRelay(localAddr, remoteAddr, listenType string) (*Relay, error) {
 	localUDPAddr, err := net.ResolveUDPAddr("udp", localAddr)
 	if err != nil {
 		return nil, err
-	}
-
-	var ts string
-	if strings.Contains(remoteAddr, "ws:") {
-		ts = Transport_WS
-	} else {
-		ts = Transport_RAW
 	}
 
 	r := &Relay{
@@ -65,9 +58,9 @@ func NewRelay(localAddr, remoteAddr, listenType string) (*Relay, error) {
 		RemoteUDPAddr: remoteAddr,
 
 		ListenType:    listenType,
-		TransportType: ts,
+		TransportType: transportType,
 	}
-	if DEBUG {
+	if DEBUG != "" {
 		go func() {
 			log.Printf("[DEBUG] start pprof server at 0.0.0.0:6060")
 			log.Println(http.ListenAndServe("0.0.0.0:6060", nil))
@@ -92,20 +85,22 @@ func (relay *Relay) Shutdown() error {
 
 func (relay *Relay) ListenAndServe() error {
 	errChan := make(chan error)
-	log.Printf("start relay AT: %s TO: %s Through %s",
-		relay.LocalTCPAddr, relay.RemoteTCPAddr, relay.TransportType)
+	log.Printf("start relay AT: %s Over: %s TO: %s Through %s",
+		relay.LocalTCPAddr, relay.ListenType, relay.RemoteTCPAddr, relay.TransportType)
 
-	if relay.ListenType == Listen_TCP {
+	if relay.ListenType == Listen_RAW {
 		go func() {
 			errChan <- relay.RunLocalTCPServer()
 		}()
 		go func() {
 			errChan <- relay.RunLocalUDPServer()
 		}()
-	} else {
+	} else if relay.ListenType == Listen_WS {
 		go func() {
 			errChan <- relay.RunLocalWsServer()
 		}()
+	} else {
+		log.Fatalf("unknown listen type: %s ", relay.ListenType)
 	}
 	return <-errChan
 }
@@ -119,9 +114,7 @@ func (relay *Relay) RunLocalTCPServer() error {
 	defer relay.TCPListener.Close()
 	for {
 		c, err := relay.TCPListener.AcceptTCP()
-
 		log.Printf("handle tcp con from: %s", c.RemoteAddr())
-
 		if err != nil {
 			return err
 		}
@@ -142,7 +135,6 @@ func (relay *Relay) RunLocalTCPServer() error {
 				}
 			}(c)
 		}
-
 	}
 }
 

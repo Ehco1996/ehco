@@ -64,6 +64,7 @@ func RunEchoServer(host string, port int) {
 	var err error
 	tcpAddr := host + ":" + strconv.Itoa(port)
 	l, err := net.Listen("tcp", tcpAddr)
+	defer l.Close()
 	if err != nil {
 		fmt.Println("ERROR", err)
 		os.Exit(1)
@@ -71,6 +72,7 @@ func RunEchoServer(host string, port int) {
 
 	udpAddr := net.UDPAddr{Port: port, IP: net.ParseIP(host)}
 	udpConn, err := net.ListenUDP("udp", &udpAddr)
+	defer udpConn.Close()
 	if err != nil {
 		fmt.Println("ERROR", err)
 		os.Exit(1)

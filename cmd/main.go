@@ -11,8 +11,9 @@ import (
 )
 
 var LocalAddr string
-var RemoteAddr string
 var ListenType string
+var RemoteAddr string
+var TransportType string
 var ConfigPath string
 
 func main() {
@@ -29,6 +30,14 @@ func main() {
 			Destination: &LocalAddr,
 		},
 		&cli.StringFlag{
+			Name:        "lt,listen_type",
+			Value:       "raw",
+			Usage:       "监听类型",
+			EnvVars:     []string{"EHCO_LISTEN_TYPE"},
+			Destination: &ListenType,
+			Required:    false,
+		},
+		&cli.StringFlag{
 			Name:        "r,remote",
 			Value:       "0.0.0.0:9001",
 			Usage:       "转发地址",
@@ -36,18 +45,12 @@ func main() {
 			Destination: &RemoteAddr,
 		},
 		&cli.StringFlag{
-			Name:        "lt,listen_type",
-			Value:       "tcp",
-			Usage:       "监听类型",
-			EnvVars:     []string{"EHCO_LISTEN_TYPE"},
-			Destination: &ListenType,
-		},
-		&cli.BoolFlag{
-			Name:        "d,debug",
-			Value:       false,
-			Usage:       "转发地址",
-			EnvVars:     []string{"EHCO_DEBUG"},
-			Destination: &relay.DEBUG,
+			Name:        "tt,transport_type",
+			Value:       "raw",
+			Usage:       "传输类型",
+			EnvVars:     []string{"EHCO_TRANSPORT_TYPE"},
+			Destination: &TransportType,
+			Required:    false,
 		},
 		&cli.StringFlag{
 			Name:        "c,config",
@@ -73,16 +76,16 @@ func start(ctx *cli.Context) error {
 		}
 
 		for _, cfg := range config.Configs {
-			go serveRelay(cfg.Listen, cfg.Remote, cfg.ListenType, ch)
+			go serveRelay(cfg.Listen, cfg.ListenType, cfg.Remote, cfg.TransportType, ch)
 		}
 	} else {
-		go serveRelay(LocalAddr, RemoteAddr, ListenType, ch)
+		go serveRelay(LocalAddr, ListenType, RemoteAddr, TransportType, ch)
 	}
 	return <-ch
 }
 
-func serveRelay(local, remote, listenType string, ch chan error) {
-	r, err := relay.NewRelay(local, remote, listenType)
+func serveRelay(local, listenType, remote, transportType string, ch chan error) {
+	r, err := relay.NewRelay(local, listenType, remote, transportType)
 	if err != nil {
 		log.Fatal(err)
 	}

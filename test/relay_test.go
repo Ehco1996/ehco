@@ -23,7 +23,7 @@ func init() {
 
 	// Start the relay server
 	go func() {
-		r, err := relay.NewRelay(rawLocal, rawRemote, relay.Listen_TCP)
+		r, err := relay.NewRelay(rawLocal, relay.Listen_RAW, rawRemote, relay.Transport_RAW)
 		if err != nil {
 			panic(err)
 		}
@@ -33,7 +33,7 @@ func init() {
 
 	// Start relay listen ws server
 	go func() {
-		r, err := relay.NewRelay(wsListen, rawRemote, relay.LisTen_WS)
+		r, err := relay.NewRelay(wsListen, relay.Listen_WS, rawRemote, relay.Transport_RAW)
 		if err != nil {
 			panic(err)
 		}
@@ -42,47 +42,44 @@ func init() {
 	}()
 	// Start relay over ws server
 	go func() {
-		r, err := relay.NewRelay(wsLocal, wsRemote, relay.Listen_TCP)
+		r, err := relay.NewRelay(wsLocal, relay.Listen_RAW, wsRemote, relay.Transport_WS)
 		if err != nil {
 			panic(err)
 		}
 		stop := make(chan error)
 		stop <- r.ListenAndServe()
 	}()
-
-}
-
-// func TestRelay(t *testing.T) {
-// 	// wait for  init
-// 	time.Sleep(time.Second)
-
-// 	msg := []byte("hello")
-// 	// test tcp
-// 	res := SendTcpMsg(msg, rawLocal)
-// 	if string(res) != string(msg) {
-// 		t.Fatal(res)
-// 	}
-// 	t.Log("test tcp down!")
-
-// 	// test udp
-// 	res = SendUdpMsg(msg, rawLocal)
-// 	if string(res) != string(msg) {
-// 		t.Fatal(res)
-// 	}
-// 	t.Log("test udp down!")
-// }
-
-func TestRelayOverWs(t *testing.T) {
 	// wait for  init
 	time.Sleep(time.Second)
 
+}
+
+func TestRelay(t *testing.T) {
+
+	msg := []byte("hello")
+	// test tcp
+	res := SendTcpMsg(msg, rawLocal)
+	if string(res) != string(msg) {
+		t.Fatal(res)
+	}
+	t.Log("test tcp down!")
+
+	// test udp
+	res = SendUdpMsg(msg, rawLocal)
+	if string(res) != string(msg) {
+		t.Fatal(res)
+	}
+	t.Log("test udp down!")
+}
+
+func TestRelayOverWs(t *testing.T) {
 	msg := []byte("hello")
 	// test tcp
 	res := SendTcpMsg(msg, wsLocal)
 	if string(res) != string(msg) {
 		t.Fatal(res)
 	}
-	t.Log("test tcp down!")
+	t.Log("test tcp over ws down!")
 }
 
 func BenchmarkTcpRelay(b *testing.B) {
