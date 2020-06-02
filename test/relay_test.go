@@ -51,7 +51,6 @@ func init() {
 	}()
 	// wait for  init
 	time.Sleep(time.Second)
-
 }
 
 func TestRelay(t *testing.T) {

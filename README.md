@@ -24,19 +24,19 @@ iperf:
 iperf3 -s
 
 # run relay server listen 1234 to 9001 (raw)
-./ehco -l 0.0.0.0:1234 -r 0.0.0.0:5201
-
-# benchmark tcp
-iperf3 -c 0.0.0.0 -p 1234
-
-# benchmark upd
-iperf3 -c 0.0.0.0 -p 1234 -u -b 1G
+go run cmd/main.go -l 0.0.0.0:1234 -r 0.0.0.0:5201
 
 # listen 1234 relay over ws to 1236
 go run cmd/main.go -l 0.0.0.0:1234  -r ws://0.0.0.0:1236 -tt ws
 
 # listen 1236 through ws relay to 5201
 go run cmd/main.go -l 0.0.0.0:1236 -lt ws -r 0.0.0.0:5201
+
+# benchmark tcp
+iperf3 -c 0.0.0.0 -p 1234
+
+# benchmark upd
+iperf3 -c 0.0.0.0 -p 1234 -u -b 1G
 
 ```
 
