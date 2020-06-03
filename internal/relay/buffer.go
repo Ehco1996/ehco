@@ -3,6 +3,7 @@ package relay
 import (
 	"io"
 	"log"
+	"net"
 	"sync"
 )
 
@@ -31,4 +32,18 @@ func doCopy(dst io.Writer, src io.Reader, bufferPool *sync.Pool, wg *sync.WaitGr
 		log.Printf("failed to relay: %v\n", err)
 	}
 	wg.Done()
+}
+
+type udpBufferCh struct {
+	Conn    net.Conn
+	Ch      chan []byte
+	Handled bool
+}
+
+func newudpBufferCh(conn net.Conn) *udpBufferCh {
+	return &udpBufferCh{
+		Conn:    conn,
+		Ch:      make(chan []byte, 1),
+		Handled: false,
+	}
 }
