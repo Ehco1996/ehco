@@ -36,6 +36,7 @@ type Relay struct {
 	// may not init
 	TCPListener *net.TCPListener
 	UDPConn     *net.UDPConn
+	udpCache    map[string]net.Conn
 }
 
 func NewRelay(localAddr, listenType, remoteAddr, transportType string) (*Relay, error) {
@@ -47,7 +48,6 @@ func NewRelay(localAddr, listenType, remoteAddr, transportType string) (*Relay, 
 	if err != nil {
 		return nil, err
 	}
-
 	r := &Relay{
 		LocalTCPAddr: localTCPAddr,
 		LocalUDPAddr: localUDPAddr,
@@ -57,6 +57,8 @@ func NewRelay(localAddr, listenType, remoteAddr, transportType string) (*Relay, 
 
 		ListenType:    listenType,
 		TransportType: transportType,
+
+		udpCache: make(map[string]net.Conn),
 	}
 	if DEBUG != "" {
 		go func() {
@@ -173,3 +175,15 @@ func (r *Relay) keepAliveAndSetNextTimeout(conn interface{}) error {
 	return nil
 }
 
+func (r *Relay) getOrCreateUdpConnByAddr(addr string) (net.Conn, error) {
+	rc, found := r.udpCache[addr]
+	if !found {
+		rc, err := net.Dial("udp", r.RemoteUDPAddr)
+		if err != nil {
+			return nil, err
+		}
+		r.udpCache[addr] = rc
+		return rc, nil
+	}
+	return rc, nil
+}
