@@ -11,7 +11,7 @@ import (
 
 var (
 	TcpDeadline = 60 * time.Second
-	UdpDeadline = 60 * time.Second
+	UdpDeadline = 6 * time.Second
 	DEBUG       = os.Getenv("EHCO_DEBUG")
 )
 
@@ -134,19 +134,6 @@ func (r *Relay) RunLocalUDPServer() error {
 	}
 	defer r.UDPConn.Close()
 
-	go func() {
-		for {
-			for addr, ubc := range r.udpCache {
-				if !ubc.Handled {
-					ubc.Handled = true
-					go r.handleOneUDPConn(addr, ubc)
-				}
-			}
-			log.Println("sleep...")
-			time.Sleep(time.Second)
-		}
-	}()
-
 	for {
 		// NOTE  mtu一般是1500,设置为超过这个这个值就够用了
 		buf := make([]byte, 1024*2)
@@ -154,13 +141,16 @@ func (r *Relay) RunLocalUDPServer() error {
 		if err != nil {
 			return err
 		}
-		// log.Printf("handle udp package from %s over: %s", addr, r.ListenType)
+		log.Printf("handle udp package from %s over: %s", addr, r.ListenType)
 		ubc, err := r.getOrCreateUbc(addr)
 		if err != nil {
 			return err
 		}
 		ubc.Ch <- buf[0:n]
-		log.Println("send b", len(buf[0:n]))
+		if !ubc.Handled {
+			ubc.Handled = true
+			go r.handleOneUDPConn(addr.String(), ubc)
+		}
 	}
 }
 

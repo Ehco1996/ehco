@@ -43,7 +43,7 @@ type udpBufferCh struct {
 func newudpBufferCh(conn net.Conn) *udpBufferCh {
 	return &udpBufferCh{
 		Conn:    conn,
-		Ch:      make(chan []byte, 1),
+		Ch:      make(chan []byte, 100),
 		Handled: false,
 	}
 }
