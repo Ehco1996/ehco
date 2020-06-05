@@ -25,38 +25,42 @@ func (r *Relay) handleTCPConn(c *net.TCPConn) error {
 
 func (r *Relay) handleOneUDPConn(addr string, ubc *udpBufferCh) {
 	rc := ubc.Conn
-	defer func() {
-		rc.Close()
-		// close(ubc.Ch)
-		// TODO clear ubc
-	}()
 	uaddr, _ := net.ResolveUDPAddr("udp", addr)
+
+	defer func() {
+		log.Println("defer")
+		rc.Close()
+		close(ubc.Ch)
+		delete(r.udpCache, addr)
+	}()
+
 	go func() {
-		var buf [1024 * 2]byte
+		buf := outboundBufferPool.Get().([]byte)
 		for {
-			i, err := rc.Read(buf[:])
+			i, err := rc.Read(buf)
 			if err != nil {
-				log.Println(err)
+				log.Println(err, 1)
 				break
 			}
 			if err := r.keepAliveAndSetNextTimeout(rc); err != nil {
-				log.Println(err)
+				log.Println(err, 2)
 				break
 			}
 			if _, err := r.UDPConn.WriteToUDP(buf[0:i], uaddr); err != nil {
-				log.Println(err)
+				log.Println(err, 3)
 				break
+
 			}
 		}
 	}()
 
 	for b := range ubc.Ch {
 		if _, err := rc.Write(b); err != nil {
-			log.Println(err)
+			log.Println(err, 4)
 			break
 		}
 		if err := r.keepAliveAndSetNextTimeout(rc); err != nil {
-			log.Println(err)
+			log.Println(err, 5)
 			break
 		}
 	}

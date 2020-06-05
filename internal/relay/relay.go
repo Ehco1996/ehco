@@ -135,13 +135,12 @@ func (r *Relay) RunLocalUDPServer() error {
 	defer r.UDPConn.Close()
 
 	for {
-		// NOTE  mtu一般是1500,设置为超过这个这个值就够用了
-		buf := make([]byte, 1024*2)
-		n, addr, err := r.UDPConn.ReadFromUDP(buf[:])
+		buf := inboundBufferPool.Get().([]byte)
+		n, addr, err := r.UDPConn.ReadFromUDP(buf)
 		if err != nil {
 			return err
 		}
-		log.Printf("handle udp package from %s over: %s", addr, r.ListenType)
+		log.Printf("handle udp package from %s over: %s len: %d", addr, r.ListenType, n)
 		ubc, err := r.getOrCreateUbc(addr)
 		if err != nil {
 			return err
@@ -170,7 +169,7 @@ func (r *Relay) keepAliveAndSetNextTimeout(conn interface{}) error {
 	return nil
 }
 
-// may race
+// NOTE not thread safe
 func (r *Relay) getOrCreateUbc(addr *net.UDPAddr) (*udpBufferCh, error) {
 	ubc, found := r.udpCache[addr.String()]
 	if !found {
