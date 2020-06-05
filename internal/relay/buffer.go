@@ -32,3 +32,15 @@ func doCopy(dst io.Writer, src io.Reader, bufferPool *sync.Pool, wg *sync.WaitGr
 	}
 	wg.Done()
 }
+
+type udpBufferCh struct {
+	Ch      chan []byte
+	Handled bool
+}
+
+func newudpBufferCh() *udpBufferCh {
+	return &udpBufferCh{
+		Ch:      make(chan []byte, 100),
+		Handled: false,
+	}
+}

@@ -11,7 +11,7 @@ import (
 
 var (
 	TcpDeadline = 60 * time.Second
-	UdpDeadline = 60 * time.Second
+	UdpDeadline = 6 * time.Second
 	DEBUG       = os.Getenv("EHCO_DEBUG")
 )
 
@@ -36,7 +36,8 @@ type Relay struct {
 	// may not init
 	TCPListener *net.TCPListener
 	UDPConn     *net.UDPConn
-	udpCache    map[string]net.Conn
+
+	udpCache map[string]*udpBufferCh
 }
 
 func NewRelay(localAddr, listenType, remoteAddr, transportType string) (*Relay, error) {
@@ -58,11 +59,11 @@ func NewRelay(localAddr, listenType, remoteAddr, transportType string) (*Relay, 
 		ListenType:    listenType,
 		TransportType: transportType,
 
-		udpCache: make(map[string]net.Conn),
+		udpCache: make(map[string](*udpBufferCh)),
 	}
 	if DEBUG != "" {
 		go func() {
-			log.Printf("[DEBUG] start pprof server at 0.0.0.0:6060")
+			log.Printf("[DEBUG] start pprof server at http://127.0.0.1:6060/debug/pprof/")
 			log.Println(http.ListenAndServe("0.0.0.0:6060", nil))
 		}()
 	}
@@ -132,30 +133,24 @@ func (r *Relay) RunLocalUDPServer() error {
 		return err
 	}
 	defer r.UDPConn.Close()
+
 	for {
-		// NOTE  mtu一般是1500,设置为超过这个这个值就够用了
-		var buf [1024 * 2]byte
-		n, addr, err := r.UDPConn.ReadFromUDP(buf[:])
+		buf := inboundBufferPool.Get().([]byte)
+		n, addr, err := r.UDPConn.ReadFromUDP(buf)
 		if err != nil {
 			return err
 		}
-		log.Printf("handle udp package from %s over: %s", addr, r.ListenType)
-		switch r.TransportType {
-		case Transport_RAW:
-			go func(addr *net.UDPAddr, b []byte) {
-				if err := r.handleUDP(addr, b); err != nil {
-					log.Printf("handleUDP err %s", err)
-					return
-				}
-			}(addr, buf[0:n])
-		case Transport_WS:
-			go func(addr *net.UDPAddr, b []byte) {
-				if err := r.handleUdpOverWs(addr, b); err != nil {
-					log.Printf("handleUdpOverWs err %s", err)
-					return
-				}
-			}(addr, buf[0:n])
+		ubc, err := r.getOrCreateUbc(addr)
+		if err != nil {
+			return err
 		}
+		ubc.Ch <- buf[0:n]
+		if !ubc.Handled {
+			ubc.Handled = true
+			log.Printf("handle udp con from %s over: %s len: %d", addr, r.ListenType, n)
+			go r.handleOneUDPConn(addr.String(), ubc)
+		}
+		inboundBufferPool.Put(buf)
 	}
 }
 
@@ -175,15 +170,13 @@ func (r *Relay) keepAliveAndSetNextTimeout(conn interface{}) error {
 	return nil
 }
 
-func (r *Relay) getOrCreateUdpConnByAddr(addr string) (net.Conn, error) {
-	rc, found := r.udpCache[addr]
+// NOTE not thread safe
+func (r *Relay) getOrCreateUbc(addr *net.UDPAddr) (*udpBufferCh, error) {
+	ubc, found := r.udpCache[addr.String()]
 	if !found {
-		rc, err := net.Dial("udp", r.RemoteUDPAddr)
-		if err != nil {
-			return nil, err
-		}
-		r.udpCache[addr] = rc
-		return rc, nil
+		ubc := newudpBufferCh()
+		r.udpCache[addr.String()] = ubc
+		return ubc, nil
 	}
-	return rc, nil
+	return ubc, nil
 }

@@ -1,7 +1,7 @@
 package relay
 
 import (
-	"bufio"
+	"log"
 	"net"
 	"sync"
 )
@@ -15,7 +15,6 @@ func (r *Relay) handleTCPConn(c *net.TCPConn) error {
 	if err := r.keepAliveAndSetNextTimeout(rc); err != nil {
 		return err
 	}
-
 	var wg sync.WaitGroup
 	wg.Add(2)
 	go doCopy(rc, c, inboundBufferPool, &wg)
@@ -24,25 +23,52 @@ func (r *Relay) handleTCPConn(c *net.TCPConn) error {
 	return nil
 }
 
-func (r *Relay) handleUDP(addr *net.UDPAddr, b []byte) error {
-	rc, err := r.getOrCreateUdpConnByAddr(addr.String())
+func (r *Relay) handleOneUDPConn(addr string, ubc *udpBufferCh) {
+	uaddr, _ := net.ResolveUDPAddr("udp", addr)
+	rc, err := net.Dial("udp", r.RemoteUDPAddr)
 	if err != nil {
-		return err
+		log.Println(err)
 	}
-	// defer rc.Close()
-	if err := r.keepAliveAndSetNextTimeout(rc); err != nil {
-		return err
+
+	defer func() {
+		rc.Close()
+		close(ubc.Ch)
+		delete(r.udpCache, addr)
+	}()
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+
+	go func() {
+		buf := outboundBufferPool.Get().([]byte)
+		for {
+			i, err := rc.Read(buf)
+			if err != nil {
+				log.Println(err, 1)
+				break
+			}
+			if err := r.keepAliveAndSetNextTimeout(rc); err != nil {
+				log.Println(err)
+				break
+			}
+			if _, err := r.UDPConn.WriteToUDP(buf[0:i], uaddr); err != nil {
+				log.Println(err)
+				break
+			}
+		}
+		outboundBufferPool.Put(buf)
+		wg.Done()
+	}()
+
+	for b := range ubc.Ch {
+		if _, err := rc.Write(b); err != nil {
+			log.Println(err)
+			break
+		}
+		if err := r.keepAliveAndSetNextTimeout(rc); err != nil {
+			log.Println(err)
+			break
+		}
 	}
-	if _, err := rc.Write(b); err != nil {
-		return err
-	}
-	var buf [1024 * 2]byte
-	i, err := bufio.NewReader(rc).Read(buf[:])
-	if err != nil {
-		return err
-	}
-	if _, err := r.UDPConn.WriteToUDP(buf[0:i], addr); err != nil {
-		return err
-	}
-	return nil
+	wg.Wait()
 }
