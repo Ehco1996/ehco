@@ -140,7 +140,6 @@ func (r *Relay) RunLocalUDPServer() error {
 		if err != nil {
 			return err
 		}
-		log.Printf("handle udp package from %s over: %s len: %d", addr, r.ListenType, n)
 		ubc, err := r.getOrCreateUbc(addr)
 		if err != nil {
 			return err
@@ -148,8 +147,10 @@ func (r *Relay) RunLocalUDPServer() error {
 		ubc.Ch <- buf[0:n]
 		if !ubc.Handled {
 			ubc.Handled = true
+			log.Printf("handle udp con from %s over: %s len: %d", addr, r.ListenType, n)
 			go r.handleOneUDPConn(addr.String(), ubc)
 		}
+		inboundBufferPool.Put(buf)
 	}
 }
 
@@ -173,11 +174,7 @@ func (r *Relay) keepAliveAndSetNextTimeout(conn interface{}) error {
 func (r *Relay) getOrCreateUbc(addr *net.UDPAddr) (*udpBufferCh, error) {
 	ubc, found := r.udpCache[addr.String()]
 	if !found {
-		rc, err := net.Dial("udp", r.RemoteUDPAddr)
-		if err != nil {
-			return nil, err
-		}
-		ubc := newudpBufferCh(rc)
+		ubc := newudpBufferCh()
 		r.udpCache[addr.String()] = ubc
 		return ubc, nil
 	}
