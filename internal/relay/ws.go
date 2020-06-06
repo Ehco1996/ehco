@@ -4,6 +4,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"sync"
 
 	"github.com/gorilla/websocket"
 )
@@ -17,6 +18,61 @@ func (relay *Relay) RunLocalWsServer() error {
 	return http.ListenAndServe(relay.LocalTCPAddr.String(), nil)
 }
 
+func (relay *Relay) handleWsToTcp(w http.ResponseWriter, r *http.Request) {
+	c, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		log.Println("upgrade:", err)
+		return
+	}
+	defer c.Close()
+
+	rc, _ := net.Dial("tcp", relay.RemoteTCPAddr)
+	if err != nil {
+		log.Println("dail:", err)
+		return
+	}
+	defer rc.Close()
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+
+	go func() {
+		buf := inboundBufferPool.Get().([]byte)
+		for {
+			var n int
+			if n, err = rc.Read(buf[:]); err != nil {
+				log.Println(err, 1)
+				break
+			}
+			if err := relay.keepAliveAndSetNextTimeout(rc); err != nil {
+				log.Println(err)
+				break
+			}
+			c.WriteMessage(websocket.BinaryMessage, buf[0:n])
+			if err := relay.keepAliveAndSetNextTimeout(c); err != nil {
+				log.Println(err)
+				break
+			}
+		}
+		inboundBufferPool.Put(buf)
+		wg.Done()
+	}()
+
+	for {
+		_, message, err := c.ReadMessage()
+		if err != nil {
+			log.Println("read error:", err)
+			break
+		}
+		rc.Write(message)
+		if err := relay.keepAliveAndSetNextTimeout(rc); err != nil {
+			log.Println(err)
+			break
+		}
+	}
+	wg.Wait()
+}
+
 func (relay *Relay) handleTcpOverWs(c *net.TCPConn) error {
 	rc, _, err := websocket.DefaultDialer.Dial(relay.RemoteTCPAddr+"/tcp/", nil)
 	if err != nil {
@@ -24,139 +80,59 @@ func (relay *Relay) handleTcpOverWs(c *net.TCPConn) error {
 	}
 	defer rc.Close()
 
+	var wg sync.WaitGroup
+	wg.Add(1)
+
 	go func() {
 		for {
 			_, msg, err := rc.ReadMessage()
 			if err != nil {
-				return
+				log.Println(err, 2)
+				break
 			}
+			if err := relay.keepAliveAndSetNextTimeout(rc); err != nil {
+				log.Println(err)
+				break
+			}
+
 			if _, err := c.Write(msg); err != nil {
-				return
+				log.Println(err, 3)
+				break
+			}
+			if err := relay.keepAliveAndSetNextTimeout(c); err != nil {
+				log.Println(err)
+				break
 			}
 		}
+		wg.Done()
 	}()
 
-	var buf [1024 * 2]byte
+	buf := inboundBufferPool.Get().([]byte)
 	for {
+		n, err := c.Read(buf[:])
 		relay.keepAliveAndSetNextTimeout(c)
-		i, err := c.Read(buf[:])
 		if err != nil {
-			return err
-		}
-		if err := rc.WriteMessage(websocket.BinaryMessage, buf[0:i]); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func (relay *Relay) handleUdpOverWs(addr *net.UDPAddr, b []byte) error {
-	// rc, _, err := websocket.DefaultDialer.Dial(relay.RemoteTCPAddr+"/udp/", nil)
-	// if err != nil {
-	// 	return err
-	// }
-	// defer rc.Close()
-
-	// go func() {
-	// 	for {
-	// 		_, msg, err := rc.ReadMessage()
-	// 		if err != nil {
-	// 			return
-	// 		}
-	// 		if _, err := c.Write(msg); err != nil {
-	// 			return
-	// 		}
-	// 	}
-	// }()
-
-	// var buf [1024 * 2]byte
-	// for {
-	// 	relay.keepAliveAndSetNextTimeout(c)
-	// 	i, err := c.Read(buf[:])
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// 	if err := rc.WriteMessage(websocket.BinaryMessage, buf[0:i]); err != nil {
-	// 		return err
-	// 	}
-	// }
-
-	return nil
-}
-
-func (relay *Relay) handleWsToTcp(w http.ResponseWriter, r *http.Request) {
-
-	c, err := upgrader.Upgrade(w, r, nil)
-	if err != nil {
-		log.Print("upgrade:", err)
-		return
-	}
-	defer c.Close()
-
-	rc, _ := net.Dial("tcp", relay.RemoteTCPAddr)
-	if err != nil {
-		log.Print("dail:", err)
-		return
-	}
-	defer rc.Close()
-
-	go func() {
-		var buf [1024 * 2]byte
-		for {
-			i, err := rc.Read(buf[:])
-			if err != nil {
-				log.Print(err)
-				return
-			}
-			c.WriteMessage(websocket.BinaryMessage, buf[0:i])
-		}
-	}()
-
-	for {
-		_, message, err := c.ReadMessage()
-		if err != nil {
-			log.Println("read error:", err)
+			log.Println(err, 4)
 			break
 		}
-		rc.Write(message)
+		if err := rc.WriteMessage(websocket.BinaryMessage, buf[0:n]); err != nil {
+			log.Println(err, 5)
+			break
+		}
+		if err := relay.keepAliveAndSetNextTimeout(rc); err != nil {
+			log.Println(err)
+			break
+		}
 	}
+	inboundBufferPool.Put(buf)
+	wg.Wait()
+	return err
 }
 
 func (relay *Relay) handleWsToUdp(w http.ResponseWriter, r *http.Request) {
+	log.Println("not support relay udp over ws currently")
+}
 
-	c, err := upgrader.Upgrade(w, r, nil)
-	if err != nil {
-		log.Print("upgrade:", err)
-		return
-	}
-	defer c.Close()
-
-	rc, _ := net.Dial("tcp", relay.RemoteTCPAddr)
-	if err != nil {
-		log.Print("dail:", err)
-		return
-	}
-	defer rc.Close()
-
-	go func() {
-		var buf [1024 * 2]byte
-		for {
-			i, err := rc.Read(buf[:])
-			if err != nil {
-				log.Print(err)
-				return
-			}
-			c.WriteMessage(websocket.BinaryMessage, buf[0:i])
-		}
-	}()
-
-	for {
-		_, message, err := c.ReadMessage()
-		if err != nil {
-			log.Println("read error:", err)
-			break
-		}
-		rc.Write(message)
-	}
+func (relay *Relay) handleUdpOverWs(addr string, ubc *udpBufferCh) {
+	log.Println("not support relay udp over ws currently")
 }

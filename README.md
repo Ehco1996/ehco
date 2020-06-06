@@ -40,7 +40,7 @@ iperf3 -c 0.0.0.0 -p 1234 -u -b 1G --length 1024
 
 ```
 
-| iperf | raw | relay(raw) |
+| iperf | raw | relay(raw) | relay(ws) |
 | ---- | ----  | ---- |
-| tcp  | 62.6 Gbits/sec | 23.9 Gbits/sec |
-| udp  | 2.2 Gbits/sec | 2.2 Gbits/sec |
+| tcp  | 62.6 Gbits/sec | 23.9 Gbits/sec | 2.77 Gbits/sec |
+| udp  | 2.2 Gbits/sec | 2.2 Gbits/sec | xx  |

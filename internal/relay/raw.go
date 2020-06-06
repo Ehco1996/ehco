@@ -12,9 +12,6 @@ func (r *Relay) handleTCPConn(c *net.TCPConn) error {
 		return err
 	}
 	defer rc.Close()
-	if err := r.keepAliveAndSetNextTimeout(rc); err != nil {
-		return err
-	}
 	var wg sync.WaitGroup
 	wg.Add(2)
 	go doCopy(rc, c, inboundBufferPool, &wg)

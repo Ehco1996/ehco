@@ -7,6 +7,8 @@ import (
 	_ "net/http/pprof"
 	"os"
 	"time"
+
+	"github.com/gorilla/websocket"
 )
 
 var (
@@ -147,8 +149,13 @@ func (r *Relay) RunLocalUDPServer() error {
 		ubc.Ch <- buf[0:n]
 		if !ubc.Handled {
 			ubc.Handled = true
-			log.Printf("handle udp con from %s over: %s len: %d", addr, r.ListenType, n)
-			go r.handleOneUDPConn(addr.String(), ubc)
+			log.Printf("handle udp con from %s over: %s", addr, r.TransportType)
+			switch r.TransportType {
+			case Transport_WS:
+				go r.handleUdpOverWs(addr.String(), ubc)
+			case Transport_RAW:
+				go r.handleOneUDPConn(addr.String(), ubc)
+			}
 		}
 		inboundBufferPool.Put(buf)
 	}
@@ -162,6 +169,13 @@ func (r *Relay) keepAliveAndSetNextTimeout(conn interface{}) error {
 		}
 	case *net.UDPConn:
 		if err := c.SetDeadline(time.Now().Add(UdpDeadline)); err != nil {
+			return err
+		}
+	case *websocket.Conn:
+		if err := c.SetReadDeadline(time.Now().Add(TcpDeadline)); err != nil {
+			return err
+		}
+		if err := c.SetWriteDeadline(time.Now().Add(TcpDeadline)); err != nil {
 			return err
 		}
 	default:
