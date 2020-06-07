@@ -1,6 +1,7 @@
 package relay
 
 import (
+	"io"
 	"log"
 	"net"
 	"net/http"
@@ -28,11 +29,11 @@ func (relay *Relay) handleWsToTcp(w http.ResponseWriter, r *http.Request) {
 
 	rc, _ := net.Dial("tcp", relay.RemoteTCPAddr)
 	if err != nil {
-		log.Println("dail:", err)
+		log.Println("dial:", err)
 		return
 	}
 	defer rc.Close()
-
+	log.Printf("handleWsToTcp from:%s to:%s", c.RemoteAddr(), rc.RemoteAddr())
 	var wg sync.WaitGroup
 	wg.Add(1)
 
@@ -41,16 +42,16 @@ func (relay *Relay) handleWsToTcp(w http.ResponseWriter, r *http.Request) {
 		for {
 			var n int
 			if n, err = rc.Read(buf[:]); err != nil {
-				log.Println(err, 1)
+				if err != io.EOF {
+					log.Println("read error", err)
+				}
 				break
 			}
 			if err := relay.keepAliveAndSetNextTimeout(rc); err != nil {
-				log.Println(err)
 				break
 			}
 			c.WriteMessage(websocket.BinaryMessage, buf[0:n])
 			if err := relay.keepAliveAndSetNextTimeout(c); err != nil {
-				log.Println(err)
 				break
 			}
 		}
@@ -66,7 +67,6 @@ func (relay *Relay) handleWsToTcp(w http.ResponseWriter, r *http.Request) {
 		}
 		rc.Write(message)
 		if err := relay.keepAliveAndSetNextTimeout(rc); err != nil {
-			log.Println(err)
 			break
 		}
 	}
@@ -87,20 +87,19 @@ func (relay *Relay) handleTcpOverWs(c *net.TCPConn) error {
 		for {
 			_, msg, err := rc.ReadMessage()
 			if err != nil {
-				log.Println(err, 2)
+				if err != io.EOF {
+					log.Println("read error", err)
+				}
 				break
 			}
 			if err := relay.keepAliveAndSetNextTimeout(rc); err != nil {
-				log.Println(err)
 				break
 			}
-
 			if _, err := c.Write(msg); err != nil {
-				log.Println(err, 3)
+				log.Println("write error", err)
 				break
 			}
 			if err := relay.keepAliveAndSetNextTimeout(c); err != nil {
-				log.Println(err)
 				break
 			}
 		}
@@ -110,17 +109,20 @@ func (relay *Relay) handleTcpOverWs(c *net.TCPConn) error {
 	buf := inboundBufferPool.Get().([]byte)
 	for {
 		n, err := c.Read(buf[:])
-		relay.keepAliveAndSetNextTimeout(c)
 		if err != nil {
-			log.Println(err, 4)
+			if err != io.EOF {
+				log.Println("read error", err)
+			}
+			break
+		}
+		if err := relay.keepAliveAndSetNextTimeout(c); err != nil {
 			break
 		}
 		if err := rc.WriteMessage(websocket.BinaryMessage, buf[0:n]); err != nil {
-			log.Println(err, 5)
+			log.Println("write error", err)
 			break
 		}
 		if err := relay.keepAliveAndSetNextTimeout(rc); err != nil {
-			log.Println(err)
 			break
 		}
 	}

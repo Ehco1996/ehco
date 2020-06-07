@@ -1,5 +1,6 @@
 # ehco
-ehco is a echo proxy and a typo
+
+ehco is a network relay tool and a typo :)
 
 ## 主要功能
 
