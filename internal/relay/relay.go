@@ -119,7 +119,6 @@ func (r *Relay) RunLocalTCPServer() error {
 		case Transport_RAW:
 			go func(c *net.TCPConn) {
 				defer c.Close()
-				r.keepAliveAndSetNextTimeout(c)
 				if err := r.handleTCPConn(c); err != nil {
 					log.Printf("handleTCPConn err %s", err)
 				}
