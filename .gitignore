@@ -14,3 +14,7 @@
 dst/
 dist/
 .idea/
+
+# tls
+cert.pem
+key.pem

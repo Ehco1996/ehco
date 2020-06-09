@@ -1,6 +1,7 @@
 package relay
 
 import (
+	"fmt"
 	"io"
 	"log"
 	"net"
@@ -16,7 +17,14 @@ var upgrader = websocket.Upgrader{}
 func (relay *Relay) RunLocalWsServer() error {
 	http.HandleFunc("/tcp/", relay.handleWsToTcp)
 	http.HandleFunc("/udp/", relay.handleWsToUdp)
-	return http.ListenAndServe(relay.LocalTCPAddr.String(), nil)
+	// fake
+	http.HandleFunc("/", index)
+	return http.ListenAndServeTLS(relay.LocalTCPAddr.String(), CertFileName, KeyFileName, nil)
+}
+
+func index(w http.ResponseWriter, r *http.Request) {
+	log.Printf("index call from %s", r.RemoteAddr)
+	fmt.Fprintf(w, "access from %s \n", r.RemoteAddr)
 }
 
 func (relay *Relay) handleWsToTcp(w http.ResponseWriter, r *http.Request) {
