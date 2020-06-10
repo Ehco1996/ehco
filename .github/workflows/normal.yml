@@ -31,7 +31,7 @@ jobs:
 
 
       - name: Build
-        run: go build -v -a -installsuffix cgo -o ehco cli/main.go
+        run: go build -v -a -installsuffix cgo -o ehco cmd/main.go
 
       - uses: actions/upload-artifact@master
         with:
