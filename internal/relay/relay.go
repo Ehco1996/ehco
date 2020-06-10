@@ -19,10 +19,10 @@ var (
 
 const (
 	Listen_RAW = "raw"
-	Listen_WS  = "ws"
+	Listen_WSS = "wss"
 
 	Transport_RAW = "raw"
-	Transport_WS  = "ws"
+	Transport_WSS = "wss"
 )
 
 type Relay struct {
@@ -70,7 +70,7 @@ func NewRelay(localAddr, listenType, remoteAddr, transportType string) (*Relay, 
 		}()
 	}
 
-	if listenType == Listen_WS || transportType == Transport_WS {
+	if listenType == Listen_WSS || transportType == Transport_WSS {
 		initTlsCfg()
 	}
 	return r, nil
@@ -88,7 +88,7 @@ func (r *Relay) ListenAndServe() error {
 		go func() {
 			errChan <- r.RunLocalUDPServer()
 		}()
-	} else if r.ListenType == Listen_WS {
+	} else if r.ListenType == Listen_WSS {
 		go func() {
 			errChan <- r.RunLocalWsServer()
 		}()
@@ -113,7 +113,7 @@ func (r *Relay) RunLocalTCPServer() error {
 		}
 
 		switch r.TransportType {
-		case Transport_WS:
+		case Transport_WSS:
 			go func(c *net.TCPConn) {
 				defer c.Close()
 				if err := r.handleTcpOverWs(c); err != nil {
@@ -154,7 +154,7 @@ func (r *Relay) RunLocalUDPServer() error {
 			ubc.Handled = true
 			log.Printf("handle udp con from %s over: %s", addr, r.TransportType)
 			switch r.TransportType {
-			case Transport_WS:
+			case Transport_WSS:
 				go r.handleUdpOverWs(addr.String(), ubc)
 			case Transport_RAW:
 				go r.handleOneUDPConn(addr.String(), ubc)

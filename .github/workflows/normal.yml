@@ -27,5 +27,13 @@ jobs:
             ${{ runner.os }}-go-
 
       - name: Test
-        run: go test ./...
+        run: go test ./test
 
+
+      - name: Build
+        run: go build -v -a -installsuffix cgo -o ehco cli/main.go
+
+      - uses: actions/upload-artifact@master
+        with:
+          name: my-artifact
+          path: ehco

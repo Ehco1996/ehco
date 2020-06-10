@@ -15,7 +15,7 @@ var rawRemote = "0.0.0.0:9002"
 var wsListen = "0.0.0.0:1236"
 
 var wsLocal = "0.0.0.0:1235"
-var wsRemote = "ws://0.0.0.0:1236"
+var wsRemote = "wss://0.0.0.0:1236"
 
 func init() {
 	// Start the new echo server.
@@ -33,7 +33,7 @@ func init() {
 
 	// Start relay listen ws server
 	go func() {
-		r, err := relay.NewRelay(wsListen, relay.Listen_WS, rawRemote, relay.Transport_RAW)
+		r, err := relay.NewRelay(wsListen, relay.Listen_WSS, rawRemote, relay.Transport_RAW)
 		if err != nil {
 			panic(err)
 		}
@@ -42,7 +42,7 @@ func init() {
 	}()
 	// Start relay over ws server
 	go func() {
-		r, err := relay.NewRelay(wsLocal, relay.Listen_RAW, wsRemote, relay.Transport_WS)
+		r, err := relay.NewRelay(wsLocal, relay.Listen_RAW, wsRemote, relay.Transport_WSS)
 		if err != nil {
 			panic(err)
 		}
