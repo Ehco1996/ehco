@@ -22,14 +22,15 @@ const (
 
 var DefaultTLSConfig *tls.Config
 
-func init() {
+func initTlsCfg() {
 	log.Printf("genCertificate...")
 	cert, err := genCertificate()
 	if err != nil {
 		panic(err)
 	}
 	DefaultTLSConfig = &tls.Config{
-		Certificates: []tls.Certificate{cert},
+		Certificates:       []tls.Certificate{cert},
+		InsecureSkipVerify: true,
 	}
 }
 
@@ -78,6 +79,7 @@ func generateKeyPair() (rawCert, rawKey []byte, err error) {
 	}
 	pem.Encode(certOut, &pem.Block{Type: "CERTIFICATE", Bytes: derBytes})
 	certOut.Close()
+	log.Printf("write cert to %s", CertFileName)
 
 	keyOut, err := os.OpenFile(KeyFileName, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
 	if err != nil {
@@ -86,6 +88,7 @@ func generateKeyPair() (rawCert, rawKey []byte, err error) {
 	}
 	pem.Encode(keyOut, pemBlockForKey(priv))
 	keyOut.Close()
+	log.Printf("write key to %s", KeyFileName)
 
 	rawCert = pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: derBytes})
 	rawKey = pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(priv)})

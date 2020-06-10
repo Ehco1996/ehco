@@ -82,11 +82,11 @@ func (relay *Relay) handleWsToTcp(w http.ResponseWriter, r *http.Request) {
 }
 
 func (relay *Relay) handleTcpOverWs(c *net.TCPConn) error {
-	rc, _, err := websocket.DefaultDialer.Dial(relay.RemoteTCPAddr+"/tcp/", nil)
+	d := websocket.Dialer{TLSClientConfig: DefaultTLSConfig}
+	rc, _, err := d.Dial(relay.RemoteTCPAddr+"/tcp/", nil)
 	if err != nil {
 		return err
 	}
-	defer rc.Close()
 
 	var wg sync.WaitGroup
 	wg.Add(1)

@@ -69,6 +69,10 @@ func NewRelay(localAddr, listenType, remoteAddr, transportType string) (*Relay, 
 			log.Println(http.ListenAndServe("0.0.0.0:6060", nil))
 		}()
 	}
+
+	if listenType == Listen_WS || transportType == Transport_WS {
+		initTlsCfg()
+	}
 	return r, nil
 }
 
