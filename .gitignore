@@ -18,3 +18,4 @@ dist/
 # tls
 cert.pem
 key.pem
+.DS_Store

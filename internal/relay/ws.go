@@ -73,6 +73,9 @@ func (relay *Relay) handleWsToTcp(w http.ResponseWriter, r *http.Request) {
 			log.Println("read error:", err)
 			break
 		}
+		if err := relay.keepAliveAndSetNextTimeout(c); err != nil {
+			break
+		}
 		rc.Write(message)
 		if err := relay.keepAliveAndSetNextTimeout(rc); err != nil {
 			break
