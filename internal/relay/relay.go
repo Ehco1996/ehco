@@ -1,12 +1,15 @@
 package relay
 
 import (
+	"io"
 	"log"
 	"net"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
 	"time"
+
+	"github.com/gorilla/websocket"
 )
 
 var (
@@ -115,7 +118,7 @@ func (r *Relay) RunLocalTCPServer() error {
 		case Transport_WSS:
 			go func(c *net.TCPConn) {
 				defer c.Close()
-				if err := r.handleTcpOverWs(c); err != nil {
+				if err := r.handleTcpOverWs(c); err != nil && err != io.EOF {
 					log.Printf("handleTcpOverWs err %s", err)
 				}
 			}(c)
@@ -171,6 +174,13 @@ func (r *Relay) keepAliveAndSetNextTimeout(conn interface{}) error {
 		}
 	case *net.UDPConn:
 		if err := c.SetDeadline(time.Now().Add(UdpDeadline)); err != nil {
+			return err
+		}
+	case *websocket.Conn:
+		if err := c.SetReadDeadline(time.Now().Add(WsDeadline)); err != nil {
+			return err
+		}
+		if err := c.SetWriteDeadline(time.Now().Add(WsDeadline)); err != nil {
 			return err
 		}
 	default:
