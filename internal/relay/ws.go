@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"sync"
+	"time"
 
 	"github.com/gorilla/websocket"
 )
@@ -42,44 +43,47 @@ func (relay *Relay) handleWsToTcp(w http.ResponseWriter, r *http.Request) {
 	}
 	defer rc.Close()
 	log.Printf("handleWsToTcp from:%s to:%s", c.RemoteAddr(), rc.RemoteAddr())
+
 	var wg sync.WaitGroup
 	wg.Add(1)
 
 	go func() {
 		buf := inboundBufferPool.Get().([]byte)
 		for {
-			var n int
-			if n, err = rc.Read(buf[:]); err != nil {
-				if err != io.EOF {
-					log.Println("read error", err)
-				}
-				break
-			}
 			if err := relay.keepAliveAndSetNextTimeout(rc); err != nil {
 				break
 			}
-			c.WriteMessage(websocket.BinaryMessage, buf[0:n])
-			if err := relay.keepAliveAndSetNextTimeout(c); err != nil {
+			var n int
+			if n, err = rc.Read(buf[:]); err != nil {
+				if err != io.EOF {
+					log.Println("read error", err, "inin")
+				}
 				break
 			}
+
+			if err := c.SetWriteDeadline(time.Now().Add(WsDeadline)); err != nil {
+				break
+			}
+			c.WriteMessage(websocket.BinaryMessage, buf[0:n])
 		}
 		inboundBufferPool.Put(buf)
 		wg.Done()
 	}()
 
 	for {
-		_, message, err := c.ReadMessage()
-		if err != nil {
+		if err := c.SetReadDeadline(time.Now().Add(WsDeadline)); err != nil {
+			break
+		}
+		var message []byte
+		if _, message, err = c.ReadMessage(); err != nil {
 			log.Println("read error:", err)
 			break
 		}
-		if err := relay.keepAliveAndSetNextTimeout(c); err != nil {
-			break
-		}
-		rc.Write(message)
+
 		if err := relay.keepAliveAndSetNextTimeout(rc); err != nil {
 			break
 		}
+		rc.Write(message)
 	}
 	wg.Wait()
 }
@@ -90,27 +94,29 @@ func (relay *Relay) handleTcpOverWs(c *net.TCPConn) error {
 	if err != nil {
 		return err
 	}
+	defer rc.Close()
 
 	var wg sync.WaitGroup
 	wg.Add(1)
 
 	go func() {
 		for {
-			_, msg, err := rc.ReadMessage()
-			if err != nil {
+			if err := rc.SetReadDeadline(time.Now().Add(WsDeadline)); err != nil {
+				break
+			}
+			var message []byte
+			if _, message, err = rc.ReadMessage(); err != nil {
 				if err != io.EOF {
 					log.Println("read error", err)
 				}
 				break
 			}
-			if err := relay.keepAliveAndSetNextTimeout(rc); err != nil {
-				break
-			}
-			if _, err := c.Write(msg); err != nil {
-				log.Println("write error", err)
-				break
-			}
+
 			if err := relay.keepAliveAndSetNextTimeout(c); err != nil {
+				break
+			}
+			if _, err := c.Write(message); err != nil {
+				log.Println("write error", err)
 				break
 			}
 		}
@@ -119,23 +125,25 @@ func (relay *Relay) handleTcpOverWs(c *net.TCPConn) error {
 
 	buf := inboundBufferPool.Get().([]byte)
 	for {
-		n, err := c.Read(buf[:])
-		if err != nil {
+		if err := relay.keepAliveAndSetNextTimeout(c); err != nil {
+			break
+		}
+		var n int
+		if n, err = c.Read(buf[:]); err != nil {
 			if err != io.EOF {
 				log.Println("read error", err)
 			}
 			break
 		}
-		if err := relay.keepAliveAndSetNextTimeout(c); err != nil {
+
+		if err := rc.SetWriteDeadline(time.Now().Add(WsDeadline)); err != nil {
 			break
 		}
 		if err := rc.WriteMessage(websocket.BinaryMessage, buf[0:n]); err != nil {
 			log.Println("write error", err)
 			break
 		}
-		if err := relay.keepAliveAndSetNextTimeout(rc); err != nil {
-			break
-		}
+
 	}
 	inboundBufferPool.Put(buf)
 	wg.Wait()

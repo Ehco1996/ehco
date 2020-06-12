@@ -7,13 +7,12 @@ import (
 	_ "net/http/pprof"
 	"os"
 	"time"
-
-	"github.com/gorilla/websocket"
 )
 
 var (
 	TcpDeadline = 60 * time.Second
 	UdpDeadline = 6 * time.Second
+	WsDeadline  = 30 * time.Second
 	DEBUG       = os.Getenv("EHCO_DEBUG")
 )
 
@@ -172,13 +171,6 @@ func (r *Relay) keepAliveAndSetNextTimeout(conn interface{}) error {
 		}
 	case *net.UDPConn:
 		if err := c.SetDeadline(time.Now().Add(UdpDeadline)); err != nil {
-			return err
-		}
-	case *websocket.Conn:
-		if err := c.SetReadDeadline(time.Now().Add(TcpDeadline)); err != nil {
-			return err
-		}
-		if err := c.SetWriteDeadline(time.Now().Add(TcpDeadline)); err != nil {
 			return err
 		}
 	default:
