@@ -31,9 +31,9 @@ func (relay *Relay) handleWsToTcp(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		return
 	}
-	rc, _ := net.Dial("tcp", relay.RemoteTCPAddr)
+	rc, err := net.Dial("tcp", relay.RemoteTCPAddr)
 	if err != nil {
-		rc.Close()
+		log.Printf("dail error: %s", err)
 		return
 	}
 	log.Printf("handleWsToTcp from:%s to:%s", c.RemoteAddr(), rc.RemoteAddr())
@@ -74,7 +74,6 @@ func (relay *Relay) handleTcpOverWs(c *net.TCPConn) error {
 	d := websocket.Dialer{TLSClientConfig: DefaultTLSConfig}
 	rc, _, err := d.Dial(relay.RemoteTCPAddr+"/tcp/", nil)
 	if err != nil {
-		rc.Close()
 		return err
 	}
 	var wg sync.WaitGroup
