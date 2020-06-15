@@ -29,7 +29,6 @@ jobs:
       - name: Test
         run: go test ./test
 
-
       - name: Build
         run: go build -v -a -installsuffix cgo -o ehco cmd/main.go
 
@@ -37,3 +36,16 @@ jobs:
         with:
           name: my-artifact
           path: ehco
+
+  build-image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@master
+      - name: Publish to Registry
+        uses: elgohr/Publish-Docker-Github-Action@master
+        with:
+          name: ehco1996/aioshadowsocks
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+          tags: "latest"
+          dockerfile: build/Dockerfile
