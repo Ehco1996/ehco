@@ -33,7 +33,7 @@ func (relay *Relay) handleWsToTcp(w http.ResponseWriter, r *http.Request) {
 	}
 	rc, err := net.Dial("tcp", relay.RemoteTCPAddr)
 	if err != nil {
-		log.Printf("dail error: %s", err)
+		log.Printf("dial error: %s", err)
 		return
 	}
 	log.Printf("handleWsToTcp from:%s to:%s", c.RemoteAddr(), rc.RemoteAddr())
@@ -42,8 +42,8 @@ func (relay *Relay) handleWsToTcp(w http.ResponseWriter, r *http.Request) {
 	go func() {
 		buf := inboundBufferPool.Get().([]byte)
 		defer func() {
-			c.Close()
-			rc.Close()
+			relay.fastTimeout(c)
+			relay.fastTimeout(rc)
 			inboundBufferPool.Put(buf)
 			wg.Done()
 		}()
@@ -67,6 +67,8 @@ func (relay *Relay) handleWsToTcp(w http.ResponseWriter, r *http.Request) {
 		}
 		rc.Write(message)
 	}
+	relay.fastTimeout(c)
+	relay.fastTimeout(rc)
 	wg.Wait()
 }
 
@@ -79,7 +81,8 @@ func (relay *Relay) handleTcpOverWs(c *net.TCPConn) error {
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
-		defer rc.Close()
+		relay.fastTimeout(c)
+		relay.fastTimeout(rc)
 		defer wg.Done()
 		for {
 			relay.keepAliveAndSetNextTimeout(rc)
@@ -103,6 +106,8 @@ func (relay *Relay) handleTcpOverWs(c *net.TCPConn) error {
 		rc.WriteMessage(websocket.BinaryMessage, buf[0:n])
 	}
 	inboundBufferPool.Put(buf)
+	relay.fastTimeout(c)
+	relay.fastTimeout(rc)
 	wg.Wait()
 	return err
 }
