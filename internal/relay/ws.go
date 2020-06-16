@@ -42,8 +42,6 @@ func (relay *Relay) handleWsToTcp(w http.ResponseWriter, r *http.Request) {
 	go func() {
 		buf := inboundBufferPool.Get().([]byte)
 		defer func() {
-			// c.Close()
-			// rc.Close()
 			relay.fastTimeout(c)
 			relay.fastTimeout(rc)
 			inboundBufferPool.Put(buf)
@@ -83,7 +81,6 @@ func (relay *Relay) handleTcpOverWs(c *net.TCPConn) error {
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
-		// defer rc.Close()
 		relay.fastTimeout(c)
 		relay.fastTimeout(rc)
 		defer wg.Done()
