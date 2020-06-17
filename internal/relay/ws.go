@@ -41,34 +41,44 @@ func (relay *Relay) handleWsToTcp(w http.ResponseWriter, r *http.Request) {
 	wg.Add(1)
 	go func() {
 		buf := inboundBufferPool.Get().([]byte)
-		defer func() {
-			relay.fastTimeout(c)
-			relay.fastTimeout(rc)
-			inboundBufferPool.Put(buf)
-			wg.Done()
-		}()
 		for {
 			relay.keepAliveAndSetNextTimeout(rc)
-			relay.keepAliveAndSetNextTimeout(c)
 			var n int
 			if n, err = rc.Read(buf[:]); err != nil {
+				println("1", err.Error())
 				break
 			}
-			c.WriteMessage(websocket.BinaryMessage, buf[0:n])
+			relay.keepAliveAndSetNextTimeout(c)
+			if err = c.WriteMessage(websocket.BinaryMessage, buf[0:n]); err != nil {
+				println("2", err.Error())
+				break
+			}
 		}
+		println("called in")
+		relay.fastTimeout(rc)
+		relay.fastTimeout(c)
+		println("called out")
+		inboundBufferPool.Put(buf)
+		wg.Done()
 	}()
 
 	for {
-		relay.keepAliveAndSetNextTimeout(rc)
 		relay.keepAliveAndSetNextTimeout(c)
 		var message []byte
 		if _, message, err = c.ReadMessage(); err != nil {
+			println("3", err.Error())
 			break
 		}
-		rc.Write(message)
+		relay.keepAliveAndSetNextTimeout(rc)
+		if _, err = rc.Write(message); err != nil {
+			println("4", err.Error())
+			break
+		}
 	}
+	println("called in")
 	relay.fastTimeout(c)
 	relay.fastTimeout(rc)
+	println("called out")
 	wg.Wait()
 }
 
@@ -81,33 +91,45 @@ func (relay *Relay) handleTcpOverWs(c *net.TCPConn) error {
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
-		relay.fastTimeout(c)
-		relay.fastTimeout(rc)
-		defer wg.Done()
 		for {
 			relay.keepAliveAndSetNextTimeout(rc)
-			relay.keepAliveAndSetNextTimeout(c)
 			var message []byte
 			if _, message, err = rc.ReadMessage(); err != nil {
+				println("5", err.Error())
 				break
 			}
-			c.Write(message)
+			relay.keepAliveAndSetNextTimeout(c)
+			if _, err = c.Write(message); err != nil {
+				println("6", err.Error())
+				break
+			}
 		}
+		println("called in")
+		relay.fastTimeout(rc)
+		relay.fastTimeout(c)
+		println("called out")
+		wg.Done()
 	}()
 
 	buf := inboundBufferPool.Get().([]byte)
 	for {
-		relay.keepAliveAndSetNextTimeout(rc)
 		relay.keepAliveAndSetNextTimeout(c)
 		var n int
 		if n, err = c.Read(buf[:]); err != nil {
+			println("7", err.Error())
 			break
 		}
-		rc.WriteMessage(websocket.BinaryMessage, buf[0:n])
+		relay.keepAliveAndSetNextTimeout(rc)
+		if err = rc.WriteMessage(websocket.BinaryMessage, buf[0:n]); err != nil {
+			println("8", err.Error())
+			break
+		}
 	}
 	inboundBufferPool.Put(buf)
+	println("called in")
 	relay.fastTimeout(c)
 	relay.fastTimeout(rc)
+	println("called out")
 	wg.Wait()
 	return err
 }

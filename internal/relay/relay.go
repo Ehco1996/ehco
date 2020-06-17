@@ -171,17 +171,21 @@ func (r *Relay) keepAliveAndSetNextTimeout(conn interface{}) error {
 	switch c := conn.(type) {
 	case *net.TCPConn:
 		if err := c.SetDeadline(time.Now().Add(TcpDeadline)); err != nil {
+			log.Println("keep alive error", err.Error())
 			return err
 		}
 	case *net.UDPConn:
 		if err := c.SetDeadline(time.Now().Add(UdpDeadline)); err != nil {
+			log.Println("keep alive error", err.Error())
 			return err
 		}
 	case *websocket.Conn:
 		if err := c.SetReadDeadline(time.Now().Add(WsDeadline)); err != nil {
+			log.Println("keep alive error", err.Error())
 			return err
 		}
 		if err := c.SetWriteDeadline(time.Now().Add(WsDeadline)); err != nil {
+			log.Println("keep alive error", err.Error())
 			return err
 		}
 	default:
@@ -194,17 +198,21 @@ func (r *Relay) fastTimeout(conn interface{}) error {
 	switch c := conn.(type) {
 	case *net.TCPConn:
 		if err := c.SetDeadline(time.Now().Add(FastCloseDeadLine)); err != nil {
+			log.Println("fast time out error", err.Error())
 			return err
 		}
 	case *net.UDPConn:
 		if err := c.SetDeadline(time.Now().Add(FastCloseDeadLine)); err != nil {
+			log.Println("fast time out error", err.Error())
 			return err
 		}
 	case *websocket.Conn:
 		if err := c.SetReadDeadline(time.Now().Add(FastCloseDeadLine)); err != nil {
+			log.Println("fast time out error", err.Error())
 			return err
 		}
 		if err := c.SetWriteDeadline(time.Now().Add(FastCloseDeadLine)); err != nil {
+			log.Println("fast time out error", err.Error())
 			return err
 		}
 	default:
