@@ -108,10 +108,10 @@ func (r *Relay) RunLocalTCPServer() error {
 	defer r.TCPListener.Close()
 	for {
 		c, err := r.TCPListener.AcceptTCP()
-		log.Printf("handle tcp con from: %s over: %s", c.RemoteAddr(), r.TransportType)
 		if err != nil {
 			return err
 		}
+		log.Printf("handle tcp con from: %s over: %s", c.RemoteAddr(), r.TransportType)
 
 		switch r.TransportType {
 		case Transport_WSS:
