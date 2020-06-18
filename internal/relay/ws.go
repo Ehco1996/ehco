@@ -1,6 +1,7 @@
 package relay
 
 import (
+	"crypto/tls"
 	"fmt"
 	"log"
 	"net"
@@ -66,8 +67,18 @@ func (relay *Relay) RunLocalWsServer() error {
 	http.HandleFunc("/udp/", relay.handleWsToUdp)
 	// fake
 	http.HandleFunc("/", index)
-	// TODO 加上server的keepalive和read time out
-	return http.ListenAndServeTLS(relay.LocalTCPAddr.String(), CertFileName, KeyFileName, nil)
+
+	server := &http.Server{
+		Addr:              relay.LocalTCPAddr.String(),
+		TLSConfig:         DefaultTLSConfig,
+		ReadHeaderTimeout: 30 * time.Second,
+	}
+	ln, err := net.Listen("tcp", relay.LocalTCPAddr.String())
+	if err != nil {
+		return err
+	}
+	defer ln.Close()
+	return server.Serve(tls.NewListener(ln, server.TLSConfig))
 }
 
 func index(w http.ResponseWriter, r *http.Request) {

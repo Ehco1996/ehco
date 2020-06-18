@@ -15,12 +15,11 @@ import (
 )
 
 // pre built in tls cert
-const (
-	CertFileName = "cert.pem"
-	KeyFileName  = "key.pem"
+var (
+	CertFileName     = os.Getenv("EHCO_CERT_FILE_NAME")
+	KeyFileName      = os.Getenv("EHCO_KEY_FILE_NAME")
+	DefaultTLSConfig *tls.Config
 )
-
-var DefaultTLSConfig *tls.Config
 
 func initTlsCfg() {
 	log.Printf("genCertificate...")
@@ -73,26 +72,27 @@ func generateKeyPair() (rawCert, rawKey []byte, err error) {
 		return
 	}
 
-	certOut, err := os.Create(CertFileName)
-	if err != nil {
-		log.Fatalf("failed to open cert.pem for writing: %s", err)
-	}
-	pem.Encode(certOut, &pem.Block{Type: "CERTIFICATE", Bytes: derBytes})
-	certOut.Close()
-	log.Printf("write cert to %s", CertFileName)
-
-	keyOut, err := os.OpenFile(KeyFileName, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
-	if err != nil {
-		log.Print("failed to open key.pem for writing:", err)
-		return
-	}
-	pem.Encode(keyOut, pemBlockForKey(priv))
-	keyOut.Close()
-	log.Printf("write key to %s", KeyFileName)
-
 	rawCert = pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: derBytes})
 	rawKey = pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(priv)})
 
+	if CertFileName != "" {
+		certOut, err := os.Create(CertFileName)
+		if err != nil {
+			log.Fatalf("failed to open cert.pem for writing: %s", err)
+		}
+		pem.Encode(certOut, &pem.Block{Type: "CERTIFICATE", Bytes: derBytes})
+		certOut.Close()
+		log.Printf("write cert to %s", CertFileName)
+	}
+	if KeyFileName != "" {
+		keyOut, err := os.OpenFile(KeyFileName, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
+		if err != nil {
+			log.Print("failed to open key.pem for writing:", err)
+		}
+		pem.Encode(keyOut, pemBlockForKey(priv))
+		keyOut.Close()
+		log.Printf("write key to %s", KeyFileName)
+	}
 	return
 }
 
@@ -103,7 +103,7 @@ func pemBlockForKey(priv interface{}) *pem.Block {
 	case *ecdsa.PrivateKey:
 		b, err := x509.MarshalECPrivateKey(k)
 		if err != nil {
-			log.Println(os.Stderr, "Unable to marshal ECDSA private key: %v", err)
+			log.Printf("Unable to marshal ECDSA private key: %v", err)
 			os.Exit(2)
 		}
 		return &pem.Block{Type: "EC PRIVATE KEY", Bytes: b}
