@@ -1,10 +1,20 @@
 [
     {
         "listen": "0.0.0.0:1234",
-        "remote": "0.0.0.0:9001"
+        "listen_type": "raw",
+        "remote": "0.0.0.0:5201",
+        "transport_type": "raw"
     },
     {
         "listen": "0.0.0.0:1235",
-        "remote": "0.0.0.0:9001"
+        "listen_type": "raw",
+        "remote": "wss://0.0.0.0:1236",
+        "transport_type": "wss"
+    },
+    {
+        "listen": "0.0.0.0:1236",
+        "listen_type": "wss",
+        "remote": "0.0.0.0:5201",
+        "transport_type": "raw"
     }
 ]

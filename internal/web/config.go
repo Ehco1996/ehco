@@ -2,8 +2,8 @@ package web
 
 import (
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -41,7 +41,7 @@ func (c *Config) readFromFile() error {
 	if err != nil {
 		return err
 	}
-	fmt.Println("[INFO] load config from file:", c.PATH)
+	log.Println("[INFO] load config from file:", c.PATH)
 	return nil
 }
 
@@ -53,6 +53,6 @@ func (c *Config) readFromHttp() error {
 	}
 	defer r.Body.Close()
 	json.NewDecoder(r.Body).Decode(&c.Configs)
-	fmt.Println("[INFO] load config from http:", c.PATH)
+	log.Println("[INFO] load config from http:", c.PATH)
 	return nil
 }
