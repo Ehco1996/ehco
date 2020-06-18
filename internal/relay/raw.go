@@ -11,12 +11,8 @@ func (r *Relay) handleTCPConn(c *net.TCPConn) error {
 	if err != nil {
 		return err
 	}
-	defer rc.Close()
-	var wg sync.WaitGroup
-	wg.Add(2)
-	go doCopy(rc, c, inboundBufferPool, &wg)
-	go doCopy(c, rc, outboundBufferPool, &wg)
-	wg.Wait()
+	transport(c, rc)
+	rc.Close()
 	return nil
 }
 

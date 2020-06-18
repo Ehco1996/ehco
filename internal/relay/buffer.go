@@ -2,7 +2,6 @@ package relay
 
 import (
 	"io"
-	"log"
 	"sync"
 )
 
@@ -23,14 +22,28 @@ func newBufferPool(size int) *sync.Pool {
 	}}
 }
 
-func doCopy(dst io.Writer, src io.Reader, bufferPool *sync.Pool, wg *sync.WaitGroup) {
+func copyBuffer(dst io.Writer, src io.Reader, bufferPool *sync.Pool) error {
 	buf := bufferPool.Get().([]byte)
 	defer bufferPool.Put(buf)
 	_, err := io.CopyBuffer(dst, src, buf)
-	if err != nil && err != io.EOF {
-		log.Printf("failed to doCopy: %v\n", err)
+	return err
+}
+
+func transport(rw1, rw2 io.ReadWriter) error {
+	errc := make(chan error, 1)
+	go func() {
+		errc <- copyBuffer(rw1, rw2, inboundBufferPool)
+	}()
+
+	go func() {
+		errc <- copyBuffer(rw2, rw1, outboundBufferPool)
+	}()
+
+	err := <-errc
+	if err != nil && err == io.EOF {
+		err = nil
 	}
-	wg.Done()
+	return err
 }
 
 type udpBufferCh struct {

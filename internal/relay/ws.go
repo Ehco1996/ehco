@@ -5,7 +5,6 @@ import (
 	"log"
 	"net"
 	"net/http"
-	"sync"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -58,9 +57,8 @@ func (c *WsConn) SetWriteDeadline(t time.Time) error {
 }
 
 func newWsConn(conn *websocket.Conn) *WsConn {
-	return &WsConn{
-		conn: conn,
-	}
+	wsc := &WsConn{conn: conn}
+	return wsc
 }
 
 func (relay *Relay) RunLocalWsServer() error {
@@ -90,13 +88,7 @@ func (relay *Relay) handleWsToTcp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	log.Printf("handleWsToTcp from:%s to:%s", wsc.RemoteAddr(), rc.RemoteAddr())
-
-	var wg sync.WaitGroup
-	wg.Add(2)
-	go doCopy(rc, wsc, outboundBufferPool, &wg)
-	go doCopy(wsc, rc, inboundBufferPool, &wg)
-	wg.Wait()
-
+	transport(rc, wsc)
 	rc.Close()
 	wsc.Close()
 }
@@ -109,12 +101,7 @@ func (relay *Relay) handleTcpOverWs(c *net.TCPConn) error {
 	}
 	resp.Body.Close()
 	wsc := newWsConn(conn)
-	var wg sync.WaitGroup
-	wg.Add(2)
-	go doCopy(c, wsc, outboundBufferPool, &wg)
-	go doCopy(wsc, c, inboundBufferPool, &wg)
-	wg.Wait()
-
+	transport(c, wsc)
 	c.Close()
 	wsc.Close()
 	return nil
