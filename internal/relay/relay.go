@@ -8,14 +8,12 @@ import (
 	_ "net/http/pprof"
 	"os"
 	"time"
-
-	"github.com/gorilla/websocket"
 )
 
 var (
 	TcpDeadline       = 60 * time.Second
 	UdpDeadline       = 6 * time.Second
-	WsDeadline        = 30 * time.Second
+	WsDeadline        = 15 * time.Second
 	FastCloseDeadLine = 1 * time.Second
 	DEBUG             = os.Getenv("EHCO_DEBUG")
 )
@@ -118,7 +116,7 @@ func (r *Relay) RunLocalTCPServer() error {
 		switch r.TransportType {
 		case Transport_WSS:
 			go func(c *net.TCPConn) {
-				defer c.Close()
+				// need close conn in handleTcpOverWs
 				if err := r.handleTcpOverWs(c); err != nil && err != io.EOF {
 					log.Printf("handleTcpOverWs err %s", err)
 				}
@@ -171,40 +169,12 @@ func (r *Relay) keepAliveAndSetNextTimeout(conn interface{}) error {
 	switch c := conn.(type) {
 	case *net.TCPConn:
 		if err := c.SetDeadline(time.Now().Add(TcpDeadline)); err != nil {
+			log.Println("keep alive error", err.Error())
 			return err
 		}
 	case *net.UDPConn:
 		if err := c.SetDeadline(time.Now().Add(UdpDeadline)); err != nil {
-			return err
-		}
-	case *websocket.Conn:
-		if err := c.SetReadDeadline(time.Now().Add(WsDeadline)); err != nil {
-			return err
-		}
-		if err := c.SetWriteDeadline(time.Now().Add(WsDeadline)); err != nil {
-			return err
-		}
-	default:
-		return nil
-	}
-	return nil
-}
-
-func (r *Relay) fastTimeout(conn interface{}) error {
-	switch c := conn.(type) {
-	case *net.TCPConn:
-		if err := c.SetDeadline(time.Now().Add(FastCloseDeadLine)); err != nil {
-			return err
-		}
-	case *net.UDPConn:
-		if err := c.SetDeadline(time.Now().Add(FastCloseDeadLine)); err != nil {
-			return err
-		}
-	case *websocket.Conn:
-		if err := c.SetReadDeadline(time.Now().Add(FastCloseDeadLine)); err != nil {
-			return err
-		}
-		if err := c.SetWriteDeadline(time.Now().Add(FastCloseDeadLine)); err != nil {
+			log.Println("keep alive error", err.Error())
 			return err
 		}
 	default:

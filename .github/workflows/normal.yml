@@ -2,6 +2,8 @@ name: normal
 
 on:
   push:
+    branches:
+      - master
 
 jobs:
   test:

@@ -28,7 +28,7 @@ func doCopy(dst io.Writer, src io.Reader, bufferPool *sync.Pool, wg *sync.WaitGr
 	defer bufferPool.Put(buf)
 	_, err := io.CopyBuffer(dst, src, buf)
 	if err != nil && err != io.EOF {
-		log.Printf("failed to relay: %v\n", err)
+		log.Printf("failed to doCopy: %v\n", err)
 	}
 	wg.Done()
 }
