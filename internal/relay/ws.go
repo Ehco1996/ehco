@@ -6,18 +6,69 @@ import (
 	"net"
 	"net/http"
 	"sync"
+	"time"
 
 	"github.com/gorilla/websocket"
 )
 
-// use default options
-var upgrader = websocket.Upgrader{}
+type WsConn struct {
+	conn *websocket.Conn
+	rb   []byte
+}
+
+func (c *WsConn) Read(b []byte) (n int, err error) {
+	if len(c.rb) == 0 {
+		_, c.rb, err = c.conn.ReadMessage()
+	}
+	n = copy(b, c.rb)
+	c.rb = c.rb[n:]
+	return
+}
+
+func (c *WsConn) Write(b []byte) (n int, err error) {
+	err = c.conn.WriteMessage(websocket.BinaryMessage, b)
+	n = len(b)
+	return
+}
+
+func (c *WsConn) Close() error {
+	return c.conn.Close()
+}
+
+func (c *WsConn) RemoteAddr() net.Addr {
+	return c.conn.RemoteAddr()
+}
+
+func (c *WsConn) LocalAddr() net.Addr {
+	return c.conn.LocalAddr()
+}
+
+func (c *WsConn) SetDeadline(t time.Time) error {
+	if err := c.SetReadDeadline(t); err != nil {
+		return err
+	}
+	return c.SetWriteDeadline(t)
+}
+func (c *WsConn) SetReadDeadline(t time.Time) error {
+	return c.conn.SetReadDeadline(t)
+}
+
+func (c *WsConn) SetWriteDeadline(t time.Time) error {
+	return c.conn.SetWriteDeadline(t)
+}
+
+func newWsConn(conn *websocket.Conn) *WsConn {
+	return &WsConn{
+		conn: conn,
+	}
+}
 
 func (relay *Relay) RunLocalWsServer() error {
 	http.HandleFunc("/tcp/", relay.handleWsToTcp)
 	http.HandleFunc("/udp/", relay.handleWsToUdp)
 	// fake
 	http.HandleFunc("/", index)
+	// TODO 加上server的keepalive和read time out
 	return http.ListenAndServeTLS(relay.LocalTCPAddr.String(), CertFileName, KeyFileName, nil)
 }
 
@@ -27,111 +78,46 @@ func index(w http.ResponseWriter, r *http.Request) {
 }
 
 func (relay *Relay) handleWsToTcp(w http.ResponseWriter, r *http.Request) {
-	c, err := upgrader.Upgrade(w, r, nil)
+	var upgrader = websocket.Upgrader{}
+	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		return
 	}
+	wsc := newWsConn(conn)
 	rc, err := net.Dial("tcp", relay.RemoteTCPAddr)
 	if err != nil {
 		log.Printf("dial error: %s", err)
 		return
 	}
-	log.Printf("handleWsToTcp from:%s to:%s", c.RemoteAddr(), rc.RemoteAddr())
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		buf := inboundBufferPool.Get().([]byte)
-		for {
-			relay.keepAliveAndSetNextTimeout(rc)
-			var n int
-			if n, err = rc.Read(buf[:]); err != nil {
-				println("1", err.Error())
-				break
-			}
-			relay.keepAliveAndSetNextTimeout(c)
-			if err = c.WriteMessage(websocket.BinaryMessage, buf[0:n]); err != nil {
-				println("2", err.Error())
-				break
-			}
-		}
-		println("called in")
-		relay.fastTimeout(rc)
-		relay.fastTimeout(c)
-		println("called out")
-		inboundBufferPool.Put(buf)
-		wg.Done()
-	}()
+	log.Printf("handleWsToTcp from:%s to:%s", wsc.RemoteAddr(), rc.RemoteAddr())
 
-	for {
-		relay.keepAliveAndSetNextTimeout(c)
-		var message []byte
-		if _, message, err = c.ReadMessage(); err != nil {
-			println("3", err.Error())
-			break
-		}
-		relay.keepAliveAndSetNextTimeout(rc)
-		if _, err = rc.Write(message); err != nil {
-			println("4", err.Error())
-			break
-		}
-	}
-	println("called in")
-	relay.fastTimeout(c)
-	relay.fastTimeout(rc)
-	println("called out")
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go doCopy(rc, wsc, outboundBufferPool, &wg)
+	go doCopy(wsc, rc, inboundBufferPool, &wg)
 	wg.Wait()
+
+	rc.Close()
+	wsc.Close()
 }
 
 func (relay *Relay) handleTcpOverWs(c *net.TCPConn) error {
 	d := websocket.Dialer{TLSClientConfig: DefaultTLSConfig}
-	rc, _, err := d.Dial(relay.RemoteTCPAddr+"/tcp/", nil)
+	conn, resp, err := d.Dial(relay.RemoteTCPAddr+"/tcp/", nil)
 	if err != nil {
 		return err
 	}
+	resp.Body.Close()
+	wsc := newWsConn(conn)
 	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		for {
-			relay.keepAliveAndSetNextTimeout(rc)
-			var message []byte
-			if _, message, err = rc.ReadMessage(); err != nil {
-				println("5", err.Error())
-				break
-			}
-			relay.keepAliveAndSetNextTimeout(c)
-			if _, err = c.Write(message); err != nil {
-				println("6", err.Error())
-				break
-			}
-		}
-		println("called in")
-		relay.fastTimeout(rc)
-		relay.fastTimeout(c)
-		println("called out")
-		wg.Done()
-	}()
-
-	buf := inboundBufferPool.Get().([]byte)
-	for {
-		relay.keepAliveAndSetNextTimeout(c)
-		var n int
-		if n, err = c.Read(buf[:]); err != nil {
-			println("7", err.Error())
-			break
-		}
-		relay.keepAliveAndSetNextTimeout(rc)
-		if err = rc.WriteMessage(websocket.BinaryMessage, buf[0:n]); err != nil {
-			println("8", err.Error())
-			break
-		}
-	}
-	inboundBufferPool.Put(buf)
-	println("called in")
-	relay.fastTimeout(c)
-	relay.fastTimeout(rc)
-	println("called out")
+	wg.Add(2)
+	go doCopy(c, wsc, outboundBufferPool, &wg)
+	go doCopy(wsc, c, inboundBufferPool, &wg)
 	wg.Wait()
-	return err
+
+	c.Close()
+	wsc.Close()
+	return nil
 }
 
 func (relay *Relay) handleWsToUdp(w http.ResponseWriter, r *http.Request) {
