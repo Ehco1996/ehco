@@ -19,7 +19,7 @@ var ConfigPath string
 func main() {
 	app := cli.NewApp()
 	app.Name = "ehco"
-	app.Version = "0.0.6"
+	app.Version = "0.0.8"
 	app.Usage = "A proxy used to relay tcp/udp traffic to anywhere"
 	app.Flags = []cli.Flag{
 		&cli.StringFlag{
