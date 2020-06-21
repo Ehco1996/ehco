@@ -62,7 +62,7 @@ func newWsConn(conn *websocket.Conn) *WsConn {
 	return wsc
 }
 
-func (relay *Relay) RunLocalWsServer() error {
+func (relay *Relay) RunLocalWSSServer() error {
 	http.HandleFunc("/tcp/", relay.handleWsToTcp)
 	http.HandleFunc("/udp/", relay.handleWsToUdp)
 	// fake
@@ -93,18 +93,19 @@ func (relay *Relay) handleWsToTcp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	wsc := newWsConn(conn)
+	defer wsc.Close()
 	rc, err := net.Dial("tcp", relay.RemoteTCPAddr)
 	if err != nil {
 		log.Printf("dial error: %s", err)
 		return
 	}
+	defer rc.Close()
 	log.Printf("handleWsToTcp from:%s to:%s", wsc.RemoteAddr(), rc.RemoteAddr())
 	transport(rc, wsc)
-	rc.Close()
-	wsc.Close()
 }
 
 func (relay *Relay) handleTcpOverWs(c *net.TCPConn) error {
+	defer c.Close()
 	d := websocket.Dialer{TLSClientConfig: DefaultTLSConfig}
 	conn, resp, err := d.Dial(relay.RemoteTCPAddr+"/tcp/", nil)
 	if err != nil {
@@ -113,7 +114,6 @@ func (relay *Relay) handleTcpOverWs(c *net.TCPConn) error {
 	resp.Body.Close()
 	wsc := newWsConn(conn)
 	transport(c, wsc)
-	c.Close()
 	wsc.Close()
 	return nil
 }

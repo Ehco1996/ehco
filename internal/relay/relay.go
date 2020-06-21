@@ -19,11 +19,13 @@ var (
 )
 
 const (
-	Listen_RAW = "raw"
-	Listen_WSS = "wss"
+	Listen_RAW  = "raw"
+	Listen_WSS  = "wss"
+	Listen_MWSS = "mwss"
 
-	Transport_RAW = "raw"
-	Transport_WSS = "wss"
+	Transport_RAW  = "raw"
+	Transport_WSS  = "wss"
+	Transport_MWSS = "mwss"
 )
 
 type Relay struct {
@@ -71,7 +73,8 @@ func NewRelay(localAddr, listenType, remoteAddr, transportType string) (*Relay, 
 		}()
 	}
 
-	if listenType == Listen_WSS || transportType == Transport_WSS {
+	if listenType == Listen_WSS || transportType == Transport_WSS ||
+		listenType == Listen_MWSS || transportType == Transport_MWSS {
 		initTlsCfg()
 	}
 	return r, nil
@@ -91,7 +94,11 @@ func (r *Relay) ListenAndServe() error {
 		}()
 	} else if r.ListenType == Listen_WSS {
 		go func() {
-			errChan <- r.RunLocalWsServer()
+			errChan <- r.RunLocalWSSServer()
+		}()
+	} else if r.ListenType == Listen_MWSS {
+		go func() {
+			errChan <- r.RunLocalMWSSServer()
 		}()
 	} else {
 		log.Fatalf("unknown listen type: %s ", r.ListenType)
@@ -126,6 +133,12 @@ func (r *Relay) RunLocalTCPServer() error {
 				defer c.Close()
 				if err := r.handleTCPConn(c); err != nil {
 					log.Printf("handleTCPConn err %s", err)
+				}
+			}(c)
+		case Transport_MWSS:
+			go func(c *net.TCPConn) {
+				if err := r.handleTcpOverMWSS(c); err != nil && err != io.EOF {
+					log.Printf("handleTcpOverMWSS err %s", err)
 				}
 			}(c)
 		}
