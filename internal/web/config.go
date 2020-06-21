@@ -21,6 +21,10 @@ type Config struct {
 	Configs []RelayConfig
 }
 
+type HttpConfigJsonResp struct {
+	Configs []RelayConfig `json:"configs"`
+}
+
 func NewConfig(path string) *Config {
 	return &Config{PATH: path, Configs: []RelayConfig{}}
 }
@@ -52,7 +56,9 @@ func (c *Config) readFromHttp() error {
 		return err
 	}
 	defer r.Body.Close()
-	json.NewDecoder(r.Body).Decode(&c.Configs)
-	log.Println("[INFO] load config from http:", c.PATH)
+	resp := HttpConfigJsonResp{}
+	json.NewDecoder(r.Body).Decode(&resp)
+	c.Configs = resp.Configs
+	log.Println("[INFO] load config from http:", c.PATH, c.Configs)
 	return nil
 }
