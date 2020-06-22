@@ -65,7 +65,10 @@ func (session *muxSession) IsClosed() bool {
 }
 
 func (session *muxSession) NumStreams() int {
-	return session.session.NumStreams()
+	if session.session != nil {
+		return session.session.NumStreams()
+	}
+	return 0
 }
 
 type mwssTransporter struct {
@@ -89,6 +92,7 @@ func (tr *mwssTransporter) Dial(addr string) (conn net.Conn, err error) {
 		delete(tr.sessions, addr)
 		ok = false
 	}
+	// TODO max session stream
 	if !ok {
 		u, err := url.Parse(addr)
 		if err != nil {
@@ -109,7 +113,7 @@ func (tr *mwssTransporter) Handshake(conn net.Conn, addr string) (net.Conn, erro
 	tr.sessionMutex.Lock()
 	defer tr.sessionMutex.Unlock()
 
-	conn.SetDeadline(time.Now().Add(TcpDeadline))
+	conn.SetDeadline(time.Now().Add(WsDeadline))
 	defer conn.SetDeadline(time.Time{})
 
 	session, ok := tr.sessions[addr]
@@ -123,6 +127,8 @@ func (tr *mwssTransporter) Handshake(conn net.Conn, addr string) (net.Conn, erro
 		session = s
 		tr.sessions[addr] = session
 	}
+
+	log.Printf("[Handshake] now strems: %d", session.NumStreams())
 	cc, err := session.GetConn()
 	if err != nil {
 		session.Close()
