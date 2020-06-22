@@ -2,14 +2,15 @@ package relay
 
 import (
 	"crypto/tls"
-	"github.com/gorilla/websocket"
-	"github.com/xtaci/smux"
 	"log"
 	"net"
 	"net/http"
 	"net/url"
 	"sync"
 	"time"
+
+	"github.com/gorilla/websocket"
+	"github.com/xtaci/smux"
 )
 
 type muxStreamConn struct {
@@ -30,8 +31,9 @@ func (c *muxStreamConn) Close() error {
 }
 
 type muxSession struct {
-	conn    net.Conn
-	session *smux.Session
+	conn         net.Conn
+	session      *smux.Session
+	maxStreamCnt int
 }
 
 func (session *muxSession) GetConn() (net.Conn, error) {
@@ -72,27 +74,52 @@ func (session *muxSession) NumStreams() int {
 }
 
 type mwssTransporter struct {
-	sessions     map[string]*muxSession
+	sessions     map[string][]*muxSession
 	sessionMutex sync.Mutex
 }
 
 func NewMWSSTransporter() *mwssTransporter {
 	return &mwssTransporter{
-		sessions: make(map[string]*muxSession),
+		sessions: make(map[string][]*muxSession),
 	}
 }
 
 func (tr *mwssTransporter) Dial(addr string) (conn net.Conn, err error) {
-
 	tr.sessionMutex.Lock()
 	defer tr.sessionMutex.Unlock()
 
-	session, ok := tr.sessions[addr]
-	if session != nil && session.IsClosed() {
-		delete(tr.sessions, addr)
-		ok = false
+	var session *muxSession
+	sessions, ok := tr.sessions[addr]
+
+	// 找到可以用的session
+	for _, s := range sessions {
+		if s.session.NumStreams() >= s.maxStreamCnt {
+			ok = false
+		} else {
+			session = s
+			ok = true
+			break
+		}
 	}
-	// TODO max session stream
+
+	// 删除已经关闭的session
+	if session != nil && session.IsClosed() {
+		closedIdx := -1
+		ok = false
+		for idx, s := range sessions {
+			if s == session {
+				closedIdx = idx
+				log.Printf("find closed session %v idx: %d", s, closedIdx)
+				break
+			}
+		}
+		if closedIdx != -1 {
+			sessions[closedIdx] = sessions[len(sessions)-1]
+			sessions = sessions[:len(sessions)-1]
+		}
+	}
+
+	// 创建新的session
 	if !ok {
 		u, err := url.Parse(addr)
 		if err != nil {
@@ -102,39 +129,23 @@ func (tr *mwssTransporter) Dial(addr string) (conn net.Conn, err error) {
 		if err != nil {
 			return nil, err
 		}
-		session = &muxSession{conn: conn}
-		tr.sessions[addr] = session
-	}
-	return session.conn, nil
-}
-
-func (tr *mwssTransporter) Handshake(conn net.Conn, addr string) (net.Conn, error) {
-
-	tr.sessionMutex.Lock()
-	defer tr.sessionMutex.Unlock()
-
-	conn.SetDeadline(time.Now().Add(WsDeadline))
-	defer conn.SetDeadline(time.Time{})
-
-	session, ok := tr.sessions[addr]
-	if !ok || session.session == nil {
-		s, err := tr.initSession(addr, conn)
+		conn.SetDeadline(time.Now().Add(WsDeadline))
+		defer conn.SetDeadline(time.Time{})
+		session, err = tr.initSession(addr, conn)
 		if err != nil {
 			conn.Close()
-			delete(tr.sessions, addr)
 			return nil, err
 		}
-		session = s
-		tr.sessions[addr] = session
+		sessions = append(sessions, session)
 	}
 
 	log.Printf("[Handshake] now strems: %d", session.NumStreams())
 	cc, err := session.GetConn()
 	if err != nil {
 		session.Close()
-		delete(tr.sessions, addr)
 		return nil, err
 	}
+	tr.sessions[addr] = sessions
 	return cc, nil
 }
 
@@ -161,7 +172,7 @@ func (tr *mwssTransporter) initSession(addr string, conn net.Conn) (*muxSession,
 		return nil, err
 	}
 	log.Printf("[mwss] Init new session %s", session.RemoteAddr())
-	return &muxSession{conn: wsc, session: session}, nil
+	return &muxSession{conn: wsc, session: session, maxStreamCnt: MaxMWSSStreamCnt}, nil
 }
 
 func (r *Relay) RunLocalMWSSServer() error {
@@ -220,13 +231,6 @@ func (r *Relay) RunLocalMWSSServer() error {
 
 		go r.handleMWSSConnToTcp(conn)
 	}
-
-	select {
-	case err := <-s.errChan:
-		return err
-	default:
-	}
-	return nil
 }
 
 type MWSSServer struct {
@@ -301,11 +305,7 @@ func (r *Relay) handleTcpOverMWSS(c *net.TCPConn) error {
 	if err != nil {
 		return err
 	}
-	rc, err := tr.Handshake(wsc, addr)
-	if err != nil {
-		return nil
-	}
-	transport(rc, c)
+	transport(wsc, c)
 	return nil
 }
 

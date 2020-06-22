@@ -16,6 +16,7 @@ var (
 	WsDeadline        = 15 * time.Second
 	FastCloseDeadLine = 1 * time.Second
 	DEBUG             = os.Getenv("EHCO_DEBUG")
+	MaxMWSSStreamCnt  = 60
 )
 
 const (
