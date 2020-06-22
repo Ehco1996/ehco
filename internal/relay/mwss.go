@@ -94,7 +94,6 @@ func (tr *mwssTransporter) Dial(addr string) (conn net.Conn, err error) {
 	// 找到可以用的session
 	for _, s := range sessions {
 		if s.session.NumStreams() >= s.maxStreamCnt {
-			log.Printf("session: %v reach the max stream count", s.session)
 			ok = false
 		} else {
 			session = s
@@ -126,7 +125,7 @@ func (tr *mwssTransporter) Dial(addr string) (conn net.Conn, err error) {
 		if err != nil {
 			return nil, err
 		}
-		conn, err = net.DialTimeout("tcp", u.Host, TcpDeadline)
+		conn, err = net.DialTimeout("tcp", u.Host, WsDeadline)
 		if err != nil {
 			return nil, err
 		}
