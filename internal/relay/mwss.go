@@ -265,7 +265,7 @@ func (s *MWSSServer) mux(conn net.Conn) {
 	for {
 		stream, err := mux.AcceptStream()
 		if err != nil {
-			log.Printf("[mwss] accept stream:", err)
+			log.Printf("[mwss] accept stream: err: %s", err)
 			return
 		}
 
@@ -310,6 +310,7 @@ func (r *Relay) handleTcpOverMWSS(c *net.TCPConn) error {
 }
 
 func (r *Relay) handleMWSSConnToTcp(c net.Conn) {
+	defer c.Close()
 	rc, err := net.Dial("tcp", r.RemoteTCPAddr)
 	if err != nil {
 		log.Printf("dial error: %s", err)
