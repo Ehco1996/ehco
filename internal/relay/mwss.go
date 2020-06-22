@@ -94,6 +94,7 @@ func (tr *mwssTransporter) Dial(addr string) (conn net.Conn, err error) {
 	// 找到可以用的session
 	for _, s := range sessions {
 		if s.session.NumStreams() >= s.maxStreamCnt {
+			log.Printf("session: %v reach the max stream count", s.session)
 			ok = false
 		} else {
 			session = s
@@ -139,7 +140,6 @@ func (tr *mwssTransporter) Dial(addr string) (conn net.Conn, err error) {
 		sessions = append(sessions, session)
 	}
 
-	log.Printf("[Handshake] now strems: %d", session.NumStreams())
 	cc, err := session.GetConn()
 	if err != nil {
 		session.Close()
@@ -305,6 +305,7 @@ func (r *Relay) handleTcpOverMWSS(c *net.TCPConn) error {
 	if err != nil {
 		return err
 	}
+	defer wsc.Close()
 	transport(wsc, c)
 	return nil
 }
