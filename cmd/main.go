@@ -1,10 +1,11 @@
 package main
 
 import (
-	"log"
-	"os"
-
 	cli "github.com/urfave/cli/v2"
+	"log"
+	"net/http"
+	_ "net/http/pprof"
+	"os"
 
 	relay "github.com/Ehco1996/ehco/internal/relay"
 	web "github.com/Ehco1996/ehco/internal/web"
@@ -15,12 +16,13 @@ var ListenType string
 var RemoteAddr string
 var TransportType string
 var ConfigPath string
+var PprofPort string
 
 func main() {
 	app := cli.NewApp()
 	app.Name = "ehco"
-	app.Version = "0.0.8"
-	app.Usage = "A proxy used to relay tcp/udp traffic to anywhere"
+	app.Version = "0.1.0"
+	app.Usage = "ehco is a network relay tool and a typo :)"
 	app.Flags = []cli.Flag{
 		&cli.StringFlag{
 			Name:        "l, local",
@@ -57,6 +59,12 @@ func main() {
 			Usage:       "配置文件地址",
 			Destination: &ConfigPath,
 		},
+		&cli.StringFlag{
+			Name:        "pport",
+			Usage:       "pprof监听端口",
+			EnvVars:     []string{"EHCO_PPROF_PORT"},
+			Destination: &PprofPort,
+		},
 	}
 
 	app.Action = start
@@ -81,6 +89,15 @@ func start(ctx *cli.Context) error {
 	} else {
 		go serveRelay(LocalAddr, ListenType, RemoteAddr, TransportType, ch)
 	}
+
+	if PprofPort != "" {
+		go func() {
+			pps := "0.0.0.0:" + PprofPort
+			log.Printf("[DEBUG] start pprof server at http://%s/debug/pprof/", pps)
+			log.Println(http.ListenAndServe(pps	, nil))
+		}()
+	}
+
 	return <-ch
 }
 

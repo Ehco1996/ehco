@@ -4,19 +4,16 @@ import (
 	"io"
 	"log"
 	"net"
-	"net/http"
-	_ "net/http/pprof"
-	"os"
 	"time"
 )
 
 var (
-	TcpDeadline       = 60 * time.Second
-	UdpDeadline       = 6 * time.Second
-	WsDeadline        = 15 * time.Second
-	FastCloseDeadLine = 1 * time.Second
-	DEBUG             = os.Getenv("EHCO_DEBUG")
-	MaxMWSSStreamCnt  = 60
+	TcpDeadline         = 60 * time.Second
+	UdpDeadline         = 6 * time.Second
+	WsDeadline          = 15 * time.Second
+	FastCloseDeadLine   = 1 * time.Second
+	MaxMWSSStreamCnt    = 10
+	MWSSSessionDeadLine = 600 * time.Second
 )
 
 const (
@@ -67,12 +64,6 @@ func NewRelay(localAddr, listenType, remoteAddr, transportType string) (*Relay, 
 
 		udpCache: make(map[string](*udpBufferCh)),
 	}
-	if DEBUG != "" {
-		go func() {
-			log.Printf("[DEBUG] start pprof server at http://127.0.0.1:6060/debug/pprof/")
-			log.Println(http.ListenAndServe("0.0.0.0:6060", nil))
-		}()
-	}
 
 	if listenType == Listen_WSS || transportType == Transport_WSS ||
 		listenType == Listen_MWSS || transportType == Transport_MWSS {
@@ -117,10 +108,9 @@ func (r *Relay) RunLocalTCPServer() error {
 	for {
 		c, err := r.TCPListener.AcceptTCP()
 		if err != nil {
+			log.Printf("accept tcp con error: %s", err)
 			return err
 		}
-		log.Printf("handle tcp con from: %s over: %s", c.RemoteAddr(), r.TransportType)
-
 		switch r.TransportType {
 		case Transport_WSS:
 			go func(c *net.TCPConn) {

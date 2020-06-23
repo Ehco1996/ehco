@@ -93,7 +93,7 @@ func (tr *mwssTransporter) Dial(addr string) (conn net.Conn, err error) {
 
 	// 找到可以用的session
 	for _, s := range sessions {
-		if s.session.NumStreams() >= s.maxStreamCnt {
+		if s.NumStreams() >= s.maxStreamCnt {
 			ok = false
 		} else {
 			session = s
@@ -130,7 +130,7 @@ func (tr *mwssTransporter) Dial(addr string) (conn net.Conn, err error) {
 			return nil, err
 		}
 		conn.SetDeadline(time.Now().Add(WsDeadline))
-		defer conn.SetDeadline(time.Time{})
+
 		session, err = tr.initSession(addr, conn)
 		if err != nil {
 			conn.Close()
@@ -144,6 +144,9 @@ func (tr *mwssTransporter) Dial(addr string) (conn net.Conn, err error) {
 		session.Close()
 		return nil, err
 	}
+	// TODO 统一管理session的deadline
+	session.conn.SetDeadline(time.Now().Add(MWSSSessionDeadLine))
+	session.session.SetDeadline(time.Now().Add(MWSSSessionDeadLine))
 	tr.sessions[addr] = sessions
 	return cc, nil
 }
@@ -184,15 +187,15 @@ func (r *Relay) RunLocalMWSSServer() error {
 	}
 
 	mux := http.NewServeMux()
+	mux.Handle("/tcp/", http.HandlerFunc(s.upgrade))
+	// fake
+	mux.Handle("/", http.HandlerFunc(index))
 	server := &http.Server{
 		Addr:              r.LocalTCPAddr.String(),
 		Handler:           mux,
 		TLSConfig:         DefaultTLSConfig,
 		ReadHeaderTimeout: 30 * time.Second,
 	}
-	mux.Handle("/tcp/", http.HandlerFunc(s.upgrade))
-	// fake
-	mux.Handle("/", http.HandlerFunc(index))
 	s.server = server
 
 	ln, err := net.Listen("tcp", r.LocalTCPAddr.String())
@@ -305,6 +308,7 @@ func (r *Relay) handleTcpOverMWSS(c *net.TCPConn) error {
 		return err
 	}
 	defer wsc.Close()
+	log.Printf("handleTcpOverMWSS from:%s to:%s", c.RemoteAddr(), wsc.RemoteAddr())
 	transport(wsc, c)
 	return nil
 }
