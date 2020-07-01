@@ -5,6 +5,14 @@
 
 ehco is a network relay tool and a typo :)
 
+## 视频安装教程
+
+* 面板视频安装教程: [地址](https://youtu.be/BRHcdGeufvY)
+
+* 后端对接视频教程: [地址](https://youtu.be/QNbnya1HHU0)
+
+* 隧道对接视频教程: [地址](https://youtu.be/R4U0NZaMUeY)
+
 ## 主要功能
 
 * tcp/udp relay
