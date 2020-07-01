@@ -309,6 +309,12 @@ func (r *Relay) handleTcpOverMWSS(c *net.TCPConn) error {
 	}
 	defer wsc.Close()
 	log.Printf("handleTcpOverMWSS from:%s to:%s", c.RemoteAddr(), wsc.RemoteAddr())
+	if err := wsc.SetDeadline(time.Now().Add(TransportDeadLine)); err != nil {
+		return err
+	}
+	if err := c.SetDeadline(time.Now().Add(TransportDeadLine)); err != nil {
+		return err
+	}
 	transport(wsc, c)
 	return nil
 }
@@ -322,5 +328,13 @@ func (r *Relay) handleMWSSConnToTcp(c net.Conn) {
 	}
 	defer rc.Close()
 	log.Printf("handleMWSSConnToTcp from:%s to:%s", c.RemoteAddr(), rc.RemoteAddr())
+	if err := rc.SetDeadline(time.Now().Add(TransportDeadLine)); err != nil {
+		log.Printf("set deadline error: %s", err)
+		return
+	}
+	if err := c.SetDeadline(time.Now().Add(TransportDeadLine)); err != nil {
+		log.Printf("set deadline error: %s", err)
+		return
+	}
 	transport(rc, c)
 }

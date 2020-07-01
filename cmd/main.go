@@ -21,7 +21,7 @@ var PprofPort string
 func main() {
 	app := cli.NewApp()
 	app.Name = "ehco"
-	app.Version = "0.1.0"
+	app.Version = "0.1.1"
 	app.Usage = "ehco is a network relay tool and a typo :)"
 	app.Flags = []cli.Flag{
 		&cli.StringFlag{
@@ -94,7 +94,7 @@ func start(ctx *cli.Context) error {
 		go func() {
 			pps := "0.0.0.0:" + PprofPort
 			log.Printf("[DEBUG] start pprof server at http://%s/debug/pprof/", pps)
-			log.Println(http.ListenAndServe(pps	, nil))
+			log.Println(http.ListenAndServe(pps, nil))
 		}()
 	}
 

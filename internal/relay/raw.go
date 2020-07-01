@@ -4,6 +4,7 @@ import (
 	"log"
 	"net"
 	"sync"
+	"time"
 )
 
 func (r *Relay) handleTCPConn(c *net.TCPConn) error {
@@ -11,8 +12,14 @@ func (r *Relay) handleTCPConn(c *net.TCPConn) error {
 	if err != nil {
 		return err
 	}
+	defer rc.Close()
+	if err := rc.SetDeadline(time.Now().Add(TransportDeadLine)); err != nil {
+		return err
+	}
+	if err := c.SetDeadline(time.Now().Add(TransportDeadLine)); err != nil {
+		return err
+	}
 	transport(c, rc)
-	rc.Close()
 	return nil
 }
 

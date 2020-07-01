@@ -14,6 +14,7 @@ var (
 	FastCloseDeadLine   = 1 * time.Second
 	MaxMWSSStreamCnt    = 10
 	MWSSSessionDeadLine = 600 * time.Second
+	TransportDeadLine   = 10 * time.Minute
 )
 
 const (

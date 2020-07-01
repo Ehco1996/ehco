@@ -101,6 +101,14 @@ func (relay *Relay) handleWsToTcp(w http.ResponseWriter, r *http.Request) {
 	}
 	defer rc.Close()
 	log.Printf("handleWsToTcp from:%s to:%s", wsc.RemoteAddr(), rc.RemoteAddr())
+	if err := wsc.SetDeadline(time.Now().Add(TransportDeadLine)); err != nil {
+		log.Printf("set deadline error: %s", err)
+		return
+	}
+	if err := rc.SetDeadline(time.Now().Add(TransportDeadLine)); err != nil {
+		log.Printf("set deadline error: %s", err)
+		return
+	}
 	transport(rc, wsc)
 }
 
@@ -113,8 +121,14 @@ func (relay *Relay) handleTcpOverWs(c *net.TCPConn) error {
 	}
 	resp.Body.Close()
 	wsc := newWsConn(conn)
+	defer wsc.Close()
+	if err := wsc.SetDeadline(time.Now().Add(TransportDeadLine)); err != nil {
+		return err
+	}
+	if err := c.SetDeadline(time.Now().Add(TransportDeadLine)); err != nil {
+		return err
+	}
 	transport(c, wsc)
-	wsc.Close()
 	return nil
 }
 
