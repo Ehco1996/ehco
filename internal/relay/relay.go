@@ -2,7 +2,6 @@ package relay
 
 import (
 	"io"
-	"log"
 	"net"
 	"time"
 )
@@ -66,16 +65,12 @@ func NewRelay(localAddr, listenType, remoteAddr, transportType string) (*Relay, 
 		udpCache: make(map[string](*udpBufferCh)),
 	}
 
-	if listenType == Listen_WSS || transportType == Transport_WSS ||
-		listenType == Listen_MWSS || transportType == Transport_MWSS {
-		initTlsCfg()
-	}
 	return r, nil
 }
 
 func (r *Relay) ListenAndServe() error {
 	errChan := make(chan error)
-	log.Printf("start relay AT: %s Over: %s TO: %s Through %s",
+	Logger.Infof("start relay AT: %s Over: %s TO: %s Through %s",
 		r.LocalTCPAddr, r.ListenType, r.RemoteTCPAddr, r.TransportType)
 
 	if r.ListenType == Listen_RAW {
@@ -94,7 +89,7 @@ func (r *Relay) ListenAndServe() error {
 			errChan <- r.RunLocalMWSSServer()
 		}()
 	} else {
-		log.Fatalf("unknown listen type: %s ", r.ListenType)
+		Logger.Fatalf("unknown listen type: %s ", r.ListenType)
 	}
 	return <-errChan
 }
@@ -109,7 +104,7 @@ func (r *Relay) RunLocalTCPServer() error {
 	for {
 		c, err := r.TCPListener.AcceptTCP()
 		if err != nil {
-			log.Printf("accept tcp con error: %s", err)
+			Logger.Infof("accept tcp con error: %s", err)
 			return err
 		}
 		switch r.TransportType {
@@ -117,20 +112,20 @@ func (r *Relay) RunLocalTCPServer() error {
 			go func(c *net.TCPConn) {
 				// need close conn in handleTcpOverWs
 				if err := r.handleTcpOverWs(c); err != nil && err != io.EOF {
-					log.Printf("handleTcpOverWs err %s", err)
+					Logger.Infof("handleTcpOverWs err %s", err)
 				}
 			}(c)
 		case Transport_RAW:
 			go func(c *net.TCPConn) {
 				defer c.Close()
 				if err := r.handleTCPConn(c); err != nil {
-					log.Printf("handleTCPConn err %s", err)
+					Logger.Infof("handleTCPConn err %s", err)
 				}
 			}(c)
 		case Transport_MWSS:
 			go func(c *net.TCPConn) {
 				if err := r.handleTcpOverMWSS(c); err != nil && err != io.EOF {
-					log.Printf("handleTcpOverMWSS err %s", err)
+					Logger.Infof("handleTcpOverMWSS err %s", err)
 				}
 			}(c)
 		}
@@ -158,7 +153,7 @@ func (r *Relay) RunLocalUDPServer() error {
 		ubc.Ch <- buf[0:n]
 		if !ubc.Handled {
 			ubc.Handled = true
-			log.Printf("handle udp con from %s over: %s", addr, r.TransportType)
+			Logger.Infof("handle udp con from %s over: %s", addr, r.TransportType)
 			switch r.TransportType {
 			case Transport_WSS:
 				go r.handleUdpOverWs(addr.String(), ubc)
@@ -174,12 +169,12 @@ func (r *Relay) keepAliveAndSetNextTimeout(conn interface{}) error {
 	switch c := conn.(type) {
 	case *net.TCPConn:
 		if err := c.SetDeadline(time.Now().Add(TcpDeadline)); err != nil {
-			log.Println("keep alive error", err.Error())
+			Logger.Info("keep alive error", err.Error())
 			return err
 		}
 	case *net.UDPConn:
 		if err := c.SetDeadline(time.Now().Add(UdpDeadline)); err != nil {
-			log.Println("keep alive error", err.Error())
+			Logger.Info("keep alive error", err.Error())
 			return err
 		}
 	default:

@@ -3,7 +3,6 @@ package relay
 import (
 	"crypto/tls"
 	"fmt"
-	"log"
 	"net"
 	"net/http"
 	"time"
@@ -82,7 +81,7 @@ func (relay *Relay) RunLocalWSSServer() error {
 }
 
 func index(w http.ResponseWriter, r *http.Request) {
-	log.Printf("index call from %s", r.RemoteAddr)
+	Logger.Infof("index call from %s", r.RemoteAddr)
 	fmt.Fprintf(w, "access from %s \n", r.RemoteAddr)
 }
 
@@ -96,17 +95,17 @@ func (relay *Relay) handleWsToTcp(w http.ResponseWriter, r *http.Request) {
 	defer wsc.Close()
 	rc, err := net.Dial("tcp", relay.RemoteTCPAddr)
 	if err != nil {
-		log.Printf("dial error: %s", err)
+		Logger.Infof("dial error: %s", err)
 		return
 	}
 	defer rc.Close()
-	log.Printf("handleWsToTcp from:%s to:%s", wsc.RemoteAddr(), rc.RemoteAddr())
+	Logger.Infof("handleWsToTcp from:%s to:%s", wsc.RemoteAddr(), rc.RemoteAddr())
 	if err := wsc.SetDeadline(time.Now().Add(TransportDeadLine)); err != nil {
-		log.Printf("set deadline error: %s", err)
+		Logger.Infof("set deadline error: %s", err)
 		return
 	}
 	if err := rc.SetDeadline(time.Now().Add(TransportDeadLine)); err != nil {
-		log.Printf("set deadline error: %s", err)
+		Logger.Infof("set deadline error: %s", err)
 		return
 	}
 	transport(rc, wsc)
@@ -133,9 +132,9 @@ func (relay *Relay) handleTcpOverWs(c *net.TCPConn) error {
 }
 
 func (relay *Relay) handleWsToUdp(w http.ResponseWriter, r *http.Request) {
-	log.Println("not support relay udp over ws currently")
+	Logger.Info("not support relay udp over ws currently")
 }
 
 func (relay *Relay) handleUdpOverWs(addr string, ubc *udpBufferCh) {
-	log.Println("not support relay udp over ws currently")
+	Logger.Info("not support relay udp over ws currently")
 }

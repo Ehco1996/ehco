@@ -2,13 +2,11 @@ package main
 
 import (
 	cli "github.com/urfave/cli/v2"
-	"log"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
 
 	relay "github.com/Ehco1996/ehco/internal/relay"
-	web "github.com/Ehco1996/ehco/internal/web"
 )
 
 var LocalAddr string
@@ -70,7 +68,7 @@ func main() {
 	app.Action = start
 	err := app.Run(os.Args)
 	if err != nil {
-		log.Fatal(err)
+		relay.Logger.Fatal(err)
 	}
 
 }
@@ -78,23 +76,32 @@ func main() {
 func start(ctx *cli.Context) error {
 	ch := make(chan error)
 	if ConfigPath != "" {
-		config := web.NewConfig(ConfigPath)
+		config := relay.NewConfig(ConfigPath)
 		if err := config.LoadConfig(); err != nil {
-			log.Fatal(err)
+			relay.Logger.Fatal(err)
 		}
 
+		initTls := false
 		for _, cfg := range config.Configs {
+			if !initTls && cfg.ListenType == relay.Listen_WSS ||
+				cfg.TransportType == relay.Transport_WSS {
+				relay.InitTlsCfg()
+				initTls = true
+			}
 			go serveRelay(cfg.Listen, cfg.ListenType, cfg.Remote, cfg.TransportType, ch)
 		}
 	} else {
+		if ListenType == relay.Listen_WSS || TransportType == relay.Transport_WSS {
+			relay.InitTlsCfg()
+		}
 		go serveRelay(LocalAddr, ListenType, RemoteAddr, TransportType, ch)
 	}
 
 	if PprofPort != "" {
 		go func() {
 			pps := "0.0.0.0:" + PprofPort
-			log.Printf("[DEBUG] start pprof server at http://%s/debug/pprof/", pps)
-			log.Println(http.ListenAndServe(pps, nil))
+			relay.Logger.Infof("start pprof server at http://%s/debug/pprof/", pps)
+			relay.Logger.Fatal(http.ListenAndServe(pps, nil))
 		}()
 	}
 
@@ -104,7 +111,7 @@ func start(ctx *cli.Context) error {
 func serveRelay(local, listenType, remote, transportType string, ch chan error) {
 	r, err := relay.NewRelay(local, listenType, remote, transportType)
 	if err != nil {
-		log.Fatal(err)
+		relay.Logger.Fatal(err)
 	}
 	ch <- r.ListenAndServe()
 }

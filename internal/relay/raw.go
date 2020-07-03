@@ -1,7 +1,6 @@
 package relay
 
 import (
-	"log"
 	"net"
 	"sync"
 	"time"
@@ -27,7 +26,7 @@ func (r *Relay) handleOneUDPConn(addr string, ubc *udpBufferCh) {
 	uaddr, _ := net.ResolveUDPAddr("udp", addr)
 	rc, err := net.Dial("udp", r.RemoteUDPAddr)
 	if err != nil {
-		log.Println(err)
+		Logger.Info(err)
 	}
 
 	defer func() {
@@ -44,15 +43,15 @@ func (r *Relay) handleOneUDPConn(addr string, ubc *udpBufferCh) {
 		for {
 			i, err := rc.Read(buf)
 			if err != nil {
-				log.Println(err, 1)
+				Logger.Info(err, 1)
 				break
 			}
 			if err := r.keepAliveAndSetNextTimeout(rc); err != nil {
-				log.Println(err)
+				Logger.Info(err)
 				break
 			}
 			if _, err := r.UDPConn.WriteToUDP(buf[0:i], uaddr); err != nil {
-				log.Println(err)
+				Logger.Info(err)
 				break
 			}
 		}
@@ -62,11 +61,11 @@ func (r *Relay) handleOneUDPConn(addr string, ubc *udpBufferCh) {
 
 	for b := range ubc.Ch {
 		if _, err := rc.Write(b); err != nil {
-			log.Println(err)
+			Logger.Info(err)
 			break
 		}
 		if err := r.keepAliveAndSetNextTimeout(rc); err != nil {
-			log.Println(err)
+			Logger.Info(err)
 			break
 		}
 	}

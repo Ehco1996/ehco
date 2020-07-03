@@ -2,7 +2,6 @@ package relay
 
 import (
 	"crypto/tls"
-	"log"
 	"net"
 	"net/http"
 	"net/url"
@@ -109,7 +108,7 @@ func (tr *mwssTransporter) Dial(addr string) (conn net.Conn, err error) {
 		for idx, s := range sessions {
 			if s == session {
 				closedIdx = idx
-				log.Printf("find closed session %v idx: %d", s, closedIdx)
+				Logger.Infof("find closed session %v idx: %d", s, closedIdx)
 				break
 			}
 		}
@@ -173,7 +172,7 @@ func (tr *mwssTransporter) initSession(addr string, conn net.Conn) (*muxSession,
 	if err != nil {
 		return nil, err
 	}
-	log.Printf("[mwss] Init new session %s", session.RemoteAddr())
+	Logger.Infof("[mwss] Init new session %s", session.RemoteAddr())
 	return &muxSession{conn: wsc, session: session, maxStreamCnt: MaxMWSSStreamCnt}, nil
 }
 
@@ -223,7 +222,7 @@ func (r *Relay) RunLocalMWSSServer() error {
 				if max := 1 * time.Second; tempDelay > max {
 					tempDelay = max
 				}
-				log.Printf("server: Accept error: %v; retrying in %v", e, tempDelay)
+				Logger.Infof("server: Accept error: %v; retrying in %v", e, tempDelay)
 				time.Sleep(tempDelay)
 				continue
 			}
@@ -246,7 +245,7 @@ type MWSSServer struct {
 func (s *MWSSServer) upgrade(w http.ResponseWriter, r *http.Request) {
 	conn, err := s.upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		log.Println(err)
+		Logger.Info(err)
 		return
 	}
 	s.mux(newWsConn(conn))
@@ -256,18 +255,18 @@ func (s *MWSSServer) mux(conn net.Conn) {
 	smuxConfig := smux.DefaultConfig()
 	mux, err := smux.Server(conn, smuxConfig)
 	if err != nil {
-		log.Printf("[mwss] %s - %s : %s", conn.RemoteAddr(), s.Addr(), err)
+		Logger.Infof("[mwss] %s - %s : %s", conn.RemoteAddr(), s.Addr(), err)
 		return
 	}
 	defer mux.Close()
 
-	log.Printf("[mwss] %s <-> %s", conn.RemoteAddr(), s.Addr())
-	defer log.Printf("[mwss] %s >-< %s", conn.RemoteAddr(), s.Addr())
+	Logger.Infof("[mwss] %s <-> %s", conn.RemoteAddr(), s.Addr())
+	defer Logger.Infof("[mwss] %s >-< %s", conn.RemoteAddr(), s.Addr())
 
 	for {
 		stream, err := mux.AcceptStream()
 		if err != nil {
-			log.Printf("[mwss] accept stream: err: %s", err)
+			Logger.Infof("[mwss] accept stream: err: %s", err)
 			return
 		}
 
@@ -276,7 +275,7 @@ func (s *MWSSServer) mux(conn net.Conn) {
 		case s.connChan <- cc:
 		default:
 			cc.Close()
-			log.Printf("[mwss] %s - %s: connection queue is full", conn.RemoteAddr(), conn.LocalAddr())
+			Logger.Infof("[mwss] %s - %s: connection queue is full", conn.RemoteAddr(), conn.LocalAddr())
 		}
 	}
 }
@@ -308,7 +307,7 @@ func (r *Relay) handleTcpOverMWSS(c *net.TCPConn) error {
 		return err
 	}
 	defer wsc.Close()
-	log.Printf("handleTcpOverMWSS from:%s to:%s", c.RemoteAddr(), wsc.RemoteAddr())
+	Logger.Infof("handleTcpOverMWSS from:%s to:%s", c.RemoteAddr(), wsc.RemoteAddr())
 	if err := wsc.SetDeadline(time.Now().Add(TransportDeadLine)); err != nil {
 		return err
 	}
@@ -323,17 +322,17 @@ func (r *Relay) handleMWSSConnToTcp(c net.Conn) {
 	defer c.Close()
 	rc, err := net.Dial("tcp", r.RemoteTCPAddr)
 	if err != nil {
-		log.Printf("dial error: %s", err)
+		Logger.Infof("dial error: %s", err)
 		return
 	}
 	defer rc.Close()
-	log.Printf("handleMWSSConnToTcp from:%s to:%s", c.RemoteAddr(), rc.RemoteAddr())
+	Logger.Infof("handleMWSSConnToTcp from:%s to:%s", c.RemoteAddr(), rc.RemoteAddr())
 	if err := rc.SetDeadline(time.Now().Add(TransportDeadLine)); err != nil {
-		log.Printf("set deadline error: %s", err)
+		Logger.Infof("set deadline error: %s", err)
 		return
 	}
 	if err := c.SetDeadline(time.Now().Add(TransportDeadLine)); err != nil {
-		log.Printf("set deadline error: %s", err)
+		Logger.Infof("set deadline error: %s", err)
 		return
 	}
 	transport(rc, c)

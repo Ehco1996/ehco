@@ -21,6 +21,9 @@ func init() {
 	// Start the new echo server.
 	go RunEchoServer(echoHost, echoPort)
 
+	// init tls
+	relay.InitTlsCfg()
+
 	// Start the relay server
 	go func() {
 		r, err := relay.NewRelay(rawLocal, relay.Listen_RAW, rawRemote, relay.Transport_RAW)

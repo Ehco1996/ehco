@@ -8,7 +8,6 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
-	"log"
 	"math/big"
 	"os"
 	"time"
@@ -21,8 +20,8 @@ var (
 	DefaultTLSConfig *tls.Config
 )
 
-func initTlsCfg() {
-	log.Printf("genCertificate...")
+func InitTlsCfg() {
+	Logger.Infof("genCertificate...")
 	cert, err := genCertificate()
 	if err != nil {
 		panic(err)
@@ -78,20 +77,20 @@ func generateKeyPair() (rawCert, rawKey []byte, err error) {
 	if CertFileName != "" {
 		certOut, err := os.Create(CertFileName)
 		if err != nil {
-			log.Fatalf("failed to open cert.pem for writing: %s", err)
+			Logger.Fatalf("failed to open cert.pem for writing: %s", err)
 		}
 		pem.Encode(certOut, &pem.Block{Type: "CERTIFICATE", Bytes: derBytes})
 		certOut.Close()
-		log.Printf("write cert to %s", CertFileName)
+		Logger.Infof("write cert to %s", CertFileName)
 	}
 	if KeyFileName != "" {
 		keyOut, err := os.OpenFile(KeyFileName, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
 		if err != nil {
-			log.Print("failed to open key.pem for writing:", err)
+			Logger.Info("failed to open key.pem for writing:", err)
 		}
 		pem.Encode(keyOut, pemBlockForKey(priv))
 		keyOut.Close()
-		log.Printf("write key to %s", KeyFileName)
+		Logger.Infof("write key to %s", KeyFileName)
 	}
 	return
 }
@@ -103,7 +102,7 @@ func pemBlockForKey(priv interface{}) *pem.Block {
 	case *ecdsa.PrivateKey:
 		b, err := x509.MarshalECPrivateKey(k)
 		if err != nil {
-			log.Printf("Unable to marshal ECDSA private key: %v", err)
+			Logger.Infof("Unable to marshal ECDSA private key: %v", err)
 			os.Exit(2)
 		}
 		return &pem.Block{Type: "EC PRIVATE KEY", Bytes: b}
