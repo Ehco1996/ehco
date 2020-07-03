@@ -88,14 +88,14 @@ func (tr *mwssTransporter) Dial(addr string) (conn net.Conn, err error) {
 	defer tr.sessionMutex.Unlock()
 
 	var session *muxSession
+	var sessionIndex int
 	sessions, ok := tr.sessions[addr]
 
 	// 找到可以用的session
-	for _, s := range sessions {
-		if s.NumStreams() >= s.maxStreamCnt {
+	for sessionIndex, session = range sessions {
+		if session.NumStreams() >= session.maxStreamCnt {
 			ok = false
 		} else {
-			session = s
 			ok = true
 			break
 		}
@@ -103,19 +103,8 @@ func (tr *mwssTransporter) Dial(addr string) (conn net.Conn, err error) {
 
 	// 删除已经关闭的session
 	if session != nil && session.IsClosed() {
-		closedIdx := -1
-		ok = false
-		for idx, s := range sessions {
-			if s == session {
-				closedIdx = idx
-				Logger.Infof("find closed session %v idx: %d", s, closedIdx)
-				break
-			}
-		}
-		if closedIdx != -1 {
-			sessions[closedIdx] = sessions[len(sessions)-1]
-			sessions = sessions[:len(sessions)-1]
-		}
+		Logger.Infof("find closed session %v idx: %d", session, sessionIndex)
+		sessions = append(sessions[:sessionIndex], sessions[sessionIndex+1:]...)
 	}
 
 	// 创建新的session
@@ -263,11 +252,13 @@ func (s *MWSSServer) mux(conn net.Conn) {
 	Logger.Infof("[mwss] %s <-> %s", conn.RemoteAddr(), s.Addr())
 	defer Logger.Infof("[mwss] %s >-< %s", conn.RemoteAddr(), s.Addr())
 
-	for {
+	failedCount := 0
+	for failedCount < 5 {
 		stream, err := mux.AcceptStream()
 		if err != nil {
 			Logger.Infof("[mwss] accept stream: err: %s", err)
-			return
+			failedCount ++
+			break
 		}
 
 		cc := &muxStreamConn{Conn: conn, stream: stream}
