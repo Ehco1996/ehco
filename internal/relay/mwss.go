@@ -256,7 +256,7 @@ func (s *MWSSServer) mux(conn net.Conn) {
 	for failedCount < 5 {
 		stream, err := mux.AcceptStream()
 		if err != nil {
-			Logger.Infof("[mwss] accept stream err: %s failedCount: %s", err, failedCount)
+			Logger.Infof("[mwss] accept stream err: %s failedCount: %d", err, failedCount)
 			failedCount++
 			break
 		}
