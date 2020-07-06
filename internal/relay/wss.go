@@ -62,15 +62,16 @@ func newWsConn(conn *websocket.Conn) *WsConn {
 }
 
 func (relay *Relay) RunLocalWSSServer() error {
-	http.HandleFunc("/tcp/", relay.handleWssToTcp)
-	http.HandleFunc("/udp/", relay.handleWsToUdp)
-	// fake
-	http.HandleFunc("/", index)
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", index)
+	mux.HandleFunc("/tcp/", relay.handleWssToTcp)
+	mux.HandleFunc("/udp/", relay.handleWssToUdp)
 
 	server := &http.Server{
 		Addr:              relay.LocalTCPAddr.String(),
 		TLSConfig:         DefaultTLSConfig,
 		ReadHeaderTimeout: 30 * time.Second,
+		Handler:           mux,
 	}
 	ln, err := net.Listen("tcp", relay.LocalTCPAddr.String())
 	if err != nil {
@@ -131,10 +132,10 @@ func (relay *Relay) handleTcpOverWss(c *net.TCPConn) error {
 	return nil
 }
 
-func (relay *Relay) handleWsToUdp(w http.ResponseWriter, r *http.Request) {
+func (relay *Relay) handleWssToUdp(w http.ResponseWriter, r *http.Request) {
 	Logger.Info("not support relay udp over ws currently")
 }
 
-func (relay *Relay) handleUdpOverWs(addr string, ubc *udpBufferCh) {
+func (relay *Relay) handleUdpOverWss(addr string, ubc *udpBufferCh) {
 	Logger.Info("not support relay udp over ws currently")
 }

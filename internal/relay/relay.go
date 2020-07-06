@@ -169,7 +169,7 @@ func (r *Relay) RunLocalUDPServer() error {
 			Logger.Infof("handle udp con from %s over: %s", addr, r.TransportType)
 			switch r.TransportType {
 			case Transport_WSS:
-				go r.handleUdpOverWs(addr.String(), ubc)
+				go r.handleUdpOverWss(addr.String(), ubc)
 			case Transport_RAW:
 				go r.handleOneUDPConn(addr.String(), ubc)
 			}

@@ -260,7 +260,6 @@ func (s *MWSSServer) mux(conn net.Conn) {
 			failedCount++
 			break
 		}
-
 		cc := &muxStreamConn{Conn: conn, stream: stream}
 		select {
 		case s.connChan <- cc:

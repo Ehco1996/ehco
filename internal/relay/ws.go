@@ -8,13 +8,15 @@ import (
 	"time"
 )
 
-
-
 func (relay *Relay) RunLocalWSServer() error {
-	http.HandleFunc("/ws/tcp/", relay.handleWsToTcp)
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", index)
+	mux.HandleFunc("/ws/tcp/", relay.handleWsToTcp)
 	server := &http.Server{
 		Addr:              relay.LocalTCPAddr.String(),
 		ReadHeaderTimeout: 30 * time.Second,
+		Handler:           mux,
 	}
 	ln, err := net.Listen("tcp", relay.LocalTCPAddr.String())
 	if err != nil {
@@ -38,6 +40,9 @@ func (relay *Relay) handleWsToTcp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer rc.Close()
+
+	Logger.Infof("handleWsToTcp from:%s to:%s", wsc.RemoteAddr(), rc.RemoteAddr())
+
 	if err := rc.SetDeadline(time.Now().Add(TransportDeadLine)); err != nil {
 		Logger.Infof("set deadline error: %s", err)
 		return

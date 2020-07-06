@@ -83,12 +83,12 @@ func start(ctx *cli.Context) error {
 
 		initTls := false
 		for _, cfg := range config.Configs {
-			if cfg.ListenType == relay.Listen_WSS ||
+			if !initTls && (cfg.ListenType == relay.Listen_WSS ||
 				cfg.ListenType == relay.Listen_MWSS ||
 				cfg.TransportType == relay.Transport_WSS ||
-				cfg.TransportType == relay.Transport_MWSS && !initTls {
-				relay.InitTlsCfg()
+				cfg.TransportType == relay.Transport_MWSS) {
 				initTls = true
+				relay.InitTlsCfg()
 			}
 			go serveRelay(cfg.Listen, cfg.ListenType, cfg.Remote, cfg.TransportType, ch)
 		}
