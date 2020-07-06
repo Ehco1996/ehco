@@ -18,10 +18,12 @@ var (
 
 const (
 	Listen_RAW  = "raw"
+	Listen_WS   = "ws"
 	Listen_WSS  = "wss"
 	Listen_MWSS = "mwss"
 
 	Transport_RAW  = "raw"
+	Transport_WS   = "ws"
 	Transport_WSS  = "wss"
 	Transport_MWSS = "mwss"
 )
@@ -80,6 +82,10 @@ func (r *Relay) ListenAndServe() error {
 		go func() {
 			errChan <- r.RunLocalUDPServer()
 		}()
+	} else if r.ListenType == Listen_WS {
+		go func() {
+			errChan <- r.RunLocalWSServer()
+		}()
 	} else if r.ListenType == Listen_WSS {
 		go func() {
 			errChan <- r.RunLocalWSSServer()
@@ -108,18 +114,25 @@ func (r *Relay) RunLocalTCPServer() error {
 			return err
 		}
 		switch r.TransportType {
-		case Transport_WSS:
+		case Transport_RAW:
+			go func(c *net.TCPConn) {
+				defer c.Close()
+				if err := r.handleTCPConn(c); err != nil {
+					Logger.Infof("handleTCPConn err %s", err)
+				}
+			}(c)
+		case Transport_WS:
 			go func(c *net.TCPConn) {
 				// need close conn in handleTcpOverWs
 				if err := r.handleTcpOverWs(c); err != nil && err != io.EOF {
 					Logger.Infof("handleTcpOverWs err %s", err)
 				}
 			}(c)
-		case Transport_RAW:
+		case Transport_WSS:
 			go func(c *net.TCPConn) {
-				defer c.Close()
-				if err := r.handleTCPConn(c); err != nil {
-					Logger.Infof("handleTCPConn err %s", err)
+				// need close conn in handleTcpOverWss
+				if err := r.handleTcpOverWss(c); err != nil && err != io.EOF {
+					Logger.Infof("handleTcpOverWss err %s", err)
 				}
 			}(c)
 		case Transport_MWSS:

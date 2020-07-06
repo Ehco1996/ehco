@@ -70,6 +70,15 @@ go run cmd/main.go -l 0.0.0.0:1234 -r 0.0.0.0:5201
 
 
 # 通过wss隧道转发
+# listen 1234 relay over ws to 1236
+go run cmd/main.go -l 0.0.0.0:1235  -r wss://0.0.0.0:1236 -tt ws
+
+# listen 1236 through ws relay to 5201
+go run cmd/main.go -l 0.0.0.0:1236 -lt wss -r 0.0.0.0:5201
+# 通过wss隧道转发END
+
+
+# 通过wss隧道转发
 # listen 1234 relay over wss to 1236
 go run cmd/main.go -l 0.0.0.0:1235  -r wss://0.0.0.0:1236 -tt wss
 
@@ -100,7 +109,7 @@ iperf3 -c 0.0.0.0 -p 1234 -u -b 1G --length 1024
 
 ```
 
-| iperf | raw | relay(raw) | relay(wss) | relay(mwss)|
-| ---- | ----  | ---- | ---- | ---- |
-| tcp  | 62.6 Gbits/sec | 23.9 Gbits/sec | 3.10 Gbits/sec | 1.77 Gbits/sec |
-| udp  | 2.2 Gbits/sec | 2.2 Gbits/sec | xx  | xx |
+| iperf | raw | relay(raw) | relay(ws) |relay(wss) | relay(mwss)|
+| ---- | ----  | ---- | ---- | ---- | ---- |
+| tcp  | 62.6 Gbits/sec | 23.9 Gbits/sec | 3.10 Gbits/sec |3.10 Gbits/sec | 1.77 Gbits/sec |
+| udp  | 2.2 Gbits/sec | 2.2 Gbits/sec | 暂不支持 | 暂不支持 | 暂不支持 |
