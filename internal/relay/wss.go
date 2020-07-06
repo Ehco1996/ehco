@@ -1,12 +1,13 @@
 package relay
 
 import (
+	"context"
 	"crypto/tls"
-	"fmt"
 	"net"
 	"net/http"
 	"time"
 
+	"github.com/gobwas/ws"
 	"github.com/gorilla/websocket"
 )
 
@@ -81,54 +82,38 @@ func (relay *Relay) RunLocalWSSServer() error {
 	return server.Serve(tls.NewListener(ln, server.TLSConfig))
 }
 
-func index(w http.ResponseWriter, r *http.Request) {
-	Logger.Infof("index call from %s", r.RemoteAddr)
-	fmt.Fprintf(w, "access from %s \n", r.RemoteAddr)
-}
-
 func (relay *Relay) handleWssToTcp(w http.ResponseWriter, r *http.Request) {
-	var upgrader = websocket.Upgrader{}
-	conn, err := upgrader.Upgrade(w, r, nil)
+	c, _, _, err := ws.UpgradeHTTP(r, w)
 	if err != nil {
 		return
 	}
-	wsc := newWsConn(conn)
+	wsc := NewDeadLinerConn(c, WsDeadline)
 	defer wsc.Close()
+
 	rc, err := net.Dial("tcp", relay.RemoteTCPAddr)
 	if err != nil {
 		Logger.Infof("dial error: %s", err)
 		return
 	}
-	defer rc.Close()
+	drc := NewDeadLinerConn(rc, TcpDeadline)
+	defer drc.Close()
 	Logger.Infof("handleWssToTcp from:%s to:%s", wsc.RemoteAddr(), rc.RemoteAddr())
-	if err := wsc.SetDeadline(time.Now().Add(TransportDeadLine)); err != nil {
-		Logger.Infof("set deadline error: %s", err)
-		return
-	}
-	if err := rc.SetDeadline(time.Now().Add(TransportDeadLine)); err != nil {
-		Logger.Infof("set deadline error: %s", err)
-		return
-	}
-	transport(rc, wsc)
+	transport(drc, wsc)
 }
 
 func (relay *Relay) handleTcpOverWss(c *net.TCPConn) error {
-	defer c.Close()
-	d := websocket.Dialer{TLSClientConfig: DefaultTLSConfig}
-	conn, resp, err := d.Dial(relay.RemoteTCPAddr+"/tcp/", nil)
+	dc := NewDeadLinerConn(c, TcpDeadline)
+	defer dc.Close()
+
+	d := ws.Dialer{TLSConfig: DefaultTLSConfig}
+	rc, _, _, err := d.Dial(context.TODO(), relay.RemoteTCPAddr+"/tcp/")
 	if err != nil {
 		return err
 	}
-	resp.Body.Close()
-	wsc := newWsConn(conn)
+
+	wsc := NewDeadLinerConn(rc, WsDeadline)
 	defer wsc.Close()
-	if err := wsc.SetDeadline(time.Now().Add(TransportDeadLine)); err != nil {
-		return err
-	}
-	if err := c.SetDeadline(time.Now().Add(TransportDeadLine)); err != nil {
-		return err
-	}
-	transport(c, wsc)
+	transport(dc, wsc)
 	return nil
 }
 

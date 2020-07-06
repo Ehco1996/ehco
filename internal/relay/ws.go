@@ -2,11 +2,18 @@ package relay
 
 import (
 	"context"
-	"github.com/gobwas/ws"
+	"fmt"
 	"net"
 	"net/http"
 	"time"
+
+	"github.com/gobwas/ws"
 )
+
+func index(w http.ResponseWriter, r *http.Request) {
+	Logger.Infof("index call from %s", r.RemoteAddr)
+	fmt.Fprintf(w, "access from %s \n", r.RemoteAddr)
+}
 
 func (relay *Relay) RunLocalWSServer() error {
 
@@ -39,29 +46,22 @@ func (relay *Relay) handleWsToTcp(w http.ResponseWriter, r *http.Request) {
 		Logger.Infof("dial error: %s", err)
 		return
 	}
-	defer rc.Close()
-
+	drc := NewDeadLinerConn(rc, TcpDeadline)
+	defer drc.Close()
 	Logger.Infof("handleWsToTcp from:%s to:%s", wsc.RemoteAddr(), rc.RemoteAddr())
-
-	if err := rc.SetDeadline(time.Now().Add(TransportDeadLine)); err != nil {
-		Logger.Infof("set deadline error: %s", err)
-		return
-	}
-	transport(rc, wsc)
+	transport(drc, wsc)
 }
 
 func (relay *Relay) handleTcpOverWs(c *net.TCPConn) error {
-	defer c.Close()
+	dc := NewDeadLinerConn(c, TcpDeadline)
+	defer dc.Close()
+
 	rc, _, _, err := ws.Dial(context.TODO(), relay.RemoteTCPAddr+"/ws/tcp/")
 	if err != nil {
 		return err
 	}
 	wsc := NewDeadLinerConn(rc, WsDeadline)
 	defer wsc.Close()
-
-	if err := c.SetDeadline(time.Now().Add(TransportDeadLine)); err != nil {
-		return err
-	}
-	transport(c, wsc)
+	transport(dc, wsc)
 	return nil
 }
