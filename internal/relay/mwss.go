@@ -105,6 +105,7 @@ func (tr *mwssTransporter) Dial(addr string) (conn net.Conn, err error) {
 	if session != nil && session.IsClosed() {
 		Logger.Infof("find closed session %v idx: %d", session, sessionIndex)
 		sessions = append(sessions[:sessionIndex], sessions[sessionIndex+1:]...)
+		ok = false
 	}
 
 	// 创建新的session
