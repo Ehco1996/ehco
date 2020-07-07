@@ -52,7 +52,6 @@ func (tr *mwssTransporter) Dial(addr string) (conn net.Conn, err error) {
 	if !ok {
 		session, err = tr.initSession(addr)
 		if err != nil {
-			conn.Close()
 			return nil, err
 		}
 		sessions = append(sessions, session)
