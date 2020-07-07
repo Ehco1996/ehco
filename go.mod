@@ -1,6 +1,6 @@
 module github.com/Ehco1996/ehco
 
-go 1.13
+go 1.14
 
 require (
 	github.com/gobwas/httphead v0.0.0-20180130184737-2c6c146eadee // indirect
