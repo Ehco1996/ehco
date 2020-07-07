@@ -3,22 +3,19 @@ package relay
 import (
 	"net"
 	"sync"
-	"time"
 )
 
 func (r *Relay) handleTCPConn(c *net.TCPConn) error {
+	dc := NewDeadLinerConn(c, TcpDeadline)
+
 	rc, err := net.Dial("tcp", r.RemoteTCPAddr)
 	if err != nil {
 		return err
 	}
-	defer rc.Close()
-	if err := rc.SetDeadline(time.Now().Add(TransportDeadLine)); err != nil {
-		return err
-	}
-	if err := c.SetDeadline(time.Now().Add(TransportDeadLine)); err != nil {
-		return err
-	}
-	transport(c, rc)
+	drc := NewDeadLinerConn(rc, TcpDeadline)
+	defer drc.Close()
+
+	transport(dc, drc)
 	return nil
 }
 

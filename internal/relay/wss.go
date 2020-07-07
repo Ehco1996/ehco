@@ -8,59 +8,7 @@ import (
 	"time"
 
 	"github.com/gobwas/ws"
-	"github.com/gorilla/websocket"
 )
-
-type WsConn struct {
-	conn *websocket.Conn
-	rb   []byte
-}
-
-func (c *WsConn) Read(b []byte) (n int, err error) {
-	if len(c.rb) == 0 {
-		_, c.rb, err = c.conn.ReadMessage()
-	}
-	n = copy(b, c.rb)
-	c.rb = c.rb[n:]
-	return
-}
-
-func (c *WsConn) Write(b []byte) (n int, err error) {
-	err = c.conn.WriteMessage(websocket.BinaryMessage, b)
-	n = len(b)
-	return
-}
-
-func (c *WsConn) Close() error {
-	return c.conn.Close()
-}
-
-func (c *WsConn) RemoteAddr() net.Addr {
-	return c.conn.RemoteAddr()
-}
-
-func (c *WsConn) LocalAddr() net.Addr {
-	return c.conn.LocalAddr()
-}
-
-func (c *WsConn) SetDeadline(t time.Time) error {
-	if err := c.SetReadDeadline(t); err != nil {
-		return err
-	}
-	return c.SetWriteDeadline(t)
-}
-func (c *WsConn) SetReadDeadline(t time.Time) error {
-	return c.conn.SetReadDeadline(t)
-}
-
-func (c *WsConn) SetWriteDeadline(t time.Time) error {
-	return c.conn.SetWriteDeadline(t)
-}
-
-func newWsConn(conn *websocket.Conn) *WsConn {
-	wsc := &WsConn{conn: conn}
-	return wsc
-}
 
 func (relay *Relay) RunLocalWSSServer() error {
 	mux := http.NewServeMux()

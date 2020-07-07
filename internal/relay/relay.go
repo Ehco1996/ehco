@@ -7,13 +7,10 @@ import (
 )
 
 var (
-	TcpDeadline         = 60 * time.Second
-	UdpDeadline         = 6 * time.Second
-	WsDeadline          = 15 * time.Second
-	FastCloseDeadLine   = 1 * time.Second
-	MaxMWSSStreamCnt    = 10
-	MWSSSessionDeadLine = 600 * time.Second
-	TransportDeadLine   = 10 * time.Minute
+	TcpDeadline      = 60 * time.Second
+	UdpDeadline      = 6 * time.Second
+	WsDeadline       = 60 * time.Second
+	MaxMWSSStreamCnt = 10
 )
 
 const (

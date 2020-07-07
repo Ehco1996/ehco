@@ -1,76 +1,16 @@
 package relay
 
 import (
+	"context"
 	"crypto/tls"
 	"net"
 	"net/http"
-	"net/url"
 	"sync"
 	"time"
 
-	"github.com/gorilla/websocket"
+	"github.com/gobwas/ws"
 	"github.com/xtaci/smux"
 )
-
-type muxStreamConn struct {
-	net.Conn
-	stream *smux.Stream
-}
-
-func (c *muxStreamConn) Read(b []byte) (n int, err error) {
-	return c.stream.Read(b)
-}
-
-func (c *muxStreamConn) Write(b []byte) (n int, err error) {
-	return c.stream.Write(b)
-}
-
-func (c *muxStreamConn) Close() error {
-	return c.stream.Close()
-}
-
-type muxSession struct {
-	conn         net.Conn
-	session      *smux.Session
-	maxStreamCnt int
-}
-
-func (session *muxSession) GetConn() (net.Conn, error) {
-	stream, err := session.session.OpenStream()
-	if err != nil {
-		return nil, err
-	}
-	return &muxStreamConn{Conn: session.conn, stream: stream}, nil
-}
-
-func (session *muxSession) Accept() (net.Conn, error) {
-	stream, err := session.session.AcceptStream()
-	if err != nil {
-		return nil, err
-	}
-	return &muxStreamConn{Conn: session.conn, stream: stream}, nil
-}
-
-func (session *muxSession) Close() error {
-	if session.session == nil {
-		return nil
-	}
-	return session.session.Close()
-}
-
-func (session *muxSession) IsClosed() bool {
-	if session.session == nil {
-		return true
-	}
-	return session.session.IsClosed()
-}
-
-func (session *muxSession) NumStreams() int {
-	if session.session != nil {
-		return session.session.NumStreams()
-	}
-	return 0
-}
 
 type mwssTransporter struct {
 	sessions     map[string][]*muxSession
@@ -110,52 +50,30 @@ func (tr *mwssTransporter) Dial(addr string) (conn net.Conn, err error) {
 
 	// 创建新的session
 	if !ok {
-		u, err := url.Parse(addr)
-		if err != nil {
-			return nil, err
-		}
-		conn, err = net.DialTimeout("tcp", u.Host, WsDeadline)
-		if err != nil {
-			return nil, err
-		}
-		conn.SetDeadline(time.Now().Add(WsDeadline))
-
-		session, err = tr.initSession(addr, conn)
+		session, err = tr.initSession(addr)
 		if err != nil {
 			conn.Close()
 			return nil, err
 		}
 		sessions = append(sessions, session)
 	}
-
 	cc, err := session.GetConn()
 	if err != nil {
 		session.Close()
 		return nil, err
 	}
-	// TODO 统一管理session的deadline
-	session.conn.SetDeadline(time.Now().Add(MWSSSessionDeadLine))
-	session.session.SetDeadline(time.Now().Add(MWSSSessionDeadLine))
 	tr.sessions[addr] = sessions
 	return cc, nil
 }
 
-func (tr *mwssTransporter) initSession(addr string, conn net.Conn) (*muxSession, error) {
-	d := websocket.Dialer{
-		TLSClientConfig: DefaultTLSConfig,
-		NetDial: func(net, addr string) (net.Conn, error) {
-			return conn, nil
-		}}
-	u, err := url.Parse(addr)
+func (tr *mwssTransporter) initSession(addr string) (*muxSession, error) {
+	d := ws.Dialer{TLSConfig: DefaultTLSConfig}
+	rc, _, _, err := d.Dial(context.TODO(), addr)
 	if err != nil {
 		return nil, err
 	}
-	c, resp, err := d.Dial(u.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-	resp.Body.Close()
-	wsc := newWsConn(c)
+	wsc := NewDeadLinerConn(rc, WsDeadline)
+
 	// stream multiplex
 	smuxConfig := smux.DefaultConfig()
 	session, err := smux.Client(wsc, smuxConfig)
@@ -163,14 +81,14 @@ func (tr *mwssTransporter) initSession(addr string, conn net.Conn) (*muxSession,
 		return nil, err
 	}
 	Logger.Infof("[mwss] Init new session %s", session.RemoteAddr())
-	return &muxSession{conn: wsc, session: session, maxStreamCnt: MaxMWSSStreamCnt}, nil
+	return &muxSession{
+		conn: wsc, session: session, maxStreamCnt: MaxMWSSStreamCnt, t: WsDeadline}, nil
 }
 
 func (r *Relay) RunLocalMWSSServer() error {
 
 	s := &MWSSServer{
 		addr:     r.LocalTCPAddr.String(),
-		upgrader: &websocket.Upgrader{},
 		connChan: make(chan net.Conn, 1024),
 		errChan:  make(chan error, 1),
 	}
@@ -226,19 +144,18 @@ func (r *Relay) RunLocalMWSSServer() error {
 
 type MWSSServer struct {
 	addr     string
-	upgrader *websocket.Upgrader
 	server   *http.Server
 	connChan chan net.Conn
 	errChan  chan error
 }
 
 func (s *MWSSServer) upgrade(w http.ResponseWriter, r *http.Request) {
-	conn, err := s.upgrader.Upgrade(w, r, nil)
+	conn, _, _, err := ws.UpgradeHTTP(r, w)
 	if err != nil {
 		Logger.Info(err)
 		return
 	}
-	s.mux(newWsConn(conn))
+	s.mux(NewDeadLinerConn(conn, WsDeadline))
 }
 
 func (s *MWSSServer) mux(conn net.Conn) {
@@ -261,7 +178,7 @@ func (s *MWSSServer) mux(conn net.Conn) {
 			failedCount++
 			break
 		}
-		cc := &muxStreamConn{Conn: conn, stream: stream}
+		cc := newMuxDeadlineStreamConn(conn, stream, WsDeadline)
 		select {
 		case s.connChan <- cc:
 		default:
@@ -290,7 +207,8 @@ func (s *MWSSServer) Addr() string {
 var tr = NewMWSSTransporter()
 
 func (r *Relay) handleTcpOverMWSS(c *net.TCPConn) error {
-	defer c.Close()
+	dc := NewDeadLinerConn(c, TcpDeadline)
+	defer dc.Close()
 
 	addr := r.RemoteTCPAddr + "/tcp/"
 	wsc, err := tr.Dial(addr)
@@ -299,13 +217,7 @@ func (r *Relay) handleTcpOverMWSS(c *net.TCPConn) error {
 	}
 	defer wsc.Close()
 	Logger.Infof("handleTcpOverMWSS from:%s to:%s", c.RemoteAddr(), wsc.RemoteAddr())
-	if err := wsc.SetDeadline(time.Now().Add(TransportDeadLine)); err != nil {
-		return err
-	}
-	if err := c.SetDeadline(time.Now().Add(TransportDeadLine)); err != nil {
-		return err
-	}
-	transport(wsc, c)
+	transport(wsc, dc)
 	return nil
 }
 
@@ -316,15 +228,9 @@ func (r *Relay) handleMWSSConnToTcp(c net.Conn) {
 		Logger.Infof("dial error: %s", err)
 		return
 	}
-	defer rc.Close()
+	drc := NewDeadLinerConn(rc, TcpDeadline)
+	defer drc.Close()
+
 	Logger.Infof("handleMWSSConnToTcp from:%s to:%s", c.RemoteAddr(), rc.RemoteAddr())
-	if err := rc.SetDeadline(time.Now().Add(TransportDeadLine)); err != nil {
-		Logger.Infof("set deadline error: %s", err)
-		return
-	}
-	if err := c.SetDeadline(time.Now().Add(TransportDeadLine)); err != nil {
-		Logger.Infof("set deadline error: %s", err)
-		return
-	}
-	transport(rc, c)
+	transport(drc, c)
 }
