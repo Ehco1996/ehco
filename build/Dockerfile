@@ -11,7 +11,7 @@ RUN go mod download
 COPY . .
 
 # Build the Go app
-RUN go build -v -a -installsuffix cgo -o ehco cmd/main.go
+RUN go build -v -a -installsuffix cgo -o ehco cmd/ehco/main.go
 
 FROM alpine:latest
 

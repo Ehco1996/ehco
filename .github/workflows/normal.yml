@@ -32,7 +32,7 @@ jobs:
         run: go test ./test
 
       - name: Build
-        run: go build -v -a -installsuffix cgo -o ehco cmd/main.go
+        run: go build -v -a -installsuffix cgo -o ehco cmd/ehco/main.go
 
       - uses: actions/upload-artifact@master
         with:
