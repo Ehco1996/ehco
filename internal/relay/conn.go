@@ -9,6 +9,7 @@ import (
 
 // Deadliner is a wrapper around net.Conn that sets read/write deadlines before
 // every Read() or Write() call.
+// TODO check deadline not work
 type Deadliner struct {
 	net.Conn
 	t time.Duration

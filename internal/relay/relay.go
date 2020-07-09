@@ -11,6 +11,8 @@ var (
 	UdpDeadline      = 6 * time.Second
 	WsDeadline       = 60 * time.Second
 	MaxMWSSStreamCnt = 10
+
+	DialTimeOut = 10 * time.Second
 )
 
 const (
@@ -35,11 +37,12 @@ type Relay struct {
 	ListenType    string
 	TransportType string
 
+	udpCache map[string]*udpBufferCh
+	mwssTSP  *mwssTransporter
+
 	// may not init
 	TCPListener *net.TCPListener
 	UDPConn     *net.UDPConn
-
-	udpCache map[string]*udpBufferCh
 }
 
 func NewRelay(localAddr, listenType, remoteAddr, transportType string) (*Relay, error) {
@@ -62,6 +65,7 @@ func NewRelay(localAddr, listenType, remoteAddr, transportType string) (*Relay, 
 		TransportType: transportType,
 
 		udpCache: make(map[string](*udpBufferCh)),
+		mwssTSP:  NewMWSSTransporter(),
 	}
 
 	return r, nil

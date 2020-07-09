@@ -66,22 +66,20 @@ func (tr *mwssTransporter) Dial(addr string) (conn net.Conn, err error) {
 }
 
 func (tr *mwssTransporter) initSession(addr string) (*muxSession, error) {
-	d := ws.Dialer{TLSConfig: DefaultTLSConfig}
+	d := ws.Dialer{TLSConfig: DefaultTLSConfig, Timeout: DialTimeOut}
 	rc, _, _, err := d.Dial(context.TODO(), addr)
 	if err != nil {
 		return nil, err
 	}
-	wsc := NewDeadLinerConn(rc, WsDeadline)
-
 	// stream multiplex
 	smuxConfig := smux.DefaultConfig()
-	session, err := smux.Client(wsc, smuxConfig)
+	session, err := smux.Client(rc, smuxConfig)
 	if err != nil {
 		return nil, err
 	}
 	Logger.Infof("[mwss] Init new session %s", session.RemoteAddr())
 	return &muxSession{
-		conn: wsc, session: session, maxStreamCnt: MaxMWSSStreamCnt, t: WsDeadline}, nil
+		conn: rc, session: session, maxStreamCnt: MaxMWSSStreamCnt, t: WsDeadline}, nil
 }
 
 func (r *Relay) RunLocalMWSSServer() error {
@@ -169,12 +167,10 @@ func (s *MWSSServer) mux(conn net.Conn) {
 	Logger.Infof("[mwss] %s <-> %s", conn.RemoteAddr(), s.Addr())
 	defer Logger.Infof("[mwss] %s >-< %s", conn.RemoteAddr(), s.Addr())
 
-	failedCount := 0
-	for failedCount < 5 {
+	for {
 		stream, err := mux.AcceptStream()
 		if err != nil {
-			Logger.Infof("[mwss] accept stream err: %s failedCount: %d", err, failedCount)
-			failedCount++
+			Logger.Infof("[mwss] accept stream err: %s", err)
 			break
 		}
 		cc := newMuxDeadlineStreamConn(conn, stream, WsDeadline)
@@ -203,20 +199,18 @@ func (s *MWSSServer) Addr() string {
 	return s.addr
 }
 
-var tr = NewMWSSTransporter()
-
 func (r *Relay) handleTcpOverMWSS(c *net.TCPConn) error {
 	dc := NewDeadLinerConn(c, TcpDeadline)
 	defer dc.Close()
 
 	addr := r.RemoteTCPAddr + "/tcp/"
-	wsc, err := tr.Dial(addr)
+	wsc, err := r.mwssTSP.Dial(addr)
 	if err != nil {
 		return err
 	}
 	defer wsc.Close()
 	Logger.Infof("handleTcpOverMWSS from:%s to:%s", c.RemoteAddr(), wsc.RemoteAddr())
-	transport(wsc, dc)
+	Logger.Info(transport(wsc, dc))
 	return nil
 }
 
@@ -231,5 +225,5 @@ func (r *Relay) handleMWSSConnToTcp(c net.Conn) {
 	defer drc.Close()
 
 	Logger.Infof("handleMWSSConnToTcp from:%s to:%s", c.RemoteAddr(), rc.RemoteAddr())
-	transport(drc, c)
+	Logger.Info((transport(drc, c)))
 }
