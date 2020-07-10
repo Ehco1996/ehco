@@ -2,64 +2,28 @@ package relay
 
 import (
 	"net"
-	"time"
 
 	"github.com/xtaci/smux"
 )
 
-// Deadliner is a wrapper around net.Conn that sets read/write deadlines before
-// every Read() or Write() call.
-// TODO check deadline not work
-type Deadliner struct {
-	net.Conn
-	t time.Duration
-}
-
-func (d Deadliner) Write(p []byte) (int, error) {
-	if err := d.Conn.SetWriteDeadline(time.Now().Add(d.t)); err != nil {
-		return 0, err
-	}
-	return d.Conn.Write(p)
-}
-
-func (d Deadliner) Read(p []byte) (int, error) {
-	if err := d.Conn.SetReadDeadline(time.Now().Add(d.t)); err != nil {
-		return 0, err
-	}
-	return d.Conn.Read(p)
-}
-
-func NewDeadLinerConn(c net.Conn, t time.Duration) *Deadliner {
-	return &Deadliner{c, t}
-}
-
-// mux steam whit deadline
-type muxDeadlineStreamConn struct {
+type muxConn struct {
 	net.Conn
 	stream *smux.Stream
-	t      time.Duration
 }
 
-func newMuxDeadlineStreamConn(
-	conn net.Conn, stream *smux.Stream, t time.Duration) *muxDeadlineStreamConn {
-	return &muxDeadlineStreamConn{Conn: conn, stream: stream, t: t}
+func newMuxConn(conn net.Conn, stream *smux.Stream) *muxConn {
+	return &muxConn{Conn: conn, stream: stream}
 }
 
-func (c *muxDeadlineStreamConn) Read(b []byte) (n int, err error) {
-	if err := c.stream.SetReadDeadline(time.Now().Add(c.t)); err != nil {
-		return 0, err
-	}
+func (c *muxConn) Read(b []byte) (n int, err error) {
 	return c.stream.Read(b)
 }
 
-func (c *muxDeadlineStreamConn) Write(b []byte) (n int, err error) {
-	if err := c.stream.SetWriteDeadline(time.Now().Add(c.t)); err != nil {
-		return 0, err
-	}
+func (c *muxConn) Write(b []byte) (n int, err error) {
 	return c.stream.Write(b)
 }
 
-func (c *muxDeadlineStreamConn) Close() error {
+func (c *muxConn) Close() error {
 	return c.stream.Close()
 }
 
@@ -67,7 +31,6 @@ type muxSession struct {
 	conn         net.Conn
 	session      *smux.Session
 	maxStreamCnt int
-	t            time.Duration
 }
 
 func (session *muxSession) GetConn() (net.Conn, error) {
@@ -75,7 +38,7 @@ func (session *muxSession) GetConn() (net.Conn, error) {
 	if err != nil {
 		return nil, err
 	}
-	return newMuxDeadlineStreamConn(session.conn, stream, session.t), nil
+	return newMuxConn(session.conn, stream), nil
 }
 
 func (session *muxSession) Close() error {

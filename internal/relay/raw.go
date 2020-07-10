@@ -6,16 +6,12 @@ import (
 )
 
 func (r *Relay) handleTCPConn(c *net.TCPConn) error {
-	dc := NewDeadLinerConn(c, TcpDeadline)
-
 	rc, err := net.Dial("tcp", r.RemoteTCPAddr)
 	if err != nil {
 		return err
 	}
-	drc := NewDeadLinerConn(rc, TcpDeadline)
-	defer drc.Close()
-
-	transport(dc, drc)
+	defer rc.Close()
+	transport(c, rc)
 	return nil
 }
 
@@ -43,10 +39,6 @@ func (r *Relay) handleOneUDPConn(addr string, ubc *udpBufferCh) {
 				Logger.Info(err, 1)
 				break
 			}
-			if err := r.keepAliveAndSetNextTimeout(rc); err != nil {
-				Logger.Info(err)
-				break
-			}
 			if _, err := r.UDPConn.WriteToUDP(buf[0:i], uaddr); err != nil {
 				Logger.Info(err)
 				break
@@ -58,10 +50,6 @@ func (r *Relay) handleOneUDPConn(addr string, ubc *udpBufferCh) {
 
 	for b := range ubc.Ch {
 		if _, err := rc.Write(b); err != nil {
-			Logger.Info(err)
-			break
-		}
-		if err := r.keepAliveAndSetNextTimeout(rc); err != nil {
 			Logger.Info(err)
 			break
 		}

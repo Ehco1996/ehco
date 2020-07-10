@@ -6,16 +6,10 @@ import (
 	"time"
 )
 
-var (
-	TcpDeadline      = 60 * time.Second
-	UdpDeadline      = 6 * time.Second
-	WsDeadline       = 60 * time.Second
-	MaxMWSSStreamCnt = 10
-
-	DialTimeOut = 10 * time.Second
-)
-
 const (
+	MaxMWSSStreamCnt = 10
+	DialTimeOut      = 10 * time.Second
+
 	Listen_RAW  = "raw"
 	Listen_WS   = "ws"
 	Listen_WSS  = "wss"
@@ -153,9 +147,9 @@ func (r *Relay) RunLocalUDPServer() error {
 		return err
 	}
 	defer r.UDPConn.Close()
-
+	buf := inboundBufferPool.Get().([]byte)
+	defer inboundBufferPool.Put(buf)
 	for {
-		buf := inboundBufferPool.Get().([]byte)
 		n, addr, err := r.UDPConn.ReadFromUDP(buf)
 		if err != nil {
 			return err
@@ -175,26 +169,7 @@ func (r *Relay) RunLocalUDPServer() error {
 				go r.handleOneUDPConn(addr.String(), ubc)
 			}
 		}
-		inboundBufferPool.Put(buf)
 	}
-}
-
-func (r *Relay) keepAliveAndSetNextTimeout(conn interface{}) error {
-	switch c := conn.(type) {
-	case *net.TCPConn:
-		if err := c.SetDeadline(time.Now().Add(TcpDeadline)); err != nil {
-			Logger.Info("keep alive error", err.Error())
-			return err
-		}
-	case *net.UDPConn:
-		if err := c.SetDeadline(time.Now().Add(UdpDeadline)); err != nil {
-			Logger.Info("keep alive error", err.Error())
-			return err
-		}
-	default:
-		return nil
-	}
-	return nil
 }
 
 // NOTE not thread safe

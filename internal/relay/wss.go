@@ -31,11 +31,10 @@ func (relay *Relay) RunLocalWSSServer() error {
 }
 
 func (relay *Relay) handleWssToTcp(w http.ResponseWriter, r *http.Request) {
-	c, _, _, err := ws.UpgradeHTTP(r, w)
+	wsc, _, _, err := ws.UpgradeHTTP(r, w)
 	if err != nil {
 		return
 	}
-	wsc := NewDeadLinerConn(c, WsDeadline)
 	defer wsc.Close()
 
 	rc, err := net.Dial("tcp", relay.RemoteTCPAddr)
@@ -43,25 +42,21 @@ func (relay *Relay) handleWssToTcp(w http.ResponseWriter, r *http.Request) {
 		Logger.Infof("dial error: %s", err)
 		return
 	}
-	drc := NewDeadLinerConn(rc, TcpDeadline)
-	defer drc.Close()
+	defer rc.Close()
 	Logger.Infof("handleWssToTcp from:%s to:%s", wsc.RemoteAddr(), rc.RemoteAddr())
-	transport(drc, wsc)
+	transport(rc, wsc)
 }
 
 func (relay *Relay) handleTcpOverWss(c *net.TCPConn) error {
-	dc := NewDeadLinerConn(c, TcpDeadline)
-	defer dc.Close()
+	defer c.Close()
 
 	d := ws.Dialer{TLSConfig: DefaultTLSConfig}
-	rc, _, _, err := d.Dial(context.TODO(), relay.RemoteTCPAddr+"/tcp/")
+	wsc, _, _, err := d.Dial(context.TODO(), relay.RemoteTCPAddr+"/tcp/")
 	if err != nil {
 		return err
 	}
-
-	wsc := NewDeadLinerConn(rc, WsDeadline)
 	defer wsc.Close()
-	transport(dc, wsc)
+	transport(c, wsc)
 	return nil
 }
 

@@ -78,8 +78,7 @@ func (tr *mwssTransporter) initSession(addr string) (*muxSession, error) {
 		return nil, err
 	}
 	Logger.Infof("[mwss] Init new session %s", session.RemoteAddr())
-	return &muxSession{
-		conn: rc, session: session, maxStreamCnt: MaxMWSSStreamCnt, t: WsDeadline}, nil
+	return &muxSession{conn: rc, session: session, maxStreamCnt: MaxMWSSStreamCnt}, nil
 }
 
 func (r *Relay) RunLocalMWSSServer() error {
@@ -152,7 +151,7 @@ func (s *MWSSServer) upgrade(w http.ResponseWriter, r *http.Request) {
 		Logger.Info(err)
 		return
 	}
-	s.mux(NewDeadLinerConn(conn, WsDeadline))
+	s.mux(conn)
 }
 
 func (s *MWSSServer) mux(conn net.Conn) {
@@ -173,7 +172,7 @@ func (s *MWSSServer) mux(conn net.Conn) {
 			Logger.Infof("[mwss] accept stream err: %s", err)
 			break
 		}
-		cc := newMuxDeadlineStreamConn(conn, stream, WsDeadline)
+		cc := newMuxConn(conn, stream)
 		select {
 		case s.connChan <- cc:
 		default:
@@ -200,8 +199,7 @@ func (s *MWSSServer) Addr() string {
 }
 
 func (r *Relay) handleTcpOverMWSS(c *net.TCPConn) error {
-	dc := NewDeadLinerConn(c, TcpDeadline)
-	defer dc.Close()
+	defer c.Close()
 
 	addr := r.RemoteTCPAddr + "/tcp/"
 	wsc, err := r.mwssTSP.Dial(addr)
@@ -210,7 +208,11 @@ func (r *Relay) handleTcpOverMWSS(c *net.TCPConn) error {
 	}
 	defer wsc.Close()
 	Logger.Infof("handleTcpOverMWSS from:%s to:%s", c.RemoteAddr(), wsc.RemoteAddr())
-	Logger.Info(transport(wsc, dc))
+
+	err = transport(wsc, c)
+	if err != nil {
+		Logger.Infof("handleTcpOverMWSS transport err: %s", err)
+	}
 	return nil
 }
 
@@ -221,9 +223,11 @@ func (r *Relay) handleMWSSConnToTcp(c net.Conn) {
 		Logger.Infof("dial error: %s", err)
 		return
 	}
-	drc := NewDeadLinerConn(rc, TcpDeadline)
-	defer drc.Close()
-
+	defer rc.Close()
 	Logger.Infof("handleMWSSConnToTcp from:%s to:%s", c.RemoteAddr(), rc.RemoteAddr())
-	Logger.Info((transport(drc, c)))
+
+	err = transport(rc, c)
+	if err != nil {
+		Logger.Infof("handleMWSSConnToTcp transport err: %s", err)
+	}
 }
