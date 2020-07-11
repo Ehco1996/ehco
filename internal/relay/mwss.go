@@ -208,11 +208,7 @@ func (r *Relay) handleTcpOverMWSS(c *net.TCPConn) error {
 	}
 	defer wsc.Close()
 	Logger.Infof("handleTcpOverMWSS from:%s to:%s", c.RemoteAddr(), wsc.RemoteAddr())
-
-	err = transport(wsc, c)
-	if err != nil {
-		Logger.Infof("handleTcpOverMWSS transport err: %s", err)
-	}
+	transport(wsc, c)
 	return nil
 }
 
@@ -225,9 +221,5 @@ func (r *Relay) handleMWSSConnToTcp(c net.Conn) {
 	}
 	defer rc.Close()
 	Logger.Infof("handleMWSSConnToTcp from:%s to:%s", c.RemoteAddr(), rc.RemoteAddr())
-
-	err = transport(rc, c)
-	if err != nil {
-		Logger.Infof("handleMWSSConnToTcp transport err: %s", err)
-	}
+	transport(rc, c)
 }
