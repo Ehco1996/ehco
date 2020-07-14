@@ -132,6 +132,7 @@ func (r *Relay) RunLocalTCPServer() error {
 			}(c)
 		case Transport_MWSS:
 			go func(c *net.TCPConn) {
+				// need close conn in handleTcpOverMWSS
 				if err := r.handleTcpOverMWSS(c); err != nil && err != io.EOF {
 					Logger.Infof("handleTcpOverMWSS err %s", err)
 				}

@@ -61,6 +61,10 @@ func (tr *mwssTransporter) Dial(addr string) (conn net.Conn, err error) {
 		session.Close()
 		return nil, err
 	}
+	// close last not used session
+	if lastSession := sessions[len(sessions)-1]; lastSession.NumStreams() == 0 {
+		lastSession.Close()
+	}
 	tr.sessions[addr] = sessions
 	return cc, nil
 }
@@ -155,6 +159,8 @@ func (s *MWSSServer) upgrade(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *MWSSServer) mux(conn net.Conn) {
+	defer conn.Close()
+
 	smuxConfig := smux.DefaultConfig()
 	mux, err := smux.Server(conn, smuxConfig)
 	if err != nil {

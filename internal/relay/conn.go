@@ -45,6 +45,7 @@ func (session *muxSession) Close() error {
 	if session.session == nil {
 		return nil
 	}
+	session.conn.Close()
 	return session.session.Close()
 }
 
