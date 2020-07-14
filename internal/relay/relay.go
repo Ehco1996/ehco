@@ -74,9 +74,12 @@ func (r *Relay) ListenAndServe() error {
 		go func() {
 			errChan <- r.RunLocalTCPServer()
 		}()
-		go func() {
-			errChan <- r.RunLocalUDPServer()
-		}()
+		// NOTE 现在只有raw支持udp
+		if r.TransportType == Transport_RAW {
+			go func() {
+				errChan <- r.RunLocalUDPServer()
+			}()
+		}
 	} else if r.ListenType == Listen_WS {
 		go func() {
 			errChan <- r.RunLocalWSServer()
