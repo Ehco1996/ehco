@@ -19,7 +19,7 @@ var PprofPort string
 func main() {
 	app := cli.NewApp()
 	app.Name = "ehco"
-	app.Version = "0.1.4"
+	app.Version = "0.1.5"
 	app.Usage = "ehco is a network relay tool and a typo :)"
 	app.Flags = []cli.Flag{
 		&cli.StringFlag{

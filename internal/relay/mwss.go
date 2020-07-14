@@ -15,11 +15,13 @@ import (
 type mwssTransporter struct {
 	sessions     map[string][]*muxSession
 	sessionMutex sync.Mutex
+	dialer       ws.Dialer
 }
 
 func NewMWSSTransporter() *mwssTransporter {
 	return &mwssTransporter{
 		sessions: make(map[string][]*muxSession),
+		dialer:   ws.Dialer{TLSConfig: DefaultTLSConfig, Timeout: DialTimeOut},
 	}
 }
 
@@ -61,17 +63,18 @@ func (tr *mwssTransporter) Dial(addr string) (conn net.Conn, err error) {
 		session.Close()
 		return nil, err
 	}
-	// close last not used session
-	if lastSession := sessions[len(sessions)-1]; lastSession.NumStreams() == 0 {
-		lastSession.Close()
+	if len(sessions) > 1 {
+		// close last not used session, but we keep one conn in session pool
+		if lastSession := sessions[len(sessions)-1]; lastSession.NumStreams() == 0 {
+			lastSession.Close()
+		}
 	}
 	tr.sessions[addr] = sessions
 	return cc, nil
 }
 
 func (tr *mwssTransporter) initSession(addr string) (*muxSession, error) {
-	d := ws.Dialer{TLSConfig: DefaultTLSConfig, Timeout: DialTimeOut}
-	rc, _, _, err := d.Dial(context.TODO(), addr)
+	rc, _, _, err := tr.dialer.Dial(context.TODO(), addr)
 	if err != nil {
 		return nil, err
 	}
@@ -81,7 +84,7 @@ func (tr *mwssTransporter) initSession(addr string) (*muxSession, error) {
 	if err != nil {
 		return nil, err
 	}
-	Logger.Infof("[mwss] Init new session %s", session.RemoteAddr())
+	Logger.Infof("[mwss] Init new session: %v ", session)
 	return &muxSession{conn: rc, session: session, maxStreamCnt: MaxMWSSStreamCnt}, nil
 }
 

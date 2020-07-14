@@ -8,7 +8,7 @@ import (
 
 const (
 	MaxMWSSStreamCnt = 10
-	DialTimeOut      = 10 * time.Second
+	DialTimeOut      = 3 * time.Second
 
 	Listen_RAW  = "raw"
 	Listen_WS   = "ws"
