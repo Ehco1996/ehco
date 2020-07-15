@@ -9,6 +9,7 @@ import (
 const (
 	MaxMWSSStreamCnt = 10
 	DialTimeOut      = 3 * time.Second
+	MaxConKeepAlive  = 10 * time.Minute
 
 	Listen_RAW  = "raw"
 	Listen_WS   = "ws"
@@ -111,31 +112,31 @@ func (r *Relay) RunLocalTCPServer() error {
 			Logger.Infof("accept tcp con error: %s", err)
 			return err
 		}
+		if err := c.SetDeadline(time.Now().Add(MaxConKeepAlive)); err != nil {
+			Logger.Infof("set max deadline err: %s", err)
+			return err
+		}
 		switch r.TransportType {
 		case Transport_RAW:
 			go func(c *net.TCPConn) {
-				defer c.Close()
 				if err := r.handleTCPConn(c); err != nil {
 					Logger.Infof("handleTCPConn err %s", err)
 				}
 			}(c)
 		case Transport_WS:
 			go func(c *net.TCPConn) {
-				// need close conn in handleTcpOverWs
 				if err := r.handleTcpOverWs(c); err != nil && err != io.EOF {
 					Logger.Infof("handleTcpOverWs err %s", err)
 				}
 			}(c)
 		case Transport_WSS:
 			go func(c *net.TCPConn) {
-				// need close conn in handleTcpOverWss
 				if err := r.handleTcpOverWss(c); err != nil && err != io.EOF {
 					Logger.Infof("handleTcpOverWss err %s", err)
 				}
 			}(c)
 		case Transport_MWSS:
 			go func(c *net.TCPConn) {
-				// need close conn in handleTcpOverMWSS
 				if err := r.handleTcpOverMWSS(c); err != nil && err != io.EOF {
 					Logger.Infof("handleTcpOverMWSS err %s", err)
 				}

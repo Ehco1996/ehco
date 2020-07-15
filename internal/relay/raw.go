@@ -6,6 +6,7 @@ import (
 )
 
 func (r *Relay) handleTCPConn(c *net.TCPConn) error {
+	defer c.Close()
 	rc, err := net.Dial("tcp", r.RemoteTCPAddr)
 	if err != nil {
 		return err

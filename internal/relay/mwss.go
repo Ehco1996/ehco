@@ -84,7 +84,7 @@ func (tr *mwssTransporter) initSession(addr string) (*muxSession, error) {
 	if err != nil {
 		return nil, err
 	}
-	Logger.Infof("[mwss] Init new session: %v ", session)
+	Logger.Infof("[mwss] Init new session to: %s", rc.RemoteAddr())
 	return &muxSession{conn: rc, session: session, maxStreamCnt: MaxMWSSStreamCnt}, nil
 }
 
@@ -167,13 +167,13 @@ func (s *MWSSServer) mux(conn net.Conn) {
 	smuxConfig := smux.DefaultConfig()
 	mux, err := smux.Server(conn, smuxConfig)
 	if err != nil {
-		Logger.Infof("[mwss] %s - %s : %s", conn.RemoteAddr(), s.Addr(), err)
+		Logger.Infof("[mwss server err] %s - %s : %s", conn.RemoteAddr(), s.Addr(), err)
 		return
 	}
 	defer mux.Close()
 
-	Logger.Infof("[mwss] %s <-> %s", conn.RemoteAddr(), s.Addr())
-	defer Logger.Infof("[mwss] %s >-< %s", conn.RemoteAddr(), s.Addr())
+	Logger.Infof("[mwss server init] %s  %s", conn.RemoteAddr(), s.Addr())
+	defer Logger.Infof("[mwss server close] %s >-< %s", conn.RemoteAddr(), s.Addr())
 
 	for {
 		stream, err := mux.AcceptStream()
