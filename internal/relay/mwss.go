@@ -57,17 +57,18 @@ func (tr *mwssTransporter) Dial(addr string) (conn net.Conn, err error) {
 			return nil, err
 		}
 		sessions = append(sessions, session)
+	} else {
+		if len(sessions) > 1 {
+			// close last not used session, but we keep one conn in session pool
+			if lastSession := sessions[len(sessions)-1]; lastSession.NumStreams() == 0 {
+				lastSession.Close()
+			}
+		}
 	}
 	cc, err := session.GetConn()
 	if err != nil {
 		session.Close()
 		return nil, err
-	}
-	if len(sessions) > 1 {
-		// close last not used session, but we keep one conn in session pool
-		if lastSession := sessions[len(sessions)-1]; lastSession.NumStreams() == 0 {
-			lastSession.Close()
-		}
 	}
 	tr.sessions[addr] = sessions
 	return cc, nil
