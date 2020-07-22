@@ -90,7 +90,7 @@ func init() {
 	ch := make(chan error)
 	for _, c := range cfg.Configs {
 		go func(c relay.RelayConfig) {
-			r, err := relay.NewRelay(c.Listen, c.ListenType, c.Remote, c.TransportType)
+			r, err := relay.NewRelay(&c)
 			if err != nil {
 				relay.Logger.Fatal(err)
 			}
