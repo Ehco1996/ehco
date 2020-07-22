@@ -75,33 +75,39 @@ func main() {
 
 func start(ctx *cli.Context) error {
 	ch := make(chan error)
+	var config *relay.Config
+
 	if ConfigPath != "" {
-		config := relay.NewConfig(ConfigPath)
+		config = relay.NewConfigByPath(ConfigPath)
 		if err := config.LoadConfig(); err != nil {
 			relay.Logger.Fatal(err)
 		}
-
-		initTls := false
-		for _, cfg := range config.Configs {
-			if !initTls && (cfg.ListenType == relay.Listen_WSS ||
-				cfg.ListenType == relay.Listen_MWSS ||
-				cfg.TransportType == relay.Transport_WSS ||
-				cfg.TransportType == relay.Transport_MWSS) {
-				initTls = true
-				relay.InitTlsCfg()
-			}
-			go serveRelay(cfg.Listen, cfg.ListenType, cfg.Remote, cfg.TransportType, ch)
-		}
 	} else {
-		if ListenType == relay.Listen_WSS ||
-			ListenType == relay.Listen_MWSS ||
-			TransportType == relay.Transport_WSS ||
-			TransportType == relay.Transport_MWSS {
+		config = &relay.Config{
+			PATH: ConfigPath,
+			Configs: []relay.RelayConfig{
+				relay.RelayConfig{
+					Listen:        LocalAddr,
+					ListenType:    ListenType,
+					Remote:        RemoteAddr,
+					TransportType: TransportType,
+				},
+			},
+		}
+	}
+	initTls := false
+	for _, cfg := range config.Configs {
+		if !initTls && (cfg.ListenType == relay.Listen_WSS ||
+			cfg.ListenType == relay.Listen_MWSS ||
+			cfg.TransportType == relay.Transport_WSS ||
+			cfg.TransportType == relay.Transport_MWSS) {
+			initTls = true
 			relay.InitTlsCfg()
 		}
-		go serveRelay(LocalAddr, ListenType, RemoteAddr, TransportType, ch)
+		go serveRelay(cfg, ch)
 	}
 
+	// start debug pprof server
 	if PprofPort != "" {
 		go func() {
 			pps := "0.0.0.0:" + PprofPort
@@ -113,8 +119,8 @@ func start(ctx *cli.Context) error {
 	return <-ch
 }
 
-func serveRelay(local, listenType, remote, transportType string, ch chan error) {
-	r, err := relay.NewRelay(local, listenType, remote, transportType)
+func serveRelay(cfg relay.RelayConfig, ch chan error) {
+	r, err := relay.NewRelay(&cfg)
 	if err != nil {
 		relay.Logger.Fatal(err)
 	}

@@ -24,7 +24,7 @@ type JsonConfig struct {
 	Configs []RelayConfig `json:"configs"`
 }
 
-func NewConfig(path string) *Config {
+func NewConfigByPath(path string) *Config {
 	return &Config{PATH: path, Configs: []RelayConfig{}}
 }
 

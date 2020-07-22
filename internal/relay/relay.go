@@ -40,12 +40,12 @@ type Relay struct {
 	UDPConn     *net.UDPConn
 }
 
-func NewRelay(localAddr, listenType, remoteAddr, transportType string) (*Relay, error) {
-	localTCPAddr, err := net.ResolveTCPAddr("tcp", localAddr)
+func NewRelay(cfg *RelayConfig) (*Relay, error) {
+	localTCPAddr, err := net.ResolveTCPAddr("tcp", cfg.Listen)
 	if err != nil {
 		return nil, err
 	}
-	localUDPAddr, err := net.ResolveUDPAddr("udp", localAddr)
+	localUDPAddr, err := net.ResolveUDPAddr("udp", cfg.Listen)
 	if err != nil {
 		return nil, err
 	}
@@ -53,11 +53,11 @@ func NewRelay(localAddr, listenType, remoteAddr, transportType string) (*Relay, 
 		LocalTCPAddr: localTCPAddr,
 		LocalUDPAddr: localUDPAddr,
 
-		RemoteTCPAddr: remoteAddr,
-		RemoteUDPAddr: remoteAddr,
+		RemoteTCPAddr: cfg.Remote,
+		RemoteUDPAddr: cfg.Remote,
 
-		ListenType:    listenType,
-		TransportType: transportType,
+		ListenType:    cfg.ListenType,
+		TransportType: cfg.TransportType,
 
 		udpCache: make(map[string](*udpBufferCh)),
 		mwssTSP:  NewMWSSTransporter(),
