@@ -1,41 +1,39 @@
 package lb
 
 import (
-	"container/heap"
 	"fmt"
 	"testing"
 )
 
-func TestPriorityQueue(*testing.T) {
-	items := map[string]int{
-		"banana": 3, "apple": 2, "pear": 4,
+func TestLBNodeHeap(t *testing.T) {
+	nodes := map[string]int{
+		"1.1.1.1": 1, "4.4.4.4": 4, "3.3.3.3": 3,
 	}
 
-	// Create a priority queue, put the items in it, and
-	// establish the priority queue (heap) invariants.
-	pq := make(PriorityQueue, len(items))
+	lp := make(LBNodeHeap, len(nodes))
 	i := 0
-	for value, priority := range items {
-		pq[i] = &Item{
-			value:    value,
-			priority: priority,
-			index:    i,
+	for value, priority := range nodes {
+		lp[i] = &LBNode{
+			Remote:        value,
+			OnLineUserCnt: priority,
+			index:         i,
 		}
 		i++
 	}
-	heap.Init(&pq)
-
+	lp.HeapInit()
 	// Insert a new item and then modify its priority.
-	item := &Item{
-		value:    "orange",
-		priority: 1,
+	node := &LBNode{
+		Remote:        "0.0.0.0",
+		OnLineUserCnt: 0,
 	}
-	heap.Push(&pq, item)
-	pq.update(item, item.value, 5)
-
+	// heap.Push(&lp, node)
+	lp.HeapPush(node)
+	if lp.MinLBNode() != node {
+		t.Fatalf("MinLBNode: %v != node: %v", lp.MinLBNode(), node)
+	}
 	// Take the items out; they arrive in decreasing priority order.
-	for pq.Len() > 0 {
-		item := heap.Pop(&pq).(*Item)
-		fmt.Printf("%.2d:%s \n", item.priority, item.value)
+	for lp.Len() > 0 {
+		node := lp.HeapPop()
+		fmt.Printf("%d : %s \n", node.OnLineUserCnt, node.Remote)
 	}
 }

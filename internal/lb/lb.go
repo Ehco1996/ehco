@@ -4,66 +4,66 @@ import (
 	"container/heap"
 )
 
-// An Item is something we manage in a priority queue.
-type Item struct {
-	value    interface{} // The value of the item; arbitrary.
-	priority int         // The priority of the item in the queue.
-	// The index is needed by update and is maintained by the heap.Interface methods.
-	index int // The index of the item in the heap.
+type LBNode struct {
+	Remote        string //value
+	OnLineUserCnt int    //priority
+	index         int
 }
 
-// A PriorityQueue implements heap.Interface and holds Items.
-type PriorityQueue []*Item
+type LBNodeHeap []*LBNode
 
 // update modifies the priority and value of an Item in the queue.
-func (pq *PriorityQueue) update(item *Item, value interface{}, priority int) {
-	item.value = value
-	item.priority = priority
-	heap.Fix(pq, item.index)
+func (lp *LBNodeHeap) update(node *LBNode, remote string, cnt int) {
+	node.Remote = remote
+	node.OnLineUserCnt = cnt
+	heap.Fix(lp, node.index)
 }
 
-func (pq PriorityQueue) Len() int { return len(pq) }
+func (lp LBNodeHeap) Len() int { return len(lp) }
 
-func (pq PriorityQueue) Less(i, j int) bool {
-	// We want Pop to give us the highest, not lowest, priority so we use greater than here.
-	return pq[i].priority > pq[j].priority
+func (lp LBNodeHeap) Less(i, j int) bool {
+	return lp[i].OnLineUserCnt < lp[j].OnLineUserCnt
 }
 
-func (pq PriorityQueue) Swap(i, j int) {
-	pq[i], pq[j] = pq[j], pq[i]
-	pq[i].index = i
-	pq[j].index = j
+func (lp LBNodeHeap) Swap(i, j int) {
+	lp[i], lp[j] = lp[j], lp[i]
+	lp[i].index = i
+	lp[j].index = j
 }
 
-func (pq *PriorityQueue) Push(x interface{}) {
-	n := len(*pq)
-	item := x.(*Item)
-	item.index = n
-	*pq = append(*pq, item)
+func (lp *LBNodeHeap) Push(x interface{}) {
+	n := len(*lp)
+	node := x.(*LBNode)
+	node.index = n
+	*lp = append(*lp, node)
 }
 
-func (pq *PriorityQueue) Pop() interface{} {
-	old := *pq
+func (lp *LBNodeHeap) Pop() interface{} {
+	old := *lp
 	n := len(old)
-	item := old[n-1]
+	node := old[n-1]
 	old[n-1] = nil  // avoid memory leak
-	item.index = -1 // for safety
-	*pq = old[0 : n-1]
-	return item
+	node.index = -1 // for safety
+	*lp = old[0 : n-1]
+	return node
 }
 
-func (pq *PriorityQueue) Bottom() interface{} {
-	if pq.Len() > 0 {
-		old := *pq
+func (lp *LBNodeHeap) HeapInit() {
+	heap.Init(lp)
+}
+
+func (lp *LBNodeHeap) HeapPush(node *LBNode) {
+	heap.Push(lp, node)
+}
+
+func (lp *LBNodeHeap) HeapPop() *LBNode {
+	return heap.Pop(lp).(*LBNode)
+}
+
+func (lp *LBNodeHeap) MinLBNode() *LBNode {
+	if lp.Len() > 0 {
+		old := *lp
 		return old[0]
 	}
 	return nil
-}
-
-type LBNode struct {
-	Remote        string
-	OnLineUserCnt int
-}
-
-type LBPool struct {
 }
