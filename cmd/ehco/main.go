@@ -86,7 +86,7 @@ func start(ctx *cli.Context) error {
 		config = &relay.Config{
 			PATH: ConfigPath,
 			Configs: []relay.RelayConfig{
-				relay.RelayConfig{
+				{
 					Listen:        LocalAddr,
 					ListenType:    ListenType,
 					Remote:        RemoteAddr,

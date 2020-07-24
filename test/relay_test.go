@@ -37,7 +37,7 @@ func init() {
 		PATH: "",
 		Configs: []relay.RelayConfig{
 			// raw cfg
-			relay.RelayConfig{
+			{
 				Listen:        RAW_LISTEN,
 				ListenType:    relay.Listen_RAW,
 				Remote:        ECHO_SERVER,
@@ -45,13 +45,13 @@ func init() {
 			},
 
 			// ws
-			relay.RelayConfig{
+			{
 				Listen:        WS_LISTEN,
 				ListenType:    relay.Listen_RAW,
 				Remote:        WS_REMOTE,
 				TransportType: relay.Transport_WS,
 			},
-			relay.RelayConfig{
+			{
 				Listen:        WS_SERVER,
 				ListenType:    relay.Listen_WS,
 				Remote:        ECHO_SERVER,
@@ -59,13 +59,13 @@ func init() {
 			},
 
 			// wss
-			relay.RelayConfig{
+			{
 				Listen:        WSS_LISTEN,
 				ListenType:    relay.Listen_RAW,
 				Remote:        WSS_REMOTE,
 				TransportType: relay.Transport_WSS,
 			},
-			relay.RelayConfig{
+			{
 				Listen:        WSS_SERVER,
 				ListenType:    relay.Listen_WSS,
 				Remote:        ECHO_SERVER,
@@ -73,13 +73,13 @@ func init() {
 			},
 
 			// mwss
-			relay.RelayConfig{
+			{
 				Listen:        MWSS_LISTEN,
 				ListenType:    relay.Listen_RAW,
 				Remote:        MWSS_REMOTE,
 				TransportType: relay.Transport_MWSS,
 			},
-			relay.RelayConfig{
+			{
 				Listen:        MWSS_SERVER,
 				ListenType:    relay.Listen_MWSS,
 				Remote:        ECHO_SERVER,
