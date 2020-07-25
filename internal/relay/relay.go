@@ -1,6 +1,7 @@
 package relay
 
 import (
+	"github.com/Ehco1996/ehco/internal/lb"
 	"io"
 	"net"
 	"time"
@@ -28,6 +29,7 @@ type Relay struct {
 
 	RemoteTCPAddr string
 	RemoteUDPAddr string
+	LBRemotes     lb.LBNodeHeap
 
 	ListenType    string
 	TransportType string
@@ -55,7 +57,7 @@ func NewRelay(cfg *RelayConfig) (*Relay, error) {
 
 		RemoteTCPAddr: cfg.Remote,
 		RemoteUDPAddr: cfg.Remote,
-
+		LBRemotes:     lb.New(cfg.LBRemotes),
 		ListenType:    cfg.ListenType,
 		TransportType: cfg.TransportType,
 
@@ -64,6 +66,10 @@ func NewRelay(cfg *RelayConfig) (*Relay, error) {
 	}
 
 	return r, nil
+}
+
+func (r *Relay) EnableLB() bool {
+	return r.LBRemotes.Len() > 0
 }
 
 func (r *Relay) ListenAndServe() error {

@@ -12,11 +12,17 @@ type LBNode struct {
 
 type LBNodeHeap []*LBNode
 
-// update modifies the priority and value of an Item in the queue.
-func (lp *LBNodeHeap) update(node *LBNode, remote string, cnt int) {
-	node.Remote = remote
-	node.OnLineUserCnt = cnt
-	heap.Fix(lp, node.index)
+func New(remotes []string) LBNodeHeap {
+	lh := make(LBNodeHeap, len(remotes))
+	for i, remote := range remotes {
+		lh[i] = &LBNode{
+			Remote:        remote,
+			OnLineUserCnt: 0,
+			index:         i,
+		}
+	}
+	lh.HeapInit()
+	return lh
 }
 
 func (lp LBNodeHeap) Len() int { return len(lp) }
@@ -48,6 +54,13 @@ func (lp *LBNodeHeap) Pop() interface{} {
 	return node
 }
 
+// update modifies the priority and value of an Item in the queue.
+func (lp *LBNodeHeap) update(node *LBNode, remote string, cnt int) {
+	node.Remote = remote
+	node.OnLineUserCnt = cnt
+	heap.Fix(lp, node.index)
+}
+
 func (lp *LBNodeHeap) HeapInit() {
 	heap.Init(lp)
 }
@@ -66,4 +79,18 @@ func (lp *LBNodeHeap) MinLBNode() *LBNode {
 		return old[0]
 	}
 	return nil
+}
+
+func (lp *LBNodeHeap) IncrUserCnt(node *LBNode, num int) {
+	lp.update(node, node.Remote, node.OnLineUserCnt+num)
+}
+
+func (lp *LBNodeHeap) PickMin() *LBNode {
+	node := lp.MinLBNode()
+	lp.IncrUserCnt(node, 1)
+	return node
+}
+
+func (lp *LBNodeHeap) DeferPick(node *LBNode) {
+	lp.IncrUserCnt(node, -1)
 }

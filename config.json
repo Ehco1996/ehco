@@ -24,7 +24,16 @@
             "remote": "wss://0.0.0.0:2002",
             "transport_type": "mwss"
         },
-
+        {
+            "listen": "0.0.0.0:1238",
+            "listen_type": "raw",
+            "remote": "",
+            "transport_type": "mwss",
+            "lb_remotes": [
+                "wss://0.0.0.0:2002",
+                "wss://0.0.0.0:2003"
+            ]
+        },
         {
             "listen": "0.0.0.0:2000",
             "listen_type": "ws",
@@ -39,6 +48,12 @@
         },
         {
             "listen": "0.0.0.0:2002",
+            "listen_type": "mwss",
+            "remote": "0.0.0.0:5201",
+            "transport_type": "raw"
+        },
+        {
+            "listen": "0.0.0.0:2003",
             "listen_type": "mwss",
             "remote": "0.0.0.0:5201",
             "transport_type": "raw"

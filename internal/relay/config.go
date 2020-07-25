@@ -8,11 +8,13 @@ import (
 	"time"
 )
 
+// TODO lbremotes 支持不同的transport_type
 type RelayConfig struct {
-	Listen        string `json:"listen"`
-	ListenType    string `json:"listen_type"`
-	Remote        string `json:"remote"`
-	TransportType string `json:"transport_type"`
+	Listen        string   `json:"listen"`
+	ListenType    string   `json:"listen_type"`
+	Remote        string   `json:"remote"`
+	TransportType string   `json:"transport_type"`
+	LBRemotes     []string `json:"lb_remotes"`
 }
 
 type Config struct {

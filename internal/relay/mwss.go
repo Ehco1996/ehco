@@ -210,8 +210,17 @@ func (s *MWSSServer) Addr() string {
 
 func (r *Relay) handleTcpOverMWSS(c *net.TCPConn) error {
 	defer c.Close()
+	var addr string
 
-	addr := r.RemoteTCPAddr + "/tcp/"
+	// TODO 抽象一下，到所有的节点里去
+	if r.EnableLB() {
+		node := r.LBRemotes.PickMin()
+		addr = node.Remote + "/tcp/"
+		Logger.Infof("pick min lb node remote: %s cnt: %d", node.Remote, node.OnLineUserCnt)
+		defer r.LBRemotes.DeferPick(node)
+	} else {
+		addr = r.RemoteTCPAddr + "/tcp/"
+	}
 	wsc, err := r.mwssTSP.Dial(addr)
 	if err != nil {
 		return err
