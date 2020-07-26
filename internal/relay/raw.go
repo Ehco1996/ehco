@@ -7,7 +7,13 @@ import (
 
 func (r *Relay) handleTCPConn(c *net.TCPConn) error {
 	defer c.Close()
-	rc, err := net.Dial("tcp", r.RemoteTCPAddr)
+
+	addr, node := r.PickTcpRemote()
+	if node != nil {
+		defer r.LBRemotes.DeferPick(node)
+	}
+
+	rc, err := net.Dial("tcp", addr)
 	if err != nil {
 		return err
 	}

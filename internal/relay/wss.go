@@ -10,19 +10,18 @@ import (
 	"github.com/gobwas/ws"
 )
 
-func (relay *Relay) RunLocalWSSServer() error {
+func (r *Relay) RunLocalWSSServer() error {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", index)
-	mux.HandleFunc("/tcp/", relay.handleWssToTcp)
-	mux.HandleFunc("/udp/", relay.handleWssToUdp)
+	mux.HandleFunc("/tcp/", r.handleWssToTcp)
 
 	server := &http.Server{
-		Addr:              relay.LocalTCPAddr.String(),
+		Addr:              r.LocalTCPAddr.String(),
 		TLSConfig:         DefaultTLSConfig,
 		ReadHeaderTimeout: 30 * time.Second,
 		Handler:           mux,
 	}
-	ln, err := net.Listen("tcp", relay.LocalTCPAddr.String())
+	ln, err := net.Listen("tcp", r.LocalTCPAddr.String())
 	if err != nil {
 		return err
 	}
@@ -30,14 +29,14 @@ func (relay *Relay) RunLocalWSSServer() error {
 	return server.Serve(tls.NewListener(ln, server.TLSConfig))
 }
 
-func (relay *Relay) handleWssToTcp(w http.ResponseWriter, r *http.Request) {
-	wsc, _, _, err := ws.UpgradeHTTP(r, w)
+func (r *Relay) handleWssToTcp(w http.ResponseWriter, req *http.Request) {
+	wsc, _, _, err := ws.UpgradeHTTP(req, w)
 	if err != nil {
 		return
 	}
 	defer wsc.Close()
 
-	rc, err := net.Dial("tcp", relay.RemoteTCPAddr)
+	rc, err := net.Dial("tcp", r.RemoteTCPAddr)
 	if err != nil {
 		Logger.Infof("dial error: %s", err)
 		return
@@ -47,23 +46,21 @@ func (relay *Relay) handleWssToTcp(w http.ResponseWriter, r *http.Request) {
 	transport(rc, wsc)
 }
 
-func (relay *Relay) handleTcpOverWss(c *net.TCPConn) error {
+func (r *Relay) handleTcpOverWss(c *net.TCPConn) error {
 	defer c.Close()
 
+	addr, node := r.PickTcpRemote()
+	if node != nil {
+		defer r.LBRemotes.DeferPick(node)
+	}
+	addr += "/tcp/"
+
 	d := ws.Dialer{TLSConfig: DefaultTLSConfig}
-	wsc, _, _, err := d.Dial(context.TODO(), relay.RemoteTCPAddr+"/tcp/")
+	wsc, _, _, err := d.Dial(context.TODO(), addr)
 	if err != nil {
 		return err
 	}
 	defer wsc.Close()
 	transport(c, wsc)
 	return nil
-}
-
-func (relay *Relay) handleWssToUdp(w http.ResponseWriter, r *http.Request) {
-	Logger.Info("not support relay udp over ws currently")
-}
-
-func (relay *Relay) handleUdpOverWss(addr string, ubc *udpBufferCh) {
-	Logger.Info("not support relay udp over ws currently")
 }

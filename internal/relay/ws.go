@@ -15,17 +15,17 @@ func index(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "access from %s \n", r.RemoteAddr)
 }
 
-func (relay *Relay) RunLocalWSServer() error {
+func (r *Relay) RunLocalWSServer() error {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", index)
-	mux.HandleFunc("/ws/tcp/", relay.handleWsToTcp)
+	mux.HandleFunc("/ws/tcp/", r.handleWsToTcp)
 	server := &http.Server{
-		Addr:              relay.LocalTCPAddr.String(),
+		Addr:              r.LocalTCPAddr.String(),
 		ReadHeaderTimeout: 30 * time.Second,
 		Handler:           mux,
 	}
-	ln, err := net.Listen("tcp", relay.LocalTCPAddr.String())
+	ln, err := net.Listen("tcp", r.LocalTCPAddr.String())
 	if err != nil {
 		return err
 	}
@@ -33,14 +33,14 @@ func (relay *Relay) RunLocalWSServer() error {
 	return server.Serve(ln)
 }
 
-func (relay *Relay) handleWsToTcp(w http.ResponseWriter, r *http.Request) {
-	wsc, _, _, err := ws.UpgradeHTTP(r, w)
+func (r *Relay) handleWsToTcp(w http.ResponseWriter, req *http.Request) {
+	wsc, _, _, err := ws.UpgradeHTTP(req, w)
 	if err != nil {
 		return
 	}
 	defer wsc.Close()
 
-	rc, err := net.Dial("tcp", relay.RemoteTCPAddr)
+	rc, err := net.Dial("tcp", r.RemoteTCPAddr)
 	if err != nil {
 		Logger.Infof("dial error: %s", err)
 		return
@@ -50,9 +50,16 @@ func (relay *Relay) handleWsToTcp(w http.ResponseWriter, r *http.Request) {
 	transport(rc, wsc)
 }
 
-func (relay *Relay) handleTcpOverWs(c *net.TCPConn) error {
+func (r *Relay) handleTcpOverWs(c *net.TCPConn) error {
 	defer c.Close()
-	wsc, _, _, err := ws.Dial(context.TODO(), relay.RemoteTCPAddr+"/ws/tcp/")
+
+	addr, node := r.PickTcpRemote()
+	if node != nil {
+		defer r.LBRemotes.DeferPick(node)
+	}
+	addr += "/ws/tcp/"
+
+	wsc, _, _, err := ws.Dial(context.TODO(), addr)
 	if err != nil {
 		return err
 	}

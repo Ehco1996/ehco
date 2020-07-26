@@ -31,8 +31,10 @@ func (tr *mwssTransporter) Dial(addr string) (conn net.Conn, err error) {
 
 	var session *muxSession
 	var sessionIndex int
-	sessions, ok := tr.sessions[addr]
+	var sessions []*muxSession
+	var ok bool
 
+	sessions, ok = tr.sessions[addr]
 	// 找到可以用的session
 	for sessionIndex, session = range sessions {
 		if session.NumStreams() >= session.maxStreamCnt {
@@ -210,17 +212,13 @@ func (s *MWSSServer) Addr() string {
 
 func (r *Relay) handleTcpOverMWSS(c *net.TCPConn) error {
 	defer c.Close()
-	var addr string
 
-	// TODO 抽象一下，到所有的节点里去
-	if r.EnableLB() {
-		node := r.LBRemotes.PickMin()
-		addr = node.Remote + "/tcp/"
-		Logger.Infof("pick min lb node remote: %s cnt: %d", node.Remote, node.OnLineUserCnt)
+	addr, node := r.PickTcpRemote()
+	if node != nil {
 		defer r.LBRemotes.DeferPick(node)
-	} else {
-		addr = r.RemoteTCPAddr + "/tcp/"
 	}
+	addr += "/tcp/"
+
 	wsc, err := r.mwssTSP.Dial(addr)
 	if err != nil {
 		return err

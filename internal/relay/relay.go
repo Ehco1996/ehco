@@ -72,6 +72,15 @@ func (r *Relay) EnableLB() bool {
 	return r.LBRemotes.Len() > 0
 }
 
+func (r *Relay) PickTcpRemote() (string, *lb.LBNode) {
+	if r.EnableLB() {
+		node := r.LBRemotes.PickMin()
+		Logger.Infof("pick from lb remote: %s cnt: %d", node.Remote, node.OnLineUserCnt)
+		return node.Remote, node
+	}
+	return r.RemoteTCPAddr, nil
+}
+
 func (r *Relay) ListenAndServe() error {
 	errChan := make(chan error)
 	Logger.Infof("start relay AT: %s Over: %s TO: %s Through %s",
@@ -174,8 +183,6 @@ func (r *Relay) RunLocalUDPServer() error {
 			ubc.Handled = true
 			Logger.Infof("handle udp con from %s over: %s", addr, r.TransportType)
 			switch r.TransportType {
-			case Transport_WSS:
-				go r.handleUdpOverWss(addr.String(), ubc)
 			case Transport_RAW:
 				go r.handleOneUDPConn(addr.String(), ubc)
 			}
