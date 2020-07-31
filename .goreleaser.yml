@@ -5,20 +5,18 @@ before:
     # you may remove this if you don't use vgo
     - go mod download
 builds:
-- env:
-  - CGO_ENABLED=0
-  main: ./cmd/ehco/main.go
+  - id: ehco
+    main: ./cmd/ehco/main.go
+    goarch:
+      - amd64
+      - arm64
+    goarm:
+      - 7
 archives:
-- replacements:
-    darwin: Darwin
-    linux: Linux
-checksum:
-  name_template: 'checksums.txt'
-snapshot:
-  name_template: "{{ .Tag }}-next"
+  - format: binary
 changelog:
   sort: asc
   filters:
     exclude:
-    - '^docs:'
-    - '^test:'
+      - "^docs:"
+      - "^test:"
