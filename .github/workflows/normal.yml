@@ -43,7 +43,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@master
-      - name: Publish to Registry
+      - name: Build x86 image
         uses: elgohr/Publish-Docker-Github-Action@master
         with:
           name: ehco1996/ehco
@@ -51,3 +51,13 @@ jobs:
           password: ${{ secrets.DOCKER_PASSWORD }}
           tags: "latest"
           dockerfile: build/Dockerfile
+
+      - uses: actions/checkout@master
+      - name: Build arm image
+        uses: elgohr/Publish-Docker-Github-Action@master
+        with:
+          name: ehco1996/ehco
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+          tags: "arm64"
+          dockerfile: build/arm.Dockerfile
