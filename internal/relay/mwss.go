@@ -221,8 +221,10 @@ func (r *Relay) handleTcpOverMWSS(c *net.TCPConn) error {
 
 	wsc, err := r.mwssTSP.Dial(addr)
 	if err != nil {
-		// NOTE 向这个节点发请求挂了，负载的优先级降低
-		r.LBRemotes.IncrUserCnt(node, 10000)
+		if r.EnableLB() && node != nil {
+			// NOTE 向这个节点发请求挂了，负载的优先级降低
+			r.LBRemotes.IncrUserCnt(node, 10000)
+		}
 		return err
 	}
 	defer wsc.Close()
