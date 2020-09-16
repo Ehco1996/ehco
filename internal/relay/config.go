@@ -51,9 +51,9 @@ func (c *Config) LoadConfig() error {
 	var err error
 	if strings.Contains(c.PATH, "http") {
 		err = c.readFromHttp()
+	} else {
+		err = c.readFromFile()
 	}
-	err = c.readFromFile()
-
 	if err == nil {
 		for _, cfg := range c.Configs {
 			cfg.WhiteIpList = parseHostToIp(cfg.WhiteIpList)
