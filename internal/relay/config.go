@@ -3,18 +3,19 @@ package relay
 import (
 	"encoding/json"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"strings"
 	"time"
 )
 
-// TODO lbremotes 支持不同的transport_type
 type RelayConfig struct {
 	Listen        string   `json:"listen"`
 	ListenType    string   `json:"listen_type"`
 	Remote        string   `json:"remote"`
 	TransportType string   `json:"transport_type"`
 	LBRemotes     []string `json:"lb_remotes"`
+	WhiteIpList   []string `json:"white_ip_list"`
 }
 
 type Config struct {
@@ -30,11 +31,35 @@ func NewConfigByPath(path string) *Config {
 	return &Config{PATH: path, Configs: []RelayConfig{}}
 }
 
-func (c *Config) LoadConfig() error {
-	if strings.Contains(c.PATH, "http") {
-		return c.readFromHttp()
+func parseHostToIp(white_ip_list []string) []string {
+	res := []string{}
+	for _, host := range white_ip_list {
+		if ips, err := net.LookupIP(host); err == nil {
+			t := make([]string, len(ips))
+			for _, ip := range ips {
+				t = append(t, ip.String())
+			}
+			res = append(res, t...)
+		} else {
+			panic(err)
+		}
 	}
-	return c.readFromFile()
+	return res
+}
+
+func (c *Config) LoadConfig() error {
+	var err error
+	if strings.Contains(c.PATH, "http") {
+		err = c.readFromHttp()
+	}
+	err = c.readFromFile()
+
+	if err == nil {
+		for _, cfg := range c.Configs {
+			cfg.WhiteIpList = parseHostToIp(cfg.WhiteIpList)
+		}
+	}
+	return err
 }
 
 func (c *Config) readFromFile() error {

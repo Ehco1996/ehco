@@ -4,7 +4,8 @@
             "listen": "0.0.0.0:1234",
             "listen_type": "raw",
             "remote": "0.0.0.0:5201",
-            "transport_type": "raw"
+            "transport_type": "raw",
+            "white_ip_list": ["127.0.0.1","ip.com"]
         },
         {
             "listen": "0.0.0.0:1235",

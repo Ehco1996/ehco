@@ -1,10 +1,11 @@
 package relay
 
 import (
-	"github.com/Ehco1996/ehco/internal/lb"
 	"io"
 	"net"
 	"time"
+
+	"github.com/Ehco1996/ehco/internal/lb"
 )
 
 const (
