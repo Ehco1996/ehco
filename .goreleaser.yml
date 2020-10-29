@@ -12,6 +12,10 @@ builds:
       - arm64
     goarm:
       - 7
+    goos:
+      - linux
+      - darwin
+      - windows
 archives:
   - format: binary
 changelog:
