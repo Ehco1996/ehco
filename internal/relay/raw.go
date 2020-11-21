@@ -27,6 +27,7 @@ func (r *Relay) handleOneUDPConn(addr string, ubc *udpBufferCh) {
 	rc, err := net.Dial("udp", r.RemoteUDPAddr)
 	if err != nil {
 		Logger.Info(err)
+		return
 	}
 
 	defer func() {
