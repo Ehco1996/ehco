@@ -7,6 +7,8 @@ ehco is a network relay tool and a typo :)
 
 ## 视频安装教程
 
+本隧道和 [django-sspanel](https://github.com/Ehco1996/django-sspanel)深度对接，可以很方便的管理中转节点
+
 * 面板视频安装教程: [地址](https://youtu.be/BRHcdGeufvY)
 
 * 后端对接视频教程: [地址](https://youtu.be/QNbnya1HHU0)
@@ -29,7 +31,7 @@ ehco is a network relay tool and a typo :)
 
 ## 使用说明
 
-使用隧道需要至少两条主机,并且在两台主机上都安装了ehco
+使用隧道需要至少两台主机,并且在两台主机上都安装了ehco
 > ehco的可执行文件可以从项目的[release](https://github.com/Ehco1996/ehco/releases)页面下载
 
 * 中转机器 A 假设机器A的IP是 1.1.1.1
