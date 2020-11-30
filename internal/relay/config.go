@@ -85,7 +85,9 @@ func (c *Config) readFromHttp() error {
 	}
 	defer r.Body.Close()
 	jsonConfig := JsonConfig{}
-	json.NewDecoder(r.Body).Decode(&jsonConfig)
+	if err := json.NewDecoder(r.Body).Decode(&jsonConfig); err != nil {
+		return err
+	}
 	c.Configs = jsonConfig.Configs
 	Logger.Info("load config from http:", c.PATH, c.Configs)
 	return nil

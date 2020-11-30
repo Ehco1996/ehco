@@ -53,7 +53,7 @@ func generateKeyPair() (rawCert, rawKey []byte, err error) {
 	notBefore := time.Now()
 	notAfter := notBefore.Add(validFor)
 	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
-	serialNumber, err := rand.Int(rand.Reader, serialNumberLimit)
+	serialNumber, _ := rand.Int(rand.Reader, serialNumberLimit)
 	template := x509.Certificate{
 		SerialNumber: serialNumber,
 		Subject: pkix.Name{
@@ -79,7 +79,9 @@ func generateKeyPair() (rawCert, rawKey []byte, err error) {
 		if err != nil {
 			Logger.Fatalf("failed to open cert.pem for writing: %s", err)
 		}
-		pem.Encode(certOut, &pem.Block{Type: "CERTIFICATE", Bytes: derBytes})
+		if err = pem.Encode(certOut, &pem.Block{Type: "CERTIFICATE", Bytes: derBytes}); err != nil {
+			Logger.Info("failed to pem encode:", err)
+		}
 		certOut.Close()
 		Logger.Infof("write cert to %s", CertFileName)
 	}
@@ -88,7 +90,9 @@ func generateKeyPair() (rawCert, rawKey []byte, err error) {
 		if err != nil {
 			Logger.Info("failed to open key.pem for writing:", err)
 		}
-		pem.Encode(keyOut, pemBlockForKey(priv))
+		if err = pem.Encode(keyOut, pemBlockForKey(priv)); err != nil {
+			Logger.Info("failed to pem encode:", err)
+		}
 		keyOut.Close()
 		Logger.Infof("write key to %s", KeyFileName)
 	}

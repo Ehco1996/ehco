@@ -18,7 +18,9 @@ func (r *Relay) handleTCPConn(c *net.TCPConn) error {
 		return err
 	}
 	defer rc.Close()
-	transport(c, rc)
+	if err := transport(c, rc); err != nil {
+		return err
+	}
 	return nil
 }
 

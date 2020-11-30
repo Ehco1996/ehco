@@ -53,7 +53,7 @@ func ServeUdp(conn *net.UDPConn) {
 		if err != nil {
 			fmt.Printf("net.ReadFromUDP() error: %s\n", err)
 		}
-		number, writeErr := conn.WriteTo(buf[0:number], remote)
+		_, writeErr := conn.WriteTo(buf[0:number], remote)
 		if writeErr != nil {
 			fmt.Printf("net.WriteTo() error: %s\n", writeErr)
 		}
@@ -64,7 +64,13 @@ func RunEchoServer(host string, port int) {
 	var err error
 	tcpAddr := host + ":" + strconv.Itoa(port)
 	l, err := net.Listen("tcp", tcpAddr)
-	defer l.Close()
+	defer func() {
+		err = l.Close()
+		if err != nil {
+			fmt.Println(err.Error())
+		}
+	}()
+
 	if err != nil {
 		fmt.Println("ERROR", err)
 		os.Exit(1)
@@ -72,7 +78,13 @@ func RunEchoServer(host string, port int) {
 
 	udpAddr := net.UDPAddr{Port: port, IP: net.ParseIP(host)}
 	udpConn, err := net.ListenUDP("udp", &udpAddr)
-	defer udpConn.Close()
+	defer func() {
+		err = udpConn.Close()
+		if err != nil {
+			fmt.Println(err.Error())
+		}
+	}()
+
 	if err != nil {
 		fmt.Println("ERROR", err)
 		os.Exit(1)
@@ -91,7 +103,9 @@ func SendTcpMsg(msg []byte, address string) []byte {
 		log.Fatal(err)
 	}
 	defer conn.Close()
-	conn.Write(msg)
+	if _, err := conn.Write(msg); err != nil {
+		log.Fatal(err)
+	}
 	buf := make([]byte, len(msg))
 	time.Sleep(time.Second * 1)
 	n, _ := conn.Read(buf)
@@ -105,7 +119,9 @@ func SendUdpMsg(msg []byte, address string) []byte {
 		log.Fatal(err)
 	}
 	defer conn.Close()
-	conn.Write(msg)
+	if _, err := conn.Write(msg); err != nil {
+		log.Fatal(err)
+	}
 	buf := make([]byte, len(msg))
 	time.Sleep(time.Second * 1)
 	n, _ := conn.Read(buf)

@@ -47,7 +47,9 @@ func (r *Relay) handleWsToTcp(w http.ResponseWriter, req *http.Request) {
 	}
 	defer rc.Close()
 	Logger.Infof("handleWsToTcp from:%s to:%s", wsc.RemoteAddr(), rc.RemoteAddr())
-	transport(rc, wsc)
+	if err := transport(rc, wsc); err != nil {
+		Logger.Infof("handleWsToTcp err: %s", err.Error())
+	}
 }
 
 func (r *Relay) handleTcpOverWs(c *net.TCPConn) error {
@@ -64,6 +66,8 @@ func (r *Relay) handleTcpOverWs(c *net.TCPConn) error {
 		return err
 	}
 	defer wsc.Close()
-	transport(c, wsc)
+	if err := transport(c, wsc); err != nil {
+		Logger.Infof("handleTcpOverWs err: %s", err.Error())
+	}
 	return nil
 }
