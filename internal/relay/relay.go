@@ -57,7 +57,7 @@ func NewRelay(cfg *RelayConfig) (*Relay, error) {
 		LocalUDPAddr: localUDPAddr,
 
 		RemoteTCPAddr: cfg.Remote,
-		RemoteUDPAddr: cfg.Remote,
+		RemoteUDPAddr: cfg.UDPRemote,
 		LBRemotes:     lb.New(cfg.LBRemotes),
 		ListenType:    cfg.ListenType,
 		TransportType: cfg.TransportType,
@@ -66,6 +66,9 @@ func NewRelay(cfg *RelayConfig) (*Relay, error) {
 		mwssTSP:  NewMWSSTransporter(),
 	}
 
+	if cfg.ListenType == Listen_RAW && cfg.TransportType == Transport_RAW {
+		r.RemoteUDPAddr = cfg.Remote
+	}
 	return r, nil
 }
 
@@ -87,31 +90,34 @@ func (r *Relay) ListenAndServe() error {
 	Logger.Infof("start relay AT: %s Over: %s TO: %s Through %s",
 		r.LocalTCPAddr, r.ListenType, r.RemoteTCPAddr, r.TransportType)
 
-	if r.ListenType == Listen_RAW {
+	switch r.ListenType {
+	case Listen_RAW:
 		go func() {
 			errChan <- r.RunLocalTCPServer()
 		}()
-		// NOTE 现在只有raw支持udp
-		if r.TransportType == Transport_RAW {
-			go func() {
-				errChan <- r.RunLocalUDPServer()
-			}()
-		}
-	} else if r.ListenType == Listen_WS {
+	case Listen_WS:
 		go func() {
 			errChan <- r.RunLocalWSServer()
 		}()
-	} else if r.ListenType == Listen_WSS {
+	case Listen_WSS:
 		go func() {
 			errChan <- r.RunLocalWSSServer()
 		}()
-	} else if r.ListenType == Listen_MWSS {
+	case Listen_MWSS:
 		go func() {
 			errChan <- r.RunLocalMWSSServer()
 		}()
-	} else {
+	default:
 		Logger.Fatalf("unknown listen type: %s ", r.ListenType)
 	}
+
+	if r.RemoteUDPAddr != "" {
+		// 直接启动udp转发
+		go func() {
+			errChan <- r.RunLocalUDPServer()
+		}()
+	}
+
 	return <-errChan
 }
 
@@ -182,11 +188,9 @@ func (r *Relay) RunLocalUDPServer() error {
 		ubc.Ch <- buf[0:n]
 		if !ubc.Handled {
 			ubc.Handled = true
-			Logger.Infof("handle udp con from %s over: %s", addr, r.TransportType)
-			switch r.TransportType {
-			case Transport_RAW:
-				go r.handleOneUDPConn(addr.String(), ubc)
-			}
+			Logger.Infof("handle udp con from %s", addr.String())
+			// NOTE 目前只要是udp都直接转发
+			go r.handleOneUDPConn(addr, ubc)
 		}
 	}
 }

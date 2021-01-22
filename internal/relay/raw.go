@@ -24,8 +24,7 @@ func (r *Relay) handleTCPConn(c *net.TCPConn) error {
 	return nil
 }
 
-func (r *Relay) handleOneUDPConn(addr string, ubc *udpBufferCh) {
-	uaddr, _ := net.ResolveUDPAddr("udp", addr)
+func (r *Relay) handleOneUDPConn(uaddr *net.UDPAddr, ubc *udpBufferCh) {
 	rc, err := net.Dial("udp", r.RemoteUDPAddr)
 	if err != nil {
 		Logger.Info(err)
@@ -35,7 +34,7 @@ func (r *Relay) handleOneUDPConn(addr string, ubc *udpBufferCh) {
 	defer func() {
 		rc.Close()
 		close(ubc.Ch)
-		delete(r.udpCache, addr)
+		delete(r.udpCache, uaddr.String())
 	}()
 
 	var wg sync.WaitGroup

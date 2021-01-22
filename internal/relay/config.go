@@ -13,6 +13,7 @@ type RelayConfig struct {
 	Listen        string   `json:"listen"`
 	ListenType    string   `json:"listen_type"`
 	Remote        string   `json:"remote"`
+	UDPRemote     string   `json:"udp_remote"`
 	TransportType string   `json:"transport_type"`
 	LBRemotes     []string `json:"lb_remotes"`
 	WhiteIpList   []string `json:"white_ip_list"`

@@ -5,7 +5,10 @@
             "listen_type": "raw",
             "remote": "0.0.0.0:5201",
             "transport_type": "raw",
-            "white_ip_list": ["127.0.0.1","ip.com"]
+            "white_ip_list": [
+                "127.0.0.1",
+                "ip.com"
+            ]
         },
         {
             "listen": "0.0.0.0:1235",
@@ -29,6 +32,7 @@
             "listen": "0.0.0.0:1238",
             "listen_type": "raw",
             "remote": "",
+            "udp_remote": "0.0.0.0:5201",
             "transport_type": "mwss",
             "lb_remotes": [
                 "wss://0.0.0.0:2002",
