@@ -1,10 +1,11 @@
 package main
 
 import (
-	cli "github.com/urfave/cli/v2"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
+
+	cli "github.com/urfave/cli/v2"
 
 	relay "github.com/Ehco1996/ehco/internal/relay"
 )
@@ -12,6 +13,7 @@ import (
 var LocalAddr string
 var ListenType string
 var RemoteAddr string
+var UDPRemoteAddr string
 var TransportType string
 var ConfigPath string
 var PprofPort string
@@ -43,6 +45,13 @@ func main() {
 			Usage:       "转发地址",
 			EnvVars:     []string{"EHCO_REMOTE_ADDR"},
 			Destination: &RemoteAddr,
+		},
+		&cli.StringFlag{
+			Name:        "ur,udp_remote",
+			Value:       "0.0.0.0:9001",
+			Usage:       "UDP转发地址",
+			EnvVars:     []string{"EHCO_UDP_REMOTE_ADDR"},
+			Destination: &UDPRemoteAddr,
 		},
 		&cli.StringFlag{
 			Name:        "tt,transport_type",
@@ -90,6 +99,7 @@ func start(ctx *cli.Context) error {
 					Listen:        LocalAddr,
 					ListenType:    ListenType,
 					Remote:        RemoteAddr,
+					UDPRemote:     UDPRemoteAddr,
 					TransportType: TransportType,
 				},
 			},

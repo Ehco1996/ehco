@@ -3,7 +3,6 @@ package relay
 import (
 	"encoding/json"
 	"io/ioutil"
-	"net"
 	"net/http"
 	"strings"
 	"time"
@@ -16,7 +15,6 @@ type RelayConfig struct {
 	UDPRemote     string   `json:"udp_remote"`
 	TransportType string   `json:"transport_type"`
 	LBRemotes     []string `json:"lb_remotes"`
-	WhiteIpList   []string `json:"white_ip_list"`
 }
 
 type Config struct {
@@ -32,33 +30,12 @@ func NewConfigByPath(path string) *Config {
 	return &Config{PATH: path, Configs: []RelayConfig{}}
 }
 
-func parseHostToIp(white_ip_list []string) []string {
-	res := []string{}
-	for _, host := range white_ip_list {
-		if ips, err := net.LookupIP(host); err == nil {
-			t := make([]string, len(ips))
-			for _, ip := range ips {
-				t = append(t, ip.String())
-			}
-			res = append(res, t...)
-		} else {
-			panic(err)
-		}
-	}
-	return res
-}
-
 func (c *Config) LoadConfig() error {
 	var err error
 	if strings.Contains(c.PATH, "http") {
 		err = c.readFromHttp()
 	} else {
 		err = c.readFromFile()
-	}
-	if err == nil {
-		for _, cfg := range c.Configs {
-			cfg.WhiteIpList = parseHostToIp(cfg.WhiteIpList)
-		}
 	}
 	return err
 }

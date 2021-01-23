@@ -18,7 +18,7 @@ ehco is a network relay tool and a typo :)
 ## 主要功能
 
 * tcp/udp relay
-* tcp/(udp暂时不支持) relay over wss
+* tcp relay over wss
 * 从配置文件启动 支持多端口转发
 * 从远程启动
 * benchmark
@@ -114,4 +114,4 @@ iperf3 -c 0.0.0.0 -p 1234 -u -b 1G --length 1024
 | iperf | raw | relay(raw) | relay(ws) |relay(wss) | relay(mwss)|
 | ---- | ----  | ---- | ---- | ---- | ---- |
 | tcp  | 62.6 Gbits/sec | 23.9 Gbits/sec | 14.65 Gbits/sec | 4.22 Gbits/sec | 2.43 Gbits/sec |
-| udp  | 2.2 Gbits/sec | 2.2 Gbits/sec | 暂不支持 | 暂不支持 | 暂不支持 |
+| udp  | 2.2 Gbits/sec | 2.2 Gbits/sec | 直接转发 | 直接转发 | 直接转发 |
