@@ -10,7 +10,7 @@ func TestLBNodeHeap(t *testing.T) {
 		"1.1.1.1": 1, "4.4.4.4": 4, "3.3.3.3": 3,
 	}
 
-	lp := make(LBNodeHeap, len(nodes))
+	lp := make(LBNodes, len(nodes))
 	i := 0
 	for value, priority := range nodes {
 		lp[i] = &LBNode{

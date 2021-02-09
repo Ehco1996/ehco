@@ -7,7 +7,9 @@ import (
 
 	cli "github.com/urfave/cli/v2"
 
-	relay "github.com/Ehco1996/ehco/internal/relay"
+	"github.com/Ehco1996/ehco/internal/constant"
+	"github.com/Ehco1996/ehco/internal/logger"
+	"github.com/Ehco1996/ehco/internal/relay"
 )
 
 var LocalAddr string
@@ -77,7 +79,7 @@ func main() {
 	app.Action = start
 	err := app.Run(os.Args)
 	if err != nil {
-		relay.Logger.Fatal(err)
+		logger.Logger.Fatal(err)
 	}
 
 }
@@ -89,7 +91,7 @@ func start(ctx *cli.Context) error {
 	if ConfigPath != "" {
 		config = relay.NewConfigByPath(ConfigPath)
 		if err := config.LoadConfig(); err != nil {
-			relay.Logger.Fatal(err)
+			logger.Logger.Fatal(err)
 		}
 	} else {
 		config = &relay.Config{
@@ -98,8 +100,8 @@ func start(ctx *cli.Context) error {
 				{
 					Listen:        LocalAddr,
 					ListenType:    ListenType,
-					Remote:        RemoteAddr,
-					UDPRemote:     UDPRemoteAddr,
+					TCPRemotes:    []string{RemoteAddr},
+					UDPRemotes:    []string{UDPRemoteAddr},
 					TransportType: TransportType,
 				},
 			},
@@ -107,10 +109,10 @@ func start(ctx *cli.Context) error {
 	}
 	initTls := false
 	for _, cfg := range config.Configs {
-		if !initTls && (cfg.ListenType == relay.Listen_WSS ||
-			cfg.ListenType == relay.Listen_MWSS ||
-			cfg.TransportType == relay.Transport_WSS ||
-			cfg.TransportType == relay.Transport_MWSS) {
+		if !initTls && (cfg.ListenType == constant.Listen_WSS ||
+			cfg.ListenType == constant.Listen_MWSS ||
+			cfg.TransportType == constant.Transport_WSS ||
+			cfg.TransportType == constant.Transport_MWSS) {
 			initTls = true
 			relay.InitTlsCfg()
 		}
@@ -121,8 +123,8 @@ func start(ctx *cli.Context) error {
 	if PprofPort != "" {
 		go func() {
 			pps := "0.0.0.0:" + PprofPort
-			relay.Logger.Infof("start pprof server at http://%s/debug/pprof/", pps)
-			relay.Logger.Fatal(http.ListenAndServe(pps, nil))
+			logger.Logger.Infof("start pprof server at http://%s/debug/pprof/", pps)
+			logger.Logger.Fatal(http.ListenAndServe(pps, nil))
 		}()
 	}
 
@@ -132,7 +134,7 @@ func start(ctx *cli.Context) error {
 func serveRelay(cfg relay.RelayConfig, ch chan error) {
 	r, err := relay.NewRelay(&cfg)
 	if err != nil {
-		relay.Logger.Fatal(err)
+		logger.Logger.Fatal(err)
 	}
 	ch <- r.ListenAndServe()
 }

@@ -1,63 +1,15 @@
 {
-    "configs": [
+    "relay_configs": [
         {
-            "listen": "0.0.0.0:1234",
+            "listen": "127.0.0.1:1234",
             "listen_type": "raw",
-            "remote": "0.0.0.0:5201",
-            "transport_type": "raw"
-        },
-        {
-            "listen": "0.0.0.0:1235",
-            "listen_type": "raw",
-            "remote": "ws://0.0.0.0:2000",
-            "transport_type": "ws"
-        },
-        {
-            "listen": "0.0.0.0:1236",
-            "listen_type": "raw",
-            "remote": "wss://0.0.0.0:2001",
-            "transport_type": "wss"
-        },
-        {
-            "listen": "0.0.0.0:1237",
-            "listen_type": "raw",
-            "remote": "wss://0.0.0.0:2002",
-            "transport_type": "mwss"
-        },
-        {
-            "listen": "0.0.0.0:1238",
-            "listen_type": "raw",
-            "remote": "",
-            "udp_remote": "0.0.0.0:5201",
-            "transport_type": "mwss",
-            "lb_remotes": [
-                "wss://0.0.0.0:2002",
-                "wss://0.0.0.0:2003"
+            "transport_type": "raw",
+            "tcp_remotes": [
+                "0.0.0.0:5201"
+            ],
+            "udp_remotes": [
+                "0.0.0.0:5201"
             ]
-        },
-        {
-            "listen": "0.0.0.0:2000",
-            "listen_type": "ws",
-            "remote": "0.0.0.0:5201",
-            "transport_type": "raw"
-        },
-        {
-            "listen": "0.0.0.0:2001",
-            "listen_type": "wss",
-            "remote": "0.0.0.0:5201",
-            "transport_type": "raw"
-        },
-        {
-            "listen": "0.0.0.0:2002",
-            "listen_type": "mwss",
-            "remote": "0.0.0.0:5201",
-            "transport_type": "raw"
-        },
-        {
-            "listen": "0.0.0.0:2003",
-            "listen_type": "mwss",
-            "remote": "0.0.0.0:5201",
-            "transport_type": "raw"
         }
     ]
 }

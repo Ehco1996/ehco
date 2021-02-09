@@ -1,46 +1,25 @@
 package relay
 
 import (
-	"io"
 	"net"
 	"time"
 
+	"github.com/Ehco1996/ehco/internal/constant"
 	"github.com/Ehco1996/ehco/internal/lb"
-)
-
-const (
-	MaxMWSSStreamCnt = 10
-	DialTimeOut      = 3 * time.Second
-	MaxConKeepAlive  = 10 * time.Minute
-
-	Listen_RAW  = "raw"
-	Listen_WS   = "ws"
-	Listen_WSS  = "wss"
-	Listen_MWSS = "mwss"
-
-	Transport_RAW  = "raw"
-	Transport_WS   = "ws"
-	Transport_WSS  = "wss"
-	Transport_MWSS = "mwss"
+	"github.com/Ehco1996/ehco/internal/logger"
+	"github.com/Ehco1996/ehco/internal/transporter"
 )
 
 type Relay struct {
+	cfg *RelayConfig
+
 	LocalTCPAddr *net.TCPAddr
 	LocalUDPAddr *net.UDPAddr
-
-	RemoteTCPAddr string
-	RemoteUDPAddr string
-	LBRemotes     lb.LBNodeHeap
 
 	ListenType    string
 	TransportType string
 
-	udpCache map[string]*udpBufferCh
-	mwssTSP  *mwssTransporter
-
-	// may not init
-	TCPListener *net.TCPListener
-	UDPConn     *net.UDPConn
+	TP transporter.RelayTransporter
 }
 
 func NewRelay(cfg *RelayConfig) (*Relay, error) {
@@ -52,156 +31,104 @@ func NewRelay(cfg *RelayConfig) (*Relay, error) {
 	if err != nil {
 		return nil, err
 	}
-	r := &Relay{
-		LocalTCPAddr: localTCPAddr,
-		LocalUDPAddr: localUDPAddr,
 
-		RemoteTCPAddr: cfg.Remote,
-		RemoteUDPAddr: cfg.UDPRemote,
-		LBRemotes:     lb.New(cfg.LBRemotes),
+	r := &Relay{
+		cfg:           cfg,
+		LocalTCPAddr:  localTCPAddr,
+		LocalUDPAddr:  localUDPAddr,
 		ListenType:    cfg.ListenType,
 		TransportType: cfg.TransportType,
 
-		udpCache: make(map[string](*udpBufferCh)),
-		mwssTSP:  NewMWSSTransporter(),
+		TP: transporter.PickTransporter(
+			cfg.TransportType,
+			lb.New(cfg.TCPRemotes),
+			lb.New(cfg.UDPRemotes),
+		),
 	}
 
-	if cfg.ListenType == Listen_RAW && cfg.TransportType == Transport_RAW {
-		r.RemoteUDPAddr = cfg.Remote
-	}
 	return r, nil
-}
-
-func (r *Relay) EnableLB() bool {
-	return r.LBRemotes.Len() > 0
-}
-
-func (r *Relay) PickTcpRemote() (string, *lb.LBNode) {
-	if r.EnableLB() {
-		node := r.LBRemotes.PickMin()
-		Logger.Infof("pick from lb remote: %s cnt: %d", node.Remote, node.OnLineUserCnt)
-		return node.Remote, node
-	}
-	return r.RemoteTCPAddr, nil
 }
 
 func (r *Relay) ListenAndServe() error {
 	errChan := make(chan error)
-	Logger.Infof("start relay AT: %s Over: %s TO: %s Through %s",
-		r.LocalTCPAddr, r.ListenType, r.RemoteTCPAddr, r.TransportType)
 
 	switch r.ListenType {
-	case Listen_RAW:
+	case constant.Listen_RAW:
 		go func() {
 			errChan <- r.RunLocalTCPServer()
 		}()
-	case Listen_WS:
-		go func() {
-			errChan <- r.RunLocalWSServer()
-		}()
-	case Listen_WSS:
-		go func() {
-			errChan <- r.RunLocalWSSServer()
-		}()
-	case Listen_MWSS:
-		go func() {
-			errChan <- r.RunLocalMWSSServer()
-		}()
-	default:
-		Logger.Fatalf("unknown listen type: %s ", r.ListenType)
+		// case Listen_WS:
+		// 	go func() {
+		// 		errChan <- r.RunLocalWSServer()
+		// 	}()
+		// case Listen_WSS:
+		// 	go func() {
+		// 		errChan <- r.RunLocalWSSServer()
+		// 	}()
+		// case Listen_MWSS:
+		// 	go func() {
+		// 		errChan <- r.RunLocalMWSSServer()
+		// }()
 	}
-
-	if r.RemoteUDPAddr != "" {
+	if len(r.cfg.UDPRemotes) > 0 {
 		// 直接启动udp转发
 		go func() {
 			errChan <- r.RunLocalUDPServer()
 		}()
 	}
-
 	return <-errChan
 }
 
 func (r *Relay) RunLocalTCPServer() error {
-	var err error
-	r.TCPListener, err = net.ListenTCP("tcp", r.LocalTCPAddr)
+	logger.Logger.Infof("Start TCP relay At: %s Over: %s To: %s Through %s",
+		r.LocalTCPAddr, r.ListenType, r.cfg.TCPRemotes, r.TransportType)
+
+	lis, err := net.ListenTCP("tcp", r.LocalTCPAddr)
 	if err != nil {
 		return err
 	}
-	defer r.TCPListener.Close()
+	defer lis.Close()
 	for {
-		c, err := r.TCPListener.AcceptTCP()
+		c, err := lis.AcceptTCP()
 		if err != nil {
-			Logger.Infof("accept tcp con error: %s", err)
+			logger.Logger.Infof("accept tcp con error: %s", err)
 			return err
 		}
-		if err := c.SetDeadline(time.Now().Add(MaxConKeepAlive)); err != nil {
-			Logger.Infof("set max deadline err: %s", err)
+		if err := c.SetDeadline(time.Now().Add(constant.MaxConKeepAlive)); err != nil {
+			logger.Logger.Infof("set max deadline err: %s", err)
 			return err
 		}
-		switch r.TransportType {
-		case Transport_RAW:
-			go func(c *net.TCPConn) {
-				if err := r.handleTCPConn(c); err != nil {
-					Logger.Infof("handleTCPConn err %s", err)
-				}
-			}(c)
-		case Transport_WS:
-			go func(c *net.TCPConn) {
-				if err := r.handleTcpOverWs(c); err != nil && err != io.EOF {
-					Logger.Infof("handleTcpOverWs err %s", err)
-				}
-			}(c)
-		case Transport_WSS:
-			go func(c *net.TCPConn) {
-				if err := r.handleTcpOverWss(c); err != nil && err != io.EOF {
-					Logger.Infof("handleTcpOverWss err %s", err)
-				}
-			}(c)
-		case Transport_MWSS:
-			go func(c *net.TCPConn) {
-				if err := r.handleTcpOverMWSS(c); err != nil && err != io.EOF {
-					Logger.Infof("handleTcpOverMWSS err %s", err)
-				}
-			}(c)
-		}
+		go func(c *net.TCPConn) {
+			if err := r.TP.HandleTCPConn(c); err != nil {
+				logger.Logger.Infof("HandleTCPConn err %s", err)
+			}
+		}(c)
 	}
 }
 
 func (r *Relay) RunLocalUDPServer() error {
-	var err error
-	r.UDPConn, err = net.ListenUDP("udp", r.LocalUDPAddr)
+	logger.Logger.Infof("Start UDP relay At: %s Over: %s To: %s Through %s",
+		r.LocalTCPAddr, r.ListenType, r.cfg.UDPRemotes, r.TransportType)
+
+	lis, err := net.ListenUDP("udp", r.LocalUDPAddr)
 	if err != nil {
 		return err
 	}
-	defer r.UDPConn.Close()
-	buf := inboundBufferPool.Get().([]byte)
-	defer inboundBufferPool.Put(buf)
-	for {
-		n, addr, err := r.UDPConn.ReadFromUDP(buf)
-		if err != nil {
-			return err
-		}
-		ubc, err := r.getOrCreateUbc(addr)
-		if err != nil {
-			return err
-		}
-		ubc.Ch <- buf[0:n]
-		if !ubc.Handled {
-			ubc.Handled = true
-			Logger.Infof("handle udp con from %s", addr.String())
-			// NOTE 目前只要是udp都直接转发
-			go r.handleOneUDPConn(addr, ubc)
-		}
-	}
-}
+	defer lis.Close()
 
-// NOTE not thread safe
-func (r *Relay) getOrCreateUbc(addr *net.UDPAddr) (*udpBufferCh, error) {
-	ubc, found := r.udpCache[addr.String()]
-	if !found {
-		ubc := newudpBufferCh()
-		r.udpCache[addr.String()] = ubc
-		return ubc, nil
+	buffers := transporter.NewBufferPool(constant.BUFFER_SIZE)
+	buf := buffers.Get().([]byte)
+	defer buffers.Put(buf)
+	for {
+		n, addr, err := lis.ReadFromUDP(buf)
+		if err != nil {
+			return err
+		}
+		bc := r.TP.GetOrCreateBufferCh(addr)
+		bc.Ch <- buf[0:n]
+		if !bc.Handled {
+			bc.Handled = true
+			go r.TP.HandleUDPConn(addr, lis)
+		}
 	}
-	return ubc, nil
 }

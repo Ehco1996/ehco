@@ -1,22 +1,21 @@
-package relay
+package transporter
 
 import (
 	"io"
 	"sync"
-)
 
-// 4KB
-const BUFFER_SIZE = 4 * 1024
+	"github.com/Ehco1996/ehco/internal/constant"
+)
 
 // 全局pool
 var inboundBufferPool, outboundBufferPool *sync.Pool
 
 func init() {
-	inboundBufferPool = newBufferPool(BUFFER_SIZE)
-	outboundBufferPool = newBufferPool(BUFFER_SIZE)
+	inboundBufferPool = NewBufferPool(constant.BUFFER_SIZE)
+	outboundBufferPool = NewBufferPool(constant.BUFFER_SIZE)
 }
 
-func newBufferPool(size int) *sync.Pool {
+func NewBufferPool(size int) *sync.Pool {
 	return &sync.Pool{New: func() interface{} {
 		return make([]byte, size)
 	}}
@@ -47,13 +46,13 @@ func transport(rw1, rw2 io.ReadWriter) error {
 	return err
 }
 
-type udpBufferCh struct {
+type BufferCh struct {
 	Ch      chan []byte
 	Handled bool
 }
 
-func newudpBufferCh() *udpBufferCh {
-	return &udpBufferCh{
+func newudpBufferCh() *BufferCh {
+	return &BufferCh{
 		Ch:      make(chan []byte, 100),
 		Handled: false,
 	}

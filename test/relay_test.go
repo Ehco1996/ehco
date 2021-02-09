@@ -1,9 +1,10 @@
 package test
 
 import (
-	"github.com/Ehco1996/ehco/internal/relay"
 	"testing"
 	"time"
+
+	"github.com/Ehco1996/ehco/internal/relay"
 )
 
 const (
@@ -92,7 +93,7 @@ func init() {
 		go func(c relay.RelayConfig) {
 			r, err := relay.NewRelay(&c)
 			if err != nil {
-				relay.Logger.Fatal(err)
+				relay.logger.Logger.Fatal(err)
 			}
 			ch <- r.ListenAndServe()
 		}(c)

@@ -1,4 +1,4 @@
-package relay
+package transporter
 
 import (
 	"net"
