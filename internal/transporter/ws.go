@@ -1,73 +1,65 @@
 package transporter
 
-// import (
-// 	"context"
-// 	"fmt"
-// 	"net"
-// 	"net/http"
-// 	"time"
+import (
+	"context"
+	"net"
+	"net/http"
 
-// 	"github.com/gobwas/ws"
-// )
+	"github.com/Ehco1996/ehco/internal/logger"
+	"github.com/gobwas/ws"
+)
 
-// func index(w http.ResponseWriter, r *http.Request) {
-// 	logger.Logger.Infof("index call from %s", r.RemoteAddr)
-// 	fmt.Fprintf(w, "access from %s \n", r.RemoteAddr)
-// }
+type Ws struct {
+	raw Raw
+}
 
-// func (r *Relay) RunLocalWSServer() error {
+func (s *Ws) GetOrCreateBufferCh(uaddr *net.UDPAddr) *BufferCh {
+	return s.raw.GetOrCreateBufferCh(uaddr)
+}
 
-// 	mux := http.NewServeMux()
-// 	mux.HandleFunc("/", index)
-// 	mux.HandleFunc("/ws/tcp/", r.handleWsToTcp)
-// 	server := &http.Server{
-// 		Addr:              r.LocalTCPAddr.String(),
-// 		ReadHeaderTimeout: 30 * time.Second,
-// 		Handler:           mux,
-// 	}
-// 	ln, err := net.Listen("tcp", r.LocalTCPAddr.String())
-// 	if err != nil {
-// 		return err
-// 	}
-// 	defer ln.Close()
-// 	return server.Serve(ln)
-// }
+func (s *Ws) HandleUDPConn(uaddr *net.UDPAddr, local *net.UDPConn) {
+	s.raw.HandleUDPConn(uaddr, local)
+}
 
-// func (r *Relay) handleWsToTcp(w http.ResponseWriter, req *http.Request) {
-// 	wsc, _, _, err := ws.UpgradeHTTP(req, w)
-// 	if err != nil {
-// 		return
-// 	}
-// 	defer wsc.Close()
+func (s *Ws) HandleTCPConn(c *net.TCPConn) error {
+	defer c.Close()
 
-// 	rc, err := net.Dial("tcp", r.RemoteTCPAddr)
-// 	if err != nil {
-// 		logger.Logger.Infof("dial error: %s", err)
-// 		return
-// 	}
-// 	defer rc.Close()
-// 	logger.Logger.Infof("handleWsToTcp from:%s to:%s", wsc.RemoteAddr(), rc.RemoteAddr())
-// 	if err := transport(rc, wsc); err != nil {
-// 		logger.Logger.Infof("handleWsToTcp err: %s", err.Error())
-// 	}
-// }
+	node := s.raw.TCPNodes.PickMin()
+	defer s.raw.TCPNodes.DeferPick(node)
 
-// func (r *Relay) handleTcpOverWs(c *net.TCPConn) error {
-// 	defer c.Close()
+	wsc, _, _, err := ws.Dial(context.TODO(), node.Remote+"/ws/")
+	if err != nil {
+		s.raw.TCPNodes.OnError(node)
+		return err
+	}
+	defer wsc.Close()
+	logger.Logger.Infof("[ws] HandleTCPConn from %s to %s", c.LocalAddr().String(), node.Remote)
+	if err := transport(c, wsc); err != nil {
+		return err
+	}
+	return nil
+}
 
-// 	addr, node := r.PickTcpRemote()
-// 	if node != nil {
-// 		defer r.LBRemotes.DeferPick(node)
-// 	}
-// 	addr += "/ws/tcp/"
+func (s *Ws) HandleWebRequset(w http.ResponseWriter, req *http.Request) {
+	wsc, _, _, err := ws.UpgradeHTTP(req, w)
+	if err != nil {
+		return
+	}
+	defer wsc.Close()
 
-// 	wsc, _, _, err := ws.Dial(context.TODO(), addr)
-// 	if err != nil {
-// 		return err
-// 	}
-// 	defer wsc.Close()
-// 	if err := transport(c, wsc); err != nil {
-// 		logger.Logger.Infof("handleTcpOverWs err: %s", err.Error())
-// 	}
-// 	return nil
-// }
+	node := s.raw.TCPNodes.PickMin()
+	defer s.raw.TCPNodes.DeferPick(node)
+
+	rc, err := net.Dial("tcp", node.Remote)
+	if err != nil {
+		logger.Logger.Infof("dial error: %s", err)
+		s.raw.TCPNodes.OnError(node)
+		return
+	}
+	defer rc.Close()
+
+	logger.Logger.Infof("[ws tun] HandleWebRequset from:%s to:%s", wsc.RemoteAddr(), rc.RemoteAddr())
+	if err := transport(rc, wsc); err != nil {
+		logger.Logger.Infof("[ws tun] HandleWebRequset err: %s", err.Error())
+	}
+}

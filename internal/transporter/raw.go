@@ -1,7 +1,9 @@
 package transporter
 
 import (
+	"fmt"
 	"net"
+	"net/http"
 	"sync"
 
 	"github.com/Ehco1996/ehco/internal/lb"
@@ -25,25 +27,6 @@ func (raw *Raw) GetOrCreateBufferCh(uaddr *net.UDPAddr) *BufferCh {
 	return bc
 }
 
-func (raw *Raw) HandleTCPConn(c *net.TCPConn) error {
-	defer c.Close()
-
-	node := raw.TCPNodes.PickMin()
-	defer raw.TCPNodes.DeferPick(node)
-
-	rc, err := net.Dial("tcp", node.Remote)
-	if err != nil {
-		return err
-	}
-	logger.Logger.Infof("HandleTCPConn from %s to %s", c.LocalAddr().String(), node.Remote)
-
-	defer rc.Close()
-	if err := transport(c, rc); err != nil {
-		return err
-	}
-	return nil
-}
-
 func (raw *Raw) HandleUDPConn(uaddr *net.UDPAddr, local *net.UDPConn) {
 
 	bc := raw.GetOrCreateBufferCh(uaddr)
@@ -53,6 +36,7 @@ func (raw *Raw) HandleUDPConn(uaddr *net.UDPAddr, local *net.UDPConn) {
 	rc, err := net.Dial("udp", node.Remote)
 	if err != nil {
 		logger.Logger.Info(err)
+		raw.UDPNodes.OnError(node)
 		return
 	}
 
@@ -62,7 +46,7 @@ func (raw *Raw) HandleUDPConn(uaddr *net.UDPAddr, local *net.UDPConn) {
 		delete(raw.UDPBufferChMap, uaddr.String())
 	}()
 
-	logger.Logger.Infof("HandleUDPConn from %s to %s", local.LocalAddr().String(), node.Remote)
+	logger.Logger.Infof("[raw] HandleUDPConn from %s to %s", local.LocalAddr().String(), node.Remote)
 
 	var wg sync.WaitGroup
 	wg.Add(1)
@@ -72,7 +56,7 @@ func (raw *Raw) HandleUDPConn(uaddr *net.UDPAddr, local *net.UDPConn) {
 		for {
 			i, err := rc.Read(buf)
 			if err != nil {
-				logger.Logger.Info(err, 1)
+				logger.Logger.Info(err)
 				break
 			}
 			if _, err := local.WriteToUDP(buf[0:i], uaddr); err != nil {
@@ -91,4 +75,28 @@ func (raw *Raw) HandleUDPConn(uaddr *net.UDPAddr, local *net.UDPConn) {
 		}
 	}
 	wg.Wait()
+}
+
+func (raw *Raw) HandleTCPConn(c *net.TCPConn) error {
+	defer c.Close()
+
+	node := raw.TCPNodes.PickMin()
+	defer raw.TCPNodes.DeferPick(node)
+
+	rc, err := net.Dial("tcp", node.Remote)
+	if err != nil {
+		raw.TCPNodes.OnError(node)
+		return err
+	}
+	logger.Logger.Infof("[raw] HandleTCPConn from %s to %s", c.LocalAddr().String(), node.Remote)
+
+	defer rc.Close()
+	if err := transport(c, rc); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (raw *Raw) HandleWebRequset(w http.ResponseWriter, req *http.Request) {
+	fmt.Printf("not impl this")
 }

@@ -1,7 +1,9 @@
 package relay
 
 import (
+	"fmt"
 	"net"
+	"net/http"
 	"time"
 
 	"github.com/Ehco1996/ehco/internal/constant"
@@ -57,10 +59,10 @@ func (r *Relay) ListenAndServe() error {
 		go func() {
 			errChan <- r.RunLocalTCPServer()
 		}()
-		// case Listen_WS:
-		// 	go func() {
-		// 		errChan <- r.RunLocalWSServer()
-		// 	}()
+	case constant.Listen_WS:
+		go func() {
+			errChan <- r.RunLocalWSServer()
+		}()
 		// case Listen_WSS:
 		// 	go func() {
 		// 		errChan <- r.RunLocalWSSServer()
@@ -131,4 +133,29 @@ func (r *Relay) RunLocalUDPServer() error {
 			go r.TP.HandleUDPConn(addr, lis)
 		}
 	}
+}
+
+func index(w http.ResponseWriter, r *http.Request) {
+	// TODO 加入一些链接比如 metrics pprof之类的
+	logger.Logger.Infof("index call from %s", r.RemoteAddr)
+	fmt.Fprintf(w, "access from %s \n", r.RemoteAddr)
+}
+
+func (r *Relay) RunLocalWSServer() error {
+
+	// TODO 修一些取 HandleWebRequset的逻辑
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", index)
+	mux.HandleFunc("/ws/", r.TP.HandleWebRequset)
+	server := &http.Server{
+		Addr:              r.LocalTCPAddr.String(),
+		ReadHeaderTimeout: 30 * time.Second,
+		Handler:           mux,
+	}
+	ln, err := net.Listen("tcp", r.LocalTCPAddr.String())
+	if err != nil {
+		return err
+	}
+	defer ln.Close()
+	return server.Serve(ln)
 }
