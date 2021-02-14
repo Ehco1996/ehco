@@ -31,6 +31,8 @@ func PickTransporter(transType string, tcpLBNodes, udpLBNodes *lb.LBNodes) Relay
 		return &Ws{raw: raw}
 	case constant.Transport_WSS:
 		return &Wss{raw: raw}
+	case constant.Transport_MWSS:
+		return &Mwss{raw: raw, mtp: NewMWSSTransporter()}
 	}
 	return nil
 }

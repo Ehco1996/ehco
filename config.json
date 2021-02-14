@@ -34,6 +34,17 @@
             ]
         },
         {
+            "listen": "127.0.0.1:1237",
+            "listen_type": "raw",
+            "transport_type": "mwss",
+            "tcp_remotes": [
+                "wss://0.0.0.0:4443"
+            ],
+            "udp_remotes": [
+                "0.0.0.0:5201"
+            ]
+        },
+        {
             "listen": "127.0.0.1:2443",
             "listen_type": "ws",
             "transport_type": "raw",
@@ -45,6 +56,15 @@
         {
             "listen": "127.0.0.1:3443",
             "listen_type": "wss",
+            "transport_type": "raw",
+            "tcp_remotes": [
+                "0.0.0.0:5201"
+            ],
+            "udp_remotes": []
+        },
+        {
+            "listen": "127.0.0.1:4443",
+            "listen_type": "mwss",
             "transport_type": "raw",
             "tcp_remotes": [
                 "0.0.0.0:5201"

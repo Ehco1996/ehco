@@ -69,10 +69,10 @@ func (r *Relay) ListenAndServe() error {
 		go func() {
 			errChan <- r.RunLocalWSSServer()
 		}()
-		// case Listen_MWSS:
-		// 	go func() {
-		// 		errChan <- r.RunLocalMWSSServer()
-		// }()
+	case constant.Listen_MWSS:
+		go func() {
+			errChan <- r.RunLocalMWSSServer()
+		}()
 	}
 	if len(r.cfg.UDPRemotes) > 0 {
 		// 直接启动udp转发
@@ -181,4 +181,60 @@ func (r *Relay) RunLocalWSSServer() error {
 	}
 	defer ln.Close()
 	return server.Serve(tls.NewListener(ln, server.TLSConfig))
+}
+
+func (r *Relay) RunLocalMWSSServer() error {
+
+	s := &transporter.MWSSServer{
+		ConnChan: make(chan net.Conn, 1024),
+		ErrChan:  make(chan error, 1),
+	}
+
+	mux := http.NewServeMux()
+	mux.Handle("/mwss/", http.HandlerFunc(s.Upgrade))
+	// fake
+	mux.Handle("/", http.HandlerFunc(index))
+	server := &http.Server{
+		Addr:              r.LocalTCPAddr.String(),
+		Handler:           mux,
+		TLSConfig:         mytls.DefaultTLSConfig,
+		ReadHeaderTimeout: 30 * time.Second,
+	}
+	s.Server = server
+
+	ln, err := net.Listen("tcp", r.LocalTCPAddr.String())
+	if err != nil {
+		return err
+	}
+	go func() {
+		err := server.Serve(tls.NewListener(ln, server.TLSConfig))
+		if err != nil {
+			s.ErrChan <- err
+		}
+		close(s.ErrChan)
+	}()
+
+	var tempDelay time.Duration
+	tp := r.TP.(*transporter.Raw)
+	for {
+		conn, e := s.Accept()
+		if e != nil {
+			if ne, ok := e.(net.Error); ok && ne.Temporary() {
+				if tempDelay == 0 {
+					tempDelay = 5 * time.Millisecond
+				} else {
+					tempDelay *= 2
+				}
+				if max := 1 * time.Second; tempDelay > max {
+					tempDelay = max
+				}
+				logger.Logger.Infof("server: Accept error: %v; retrying in %v", e, tempDelay)
+				time.Sleep(tempDelay)
+				continue
+			}
+			return e
+		}
+		tempDelay = 0
+		go tp.HandleMWssRequset(conn)
+	}
 }

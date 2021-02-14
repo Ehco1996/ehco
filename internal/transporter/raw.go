@@ -141,3 +141,23 @@ func (raw *Raw) HandleWssRequset(w http.ResponseWriter, req *http.Request) {
 		logger.Logger.Infof("[tun] HandleWssRequset err: %s", err.Error())
 	}
 }
+
+func (raw *Raw) HandleMWssRequset(c net.Conn) {
+	defer c.Close()
+
+	node := raw.TCPNodes.PickMin()
+	defer raw.TCPNodes.DeferPick(node)
+
+	rc, err := net.Dial("tcp", node.Remote)
+	if err != nil {
+		logger.Logger.Infof("dial error: %s", err)
+		raw.TCPNodes.OnError(node)
+		return
+	}
+	defer rc.Close()
+
+	logger.Logger.Infof("[tun] HandleMWssRequset from:%s to:%s", c.RemoteAddr(), rc.RemoteAddr())
+	if err := transport(rc, c); err != nil {
+		logger.Logger.Infof("[tun] HandleMWssRequset err: %s", err.Error())
+	}
+}

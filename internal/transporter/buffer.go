@@ -3,6 +3,7 @@ package transporter
 import (
 	"errors"
 	"io"
+	"net"
 	"sync"
 	"syscall"
 
@@ -40,10 +41,15 @@ func transport(rw1, rw2 io.ReadWriter) error {
 	go func() {
 		errc <- copyBuffer(rw2, rw1, outboundBufferPool)
 	}()
-
 	err := <-errc
-	if err != nil && (err == io.EOF || errors.Is(err, syscall.EPIPE) || errors.Is(err, syscall.ECONNRESET)) {
-		err = nil
+	// NOTE 我们不关心operror 比如 eof/reset/broken pipe
+	if err != nil {
+		if err == io.EOF || errors.Is(err, syscall.EPIPE) || errors.Is(err, syscall.ECONNRESET) {
+			err = nil
+		}
+		if _, ok := err.(*net.OpError); ok {
+			err = nil
+		}
 	}
 	return err
 }

@@ -12,7 +12,7 @@ var Logger *zap.SugaredLogger
 func init() {
 	writers := []zapcore.WriteSyncer{zapcore.AddSync(os.Stdout)}
 	encoder := zapcore.EncoderConfig{
-		CallerKey:      "file",
+		CallerKey:      "caller",
 		MessageKey:     "msg",
 		StacktraceKey:  "stacktrace",
 		LineEnding:     zapcore.DefaultLineEnding,
@@ -25,4 +25,5 @@ func init() {
 		zapcore.InfoLevel,
 	)
 	Logger = zap.New(core).Sugar()
+
 }
