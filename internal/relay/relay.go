@@ -1,6 +1,7 @@
 package relay
 
 import (
+	"crypto/tls"
 	"fmt"
 	"net"
 	"net/http"
@@ -9,6 +10,7 @@ import (
 	"github.com/Ehco1996/ehco/internal/constant"
 	"github.com/Ehco1996/ehco/internal/lb"
 	"github.com/Ehco1996/ehco/internal/logger"
+	mytls "github.com/Ehco1996/ehco/internal/tls"
 	"github.com/Ehco1996/ehco/internal/transporter"
 )
 
@@ -63,10 +65,10 @@ func (r *Relay) ListenAndServe() error {
 		go func() {
 			errChan <- r.RunLocalWSServer()
 		}()
-		// case Listen_WSS:
-		// 	go func() {
-		// 		errChan <- r.RunLocalWSSServer()
-		// 	}()
+	case constant.Listen_WSS:
+		go func() {
+			errChan <- r.RunLocalWSSServer()
+		}()
 		// case Listen_MWSS:
 		// 	go func() {
 		// 		errChan <- r.RunLocalMWSSServer()
@@ -146,7 +148,8 @@ func (r *Relay) RunLocalWSServer() error {
 	// TODO 修一些取 HandleWebRequset的逻辑
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", index)
-	mux.HandleFunc("/ws/", r.TP.HandleWebRequset)
+	tp := r.TP.(*transporter.Raw)
+	mux.HandleFunc("/ws/", tp.HandleWsRequset)
 	server := &http.Server{
 		Addr:              r.LocalTCPAddr.String(),
 		ReadHeaderTimeout: 30 * time.Second,
@@ -158,4 +161,24 @@ func (r *Relay) RunLocalWSServer() error {
 	}
 	defer ln.Close()
 	return server.Serve(ln)
+}
+
+func (r *Relay) RunLocalWSSServer() error {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", index)
+	tp := r.TP.(*transporter.Raw)
+	mux.HandleFunc("/wss/", tp.HandleWssRequset)
+
+	server := &http.Server{
+		Addr:              r.LocalTCPAddr.String(),
+		TLSConfig:         mytls.DefaultTLSConfig,
+		ReadHeaderTimeout: 30 * time.Second,
+		Handler:           mux,
+	}
+	ln, err := net.Listen("tcp", r.LocalTCPAddr.String())
+	if err != nil {
+		return err
+	}
+	defer ln.Close()
+	return server.Serve(tls.NewListener(ln, server.TLSConfig))
 }

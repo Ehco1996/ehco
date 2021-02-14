@@ -1,70 +1,38 @@
 package transporter
 
-// import (
-// 	"context"
-// 	"crypto/tls"
-// 	"net"
-// 	"net/http"
-// 	"time"
+import (
+	"context"
+	"net"
 
-// 	"github.com/gobwas/ws"
-// )
+	"github.com/Ehco1996/ehco/internal/logger"
+	"github.com/Ehco1996/ehco/internal/tls"
+	"github.com/gobwas/ws"
+)
 
-// func (r *Relay) RunLocalWSSServer() error {
-// 	mux := http.NewServeMux()
-// 	mux.HandleFunc("/", index)
-// 	mux.HandleFunc("/tcp/", r.handleWssToTcp)
+type Wss struct {
+	raw Raw
+}
 
-// 	server := &http.Server{
-// 		Addr:              r.LocalTCPAddr.String(),
-// 		TLSConfig:         DefaultTLSConfig,
-// 		ReadHeaderTimeout: 30 * time.Second,
-// 		Handler:           mux,
-// 	}
-// 	ln, err := net.Listen("tcp", r.LocalTCPAddr.String())
-// 	if err != nil {
-// 		return err
-// 	}
-// 	defer ln.Close()
-// 	return server.Serve(tls.NewListener(ln, server.TLSConfig))
-// }
+func (s *Wss) GetOrCreateBufferCh(uaddr *net.UDPAddr) *BufferCh {
+	return s.raw.GetOrCreateBufferCh(uaddr)
+}
 
-// func (r *Relay) handleWssToTcp(w http.ResponseWriter, req *http.Request) {
-// 	wsc, _, _, err := ws.UpgradeHTTP(req, w)
-// 	if err != nil {
-// 		return
-// 	}
-// 	defer wsc.Close()
+func (s *Wss) HandleUDPConn(uaddr *net.UDPAddr, local *net.UDPConn) {
+	s.raw.HandleUDPConn(uaddr, local)
+}
 
-// 	rc, err := net.Dial("tcp", r.RemoteTCPAddr)
-// 	if err != nil {
-// 		logger.Logger.Infof("dial error: %s", err)
-// 		return
-// 	}
-// 	defer rc.Close()
-// 	logger.Logger.Infof("handleWssToTcp from:%s to:%s", wsc.RemoteAddr(), rc.RemoteAddr())
-// 	if err := transport(rc, wsc); err != nil {
-// 		logger.Logger.Infof("handleWssToTcp err: %s", err.Error())
-// 	}
-// }
+func (s *Wss) HandleTCPConn(c *net.TCPConn) error {
+	defer c.Close()
 
-// func (r *Relay) handleTcpOverWss(c *net.TCPConn) error {
-// 	defer c.Close()
+	node := s.raw.TCPNodes.PickMin()
+	defer s.raw.TCPNodes.DeferPick(node)
 
-// 	addr, node := r.PickTcpRemote()
-// 	if node != nil {
-// 		defer r.LBRemotes.DeferPick(node)
-// 	}
-// 	addr += "/tcp/"
-
-// 	d := ws.Dialer{TLSConfig: DefaultTLSConfig}
-// 	wsc, _, _, err := d.Dial(context.TODO(), addr)
-// 	if err != nil {
-// 		return err
-// 	}
-// 	defer wsc.Close()
-// 	if err := transport(c, wsc); err != nil {
-// 		logger.Logger.Infof("handleTcpOverWss err: %s", err.Error())
-// 	}
-// 	return nil
-// }
+	d := ws.Dialer{TLSConfig: tls.DefaultTLSConfig}
+	wsc, _, _, err := d.Dial(context.TODO(), node.Remote+"/wss/")
+	if err != nil {
+		return err
+	}
+	defer wsc.Close()
+	logger.Logger.Infof("[ws] HandleTCPConn from %s to %s", c.LocalAddr().String(), node.Remote)
+	return transport(c, wsc)
+}

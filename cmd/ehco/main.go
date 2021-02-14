@@ -10,6 +10,7 @@ import (
 	"github.com/Ehco1996/ehco/internal/constant"
 	"github.com/Ehco1996/ehco/internal/logger"
 	"github.com/Ehco1996/ehco/internal/relay"
+	"github.com/Ehco1996/ehco/internal/tls"
 )
 
 var LocalAddr string
@@ -114,7 +115,7 @@ func start(ctx *cli.Context) error {
 			cfg.TransportType == constant.Transport_WSS ||
 			cfg.TransportType == constant.Transport_MWSS) {
 			initTls = true
-			relay.InitTlsCfg()
+			tls.InitTlsCfg()
 		}
 		go serveRelay(cfg, ch)
 	}

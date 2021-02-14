@@ -2,7 +2,6 @@ package transporter
 
 import (
 	"net"
-	"net/http"
 
 	"github.com/Ehco1996/ehco/internal/constant"
 	"github.com/Ehco1996/ehco/internal/lb"
@@ -17,9 +16,6 @@ type RelayTransporter interface {
 
 	// TCP相关
 	HandleTCPConn(c *net.TCPConn) error
-
-	// TUN相关
-	HandleWebRequset(w http.ResponseWriter, req *http.Request)
 }
 
 func PickTransporter(transType string, tcpLBNodes, udpLBNodes *lb.LBNodes) RelayTransporter {
@@ -33,6 +29,8 @@ func PickTransporter(transType string, tcpLBNodes, udpLBNodes *lb.LBNodes) Relay
 		return &raw
 	case constant.Transport_WS:
 		return &Ws{raw: raw}
+	case constant.Transport_WSS:
+		return &Wss{raw: raw}
 	}
 	return nil
 }

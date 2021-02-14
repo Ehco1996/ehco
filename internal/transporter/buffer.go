@@ -1,8 +1,10 @@
 package transporter
 
 import (
+	"errors"
 	"io"
 	"sync"
+	"syscall"
 
 	"github.com/Ehco1996/ehco/internal/constant"
 )
@@ -40,7 +42,7 @@ func transport(rw1, rw2 io.ReadWriter) error {
 	}()
 
 	err := <-errc
-	if err != nil && err == io.EOF {
+	if err != nil && (err == io.EOF || errors.Is(err, syscall.EPIPE) || errors.Is(err, syscall.ECONNRESET)) {
 		err = nil
 	}
 	return err

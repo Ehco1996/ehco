@@ -1,13 +1,13 @@
 package transporter
 
 import (
-	"fmt"
 	"net"
 	"net/http"
 	"sync"
 
 	"github.com/Ehco1996/ehco/internal/lb"
 	"github.com/Ehco1996/ehco/internal/logger"
+	"github.com/gobwas/ws"
 )
 
 type Raw struct {
@@ -91,12 +91,53 @@ func (raw *Raw) HandleTCPConn(c *net.TCPConn) error {
 	logger.Logger.Infof("[raw] HandleTCPConn from %s to %s", c.LocalAddr().String(), node.Remote)
 
 	defer rc.Close()
-	if err := transport(c, rc); err != nil {
-		return err
-	}
-	return nil
+	return transport(c, rc)
 }
 
-func (raw *Raw) HandleWebRequset(w http.ResponseWriter, req *http.Request) {
-	fmt.Printf("not impl this")
+func (raw *Raw) HandleWsRequset(w http.ResponseWriter, req *http.Request) {
+	wsc, _, _, err := ws.UpgradeHTTP(req, w)
+	if err != nil {
+		return
+	}
+	defer wsc.Close()
+
+	node := raw.TCPNodes.PickMin()
+	defer raw.TCPNodes.DeferPick(node)
+
+	rc, err := net.Dial("tcp", node.Remote)
+	if err != nil {
+		logger.Logger.Infof("dial error: %s", err)
+		raw.TCPNodes.OnError(node)
+		return
+	}
+	defer rc.Close()
+
+	logger.Logger.Infof("[tun] HandleWsRequset from:%s to:%s", wsc.RemoteAddr(), rc.RemoteAddr())
+	if err := transport(rc, wsc); err != nil {
+		logger.Logger.Infof("[tun] HandleWsRequset err: %s", err.Error())
+	}
+}
+
+func (raw *Raw) HandleWssRequset(w http.ResponseWriter, req *http.Request) {
+	wsc, _, _, err := ws.UpgradeHTTP(req, w)
+	if err != nil {
+		return
+	}
+	defer wsc.Close()
+
+	node := raw.TCPNodes.PickMin()
+	defer raw.TCPNodes.DeferPick(node)
+
+	rc, err := net.Dial("tcp", node.Remote)
+	if err != nil {
+		logger.Logger.Infof("dial error: %s", err)
+		raw.TCPNodes.OnError(node)
+		return
+	}
+	defer rc.Close()
+
+	logger.Logger.Infof("[tun] HandleWssRequset from:%s to:%s", wsc.RemoteAddr(), rc.RemoteAddr())
+	if err := transport(rc, wsc); err != nil {
+		logger.Logger.Infof("[tun] HandleWssRequset err: %s", err.Error())
+	}
 }

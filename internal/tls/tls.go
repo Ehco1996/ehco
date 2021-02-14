@@ -1,4 +1,4 @@
-package relay
+package tls
 
 import (
 	"crypto/ecdsa"
