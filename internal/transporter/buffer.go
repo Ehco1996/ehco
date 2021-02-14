@@ -1,22 +1,24 @@
-package relay
+package transporter
 
 import (
+	"errors"
 	"io"
+	"net"
 	"sync"
-)
+	"syscall"
 
-// 4KB
-const BUFFER_SIZE = 4 * 1024
+	"github.com/Ehco1996/ehco/internal/constant"
+)
 
 // 全局pool
 var inboundBufferPool, outboundBufferPool *sync.Pool
 
 func init() {
-	inboundBufferPool = newBufferPool(BUFFER_SIZE)
-	outboundBufferPool = newBufferPool(BUFFER_SIZE)
+	inboundBufferPool = NewBufferPool(constant.BUFFER_SIZE)
+	outboundBufferPool = NewBufferPool(constant.BUFFER_SIZE)
 }
 
-func newBufferPool(size int) *sync.Pool {
+func NewBufferPool(size int) *sync.Pool {
 	return &sync.Pool{New: func() interface{} {
 		return make([]byte, size)
 	}}
@@ -39,21 +41,26 @@ func transport(rw1, rw2 io.ReadWriter) error {
 	go func() {
 		errc <- copyBuffer(rw2, rw1, outboundBufferPool)
 	}()
-
 	err := <-errc
-	if err != nil && err == io.EOF {
-		err = nil
+	// NOTE 我们不关心operror 比如 eof/reset/broken pipe
+	if err != nil {
+		if err == io.EOF || errors.Is(err, syscall.EPIPE) || errors.Is(err, syscall.ECONNRESET) {
+			err = nil
+		}
+		if _, ok := err.(*net.OpError); ok {
+			err = nil
+		}
 	}
 	return err
 }
 
-type udpBufferCh struct {
+type BufferCh struct {
 	Ch      chan []byte
 	Handled bool
 }
 
-func newudpBufferCh() *udpBufferCh {
-	return &udpBufferCh{
+func newudpBufferCh() *BufferCh {
+	return &BufferCh{
 		Ch:      make(chan []byte, 100),
 		Handled: false,
 	}

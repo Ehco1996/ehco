@@ -10,10 +10,10 @@ type LBNode struct {
 	index         int
 }
 
-type LBNodeHeap []*LBNode
+type LBNodes []*LBNode
 
-func New(remotes []string) LBNodeHeap {
-	lh := make(LBNodeHeap, len(remotes))
+func New(remotes []string) *LBNodes {
+	lh := make(LBNodes, len(remotes))
 	for i, remote := range remotes {
 		lh[i] = &LBNode{
 			Remote:        remote,
@@ -22,29 +22,31 @@ func New(remotes []string) LBNodeHeap {
 		}
 	}
 	lh.HeapInit()
-	return lh
+	return &lh
 }
 
-func (lp LBNodeHeap) Len() int { return len(lp) }
+func (lp *LBNodes) Len() int { return len(*lp) }
 
-func (lp LBNodeHeap) Less(i, j int) bool {
-	return lp[i].OnLineUserCnt < lp[j].OnLineUserCnt
+func (lp *LBNodes) Less(i, j int) bool {
+	l := *lp
+	return l[i].OnLineUserCnt < l[j].OnLineUserCnt
 }
 
-func (lp LBNodeHeap) Swap(i, j int) {
-	lp[i], lp[j] = lp[j], lp[i]
-	lp[i].index = i
-	lp[j].index = j
+func (lp *LBNodes) Swap(i, j int) {
+	l := *lp
+	l[i], l[j] = l[j], l[i]
+	l[i].index = i
+	l[j].index = j
 }
 
-func (lp *LBNodeHeap) Push(x interface{}) {
+func (lp *LBNodes) Push(x interface{}) {
 	n := len(*lp)
 	node := x.(*LBNode)
 	node.index = n
 	*lp = append(*lp, node)
 }
 
-func (lp *LBNodeHeap) Pop() interface{} {
+func (lp *LBNodes) Pop() interface{} {
 	old := *lp
 	n := len(old)
 	node := old[n-1]
@@ -55,25 +57,25 @@ func (lp *LBNodeHeap) Pop() interface{} {
 }
 
 // update modifies the priority and value of an Item in the queue.
-func (lp *LBNodeHeap) update(node *LBNode, remote string, cnt int) {
+func (lp *LBNodes) update(node *LBNode, remote string, cnt int) {
 	node.Remote = remote
 	node.OnLineUserCnt = cnt
 	heap.Fix(lp, node.index)
 }
 
-func (lp *LBNodeHeap) HeapInit() {
+func (lp *LBNodes) HeapInit() {
 	heap.Init(lp)
 }
 
-func (lp *LBNodeHeap) HeapPush(node *LBNode) {
+func (lp *LBNodes) HeapPush(node *LBNode) {
 	heap.Push(lp, node)
 }
 
-func (lp *LBNodeHeap) HeapPop() *LBNode {
+func (lp *LBNodes) HeapPop() *LBNode {
 	return heap.Pop(lp).(*LBNode)
 }
 
-func (lp *LBNodeHeap) MinLBNode() *LBNode {
+func (lp *LBNodes) MinLBNode() *LBNode {
 	if lp.Len() > 0 {
 		old := *lp
 		return old[0]
@@ -81,16 +83,21 @@ func (lp *LBNodeHeap) MinLBNode() *LBNode {
 	return nil
 }
 
-func (lp *LBNodeHeap) IncrUserCnt(node *LBNode, num int) {
+func (lp *LBNodes) IncrUserCnt(node *LBNode, num int) {
 	lp.update(node, node.Remote, node.OnLineUserCnt+num)
 }
 
-func (lp *LBNodeHeap) PickMin() *LBNode {
+func (lp *LBNodes) PickMin() *LBNode {
 	node := lp.MinLBNode()
 	lp.IncrUserCnt(node, 1)
 	return node
 }
 
-func (lp *LBNodeHeap) DeferPick(node *LBNode) {
+func (lp *LBNodes) DeferPick(node *LBNode) {
 	lp.IncrUserCnt(node, -1)
+}
+
+func (lp *LBNodes) OnError(node *LBNode) {
+	// NOTE 遇到错误的时候降低这个节点的权重
+	lp.IncrUserCnt(node, 100)
 }

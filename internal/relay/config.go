@@ -6,15 +6,16 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/Ehco1996/ehco/internal/logger"
 )
 
 type RelayConfig struct {
 	Listen        string   `json:"listen"`
 	ListenType    string   `json:"listen_type"`
-	Remote        string   `json:"remote"`
-	UDPRemote     string   `json:"udp_remote"`
 	TransportType string   `json:"transport_type"`
-	LBRemotes     []string `json:"lb_remotes"`
+	TCPRemotes    []string `json:"tcp_remotes"`
+	UDPRemotes    []string `json:"udp_remotes"`
 }
 
 type Config struct {
@@ -23,7 +24,7 @@ type Config struct {
 }
 
 type JsonConfig struct {
-	Configs []RelayConfig `json:"configs"`
+	Configs []RelayConfig `json:"relay_configs"`
 }
 
 func NewConfigByPath(path string) *Config {
@@ -51,7 +52,7 @@ func (c *Config) readFromFile() error {
 		return err
 	}
 	c.Configs = jsonConfig.Configs
-	Logger.Info("load config from file:", c.PATH)
+	logger.Logger.Info("load config from file:", c.PATH)
 	return nil
 }
 
@@ -67,6 +68,6 @@ func (c *Config) readFromHttp() error {
 		return err
 	}
 	c.Configs = jsonConfig.Configs
-	Logger.Info("load config from http:", c.PATH, c.Configs)
+	logger.Logger.Info("load config from http:", c.PATH, c.Configs)
 	return nil
 }
