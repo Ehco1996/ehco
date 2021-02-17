@@ -2,7 +2,6 @@ package relay
 
 import (
 	"crypto/tls"
-	"fmt"
 	"net"
 	"net/http"
 	"time"
@@ -12,6 +11,8 @@ import (
 	"github.com/Ehco1996/ehco/internal/logger"
 	mytls "github.com/Ehco1996/ehco/internal/tls"
 	"github.com/Ehco1996/ehco/internal/transporter"
+	"github.com/Ehco1996/ehco/internal/web"
+	"github.com/gorilla/mux"
 )
 
 type Relay struct {
@@ -83,10 +84,13 @@ func (r *Relay) ListenAndServe() error {
 	return <-errChan
 }
 
-func (r *Relay) RunLocalTCPServer() error {
+func (r *Relay) LogRelay() {
 	logger.Logger.Infof("Start TCP relay At: %s Over: %s To: %s Through %s",
 		r.LocalTCPAddr, r.ListenType, r.cfg.TCPRemotes, r.TransportType)
+}
 
+func (r *Relay) RunLocalTCPServer() error {
+	r.LogRelay()
 	lis, err := net.ListenTCP("tcp", r.LocalTCPAddr)
 	if err != nil {
 		return err
@@ -137,18 +141,11 @@ func (r *Relay) RunLocalUDPServer() error {
 	}
 }
 
-func index(w http.ResponseWriter, r *http.Request) {
-	// TODO 加入一些链接比如 metrics pprof之类的
-	logger.Logger.Infof("index call from %s", r.RemoteAddr)
-	fmt.Fprintf(w, "access from %s \n", r.RemoteAddr)
-}
-
 func (r *Relay) RunLocalWSServer() error {
-
-	// TODO 修一些取 HandleWebRequset的逻辑
-	mux := http.NewServeMux()
-	mux.HandleFunc("/", index)
+	r.LogRelay()
 	tp := r.TP.(*transporter.Raw)
+	mux := mux.NewRouter()
+	mux.HandleFunc("/", web.Index)
 	mux.HandleFunc("/ws/", tp.HandleWsRequset)
 	server := &http.Server{
 		Addr:              r.LocalTCPAddr.String(),
@@ -164,9 +161,10 @@ func (r *Relay) RunLocalWSServer() error {
 }
 
 func (r *Relay) RunLocalWSSServer() error {
-	mux := http.NewServeMux()
-	mux.HandleFunc("/", index)
+	r.LogRelay()
 	tp := r.TP.(*transporter.Raw)
+	mux := mux.NewRouter()
+	mux.HandleFunc("/", web.Index)
 	mux.HandleFunc("/wss/", tp.HandleWssRequset)
 
 	server := &http.Server{
@@ -184,16 +182,15 @@ func (r *Relay) RunLocalWSSServer() error {
 }
 
 func (r *Relay) RunLocalMWSSServer() error {
-
+	r.LogRelay()
+	tp := r.TP.(*transporter.Raw)
 	s := &transporter.MWSSServer{
 		ConnChan: make(chan net.Conn, 1024),
 		ErrChan:  make(chan error, 1),
 	}
-
-	mux := http.NewServeMux()
+	mux := mux.NewRouter()
+	mux.Handle("/", http.HandlerFunc(web.Index))
 	mux.Handle("/mwss/", http.HandlerFunc(s.Upgrade))
-	// fake
-	mux.Handle("/", http.HandlerFunc(index))
 	server := &http.Server{
 		Addr:              r.LocalTCPAddr.String(),
 		Handler:           mux,
@@ -213,9 +210,7 @@ func (r *Relay) RunLocalMWSSServer() error {
 		}
 		close(s.ErrChan)
 	}()
-
 	var tempDelay time.Duration
-	tp := r.TP.(*transporter.Raw)
 	for {
 		conn, e := s.Accept()
 		if e != nil {

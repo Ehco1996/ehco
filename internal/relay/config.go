@@ -52,7 +52,7 @@ func (c *Config) readFromFile() error {
 		return err
 	}
 	c.Configs = jsonConfig.Configs
-	logger.Logger.Info("load config from file:", c.PATH)
+	logger.Logger.Info("Load Config From file:", c.PATH)
 	return nil
 }
 
@@ -68,6 +68,6 @@ func (c *Config) readFromHttp() error {
 		return err
 	}
 	c.Configs = jsonConfig.Configs
-	logger.Logger.Info("load config from http:", c.PATH, c.Configs)
+	logger.Logger.Info("Load Config From http:", c.PATH, c.Configs)
 	return nil
 }

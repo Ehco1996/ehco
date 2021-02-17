@@ -1,8 +1,6 @@
 package main
 
 import (
-	"net/http"
-	_ "net/http/pprof"
 	"os"
 
 	cli "github.com/urfave/cli/v2"
@@ -11,6 +9,7 @@ import (
 	"github.com/Ehco1996/ehco/internal/logger"
 	"github.com/Ehco1996/ehco/internal/relay"
 	"github.com/Ehco1996/ehco/internal/tls"
+	"github.com/Ehco1996/ehco/internal/web"
 )
 
 var LocalAddr string
@@ -19,12 +18,12 @@ var RemoteAddr string
 var UDPRemoteAddr string
 var TransportType string
 var ConfigPath string
-var PprofPort string
+var WebfPort string
 
 func main() {
 	app := cli.NewApp()
 	app.Name = "ehco"
-	app.Version = "0.1.6"
+	app.Version = constant.Version
 	app.Usage = "ehco is a network relay tool and a typo :)"
 	app.Flags = []cli.Flag{
 		&cli.StringFlag{
@@ -70,10 +69,11 @@ func main() {
 			Destination: &ConfigPath,
 		},
 		&cli.StringFlag{
-			Name:        "pport",
-			Usage:       "pprof监听端口",
-			EnvVars:     []string{"EHCO_PPROF_PORT"},
-			Destination: &PprofPort,
+			Name:        "web_port",
+			Usage:       "web监听端口",
+			EnvVars:     []string{"EHCO_WEB_PORT"},
+			Value:       "9000",
+			Destination: &WebfPort,
 		},
 	}
 
@@ -108,6 +108,11 @@ func start(ctx *cli.Context) error {
 			},
 		}
 	}
+
+	if WebfPort != "" {
+		go web.StartWebServer(WebfPort)
+	}
+
 	initTls := false
 	for _, cfg := range config.Configs {
 		if !initTls && (cfg.ListenType == constant.Listen_WSS ||
@@ -119,16 +124,6 @@ func start(ctx *cli.Context) error {
 		}
 		go serveRelay(cfg, ch)
 	}
-
-	// start debug pprof server
-	if PprofPort != "" {
-		go func() {
-			pps := "0.0.0.0:" + PprofPort
-			logger.Logger.Infof("start pprof server at http://%s/debug/pprof/", pps)
-			logger.Logger.Fatal(http.ListenAndServe(pps, nil))
-		}()
-	}
-
 	return <-ch
 }
 

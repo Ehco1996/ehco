@@ -23,7 +23,6 @@ var (
 )
 
 func InitTlsCfg() {
-	logger.Logger.Infof("genCertificate...")
 	cert, err := genCertificate()
 	if err != nil {
 		panic(err)
