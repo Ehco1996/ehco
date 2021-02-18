@@ -99,12 +99,7 @@ func (r *Relay) RunLocalTCPServer() error {
 	for {
 		c, err := lis.AcceptTCP()
 		if err != nil {
-			logger.Logger.Infof("accept tcp con error: %s", err)
-			return err
-		}
-		if err := c.SetDeadline(time.Now().Add(constant.MaxConKeepAlive)); err != nil {
-			logger.Logger.Infof("set max deadline err: %s", err)
-			return err
+			logger.Logger.Fatal("accept tcp conn error: %s", err)
 		}
 		go func(c *net.TCPConn) {
 			if err := r.TP.HandleTCPConn(c); err != nil {
@@ -124,13 +119,12 @@ func (r *Relay) RunLocalUDPServer() error {
 	}
 	defer lis.Close()
 
-	buffers := transporter.NewBufferPool(constant.BUFFER_SIZE)
-	buf := buffers.Get().([]byte)
-	defer buffers.Put(buf)
+	buf := transporter.InboundBufferPool.Get().([]byte)
+	defer transporter.InboundBufferPool.Put(buf)
 	for {
 		n, addr, err := lis.ReadFromUDP(buf)
 		if err != nil {
-			return err
+			logger.Logger.Fatal("listen udp conn error: %s", err)
 		}
 		bc := r.TP.GetOrCreateBufferCh(addr)
 		bc.Ch <- buf[0:n]

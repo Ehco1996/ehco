@@ -4,9 +4,12 @@ import (
 	"net"
 	"net/http"
 	"sync"
+	"time"
 
+	"github.com/Ehco1996/ehco/internal/constant"
 	"github.com/Ehco1996/ehco/internal/lb"
 	"github.com/Ehco1996/ehco/internal/logger"
+	"github.com/Ehco1996/ehco/internal/web"
 	"github.com/gobwas/ws"
 )
 
@@ -28,6 +31,8 @@ func (raw *Raw) GetOrCreateBufferCh(uaddr *net.UDPAddr) *BufferCh {
 }
 
 func (raw *Raw) HandleUDPConn(uaddr *net.UDPAddr, local *net.UDPConn) {
+	web.CurUDPNum.Inc()
+	defer web.CurUDPNum.Dec()
 
 	bc := raw.GetOrCreateBufferCh(uaddr)
 	node := raw.UDPNodes.PickMin()
@@ -39,10 +44,8 @@ func (raw *Raw) HandleUDPConn(uaddr *net.UDPAddr, local *net.UDPConn) {
 		raw.UDPNodes.OnError(node)
 		return
 	}
-
 	defer func() {
 		rc.Close()
-		close(bc.Ch)
 		delete(raw.UDPBufferChMap, uaddr.String())
 	}()
 
@@ -52,34 +55,45 @@ func (raw *Raw) HandleUDPConn(uaddr *net.UDPAddr, local *net.UDPConn) {
 	wg.Add(1)
 
 	go func() {
-		buf := outboundBufferPool.Get().([]byte)
+		buf := OutboundBufferPool.Get().([]byte)
+		wt := 0
 		for {
 			i, err := rc.Read(buf)
 			if err != nil {
 				logger.Logger.Info(err)
 				break
 			}
+			rc.SetReadDeadline(time.Now().Add(constant.MaxConKeepAlive))
 			if _, err := local.WriteToUDP(buf[0:i], uaddr); err != nil {
 				logger.Logger.Info(err)
 				break
 			}
+			wt += i
 		}
-		outboundBufferPool.Put(buf)
+		web.NetWorkTransmitBytes.Add(float64(wt * 2))
+		OutboundBufferPool.Put(buf)
 		wg.Done()
+		close(bc.Ch)
 	}()
 
+	wt := 0
 	for b := range bc.Ch {
+		wt += len(b)
+		rc.SetReadDeadline(time.Now().Add(constant.MaxConKeepAlive))
 		if _, err := rc.Write(b); err != nil {
 			logger.Logger.Info(err)
+			close(bc.Ch)
 			break
 		}
 	}
+	web.NetWorkTransmitBytes.Add(float64(wt * 2))
 	wg.Wait()
 }
 
 func (raw *Raw) HandleTCPConn(c *net.TCPConn) error {
 	defer c.Close()
-
+	web.CurTCPNum.Inc()
+	defer web.CurTCPNum.Dec()
 	node := raw.TCPNodes.PickMin()
 	defer raw.TCPNodes.DeferPick(node)
 
@@ -89,18 +103,19 @@ func (raw *Raw) HandleTCPConn(c *net.TCPConn) error {
 		return err
 	}
 	logger.Logger.Infof("[raw] HandleTCPConn from %s to %s", c.LocalAddr().String(), node.Remote)
-
 	defer rc.Close()
+
 	return transport(c, rc)
 }
 
 func (raw *Raw) HandleWsRequset(w http.ResponseWriter, req *http.Request) {
+	web.CurTCPNum.Inc()
+	defer web.CurTCPNum.Dec()
 	wsc, _, _, err := ws.UpgradeHTTP(req, w)
 	if err != nil {
 		return
 	}
 	defer wsc.Close()
-
 	node := raw.TCPNodes.PickMin()
 	defer raw.TCPNodes.DeferPick(node)
 
@@ -119,12 +134,13 @@ func (raw *Raw) HandleWsRequset(w http.ResponseWriter, req *http.Request) {
 }
 
 func (raw *Raw) HandleWssRequset(w http.ResponseWriter, req *http.Request) {
+	web.CurTCPNum.Inc()
+	defer web.CurTCPNum.Dec()
 	wsc, _, _, err := ws.UpgradeHTTP(req, w)
 	if err != nil {
 		return
 	}
 	defer wsc.Close()
-
 	node := raw.TCPNodes.PickMin()
 	defer raw.TCPNodes.DeferPick(node)
 
@@ -143,8 +159,9 @@ func (raw *Raw) HandleWssRequset(w http.ResponseWriter, req *http.Request) {
 }
 
 func (raw *Raw) HandleMWssRequset(c net.Conn) {
+	web.CurTCPNum.Inc()
+	defer web.CurTCPNum.Dec()
 	defer c.Close()
-
 	node := raw.TCPNodes.PickMin()
 	defer raw.TCPNodes.DeferPick(node)
 

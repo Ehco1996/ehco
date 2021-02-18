@@ -5,6 +5,7 @@ import (
 	"net"
 
 	"github.com/Ehco1996/ehco/internal/logger"
+	"github.com/Ehco1996/ehco/internal/web"
 	"github.com/gobwas/ws"
 )
 
@@ -22,6 +23,8 @@ func (s *Ws) HandleUDPConn(uaddr *net.UDPAddr, local *net.UDPConn) {
 
 func (s *Ws) HandleTCPConn(c *net.TCPConn) error {
 	defer c.Close()
+	web.CurTCPNum.Inc()
+	defer web.CurTCPNum.Dec()
 
 	node := s.raw.TCPNodes.PickMin()
 	defer s.raw.TCPNodes.DeferPick(node)

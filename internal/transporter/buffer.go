@@ -8,14 +8,15 @@ import (
 	"syscall"
 
 	"github.com/Ehco1996/ehco/internal/constant"
+	"github.com/Ehco1996/ehco/internal/web"
 )
 
 // 全局pool
-var inboundBufferPool, outboundBufferPool *sync.Pool
+var InboundBufferPool, OutboundBufferPool *sync.Pool
 
 func init() {
-	inboundBufferPool = NewBufferPool(constant.BUFFER_SIZE)
-	outboundBufferPool = NewBufferPool(constant.BUFFER_SIZE)
+	InboundBufferPool = NewBufferPool(constant.BUFFER_SIZE)
+	OutboundBufferPool = NewBufferPool(constant.BUFFER_SIZE)
 }
 
 func NewBufferPool(size int) *sync.Pool {
@@ -24,22 +25,62 @@ func NewBufferPool(size int) *sync.Pool {
 	}}
 }
 
-func copyBuffer(dst io.Writer, src io.Reader, bufferPool *sync.Pool) error {
+// NOTE adapeted from io.CopyBuffer
+func copyBuffer(dst io.Writer, src io.Reader, bufferPool *sync.Pool) (written int64, err error) {
 	buf := bufferPool.Get().([]byte)
 	defer bufferPool.Put(buf)
-	_, err := io.CopyBuffer(dst, src, buf)
-	return err
+
+	// If the reader has a WriteTo method, use it to do the copy.
+	// Avoids an allocation and a copy.
+	if wt, ok := src.(io.WriterTo); ok {
+		written, err = wt.WriteTo(dst)
+		web.NetWorkTransmitBytes.Add(float64(written))
+		return
+	}
+	// Similarly, if the writer has a ReadFrom method, use it to do the copy.
+	if rt, ok := dst.(io.ReaderFrom); ok {
+		written, err = rt.ReadFrom(src)
+		web.NetWorkTransmitBytes.Add(float64(written))
+		return
+	}
+	for {
+		nr, er := src.Read(buf)
+		if nr > 0 {
+			nw, ew := dst.Write(buf[0:nr])
+			if nw > 0 {
+				written += int64(nw)
+			}
+			if ew != nil {
+				err = ew
+				break
+			}
+			if nr != nw {
+				err = io.ErrShortWrite
+				break
+			}
+		}
+		if er != nil {
+			if er != io.EOF {
+				err = er
+			}
+			break
+		}
+	}
+	web.NetWorkTransmitBytes.Add(float64(written * 2))
+	return
 }
 
 // NOTE must call setdeadline before use this func or may goroutine  leak
 func transport(rw1, rw2 io.ReadWriter) error {
 	errc := make(chan error, 1)
 	go func() {
-		errc <- copyBuffer(rw1, rw2, inboundBufferPool)
+		_, err := copyBuffer(rw1, rw2, InboundBufferPool)
+		errc <- err
 	}()
 
 	go func() {
-		errc <- copyBuffer(rw2, rw1, outboundBufferPool)
+		_, err := copyBuffer(rw2, rw1, OutboundBufferPool)
+		errc <- err
 	}()
 	err := <-errc
 	// NOTE 我们不关心operror 比如 eof/reset/broken pipe
