@@ -131,4 +131,4 @@ iperf3 -c 0.0.0.0 -p 1234 -u -b 1G --length 1024
 | iperf | raw | relay(raw) | relay(ws) |relay(wss) | relay(mwss)|
 | ---- | ----  | ---- | ---- | ---- | ---- |
 | tcp  | 62.6 Gbits/sec | 23.9 Gbits/sec | 14.65 Gbits/sec | 4.22 Gbits/sec | 2.43 Gbits/sec |
-| udp  | 2.2 Gbits/sec | 2.2 Gbits/sec | 直接转发 | 直接转发 | 直接转发 |
+| udp  | 14.5 Gbits/sec | 3.3 Gbits/sec | 直接转发 | 直接转发 | 直接转发 |
