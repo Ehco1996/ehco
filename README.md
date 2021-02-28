@@ -15,6 +15,18 @@ ehco is a network relay tool and a typo :)
 
 * 隧道对接视频教程: [地址](https://youtu.be/R4U0NZaMUeY)
 
+## 安装
+
+### go get
+
+``` bash
+go get -u "github.com/Ehco1996/ehco/cmd/ehco"
+```
+
+### 从release下载编译好的文件
+
+> ehco的可执行文件可以从项目的[release](https://github.com/Ehco1996/ehco/releases)页面下载
+
 ## 主要功能
 
 * tcp/udp relay
@@ -27,10 +39,8 @@ ehco is a network relay tool and a typo :)
 
 使用隧道需要至少两台主机, 并且在两台主机上都安装了ehco
 
-> ehco的可执行文件可以从项目的[release](https://github.com/Ehco1996/ehco/releases)页面下载
-
 * 中转机器 A 假设机器A的IP是 1.1.1.1
-* 落地机器 B 假设机器B的IP是 2.2.2.2 并且落地机器B的5555端口跑着一个SS/v2ray服务
+* 落地机器 B 假设机器B的IP是 2.2.2.2 并且落地机器B的5555端口跑着一个SS/v2ray/任意tcp/udp服务
 
 ### 案例一 不用隧道直接通过中转机器中转用户流量
 

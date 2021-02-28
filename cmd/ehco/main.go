@@ -1,7 +1,9 @@
 package main
 
 import (
+	"fmt"
 	"os"
+	"os/exec"
 
 	cli "github.com/urfave/cli/v2"
 
@@ -19,6 +21,20 @@ var UDPRemoteAddr string
 var TransportType string
 var ConfigPath string
 var WebfPort string
+var SystemFilePath = "/etc/systemd/system/ehco.service"
+
+const SystemDTMPL = `# Ehco service
+[Unit]
+Description=ehco
+After=network.target
+
+[Service]
+ExecStart=/root/ehco -c ""
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+`
 
 func main() {
 	app := cli.NewApp()
@@ -74,6 +90,26 @@ func main() {
 			EnvVars:     []string{"EHCO_WEB_PORT"},
 			Value:       "9000",
 			Destination: &WebfPort,
+		},
+	}
+
+	app.Commands = []*cli.Command{
+		{
+			Name:  "install",
+			Usage: "install ehco systemd service",
+			Action: func(c *cli.Context) error {
+				fmt.Printf("Install ehco systemd file to `%s`\n", SystemFilePath)
+
+				if _, err := os.Stat(SystemFilePath); err != nil && os.IsNotExist(err) {
+					f, _ := os.OpenFile(SystemFilePath, os.O_CREATE|os.O_WRONLY, 0644)
+					f.WriteString(SystemDTMPL)
+					f.Close()
+				}
+				command := exec.Command("vi", SystemFilePath)
+				command.Stdin = os.Stdin
+				command.Stdout = os.Stdout
+				return command.Run()
+			},
 		},
 	}
 

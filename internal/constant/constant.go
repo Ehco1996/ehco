@@ -3,7 +3,7 @@ package constant
 import "time"
 
 const (
-	Version = "1.0.1"
+	Version = "1.0.2"
 
 	MaxMWSSStreamCnt = 10
 	DialTimeOut      = 3 * time.Second
