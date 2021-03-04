@@ -107,7 +107,7 @@ func (tr *mwssTransporter) Dial(addr string) (conn net.Conn, err error) {
 
 	// 删除已经关闭的session
 	if session != nil && session.IsClosed() {
-		logger.Logger.Infof("find closed session %v idx: %d", session, sessionIndex)
+		logger.Infof("find closed session %v idx: %d", session, sessionIndex)
 		sessions = append(sessions[:sessionIndex], sessions[sessionIndex+1:]...)
 		ok = false
 	}
@@ -147,7 +147,7 @@ func (tr *mwssTransporter) initSession(addr string) (*muxSession, error) {
 	if err != nil {
 		return nil, err
 	}
-	logger.Logger.Infof("[mwss] Init new session to: %s", rc.RemoteAddr())
+	logger.Infof("[mwss] Init new session to: %s", rc.RemoteAddr())
 	return &muxSession{conn: rc, session: session, maxStreamCnt: constant.MaxMWSSStreamCnt}, nil
 }
 
@@ -160,7 +160,7 @@ type MWSSServer struct {
 func (s *MWSSServer) Upgrade(w http.ResponseWriter, r *http.Request) {
 	conn, _, _, err := ws.UpgradeHTTP(r, w)
 	if err != nil {
-		logger.Logger.Info(err)
+		logger.Info(err)
 		return
 	}
 	s.mux(conn)
@@ -172,18 +172,18 @@ func (s *MWSSServer) mux(conn net.Conn) {
 	smuxConfig := smux.DefaultConfig()
 	mux, err := smux.Server(conn, smuxConfig)
 	if err != nil {
-		logger.Logger.Infof("[mwss server err] %s - %s : %s", conn.RemoteAddr(), s.Server.Addr, err)
+		logger.Infof("[mwss server err] %s - %s : %s", conn.RemoteAddr(), s.Server.Addr, err)
 		return
 	}
 	defer mux.Close()
 
-	logger.Logger.Infof("[mwss server init] %s  %s", conn.RemoteAddr(), s.Server.Addr)
-	defer logger.Logger.Infof("[mwss server close] %s >-< %s", conn.RemoteAddr(), s.Server.Addr)
+	logger.Infof("[mwss server init] %s  %s", conn.RemoteAddr(), s.Server.Addr)
+	defer logger.Infof("[mwss server close] %s >-< %s", conn.RemoteAddr(), s.Server.Addr)
 
 	for {
 		stream, err := mux.AcceptStream()
 		if err != nil {
-			logger.Logger.Infof("[mwss] accept stream err: %s", err)
+			logger.Infof("[mwss] accept stream err: %s", err)
 			break
 		}
 		cc := newMuxConn(conn, stream)
@@ -191,7 +191,7 @@ func (s *MWSSServer) mux(conn net.Conn) {
 		case s.ConnChan <- cc:
 		default:
 			cc.Close()
-			logger.Logger.Infof("[mwss] %s - %s: connection queue is full", conn.RemoteAddr(), conn.LocalAddr())
+			logger.Infof("[mwss] %s - %s: connection queue is full", conn.RemoteAddr(), conn.LocalAddr())
 		}
 	}
 }

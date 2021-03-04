@@ -34,6 +34,6 @@ func (s *Mwss) HandleTCPConn(c *net.TCPConn) error {
 		return err
 	}
 	defer wsc.Close()
-	logger.Logger.Infof("[mwss] HandleTCPConn from:%s to:%s", c.RemoteAddr(), wsc.RemoteAddr())
+	logger.Infof("[mwss] HandleTCPConn from:%s to:%s", c.RemoteAddr(), wsc.RemoteAddr())
 	return transport(wsc, c)
 }

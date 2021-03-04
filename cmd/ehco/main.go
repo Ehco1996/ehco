@@ -116,7 +116,7 @@ func main() {
 	app.Action = start
 	err := app.Run(os.Args)
 	if err != nil {
-		logger.Logger.Fatal(err)
+		logger.Fatal(err)
 	}
 
 }
@@ -128,7 +128,7 @@ func start(ctx *cli.Context) error {
 	if ConfigPath != "" {
 		config = relay.NewConfigByPath(ConfigPath)
 		if err := config.LoadConfig(); err != nil {
-			logger.Logger.Fatal(err)
+			logger.Fatal(err)
 		}
 	} else {
 		config = &relay.Config{
@@ -146,7 +146,7 @@ func start(ctx *cli.Context) error {
 	}
 
 	if WebfPort != "" {
-		go web.StartWebServer(WebfPort)
+		go web.StartWebServer(WebfPort, config.GetPingHosts())
 	}
 
 	initTls := false
@@ -166,7 +166,7 @@ func start(ctx *cli.Context) error {
 func serveRelay(cfg relay.RelayConfig, ch chan error) {
 	r, err := relay.NewRelay(&cfg)
 	if err != nil {
-		logger.Logger.Fatal(err)
+		logger.Fatal(err)
 	}
 	ch <- r.ListenAndServe()
 }

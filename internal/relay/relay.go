@@ -85,7 +85,7 @@ func (r *Relay) ListenAndServe() error {
 }
 
 func (r *Relay) LogRelay() {
-	logger.Logger.Infof("Start TCP relay At: %s Over: %s To: %s Through %s",
+	logger.Infof("[relay] TCP relay At: %s Over: %s To: %s Through %s",
 		r.LocalTCPAddr, r.ListenType, r.cfg.TCPRemotes, r.TransportType)
 }
 
@@ -99,18 +99,18 @@ func (r *Relay) RunLocalTCPServer() error {
 	for {
 		c, err := lis.AcceptTCP()
 		if err != nil {
-			logger.Logger.Fatal("accept tcp conn error: %s", err)
+			logger.Fatal("accept tcp conn error: %s", err)
 		}
 		go func(c *net.TCPConn) {
 			if err := r.TP.HandleTCPConn(c); err != nil {
-				logger.Logger.Infof("HandleTCPConn err %s", err)
+				logger.Infof("HandleTCPConn err %s", err)
 			}
 		}(c)
 	}
 }
 
 func (r *Relay) RunLocalUDPServer() error {
-	logger.Logger.Infof("Start UDP relay At: %s Over: %s To: %s Through %s",
+	logger.Infof("[relay] Start UDP relay At: %s Over: %s To: %s Through %s",
 		r.LocalTCPAddr, r.ListenType, r.cfg.UDPRemotes, r.TransportType)
 
 	lis, err := net.ListenUDP("udp", r.LocalUDPAddr)
@@ -124,7 +124,7 @@ func (r *Relay) RunLocalUDPServer() error {
 	for {
 		n, addr, err := lis.ReadFromUDP(buf)
 		if err != nil {
-			logger.Logger.Fatal("listen udp conn error: %s", err)
+			logger.Fatal("listen udp conn error: %s", err)
 		}
 		bc := r.TP.GetOrCreateBufferCh(addr)
 		bc.Ch <- buf[0:n]
@@ -217,7 +217,7 @@ func (r *Relay) RunLocalMWSSServer() error {
 				if max := 1 * time.Second; tempDelay > max {
 					tempDelay = max
 				}
-				logger.Logger.Infof("server: Accept error: %v; retrying in %v", e, tempDelay)
+				logger.Infof("server: Accept error: %v; retrying in %v", e, tempDelay)
 				time.Sleep(tempDelay)
 				continue
 			}

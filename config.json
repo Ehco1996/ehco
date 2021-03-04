@@ -70,6 +70,14 @@
                 "0.0.0.0:5201"
             ],
             "udp_remotes": []
+        },
+        {
+            "listen": "127.0.0.1:8888",
+            "listen_type": "raw",
+            "transport_type": "raw",
+            "tcp_remotes": [
+                "8.8.8.8:5201"
+            ]
         }
     ]
 }

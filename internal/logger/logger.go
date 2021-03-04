@@ -27,3 +27,23 @@ func init() {
 	Logger = zap.New(core).Sugar()
 
 }
+
+func Info(args ...interface{}) {
+	Logger.Info(args...)
+}
+
+func Fatal(args ...interface{}) {
+	Logger.Fatal(args...)
+}
+
+func Infof(template string, args ...interface{}) {
+	Logger.Infof(template, args...)
+}
+
+func Fatalf(template string, args ...interface{}) {
+	Logger.Fatalf(template, args...)
+}
+
+func Errorf(template string, args ...interface{}) {
+	Logger.Errorf(template, args...)
+}

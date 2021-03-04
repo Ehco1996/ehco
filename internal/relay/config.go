@@ -18,13 +18,12 @@ type RelayConfig struct {
 	UDPRemotes    []string `json:"udp_remotes"`
 }
 
+type JsonConfig struct {
+	Configs []RelayConfig `json:"relay_configs"`
+}
 type Config struct {
 	PATH    string
 	Configs []RelayConfig
-}
-
-type JsonConfig struct {
-	Configs []RelayConfig `json:"relay_configs"`
 }
 
 func NewConfigByPath(path string) *Config {
@@ -52,7 +51,7 @@ func (c *Config) readFromFile() error {
 		return err
 	}
 	c.Configs = jsonConfig.Configs
-	logger.Logger.Info("Load Config From file:", c.PATH)
+	logger.Info("[cfg] Load Config From file:", c.PATH)
 	return nil
 }
 
@@ -68,6 +67,13 @@ func (c *Config) readFromHttp() error {
 		return err
 	}
 	c.Configs = jsonConfig.Configs
-	logger.Logger.Info("Load Config From http:", c.PATH, c.Configs)
+	logger.Info("[cfg] Load Config From http:", c.PATH, c.Configs)
 	return nil
+}
+
+func (c *Config) GetPingHosts() (hosts []string) {
+	for _, cfg := range c.Configs {
+		hosts = append(hosts, cfg.TCPRemotes...)
+	}
+	return
 }

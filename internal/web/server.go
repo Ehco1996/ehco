@@ -9,11 +9,12 @@ import (
 	"github.com/Ehco1996/ehco/internal/constant"
 	"github.com/Ehco1996/ehco/internal/logger"
 	"github.com/gorilla/mux"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 func Index(w http.ResponseWriter, r *http.Request) {
-	logger.Logger.Infof("index call from %s", r.RemoteAddr)
+	logger.Infof("index call from %s", r.RemoteAddr)
 	fmt.Fprintf(w, "access from %s \n", r.RemoteAddr)
 }
 
@@ -30,16 +31,29 @@ func AttachProfiler(router *mux.Router) {
 	router.Handle("/debug/pprof/block", pprof.Handler("block"))
 }
 
-func StartWebServer(port string) {
+func registerMetrics(pingHosts []string) {
+	// traffic
+	prometheus.MustRegister(CurTCPNum)
+	prometheus.MustRegister(CurUDPNum)
+	prometheus.MustRegister(NetWorkTransmitBytes)
+
+	//ping
+	pg := NewPingGroup(pingHosts)
+	pg.Run()
+	prometheus.MustRegister(PingResponseDurationSeconds)
+	prometheus.MustRegister(NewSmokepingCollector(pg, *PingResponseDurationSeconds))
+}
+
+func StartWebServer(port string, pingHosts []string) {
 	addr := "0.0.0.0:" + port
-	logger.Logger.Infof("Start Web Server at http://%s/", addr)
+	logger.Infof("[prom] Start Web Server at http://%s/", addr)
 	r := mux.NewRouter()
 	AttachProfiler(r)
+	registerMetrics(pingHosts)
 	r.Handle("/metrics/", promhttp.Handler())
 	r.HandleFunc("/",
 		func(w http.ResponseWriter, r *http.Request) {
 			fmt.Fprintf(w, constant.IndexHTMLTMPL)
 		})
-
-	logger.Logger.Fatal(http.ListenAndServe(addr, r))
+	logger.Fatal(http.ListenAndServe(addr, r))
 }

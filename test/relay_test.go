@@ -97,7 +97,7 @@ func init() {
 		go func(c relay.RelayConfig) {
 			r, err := relay.NewRelay(&c)
 			if err != nil {
-				logger.Logger.Fatal(err)
+				logger.Fatal(err)
 			}
 			ch <- r.ListenAndServe()
 		}(c)
