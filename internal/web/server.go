@@ -39,9 +39,9 @@ func registerMetrics(pingHosts []string) {
 
 	//ping
 	pg := NewPingGroup(pingHosts)
-	pg.Run()
 	prometheus.MustRegister(PingResponseDurationSeconds)
 	prometheus.MustRegister(NewSmokepingCollector(pg, *PingResponseDurationSeconds))
+	go pg.Run()
 }
 
 func StartWebServer(port string, pingHosts []string) {

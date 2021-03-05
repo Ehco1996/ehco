@@ -1,8 +1,8 @@
-// adapted from https://github.com/SuperQ/smokeping_prober
 package web
 
 import (
 	"math"
+	"runtime"
 	"strings"
 	"time"
 
@@ -39,7 +39,7 @@ var (
 
 	pingResponseTtl = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
-			Namespace: "ping",
+			Namespace:   "ping",
 			Name:        "response_ttl",
 			Help:        "The last response Time To Live (TTL).",
 			ConstLabels: ConstLabels,
@@ -48,17 +48,16 @@ var (
 	)
 	pingResponseDuplicates = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
-			Namespace: "ping",
+			Namespace:   "ping",
 			Name:        "response_duplicates_total",
 			Help:        "The number of duplicated response packets.",
 			ConstLabels: ConstLabels,
 		},
 		pingLabelNames,
 	)
-
 	PingResponseDurationSeconds = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
-			Namespace: "ping",
+			Namespace:   "ping",
 			Name:        "response_duration_seconds",
 			Help:        "A histogram of latencies for ping responses.",
 			Buckets:     pingBuckets,
@@ -92,18 +91,11 @@ func NewSmokepingCollector(pg *PingGroup, pingResponseSeconds prometheus.Histogr
 			logger.Infof("[ping] %d bytes from %s: icmp_seq=%d time=%v ttl=%v (DUP!)",
 				pkt.Nbytes, pkt.IPAddr, pkt.Seq, pkt.Rtt, pkt.Ttl)
 		}
-		pinger.OnFinish = func(stats *ping.Statistics) {
-			logger.Infof("\n--- %s ping statistics ---\n", stats.Addr)
-			logger.Infof("[ping] %d packets transmitted, %d packets received, %v%% packet loss",
-				stats.PacketsSent, stats.PacketsRecv, stats.PacketLoss)
-			logger.Infof("[ping] round-trip min/avg/max/stddev = %v/%v/%v/%v",
-				stats.MinRtt, stats.AvgRtt, stats.MaxRtt, stats.StdDevRtt)
-		}
 	}
 	return &SmokepingCollector{
 		pg: pg,
 		requestsSent: prometheus.NewDesc(
-			prometheus.BuildFQName("", "", "requests_total"),
+			prometheus.BuildFQName("ping", "", "requests_total"),
 			"Number of ping requests sent",
 			pingLabelNames,
 			ConstLabels,
@@ -157,6 +149,9 @@ func NewPingGroup(hosts []string) *PingGroup {
 		pinger.Interval = pingInerval
 		pinger.Timeout = time.Duration(math.MaxInt64)
 		pinger.RecordRtts = false
+		if runtime.GOOS != "darwin" {
+			pinger.SetPrivileged(true)
+		}
 		seen[host] = pinger
 	}
 	pingers := make([]*ping.Pinger, len(seen))
@@ -174,9 +169,14 @@ func NewPingGroup(hosts []string) *PingGroup {
 func (pg *PingGroup) Run() {
 	splay := time.Duration(pingInerval.Nanoseconds() / int64(len(pg.Pingers)))
 	logger.Infof("[ping] Waiting %s between starting pingers", splay)
-	for _, pinger := range pg.Pingers {
-		logger.Infof("[ping] Starting prober for %s", pinger.Addr())
-		go pinger.Run()
+	for idx := range pg.Pingers {
+		go func() {
+			pinger := pg.Pingers[idx]
+			if err := pinger.Run(); err != nil {
+				logger.Infof("[ping] Starting prober err: %s", err)
+			}
+			logger.Infof("[ping] Starting prober for %s", pinger.Addr())
+		}()
 		time.Sleep(splay)
 	}
 }
