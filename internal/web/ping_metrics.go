@@ -6,13 +6,16 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Ehco1996/ehco/internal/config"
 	"github.com/Ehco1996/ehco/internal/logger"
 	"github.com/go-ping/ping"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
 var (
-	pingLabelNames = []string{"ip", "host"}
+	namespace      = "ping"
+	subsystem      = ""
+	pingLabelNames = []string{"ip", "host", "label"}
 	pingBuckets    = []float64{
 		float64(5e-05),
 		float64(0.0001),
@@ -35,29 +38,12 @@ var (
 		float64(13.1072),
 		float64(26.2144),
 	}
-	pingInerval = time.Second * 15
+	pingInerval = time.Second * 30
 
-	pingResponseTtl = prometheus.NewGaugeVec(
-		prometheus.GaugeOpts{
-			Namespace:   "ping",
-			Name:        "response_ttl",
-			Help:        "The last response Time To Live (TTL).",
-			ConstLabels: ConstLabels,
-		},
-		pingLabelNames,
-	)
-	pingResponseDuplicates = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Namespace:   "ping",
-			Name:        "response_duplicates_total",
-			Help:        "The number of duplicated response packets.",
-			ConstLabels: ConstLabels,
-		},
-		pingLabelNames,
-	)
 	PingResponseDurationSeconds = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
-			Namespace:   "ping",
+			Namespace:   namespace,
+			Subsystem:   subsystem,
 			Name:        "response_duration_seconds",
 			Help:        "A histogram of latencies for ping responses.",
 			Buckets:     pingBuckets,
@@ -65,104 +51,94 @@ var (
 		},
 		pingLabelNames,
 	)
+	PingRequestTotal = prometheus.NewDesc(
+		prometheus.BuildFQName(namespace, subsystem, "requests_total"),
+		"Number of ping requests sent",
+		pingLabelNames,
+		ConstLabels,
+	)
 )
 
-type SmokepingCollector struct {
-	pg           *PingGroup
-	requestsSent *prometheus.Desc
+type PingGroup struct {
+	Pingers  []*ping.Pinger
+	LabelMap map[string]string
 }
 
-func NewSmokepingCollector(pg *PingGroup, pingResponseSeconds prometheus.HistogramVec) *SmokepingCollector {
-	for _, pinger := range pg.Pingers {
-		// Init all metrics to 0s.
-		ipAddr := pinger.IPAddr().String()
-		pingResponseDuplicates.WithLabelValues(ipAddr, pinger.Addr())
-		pingResponseSeconds.WithLabelValues(ipAddr, pinger.Addr())
-		pingResponseTtl.WithLabelValues(ipAddr, pinger.Addr())
-		// Setup handler functions.
+func initPinger(host string) *ping.Pinger {
+	pinger := ping.New(host)
+	if err := pinger.Resolve(); err != nil {
+		logger.Errorf("[ping] failed to resolve pinger: %s\n", err.Error())
+		return nil
+	}
+	logger.Infof("[ping] Resolved %s as %s", host, pinger.IPAddr())
+	pinger.Interval = pingInerval
+	pinger.Timeout = time.Duration(math.MaxInt64)
+	pinger.RecordRtts = false
+	if runtime.GOOS != "darwin" {
+		pinger.SetPrivileged(true)
+	}
+	return pinger
+}
+
+func NewPingGroup(cfg *config.Config) *PingGroup {
+	seen := make(map[string]*ping.Pinger)
+	labelMap := make(map[string]string)
+
+	for _, realyCfg := range cfg.Configs {
+		// NOTE (https/ws/wss)://xxx.com -> xxx.com
+		for _, host := range realyCfg.TCPRemotes {
+			if strings.Contains(host, "//") {
+				host = strings.Split(host, "//")[1]
+			}
+			// NOTE xxx:1234 -> xxx
+			if strings.Contains(host, ":") {
+				host = strings.Split(host, ":")[0]
+			}
+			if _, ok := seen[host]; ok {
+				continue
+			}
+			seen[host] = initPinger(host)
+			labelMap[host] = realyCfg.Label
+		}
+	}
+
+	pingers := make([]*ping.Pinger, len(seen))
+	i := 0
+	for _, pinger := range seen {
 		pinger.OnRecv = func(pkt *ping.Packet) {
-			pingResponseSeconds.WithLabelValues(pkt.IPAddr.String(), pkt.Addr).Observe(pkt.Rtt.Seconds())
-			pingResponseTtl.WithLabelValues(pkt.IPAddr.String(), pkt.Addr).Set(float64(pkt.Ttl))
+			PingResponseDurationSeconds.WithLabelValues(
+				pkt.IPAddr.String(), pkt.Addr, labelMap[pkt.Addr]).Observe(pkt.Rtt.Seconds())
 			logger.Infof("[ping] %d bytes from %s: icmp_seq=%d time=%v ttl=%v",
-				pkt.Nbytes, pkt.IPAddr, pkt.Seq, pkt.Rtt, pkt.Ttl)
+				pkt.Nbytes, pkt.Addr, pkt.Seq, pkt.Rtt, pkt.Ttl)
 		}
 		pinger.OnDuplicateRecv = func(pkt *ping.Packet) {
-			pingResponseDuplicates.WithLabelValues(pkt.IPAddr.String(), pkt.Addr).Inc()
 			logger.Infof("[ping] %d bytes from %s: icmp_seq=%d time=%v ttl=%v (DUP!)",
 				pkt.Nbytes, pkt.IPAddr, pkt.Seq, pkt.Rtt, pkt.Ttl)
 		}
+		pingers[i] = pinger
+		i += 1
 	}
-	return &SmokepingCollector{
-		pg: pg,
-		requestsSent: prometheus.NewDesc(
-			prometheus.BuildFQName("ping", "", "requests_total"),
-			"Number of ping requests sent",
-			pingLabelNames,
-			ConstLabels,
-		),
+	return &PingGroup{
+		Pingers:  pingers,
+		LabelMap: labelMap,
 	}
 }
 
-func (s *SmokepingCollector) Describe(ch chan<- *prometheus.Desc) {
-	ch <- s.requestsSent
+func (pg *PingGroup) Describe(ch chan<- *prometheus.Desc) {
+	ch <- PingRequestTotal
 }
 
-func (s *SmokepingCollector) Collect(ch chan<- prometheus.Metric) {
-	for _, pinger := range s.pg.Pingers {
+func (pg *PingGroup) Collect(ch chan<- prometheus.Metric) {
+	for _, pinger := range pg.Pingers {
 		stats := pinger.Statistics()
 		ch <- prometheus.MustNewConstMetric(
-			s.requestsSent,
+			PingRequestTotal,
 			prometheus.CounterValue,
 			float64(stats.PacketsSent),
 			stats.IPAddr.String(),
 			stats.Addr,
+			pg.LabelMap[stats.Addr],
 		)
-	}
-}
-
-type PingGroup struct {
-	Pingers []*ping.Pinger
-	Hosts   []string
-}
-
-func NewPingGroup(hosts []string) *PingGroup {
-	seen := make(map[string]*ping.Pinger)
-	for _, host := range hosts {
-		// NOTE (https/ws/wss)://xxx.com -> xxx.com
-		if strings.Contains(host, "//") {
-			host = strings.Split(host, "//")[1]
-		}
-		// NOTE xxx:1234 -> xxx
-		if strings.Contains(host, ":") {
-			host = strings.Split(host, ":")[0]
-		}
-		if _, ok := seen[host]; ok {
-			continue
-		}
-		pinger := ping.New(host)
-		if err := pinger.Resolve(); err != nil {
-			logger.Errorf("[ping] failed to resolve pinger: %s\n", err.Error())
-			continue
-		}
-		logger.Infof("[ping] Resolved %s as %s", host, pinger.IPAddr())
-
-		pinger.Interval = pingInerval
-		pinger.Timeout = time.Duration(math.MaxInt64)
-		pinger.RecordRtts = false
-		if runtime.GOOS != "darwin" {
-			pinger.SetPrivileged(true)
-		}
-		seen[host] = pinger
-	}
-	pingers := make([]*ping.Pinger, len(seen))
-	i := 0
-	for _, p := range seen {
-		pingers[i] = p
-		i += 1
-	}
-	return &PingGroup{
-		Pingers: pingers,
-		Hosts:   hosts,
 	}
 }
 

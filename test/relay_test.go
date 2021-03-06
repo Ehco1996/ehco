@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Ehco1996/ehco/internal/config"
 	"github.com/Ehco1996/ehco/internal/constant"
 	"github.com/Ehco1996/ehco/internal/logger"
 	"github.com/Ehco1996/ehco/internal/relay"
@@ -37,9 +38,9 @@ func init() {
 	// init tls
 	tls.InitTlsCfg()
 
-	cfg := relay.Config{
+	cfg := config.Config{
 		PATH: "",
-		Configs: []relay.RelayConfig{
+		Configs: []config.RelayConfig{
 			// raw cfg
 			{
 				Listen:        RAW_LISTEN,
@@ -94,7 +95,7 @@ func init() {
 	}
 	ch := make(chan error)
 	for _, c := range cfg.Configs {
-		go func(c relay.RelayConfig) {
+		go func(c config.RelayConfig) {
 			r, err := relay.NewRelay(&c)
 			if err != nil {
 				logger.Fatal(err)

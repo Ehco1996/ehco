@@ -5,7 +5,9 @@ import (
 	"net/http"
 	"net/http/pprof"
 	_ "net/http/pprof"
+	"time"
 
+	"github.com/Ehco1996/ehco/internal/config"
 	"github.com/Ehco1996/ehco/internal/constant"
 	"github.com/Ehco1996/ehco/internal/logger"
 	"github.com/gorilla/mux"
@@ -31,29 +33,41 @@ func AttachProfiler(router *mux.Router) {
 	router.Handle("/debug/pprof/block", pprof.Handler("block"))
 }
 
-func registerMetrics(pingHosts []string) {
+func registerMetrics(cfg *config.Config) {
 	// traffic
 	prometheus.MustRegister(CurTCPNum)
 	prometheus.MustRegister(CurUDPNum)
 	prometheus.MustRegister(NetWorkTransmitBytes)
 
 	//ping
-	pg := NewPingGroup(pingHosts)
+	pg := NewPingGroup(cfg)
 	prometheus.MustRegister(PingResponseDurationSeconds)
-	prometheus.MustRegister(NewSmokepingCollector(pg, *PingResponseDurationSeconds))
+	prometheus.MustRegister(pg)
 	go pg.Run()
 }
 
-func StartWebServer(port string, pingHosts []string) {
+func StartWebServer(port, token string, cfg *config.Config) {
+	time.Sleep(time.Second)
 	addr := "0.0.0.0:" + port
-	logger.Infof("[prom] Start Web Server at http://%s/", addr)
+	logger.Infof("[web] Start Web Server at http://%s/", addr)
 	r := mux.NewRouter()
 	AttachProfiler(r)
-	registerMetrics(pingHosts)
-	r.Handle("/metrics/", promhttp.Handler())
+	registerMetrics(cfg)
+	r.Handle("/metrics/", SimpleTokenAuthMiddleware(token, promhttp.Handler()))
 	r.HandleFunc("/",
 		func(w http.ResponseWriter, r *http.Request) {
 			fmt.Fprintf(w, constant.IndexHTMLTMPL)
 		})
 	logger.Fatal(http.ListenAndServe(addr, r))
+}
+
+func SimpleTokenAuthMiddleware(token string, h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if t := r.URL.Query().Get("token"); t != token {
+			logger.Logger.Errorf("[web] unauthorsied from %s", r.RemoteAddr)
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		h.ServeHTTP(w, r)
+	})
 }

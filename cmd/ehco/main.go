@@ -7,6 +7,7 @@ import (
 
 	cli "github.com/urfave/cli/v2"
 
+	"github.com/Ehco1996/ehco/internal/config"
 	"github.com/Ehco1996/ehco/internal/constant"
 	"github.com/Ehco1996/ehco/internal/logger"
 	"github.com/Ehco1996/ehco/internal/relay"
@@ -21,6 +22,7 @@ var UDPRemoteAddr string
 var TransportType string
 var ConfigPath string
 var WebfPort string
+var WebToken string
 var SystemFilePath = "/etc/systemd/system/ehco.service"
 
 const SystemDTMPL = `# Ehco service
@@ -91,6 +93,13 @@ func main() {
 			Value:       "9000",
 			Destination: &WebfPort,
 		},
+		&cli.StringFlag{
+			Name:        "web_token",
+			Usage:       "访问web的token",
+			EnvVars:     []string{"EHCO_WEB_TOKEN"},
+			Value:       "randomtoken",
+			Destination: &WebToken,
+		},
 	}
 
 	app.Commands = []*cli.Command{
@@ -123,17 +132,17 @@ func main() {
 
 func start(ctx *cli.Context) error {
 	ch := make(chan error)
-	var config *relay.Config
+	var cfg *config.Config
 
 	if ConfigPath != "" {
-		config = relay.NewConfigByPath(ConfigPath)
-		if err := config.LoadConfig(); err != nil {
+		cfg = config.NewConfigByPath(ConfigPath)
+		if err := cfg.LoadConfig(); err != nil {
 			logger.Fatal(err)
 		}
 	} else {
-		config = &relay.Config{
+		cfg = &config.Config{
 			PATH: ConfigPath,
-			Configs: []relay.RelayConfig{
+			Configs: []config.RelayConfig{
 				{
 					Listen:        LocalAddr,
 					ListenType:    ListenType,
@@ -146,11 +155,11 @@ func start(ctx *cli.Context) error {
 	}
 
 	if WebfPort != "" {
-		go web.StartWebServer(WebfPort, config.GetPingHosts())
+		go web.StartWebServer(WebfPort, WebToken, cfg)
 	}
 
 	initTls := false
-	for _, cfg := range config.Configs {
+	for _, cfg := range cfg.Configs {
 		if !initTls && (cfg.ListenType == constant.Listen_WSS ||
 			cfg.ListenType == constant.Listen_MWSS ||
 			cfg.TransportType == constant.Transport_WSS ||
@@ -163,7 +172,7 @@ func start(ctx *cli.Context) error {
 	return <-ch
 }
 
-func serveRelay(cfg relay.RelayConfig, ch chan error) {
+func serveRelay(cfg config.RelayConfig, ch chan error) {
 	r, err := relay.NewRelay(&cfg)
 	if err != nil {
 		logger.Fatal(err)

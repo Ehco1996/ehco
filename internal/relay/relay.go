@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/Ehco1996/ehco/internal/config"
 	"github.com/Ehco1996/ehco/internal/constant"
 	"github.com/Ehco1996/ehco/internal/lb"
 	"github.com/Ehco1996/ehco/internal/logger"
@@ -16,7 +17,7 @@ import (
 )
 
 type Relay struct {
-	cfg *RelayConfig
+	cfg *config.RelayConfig
 
 	LocalTCPAddr *net.TCPAddr
 	LocalUDPAddr *net.UDPAddr
@@ -27,7 +28,7 @@ type Relay struct {
 	TP transporter.RelayTransporter
 }
 
-func NewRelay(cfg *RelayConfig) (*Relay, error) {
+func NewRelay(cfg *config.RelayConfig) (*Relay, error) {
 	localTCPAddr, err := net.ResolveTCPAddr("tcp", cfg.Listen)
 	if err != nil {
 		return nil, err

@@ -1,4 +1,4 @@
-package relay
+package config
 
 import (
 	"encoding/json"
@@ -16,6 +16,7 @@ type RelayConfig struct {
 	TransportType string   `json:"transport_type"`
 	TCPRemotes    []string `json:"tcp_remotes"`
 	UDPRemotes    []string `json:"udp_remotes"`
+	Label         string   `json:"label"`
 }
 
 type JsonConfig struct {
@@ -69,11 +70,4 @@ func (c *Config) readFromHttp() error {
 	c.Configs = jsonConfig.Configs
 	logger.Info("[cfg] Load Config From http:", c.PATH, c.Configs)
 	return nil
-}
-
-func (c *Config) GetPingHosts() (hosts []string) {
-	for _, cfg := range c.Configs {
-		hosts = append(hosts, cfg.TCPRemotes...)
-	}
-	return
 }

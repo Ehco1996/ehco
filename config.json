@@ -72,11 +72,13 @@
             "udp_remotes": []
         },
         {
+            "label": "ping_test",
             "listen": "127.0.0.1:8888",
             "listen_type": "raw",
             "transport_type": "raw",
             "tcp_remotes": [
-                "8.8.8.8:5201"
+                "8.8.8.8:5201",
+                "google.com:5201"
             ]
         }
     ]
