@@ -20,6 +20,10 @@ func Index(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "access from %s \n", r.RemoteAddr)
 }
 
+func Welcome(w http.ResponseWriter, r *http.Request) {
+	fmt.Fprintf(w, constant.IndexHTMLTMPL)
+}
+
 func AttachProfiler(router *mux.Router) {
 	router.HandleFunc("/debug/pprof/", pprof.Index)
 	router.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
@@ -53,19 +57,27 @@ func StartWebServer(port, token string, cfg *config.Config) {
 	r := mux.NewRouter()
 	AttachProfiler(r)
 	registerMetrics(cfg)
-	r.Handle("/metrics/", SimpleTokenAuthMiddleware(token, promhttp.Handler()))
-	r.HandleFunc("/",
-		func(w http.ResponseWriter, r *http.Request) {
-			fmt.Fprintf(w, constant.IndexHTMLTMPL)
-		})
-	logger.Fatal(http.ListenAndServe(addr, r))
+	r.Handle("/", http.HandlerFunc(Welcome))
+	r.Handle("/metrics/", promhttp.Handler())
+	if token != "" {
+		logger.Fatal(http.ListenAndServe(addr, SimpleTokenAuthMiddleware(token, r)))
+	} else {
+		logger.Fatal(http.ListenAndServe(addr, r))
+	}
 }
 
 func SimpleTokenAuthMiddleware(token string, h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if t := r.URL.Query().Get("token"); t != token {
-			logger.Logger.Errorf("[web] unauthorsied from %s", r.RemoteAddr)
-			w.WriteHeader(http.StatusUnauthorized)
+			msg := fmt.Sprintf("[web] unauthorsied from %s", r.RemoteAddr)
+			logger.Logger.Error(msg)
+			hj, ok := w.(http.Hijacker)
+			if ok {
+				conn, _, _ := hj.Hijack()
+				conn.Close()
+			} else {
+				panic(msg)
+			}
 			return
 		}
 		h.ServeHTTP(w, r)

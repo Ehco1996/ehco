@@ -95,9 +95,8 @@ func main() {
 		},
 		&cli.StringFlag{
 			Name:        "web_token",
-			Usage:       "访问web的token",
+			Usage:       "访问web的token,如果访问不带着正确的token，会直接reset连接",
 			EnvVars:     []string{"EHCO_WEB_TOKEN"},
-			Value:       "randomtoken",
 			Destination: &WebToken,
 		},
 	}
