@@ -96,8 +96,3 @@ func (lp *LBNodes) PickMin() *LBNode {
 func (lp *LBNodes) DeferPick(node *LBNode) {
 	lp.IncrUserCnt(node, -1)
 }
-
-func (lp *LBNodes) OnError(node *LBNode) {
-	// NOTE 遇到错误的时候降低这个节点的权重
-	lp.IncrUserCnt(node, 100)
-}

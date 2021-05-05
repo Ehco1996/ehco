@@ -31,7 +31,6 @@ func (s *Ws) HandleTCPConn(c *net.TCPConn) error {
 
 	wsc, _, _, err := ws.Dial(context.TODO(), node.Remote+"/ws/")
 	if err != nil {
-		s.raw.TCPNodes.OnError(node)
 		return err
 	}
 	defer wsc.Close()

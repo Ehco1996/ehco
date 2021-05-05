@@ -50,23 +50,7 @@ func registerMetrics(cfg *config.Config) {
 	go pg.Run()
 }
 
-func StartWebServer(port, token string, cfg *config.Config) {
-	time.Sleep(time.Second)
-	addr := "0.0.0.0:" + port
-	logger.Infof("[web] Start Web Server at http://%s/", addr)
-	r := mux.NewRouter()
-	AttachProfiler(r)
-	registerMetrics(cfg)
-	r.Handle("/", http.HandlerFunc(Welcome))
-	r.Handle("/metrics/", promhttp.Handler())
-	if token != "" {
-		logger.Fatal(http.ListenAndServe(addr, SimpleTokenAuthMiddleware(token, r)))
-	} else {
-		logger.Fatal(http.ListenAndServe(addr, r))
-	}
-}
-
-func SimpleTokenAuthMiddleware(token string, h http.Handler) http.Handler {
+func simpleTokenAuthMiddleware(token string, h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if t := r.URL.Query().Get("token"); t != token {
 			msg := fmt.Sprintf("[web] unauthorsied from %s", r.RemoteAddr)
@@ -82,4 +66,20 @@ func SimpleTokenAuthMiddleware(token string, h http.Handler) http.Handler {
 		}
 		h.ServeHTTP(w, r)
 	})
+}
+
+func StartWebServer(port, token string, cfg *config.Config) {
+	time.Sleep(time.Second)
+	addr := "0.0.0.0:" + port
+	logger.Infof("[web] Start Web Server at http://%s/", addr)
+	r := mux.NewRouter()
+	AttachProfiler(r)
+	registerMetrics(cfg)
+	r.Handle("/", http.HandlerFunc(Welcome))
+	r.Handle("/metrics/", promhttp.Handler())
+	if token != "" {
+		logger.Fatal(http.ListenAndServe(addr, simpleTokenAuthMiddleware(token, r)))
+	} else {
+		logger.Fatal(http.ListenAndServe(addr, r))
+	}
 }

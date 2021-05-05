@@ -41,7 +41,6 @@ func (raw *Raw) HandleUDPConn(uaddr *net.UDPAddr, local *net.UDPConn) {
 	rc, err := net.Dial("udp", node.Remote)
 	if err != nil {
 		logger.Info(err)
-		raw.UDPNodes.OnError(node)
 		return
 	}
 	defer func() {
@@ -99,7 +98,6 @@ func (raw *Raw) HandleTCPConn(c *net.TCPConn) error {
 
 	rc, err := net.Dial("tcp", node.Remote)
 	if err != nil {
-		raw.TCPNodes.OnError(node)
 		return err
 	}
 	logger.Infof("[raw] HandleTCPConn from %s to %s", c.LocalAddr().String(), node.Remote)
@@ -122,7 +120,6 @@ func (raw *Raw) HandleWsRequset(w http.ResponseWriter, req *http.Request) {
 	rc, err := net.Dial("tcp", node.Remote)
 	if err != nil {
 		logger.Infof("dial error: %s", err)
-		raw.TCPNodes.OnError(node)
 		return
 	}
 	defer rc.Close()
@@ -147,7 +144,6 @@ func (raw *Raw) HandleWssRequset(w http.ResponseWriter, req *http.Request) {
 	rc, err := net.Dial("tcp", node.Remote)
 	if err != nil {
 		logger.Infof("dial error: %s", err)
-		raw.TCPNodes.OnError(node)
 		return
 	}
 	defer rc.Close()
@@ -168,7 +164,6 @@ func (raw *Raw) HandleMWssRequset(c net.Conn) {
 	rc, err := net.Dial("tcp", node.Remote)
 	if err != nil {
 		logger.Infof("dial error: %s", err)
-		raw.TCPNodes.OnError(node)
 		return
 	}
 	defer rc.Close()

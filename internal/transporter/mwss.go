@@ -30,7 +30,6 @@ func (s *Mwss) HandleTCPConn(c *net.TCPConn) error {
 
 	wsc, err := s.mtp.Dial(node.Remote + "/mwss/")
 	if err != nil {
-		s.raw.TCPNodes.OnError(node)
 		return err
 	}
 	defer wsc.Close()
