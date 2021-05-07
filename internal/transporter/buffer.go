@@ -1,6 +1,7 @@
 package transporter
 
 import (
+	"context"
 	"errors"
 	"io"
 	"net"
@@ -72,15 +73,28 @@ func copyBuffer(dst io.Writer, src io.Reader, bufferPool *sync.Pool) (written in
 
 // NOTE must call setdeadline before use this func or may goroutine  leak
 func transport(rw1, rw2 io.ReadWriter) error {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	errc := make(chan error, 1)
 	go func() {
-		_, err := copyBuffer(rw1, rw2, InboundBufferPool)
-		errc <- err
+		select {
+		case <-ctx.Done():
+			println("ctx done exits copy1")
+		default:
+			_, err := copyBuffer(rw1, rw2, InboundBufferPool)
+			errc <- err
+		}
 	}()
 
 	go func() {
-		_, err := copyBuffer(rw2, rw1, OutboundBufferPool)
-		errc <- err
+		select {
+		case <-ctx.Done():
+			println("ctx done exit copy1")
+		default:
+			_, err := copyBuffer(rw2, rw1, InboundBufferPool)
+			errc <- err
+		}
 	}()
 	err := <-errc
 	// NOTE 我们不关心operror 比如 eof/reset/broken pipe

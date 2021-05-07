@@ -26,14 +26,12 @@ func (s *Ws) HandleTCPConn(c *net.TCPConn) error {
 	web.CurTCPNum.Inc()
 	defer web.CurTCPNum.Dec()
 
-	node := s.raw.TCPNodes.PickMin()
-	defer s.raw.TCPNodes.DeferPick(node)
-
-	wsc, _, _, err := ws.Dial(context.TODO(), node.Remote+"/ws/")
+	remote := s.raw.TCPRemotes.Next()
+	wsc, _, _, err := ws.Dial(context.TODO(), remote+"/ws/")
 	if err != nil {
 		return err
 	}
 	defer wsc.Close()
-	logger.Infof("[ws] HandleTCPConn from %s to %s", c.LocalAddr().String(), node.Remote)
+	logger.Infof("[ws] HandleTCPConn from %s to %s", c.LocalAddr().String(), remote)
 	return transport(c, wsc)
 }

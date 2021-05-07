@@ -13,72 +13,15 @@ import (
 	"github.com/xtaci/smux"
 )
 
-type muxConn struct {
-	net.Conn
-	stream *smux.Stream
-}
-
-func newMuxConn(conn net.Conn, stream *smux.Stream) *muxConn {
-	return &muxConn{Conn: conn, stream: stream}
-}
-
-func (c *muxConn) Read(b []byte) (n int, err error) {
-	return c.stream.Read(b)
-}
-
-func (c *muxConn) Write(b []byte) (n int, err error) {
-	return c.stream.Write(b)
-}
-
-func (c *muxConn) Close() error {
-	return c.stream.Close()
-}
-
-type muxSession struct {
-	conn         net.Conn
-	session      *smux.Session
-	maxStreamCnt int
-}
-
-func (session *muxSession) GetConn() (net.Conn, error) {
-	stream, err := session.session.OpenStream()
-	if err != nil {
-		return nil, err
-	}
-	return newMuxConn(session.conn, stream), nil
-}
-
-func (session *muxSession) Close() error {
-	if session.session == nil {
-		return nil
-	}
-	session.conn.Close()
-	return session.session.Close()
-}
-
-func (session *muxSession) IsClosed() bool {
-	if session.session == nil {
-		return true
-	}
-	return session.session.IsClosed()
-}
-
-func (session *muxSession) NumStreams() int {
-	if session.session != nil {
-		return session.session.NumStreams()
-	}
-	return 0
-}
-
 type mwssTransporter struct {
-	sessions     map[string][]*muxSession
+	sessions     map[string][]*smux.Session
 	sessionMutex sync.Mutex
 	dialer       ws.Dialer
 }
 
 func NewMWSSTransporter() *mwssTransporter {
 	return &mwssTransporter{
-		sessions: make(map[string][]*muxSession),
+		sessions: make(map[string][]*smux.Session),
 		dialer: ws.Dialer{
 			TLSConfig: mytls.DefaultTLSConfig,
 			Timeout:   constant.DialTimeOut},
@@ -89,15 +32,15 @@ func (tr *mwssTransporter) Dial(addr string) (conn net.Conn, err error) {
 	tr.sessionMutex.Lock()
 	defer tr.sessionMutex.Unlock()
 
-	var session *muxSession
+	var session *smux.Session
 	var sessionIndex int
-	var sessions []*muxSession
+	var sessions []*smux.Session
 	var ok bool
 
 	sessions, ok = tr.sessions[addr]
 	// 找到可以用的session
 	for sessionIndex, session = range sessions {
-		if session.NumStreams() >= session.maxStreamCnt {
+		if session.NumStreams() >= constant.MaxMWSSStreamCnt {
 			ok = false
 		} else {
 			ok = true
@@ -127,34 +70,40 @@ func (tr *mwssTransporter) Dial(addr string) (conn net.Conn, err error) {
 			}
 		}
 	}
-	cc, err := session.GetConn()
+	stream, err := session.OpenStream()
 	if err != nil {
 		session.Close()
 		return nil, err
 	}
 	tr.sessions[addr] = sessions
-	return cc, nil
+	return stream, nil
 }
 
-func (tr *mwssTransporter) initSession(addr string) (*muxSession, error) {
+func (tr *mwssTransporter) initSession(addr string) (*smux.Session, error) {
 	rc, _, _, err := tr.dialer.Dial(context.TODO(), addr)
 	if err != nil {
 		return nil, err
 	}
 	// stream multiplex
-	smuxConfig := smux.DefaultConfig()
-	session, err := smux.Client(rc, smuxConfig)
+	session, err := smux.Client(rc, nil)
 	if err != nil {
 		return nil, err
 	}
 	logger.Infof("[mwss] Init new session to: %s", rc.RemoteAddr())
-	return &muxSession{conn: rc, session: session, maxStreamCnt: constant.MaxMWSSStreamCnt}, nil
+	return session, nil
 }
 
 type MWSSServer struct {
 	Server   *http.Server
 	ConnChan chan net.Conn
 	ErrChan  chan error
+}
+
+func NewMWSSServer() *MWSSServer {
+	return &MWSSServer{
+		ConnChan: make(chan net.Conn, 1024),
+		ErrChan:  make(chan error, 1),
+	}
 }
 
 func (s *MWSSServer) Upgrade(w http.ResponseWriter, r *http.Request) {
@@ -169,28 +118,26 @@ func (s *MWSSServer) Upgrade(w http.ResponseWriter, r *http.Request) {
 func (s *MWSSServer) mux(conn net.Conn) {
 	defer conn.Close()
 
-	smuxConfig := smux.DefaultConfig()
-	mux, err := smux.Server(conn, smuxConfig)
+	session, err := smux.Server(conn, nil)
 	if err != nil {
 		logger.Infof("[mwss server err] %s - %s : %s", conn.RemoteAddr(), s.Server.Addr, err)
 		return
 	}
-	defer mux.Close()
+	defer session.Close()
 
 	logger.Infof("[mwss server init] %s  %s", conn.RemoteAddr(), s.Server.Addr)
 	defer logger.Infof("[mwss server close] %s >-< %s", conn.RemoteAddr(), s.Server.Addr)
 
 	for {
-		stream, err := mux.AcceptStream()
+		stream, err := session.AcceptStream()
 		if err != nil {
 			logger.Infof("[mwss] accept stream err: %s", err)
 			break
 		}
-		cc := newMuxConn(conn, stream)
 		select {
-		case s.ConnChan <- cc:
+		case s.ConnChan <- stream:
 		default:
-			cc.Close()
+			stream.Close()
 			logger.Infof("[mwss] %s - %s: connection queue is full", conn.RemoteAddr(), conn.LocalAddr())
 		}
 	}

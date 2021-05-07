@@ -1,6 +1,7 @@
 package test
 
 import (
+	"sync"
 	"testing"
 	"time"
 
@@ -116,14 +117,14 @@ func TestRelay(t *testing.T) {
 	if string(res) != string(msg) {
 		t.Fatal(res)
 	}
-	t.Log("test tcp down!")
+	t.Log("test tcp done!")
 
 	// test udp
 	res = SendUdpMsg(msg, RAW_LISTEN)
 	if string(res) != string(msg) {
 		t.Fatal(res)
 	}
-	t.Log("test udp down!")
+	t.Log("test udp done!")
 }
 
 func TestRelayOverWs(t *testing.T) {
@@ -133,7 +134,7 @@ func TestRelayOverWs(t *testing.T) {
 	if string(res) != string(msg) {
 		t.Fatal(res)
 	}
-	t.Log("test tcp over ws down!")
+	t.Log("test tcp over ws done!")
 }
 
 func TestRelayOverWss(t *testing.T) {
@@ -143,17 +144,26 @@ func TestRelayOverWss(t *testing.T) {
 	if string(res) != string(msg) {
 		t.Fatal(res)
 	}
-	t.Log("test tcp over ws down!")
+	t.Log("test tcp over wss done!")
 }
 
 func TestRelayOverMwss(t *testing.T) {
 	msg := []byte("hello")
-	// test tcp
-	res := SendTcpMsg(msg, MWSS_LISTEN)
-	if string(res) != string(msg) {
-		t.Fatal(res)
+	var wg sync.WaitGroup
+	wg.Add(constant.MaxMWSSStreamCnt * 2)
+	for i := 0; i < constant.MaxMWSSStreamCnt*2; i++ {
+		go func(i int) {
+			t.Logf("run no: %d test.", i)
+			res := SendTcpMsg(msg, MWSS_LISTEN)
+			wg.Done()
+			if string(res) != string(msg) {
+				t.Log(res)
+				panic(1)
+			}
+		}(i)
 	}
-	t.Log("test tcp over ws down!")
+	wg.Wait()
+	t.Log("test tcp over mwss done!")
 }
 
 func BenchmarkTcpRelay(b *testing.B) {

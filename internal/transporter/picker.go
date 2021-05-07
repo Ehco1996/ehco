@@ -18,10 +18,10 @@ type RelayTransporter interface {
 	HandleTCPConn(c *net.TCPConn) error
 }
 
-func PickTransporter(transType string, tcpLBNodes, udpLBNodes *lb.LBNodes) RelayTransporter {
+func PickTransporter(transType string, tcpRemotes, udpRemotes lb.RoundRobin) RelayTransporter {
 	raw := Raw{
-		TCPNodes:       tcpLBNodes,
-		UDPNodes:       udpLBNodes,
+		TCPRemotes:     tcpRemotes,
+		UDPRemotes:     udpRemotes,
 		UDPBufferChMap: make(map[string]*BufferCh),
 	}
 	switch transType {

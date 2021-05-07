@@ -47,8 +47,8 @@ func NewRelay(cfg *config.RelayConfig) (*Relay, error) {
 
 		TP: transporter.PickTransporter(
 			cfg.TransportType,
-			lb.New(cfg.TCPRemotes),
-			lb.New(cfg.UDPRemotes),
+			lb.NewRBRemotes(cfg.TCPRemotes),
+			lb.NewRBRemotes(cfg.UDPRemotes),
 		),
 	}
 
@@ -179,35 +179,33 @@ func (r *Relay) RunLocalWSSServer() error {
 func (r *Relay) RunLocalMWSSServer() error {
 	r.LogRelay()
 	tp := r.TP.(*transporter.Raw)
-	s := &transporter.MWSSServer{
-		ConnChan: make(chan net.Conn, 1024),
-		ErrChan:  make(chan error, 1),
-	}
+	mwssServer := transporter.NewMWSSServer()
 	mux := mux.NewRouter()
 	mux.Handle("/", http.HandlerFunc(web.Index))
-	mux.Handle("/mwss/", http.HandlerFunc(s.Upgrade))
-	server := &http.Server{
+	mux.Handle("/mwss/", http.HandlerFunc(mwssServer.Upgrade))
+	httpServer := &http.Server{
 		Addr:              r.LocalTCPAddr.String(),
 		Handler:           mux,
 		TLSConfig:         mytls.DefaultTLSConfig,
 		ReadHeaderTimeout: 30 * time.Second,
 	}
-	s.Server = server
+	mwssServer.Server = httpServer
 
 	ln, err := net.Listen("tcp", r.LocalTCPAddr.String())
 	if err != nil {
 		return err
 	}
 	go func() {
-		err := server.Serve(tls.NewListener(ln, server.TLSConfig))
+		err := httpServer.Serve(tls.NewListener(ln, httpServer.TLSConfig))
 		if err != nil {
-			s.ErrChan <- err
+			mwssServer.ErrChan <- err
 		}
-		close(s.ErrChan)
+		close(mwssServer.ErrChan)
 	}()
+
 	var tempDelay time.Duration
 	for {
-		conn, e := s.Accept()
+		conn, e := mwssServer.Accept()
 		if e != nil {
 			if ne, ok := e.(net.Error); ok && ne.Temporary() {
 				if tempDelay == 0 {
