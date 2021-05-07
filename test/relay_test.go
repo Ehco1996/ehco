@@ -1,6 +1,7 @@
 package test
 
 import (
+	"sync"
 	"testing"
 	"time"
 
@@ -147,13 +148,21 @@ func TestRelayOverWss(t *testing.T) {
 }
 
 func TestRelayOverMwss(t *testing.T) {
-	// TODO(ehco):  test one conn with 1024 stream.
 	msg := []byte("hello")
-	// test tcp
-	res := SendTcpMsg(msg, MWSS_LISTEN)
-	if string(res) != string(msg) {
-		t.Fatal(res)
+	var wg sync.WaitGroup
+	wg.Add(constant.MaxMWSSStreamCnt * 2)
+	for i := 0; i < constant.MaxMWSSStreamCnt*2; i++ {
+		go func(i int) {
+			t.Logf("run no: %d test.", i)
+			res := SendTcpMsg(msg, MWSS_LISTEN)
+			wg.Done()
+			if string(res) != string(msg) {
+				t.Log(res)
+				panic(1)
+			}
+		}(i)
 	}
+	wg.Wait()
 	t.Log("test tcp over mwss done!")
 }
 

@@ -86,7 +86,7 @@ go get -u "github.com/Ehco1996/ehco/cmd/ehco"
 }
 ```
 
-## Benchmark
+## Benchmark(Apple m1)
 
 iperf:
 
@@ -140,5 +140,5 @@ iperf3 -c 0.0.0.0 -p 1234 -u -b 1G --length 1024
 
 | iperf | raw | relay(raw) | relay(ws) |relay(wss) | relay(mwss)|
 | ---- | ----  | ---- | ---- | ---- | ---- |
-| tcp  | 62.6 Gbits/sec | 23.9 Gbits/sec | 14.65 Gbits/sec | 4.22 Gbits/sec | 2.43 Gbits/sec |
+| tcp  | 123 Gbits/sec | 55 Gbits/sec | 41 Gbits/sec | 10 Gbits/sec | 5.78 Gbits/sec |
 | udp  | 14.5 Gbits/sec | 3.3 Gbits/sec | 直接转发 | 直接转发 | 直接转发 |
