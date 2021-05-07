@@ -13,46 +13,17 @@ import (
 	"github.com/xtaci/smux"
 )
 
-type muxConn struct {
-	net.Conn
-	stream *smux.Stream
-}
-
-func newMuxConn(conn net.Conn, stream *smux.Stream) *muxConn {
-	return &muxConn{Conn: conn, stream: stream}
-}
-
-func (c *muxConn) Read(b []byte) (n int, err error) {
-	return c.stream.Read(b)
-}
-
-func (c *muxConn) Write(b []byte) (n int, err error) {
-	return c.stream.Write(b)
-}
-
-func (c *muxConn) Close() error {
-	return c.stream.Close()
-}
-
 type muxSession struct {
 	conn         net.Conn
 	session      *smux.Session
 	maxStreamCnt int
 }
 
-func (session *muxSession) GetConn() (net.Conn, error) {
-	stream, err := session.session.OpenStream()
-	if err != nil {
-		return nil, err
-	}
-	return newMuxConn(session.conn, stream), nil
-}
-
 func (session *muxSession) Close() error {
+	session.conn.Close()
 	if session.session == nil {
 		return nil
 	}
-	session.conn.Close()
 	return session.session.Close()
 }
 
@@ -127,13 +98,13 @@ func (tr *mwssTransporter) Dial(addr string) (conn net.Conn, err error) {
 			}
 		}
 	}
-	cc, err := session.GetConn()
+	stream, err := session.session.OpenStream()
 	if err != nil {
 		session.Close()
 		return nil, err
 	}
 	tr.sessions[addr] = sessions
-	return cc, nil
+	return stream, nil
 }
 
 func (tr *mwssTransporter) initSession(addr string) (*muxSession, error) {
@@ -142,8 +113,7 @@ func (tr *mwssTransporter) initSession(addr string) (*muxSession, error) {
 		return nil, err
 	}
 	// stream multiplex
-	smuxConfig := smux.DefaultConfig()
-	session, err := smux.Client(rc, smuxConfig)
+	session, err := smux.Client(rc, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -155,6 +125,13 @@ type MWSSServer struct {
 	Server   *http.Server
 	ConnChan chan net.Conn
 	ErrChan  chan error
+}
+
+func NewMWSSServer() *MWSSServer {
+	return &MWSSServer{
+		ConnChan: make(chan net.Conn, 1024),
+		ErrChan:  make(chan error, 1),
+	}
 }
 
 func (s *MWSSServer) Upgrade(w http.ResponseWriter, r *http.Request) {
@@ -169,28 +146,26 @@ func (s *MWSSServer) Upgrade(w http.ResponseWriter, r *http.Request) {
 func (s *MWSSServer) mux(conn net.Conn) {
 	defer conn.Close()
 
-	smuxConfig := smux.DefaultConfig()
-	mux, err := smux.Server(conn, smuxConfig)
+	session, err := smux.Server(conn, nil)
 	if err != nil {
 		logger.Infof("[mwss server err] %s - %s : %s", conn.RemoteAddr(), s.Server.Addr, err)
 		return
 	}
-	defer mux.Close()
+	defer session.Close()
 
 	logger.Infof("[mwss server init] %s  %s", conn.RemoteAddr(), s.Server.Addr)
 	defer logger.Infof("[mwss server close] %s >-< %s", conn.RemoteAddr(), s.Server.Addr)
 
 	for {
-		stream, err := mux.AcceptStream()
+		stream, err := session.AcceptStream()
 		if err != nil {
 			logger.Infof("[mwss] accept stream err: %s", err)
 			break
 		}
-		cc := newMuxConn(conn, stream)
 		select {
-		case s.ConnChan <- cc:
+		case s.ConnChan <- stream:
 		default:
-			cc.Close()
+			stream.Close()
 			logger.Infof("[mwss] %s - %s: connection queue is full", conn.RemoteAddr(), conn.LocalAddr())
 		}
 	}

@@ -116,14 +116,14 @@ func TestRelay(t *testing.T) {
 	if string(res) != string(msg) {
 		t.Fatal(res)
 	}
-	t.Log("test tcp down!")
+	t.Log("test tcp done!")
 
 	// test udp
 	res = SendUdpMsg(msg, RAW_LISTEN)
 	if string(res) != string(msg) {
 		t.Fatal(res)
 	}
-	t.Log("test udp down!")
+	t.Log("test udp done!")
 }
 
 func TestRelayOverWs(t *testing.T) {
@@ -133,7 +133,7 @@ func TestRelayOverWs(t *testing.T) {
 	if string(res) != string(msg) {
 		t.Fatal(res)
 	}
-	t.Log("test tcp over ws down!")
+	t.Log("test tcp over ws done!")
 }
 
 func TestRelayOverWss(t *testing.T) {
@@ -143,17 +143,18 @@ func TestRelayOverWss(t *testing.T) {
 	if string(res) != string(msg) {
 		t.Fatal(res)
 	}
-	t.Log("test tcp over ws down!")
+	t.Log("test tcp over wss done!")
 }
 
 func TestRelayOverMwss(t *testing.T) {
+	// TODO(ehco):  test one conn with 1024 stream.
 	msg := []byte("hello")
 	// test tcp
 	res := SendTcpMsg(msg, MWSS_LISTEN)
 	if string(res) != string(msg) {
 		t.Fatal(res)
 	}
-	t.Log("test tcp over ws down!")
+	t.Log("test tcp over mwss done!")
 }
 
 func BenchmarkTcpRelay(b *testing.B) {

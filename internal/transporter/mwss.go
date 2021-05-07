@@ -28,11 +28,11 @@ func (s *Mwss) HandleTCPConn(c *net.TCPConn) error {
 	node := s.raw.TCPNodes.PickMin()
 	defer s.raw.TCPNodes.DeferPick(node)
 
-	wsc, err := s.mtp.Dial(node.Remote + "/mwss/")
+	muxwsc, err := s.mtp.Dial(node.Remote + "/mwss/")
 	if err != nil {
 		return err
 	}
-	defer wsc.Close()
-	logger.Infof("[mwss] HandleTCPConn from:%s to:%s", c.RemoteAddr(), wsc.RemoteAddr())
-	return transport(wsc, c)
+	defer muxwsc.Close()
+	logger.Infof("[mwss] HandleTCPConn from:%s to:%s", c.RemoteAddr(), muxwsc.RemoteAddr())
+	return transport(muxwsc, c)
 }

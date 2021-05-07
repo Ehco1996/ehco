@@ -72,6 +72,7 @@ func copyBuffer(dst io.Writer, src io.Reader, bufferPool *sync.Pool) (written in
 
 // NOTE must call setdeadline before use this func or may goroutine  leak
 func transport(rw1, rw2 io.ReadWriter) error {
+	// TODO(ehco) add cancel ctx.
 	errc := make(chan error, 1)
 	go func() {
 		_, err := copyBuffer(rw1, rw2, InboundBufferPool)
