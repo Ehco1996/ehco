@@ -13,43 +13,15 @@ import (
 	"github.com/xtaci/smux"
 )
 
-type muxSession struct {
-	conn         net.Conn
-	session      *smux.Session
-	maxStreamCnt int
-}
-
-func (session *muxSession) Close() error {
-	session.conn.Close()
-	if session.session == nil {
-		return nil
-	}
-	return session.session.Close()
-}
-
-func (session *muxSession) IsClosed() bool {
-	if session.session == nil {
-		return true
-	}
-	return session.session.IsClosed()
-}
-
-func (session *muxSession) NumStreams() int {
-	if session.session != nil {
-		return session.session.NumStreams()
-	}
-	return 0
-}
-
 type mwssTransporter struct {
-	sessions     map[string][]*muxSession
+	sessions     map[string][]*smux.Session
 	sessionMutex sync.Mutex
 	dialer       ws.Dialer
 }
 
 func NewMWSSTransporter() *mwssTransporter {
 	return &mwssTransporter{
-		sessions: make(map[string][]*muxSession),
+		sessions: make(map[string][]*smux.Session),
 		dialer: ws.Dialer{
 			TLSConfig: mytls.DefaultTLSConfig,
 			Timeout:   constant.DialTimeOut},
@@ -60,15 +32,15 @@ func (tr *mwssTransporter) Dial(addr string) (conn net.Conn, err error) {
 	tr.sessionMutex.Lock()
 	defer tr.sessionMutex.Unlock()
 
-	var session *muxSession
+	var session *smux.Session
 	var sessionIndex int
-	var sessions []*muxSession
+	var sessions []*smux.Session
 	var ok bool
 
 	sessions, ok = tr.sessions[addr]
 	// 找到可以用的session
 	for sessionIndex, session = range sessions {
-		if session.NumStreams() >= session.maxStreamCnt {
+		if session.NumStreams() >= constant.MaxMWSSStreamCnt {
 			ok = false
 		} else {
 			ok = true
@@ -98,7 +70,7 @@ func (tr *mwssTransporter) Dial(addr string) (conn net.Conn, err error) {
 			}
 		}
 	}
-	stream, err := session.session.OpenStream()
+	stream, err := session.OpenStream()
 	if err != nil {
 		session.Close()
 		return nil, err
@@ -107,7 +79,7 @@ func (tr *mwssTransporter) Dial(addr string) (conn net.Conn, err error) {
 	return stream, nil
 }
 
-func (tr *mwssTransporter) initSession(addr string) (*muxSession, error) {
+func (tr *mwssTransporter) initSession(addr string) (*smux.Session, error) {
 	rc, _, _, err := tr.dialer.Dial(context.TODO(), addr)
 	if err != nil {
 		return nil, err
@@ -118,7 +90,7 @@ func (tr *mwssTransporter) initSession(addr string) (*muxSession, error) {
 		return nil, err
 	}
 	logger.Infof("[mwss] Init new session to: %s", rc.RemoteAddr())
-	return &muxSession{conn: rc, session: session, maxStreamCnt: constant.MaxMWSSStreamCnt}, nil
+	return session, nil
 }
 
 type MWSSServer struct {

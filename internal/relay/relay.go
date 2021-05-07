@@ -47,8 +47,8 @@ func NewRelay(cfg *config.RelayConfig) (*Relay, error) {
 
 		TP: transporter.PickTransporter(
 			cfg.TransportType,
-			lb.New(cfg.TCPRemotes),
-			lb.New(cfg.UDPRemotes),
+			lb.NewRBRemotes(cfg.TCPRemotes),
+			lb.NewRBRemotes(cfg.UDPRemotes),
 		),
 	}
 

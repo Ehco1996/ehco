@@ -25,10 +25,8 @@ func (s *Mwss) HandleTCPConn(c *net.TCPConn) error {
 	web.CurTCPNum.Inc()
 	defer web.CurTCPNum.Dec()
 
-	node := s.raw.TCPNodes.PickMin()
-	defer s.raw.TCPNodes.DeferPick(node)
-
-	muxwsc, err := s.mtp.Dial(node.Remote + "/mwss/")
+	remote := s.raw.TCPRemotes.Next()
+	muxwsc, err := s.mtp.Dial(remote + "/mwss/")
 	if err != nil {
 		return err
 	}

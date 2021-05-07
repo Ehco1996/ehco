@@ -27,15 +27,14 @@ func (s *Wss) HandleTCPConn(c *net.TCPConn) error {
 	web.CurTCPNum.Inc()
 	defer web.CurTCPNum.Dec()
 
-	node := s.raw.TCPNodes.PickMin()
-	defer s.raw.TCPNodes.DeferPick(node)
+	remote := s.raw.TCPRemotes.Next()
 
 	d := ws.Dialer{TLSConfig: tls.DefaultTLSConfig}
-	wsc, _, _, err := d.Dial(context.TODO(), node.Remote+"/wss/")
+	wsc, _, _, err := d.Dial(context.TODO(), remote+"/wss/")
 	if err != nil {
 		return err
 	}
 	defer wsc.Close()
-	logger.Infof("[ws] HandleTCPConn from %s to %s", c.LocalAddr().String(), node.Remote)
+	logger.Infof("[ws] HandleTCPConn from %s to %s", c.LocalAddr().String(), remote)
 	return transport(c, wsc)
 }

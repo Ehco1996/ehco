@@ -14,8 +14,8 @@ import (
 )
 
 type Raw struct {
-	TCPNodes       *lb.LBNodes
-	UDPNodes       *lb.LBNodes
+	TCPRemotes     lb.RoundRobin
+	UDPRemotes     lb.RoundRobin
 	UDPBufferChMap map[string]*BufferCh
 }
 
@@ -35,10 +35,9 @@ func (raw *Raw) HandleUDPConn(uaddr *net.UDPAddr, local *net.UDPConn) {
 	defer web.CurUDPNum.Dec()
 
 	bc := raw.GetOrCreateBufferCh(uaddr)
-	node := raw.UDPNodes.PickMin()
-	defer raw.UDPNodes.DeferPick(node)
+	remote := raw.UDPRemotes.Next()
 
-	rc, err := net.Dial("udp", node.Remote)
+	rc, err := net.Dial("udp", remote)
 	if err != nil {
 		logger.Info(err)
 		return
@@ -48,7 +47,7 @@ func (raw *Raw) HandleUDPConn(uaddr *net.UDPAddr, local *net.UDPConn) {
 		delete(raw.UDPBufferChMap, uaddr.String())
 	}()
 
-	logger.Infof("[raw] HandleUDPConn from %s to %s", local.LocalAddr().String(), node.Remote)
+	logger.Infof("[raw] HandleUDPConn from %s to %s", local.LocalAddr().String(), remote)
 
 	var wg sync.WaitGroup
 	wg.Add(1)
@@ -93,14 +92,13 @@ func (raw *Raw) HandleTCPConn(c *net.TCPConn) error {
 	defer c.Close()
 	web.CurTCPNum.Inc()
 	defer web.CurTCPNum.Dec()
-	node := raw.TCPNodes.PickMin()
-	defer raw.TCPNodes.DeferPick(node)
+	remote := raw.TCPRemotes.Next()
 
-	rc, err := net.Dial("tcp", node.Remote)
+	rc, err := net.Dial("tcp", remote)
 	if err != nil {
 		return err
 	}
-	logger.Infof("[raw] HandleTCPConn from %s to %s", c.LocalAddr().String(), node.Remote)
+	logger.Infof("[raw] HandleTCPConn from %s to %s", c.LocalAddr().String(), remote)
 	defer rc.Close()
 
 	return transport(c, rc)
@@ -114,10 +112,9 @@ func (raw *Raw) HandleWsRequset(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	defer wsc.Close()
-	node := raw.TCPNodes.PickMin()
-	defer raw.TCPNodes.DeferPick(node)
+	remote := raw.TCPRemotes.Next()
 
-	rc, err := net.Dial("tcp", node.Remote)
+	rc, err := net.Dial("tcp", remote)
 	if err != nil {
 		logger.Infof("dial error: %s", err)
 		return
@@ -138,10 +135,9 @@ func (raw *Raw) HandleWssRequset(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	defer wsc.Close()
-	node := raw.TCPNodes.PickMin()
-	defer raw.TCPNodes.DeferPick(node)
+	remote := raw.TCPRemotes.Next()
 
-	rc, err := net.Dial("tcp", node.Remote)
+	rc, err := net.Dial("tcp", remote)
 	if err != nil {
 		logger.Infof("dial error: %s", err)
 		return
@@ -158,10 +154,9 @@ func (raw *Raw) HandleMWssRequset(c net.Conn) {
 	web.CurTCPNum.Inc()
 	defer web.CurTCPNum.Dec()
 	defer c.Close()
-	node := raw.TCPNodes.PickMin()
-	defer raw.TCPNodes.DeferPick(node)
+	remote := raw.TCPRemotes.Next()
 
-	rc, err := net.Dial("tcp", node.Remote)
+	rc, err := net.Dial("tcp", remote)
 	if err != nil {
 		logger.Infof("dial error: %s", err)
 		return
