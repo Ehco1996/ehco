@@ -46,6 +46,7 @@ func copyBuffer(dst io.Writer, src io.Reader, bufferPool *sync.Pool) (written in
 	}
 	for {
 		nr, er := src.Read(buf)
+		web.NetWorkTransmitBytes.Add(float64(nr * 2))
 		if nr > 0 {
 			nw, ew := dst.Write(buf[0:nr])
 			if nw > 0 {
@@ -67,7 +68,6 @@ func copyBuffer(dst io.Writer, src io.Reader, bufferPool *sync.Pool) (written in
 			break
 		}
 	}
-	web.NetWorkTransmitBytes.Add(float64(written * 2))
 	return
 }
 
