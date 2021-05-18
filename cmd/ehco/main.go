@@ -90,7 +90,7 @@ func main() {
 			Name:        "web_port",
 			Usage:       "web监听端口",
 			EnvVars:     []string{"EHCO_WEB_PORT"},
-			Value:       "9000",
+			Value:       "",
 			Destination: &WebfPort,
 		},
 		&cli.StringFlag{

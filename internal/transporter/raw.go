@@ -14,13 +14,15 @@ import (
 )
 
 type Raw struct {
+	udpmu          sync.Mutex
 	TCPRemotes     lb.RoundRobin
 	UDPRemotes     lb.RoundRobin
 	UDPBufferChMap map[string]*BufferCh
 }
 
-// NOTE not thread safe
 func (raw *Raw) GetOrCreateBufferCh(uaddr *net.UDPAddr) *BufferCh {
+	raw.udpmu.Lock()
+	defer raw.udpmu.Unlock()
 	bc, found := raw.UDPBufferChMap[uaddr.String()]
 	if !found {
 		bc := newudpBufferCh()
@@ -35,6 +37,7 @@ func (raw *Raw) HandleUDPConn(uaddr *net.UDPAddr, local *net.UDPConn) {
 	defer web.CurUDPNum.Dec()
 
 	bc := raw.GetOrCreateBufferCh(uaddr)
+	defer close(bc.Ch)
 	remote := raw.UDPRemotes.Next()
 
 	rc, err := net.Dial("udp", remote)
@@ -71,7 +74,6 @@ func (raw *Raw) HandleUDPConn(uaddr *net.UDPAddr, local *net.UDPConn) {
 		web.NetWorkTransmitBytes.Add(float64(wt * 2))
 		OutboundBufferPool.Put(buf)
 		wg.Done()
-		close(bc.Ch)
 	}()
 
 	wt := 0
@@ -80,7 +82,6 @@ func (raw *Raw) HandleUDPConn(uaddr *net.UDPAddr, local *net.UDPConn) {
 		rc.SetReadDeadline(time.Now().Add(constant.MaxConKeepAlive))
 		if _, err := rc.Write(b); err != nil {
 			logger.Info(err)
-			close(bc.Ch)
 			break
 		}
 	}
