@@ -18,6 +18,10 @@ ehco is a network relay tool and a typo :)
 
 ## 安装
 
+### brew
+
+`brew install ehco`
+
 ### go get
 
 ``` bash
