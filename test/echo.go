@@ -10,6 +10,8 @@ import (
 	"time"
 )
 
+//TODO support random timeouts
+
 func echo(conn net.Conn) {
 	defer conn.Close()
 	defer fmt.Println("conn closed", conn.RemoteAddr().String())

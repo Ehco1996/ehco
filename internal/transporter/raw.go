@@ -4,6 +4,7 @@ import (
 	"net"
 	"net/http"
 	"sync"
+	"time"
 
 	"github.com/Ehco1996/ehco/internal/lb"
 	"github.com/Ehco1996/ehco/internal/logger"
@@ -50,18 +51,28 @@ func (raw *Raw) HandleUDPConn(uaddr *net.UDPAddr, local *net.UDPConn) {
 
 	logger.Infof("[raw] HandleUDPConn from %s to %s", local.LocalAddr().String(), remote)
 
-	var wg sync.WaitGroup
-	wg.Add(1)
-
 	buf := BufferPool.Get()
 	defer BufferPool.Put(buf)
+
+	var wg sync.WaitGroup
+	wg.Add(1)
 	go func() {
+		defer wg.Done()
 		wt := 0
 		for {
+			if serr := rc.SetDeadline(time.Now().Add(time.Second * 3)); serr != nil {
+				logger.Info(err)
+				break
+			}
 			i, err := rc.Read(buf)
 			if err != nil {
 				logger.Info(err)
 				break
+			} else {
+				if serr := rc.SetDeadline(time.Now().Add(time.Second * 3)); serr != nil {
+					logger.Info(err)
+					break
+				}
 			}
 
 			if _, err := local.WriteToUDP(buf[0:i], uaddr); err != nil {
@@ -71,18 +82,22 @@ func (raw *Raw) HandleUDPConn(uaddr *net.UDPAddr, local *net.UDPConn) {
 			wt += i
 		}
 		web.NetWorkTransmitBytes.Add(float64(wt * 2))
-		wg.Done()
 	}()
 
-	wt := 0
-	for b := range bc.Ch {
-		wt += len(b)
-		if _, err := rc.Write(b); err != nil {
-			logger.Info(err)
-			break
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		wt := 0
+		for b := range bc.Ch {
+			wt += len(b)
+			if _, err := rc.Write(b); err != nil {
+				logger.Info(err)
+				break
+			}
 		}
-	}
-	web.NetWorkTransmitBytes.Add(float64(wt * 2))
+		web.NetWorkTransmitBytes.Add(float64(wt * 2))
+	}()
+
 	wg.Wait()
 }
 
