@@ -32,12 +32,12 @@ jobs:
         run: go test ./test
 
       - name: Build
-        run: go build -v -a -installsuffix cgo -o ehco cmd/ehco/main.go
+        run: make build
 
       - uses: actions/upload-artifact@master
         with:
           name: my-artifact
-          path: ehco
+          path: .dist/ehco
 
   build-image:
     runs-on: ubuntu-latest
