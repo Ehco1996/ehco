@@ -1,11 +1,9 @@
 package transporter
 
 import (
-	"context"
 	"errors"
 	"io"
 	"net"
-	"sync"
 	"syscall"
 
 	"github.com/Ehco1996/ehco/internal/constant"
@@ -13,89 +11,69 @@ import (
 )
 
 // 全局pool
-var InboundBufferPool, OutboundBufferPool *sync.Pool
+var BufferPool *BytePool
 
 func init() {
-	InboundBufferPool = NewBufferPool(constant.BUFFER_SIZE)
-	OutboundBufferPool = NewBufferPool(constant.BUFFER_SIZE)
+	BufferPool = NewBytePool(constant.BUFFER_POOL_SIZE, constant.BUFFER_SIZE)
 }
 
-func NewBufferPool(size int) *sync.Pool {
-	return &sync.Pool{New: func() interface{} {
-		return make([]byte, size)
-	}}
+// BytePool implements a leaky pool of []byte in the form of a bounded channel
+type BytePool struct {
+	c    chan []byte
+	size int
 }
 
-// NOTE adapeted from io.CopyBuffer
-func copyBuffer(dst io.Writer, src io.Reader, bufferPool *sync.Pool) (written int64, err error) {
-	buf := bufferPool.Get().([]byte)
-	defer bufferPool.Put(buf)
+// NewBytePool creates a new BytePool bounded to the given maxSize, with new
+// byte arrays sized based on width.
+func NewBytePool(maxSize int, size int) (bp *BytePool) {
+	return &BytePool{
+		c:    make(chan []byte, maxSize),
+		size: size,
+	}
+}
 
-	// If the reader has a WriteTo method, use it to do the copy.
-	// Avoids an allocation and a copy.
-	if wt, ok := src.(io.WriterTo); ok {
-		written, err = wt.WriteTo(dst)
-		web.NetWorkTransmitBytes.Add(float64(written))
-		return
-	}
-	// Similarly, if the writer has a ReadFrom method, use it to do the copy.
-	if rt, ok := dst.(io.ReaderFrom); ok {
-		written, err = rt.ReadFrom(src)
-		web.NetWorkTransmitBytes.Add(float64(written))
-		return
-	}
-	for {
-		nr, er := src.Read(buf)
-		web.NetWorkTransmitBytes.Add(float64(nr * 2))
-		if nr > 0 {
-			nw, ew := dst.Write(buf[0:nr])
-			if nw > 0 {
-				written += int64(nw)
-			}
-			if ew != nil {
-				err = ew
-				break
-			}
-			if nr != nw {
-				err = io.ErrShortWrite
-				break
-			}
-		}
-		if er != nil {
-			if er != io.EOF {
-				err = er
-			}
-			break
-		}
+// Get gets a []byte from the BytePool, or creates a new one if none are
+// available in the pool.
+func (bp *BytePool) Get() (b []byte) {
+	select {
+	case b = <-bp.c:
+	// reuse existing buffer
+	default:
+		// create new buffer
+		b = make([]byte, bp.size)
 	}
 	return
 }
 
-// NOTE must call setdeadline before use this func or may goroutine  leak
+// Put returns the given Buffer to the BytePool.
+func (bp *BytePool) Put(b []byte) {
+	select {
+	case bp.c <- b:
+		// buffer went back into pool
+	default:
+		// buffer didn't go back into pool, just discard
+	}
+}
+
 func transport(rw1, rw2 io.ReadWriter) error {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	errc := make(chan error, 2)
 
-	errc := make(chan error, 1)
 	go func() {
-		select {
-		case <-ctx.Done():
-			println("ctx done exits copy1")
-		default:
-			_, err := copyBuffer(rw1, rw2, InboundBufferPool)
-			errc <- err
-		}
+		buf := BufferPool.Get()
+		defer BufferPool.Put(buf)
+		written, err := io.CopyBuffer(rw1, rw2, buf)
+		web.NetWorkTransmitBytes.Add(float64(written * 2))
+		errc <- err
 	}()
 
 	go func() {
-		select {
-		case <-ctx.Done():
-			println("ctx done exit copy1")
-		default:
-			_, err := copyBuffer(rw2, rw1, InboundBufferPool)
-			errc <- err
-		}
+		buf := BufferPool.Get()
+		defer BufferPool.Put(buf)
+		written, err := io.CopyBuffer(rw2, rw1, buf)
+		web.NetWorkTransmitBytes.Add(float64(written * 2))
+		errc <- err
 	}()
+
 	err := <-errc
 	// NOTE 我们不关心operror 比如 eof/reset/broken pipe
 	if err != nil {

@@ -32,6 +32,10 @@ go get -u "github.com/Ehco1996/ehco/cmd/ehco"
 
 > ehco的可执行文件可以从项目的[release](https://github.com/Ehco1996/ehco/releases)页面下载
 
+### docker image
+
+`docker pull ehco1996/ehco`
+
 ## 主要功能
 
 * tcp/udp relay

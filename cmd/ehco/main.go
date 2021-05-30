@@ -110,9 +110,12 @@ func main() {
 
 				if _, err := os.Stat(SystemFilePath); err != nil && os.IsNotExist(err) {
 					f, _ := os.OpenFile(SystemFilePath, os.O_CREATE|os.O_WRONLY, 0644)
-					f.WriteString(SystemDTMPL)
+					if _, err := f.WriteString(SystemDTMPL); err != nil {
+						logger.Fatal(err)
+					}
 					f.Close()
 				}
+
 				command := exec.Command("vi", SystemFilePath)
 				command.Stdin = os.Stdin
 				command.Stdout = os.Stdout

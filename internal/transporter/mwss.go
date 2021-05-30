@@ -8,7 +8,7 @@ import (
 )
 
 type Mwss struct {
-	raw Raw
+	raw *Raw
 	mtp *mwssTransporter
 }
 

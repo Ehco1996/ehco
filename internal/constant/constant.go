@@ -7,7 +7,6 @@ const (
 
 	MaxMWSSStreamCnt = 10
 	DialTimeOut      = 3 * time.Second
-	MaxConKeepAlive  = 3 * time.Second
 
 	Listen_RAW  = "raw"
 	Listen_WS   = "ws"
@@ -19,7 +18,8 @@ const (
 	Transport_WSS  = "wss"
 	Transport_MWSS = "mwss"
 
-	BUFFER_SIZE = 4 * 1024 // 4kb
+	BUFFER_POOL_SIZE = 128      // 128 * 4kb
+	BUFFER_SIZE      = 4 * 1024 // 4kb
 
 	IndexHTMLTMPL = `<!doctype html>
 <html>

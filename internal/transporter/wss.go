@@ -11,7 +11,7 @@ import (
 )
 
 type Wss struct {
-	raw Raw
+	raw *Raw
 }
 
 func (s *Wss) GetOrCreateBufferCh(uaddr *net.UDPAddr) *BufferCh {

@@ -4,9 +4,7 @@ import (
 	"net"
 	"net/http"
 	"sync"
-	"time"
 
-	"github.com/Ehco1996/ehco/internal/constant"
 	"github.com/Ehco1996/ehco/internal/lb"
 	"github.com/Ehco1996/ehco/internal/logger"
 	"github.com/Ehco1996/ehco/internal/web"
@@ -55,8 +53,9 @@ func (raw *Raw) HandleUDPConn(uaddr *net.UDPAddr, local *net.UDPConn) {
 	var wg sync.WaitGroup
 	wg.Add(1)
 
+	buf := BufferPool.Get()
+	defer BufferPool.Put(buf)
 	go func() {
-		buf := OutboundBufferPool.Get().([]byte)
 		wt := 0
 		for {
 			i, err := rc.Read(buf)
@@ -64,7 +63,7 @@ func (raw *Raw) HandleUDPConn(uaddr *net.UDPAddr, local *net.UDPConn) {
 				logger.Info(err)
 				break
 			}
-			rc.SetReadDeadline(time.Now().Add(constant.MaxConKeepAlive))
+
 			if _, err := local.WriteToUDP(buf[0:i], uaddr); err != nil {
 				logger.Info(err)
 				break
@@ -72,14 +71,12 @@ func (raw *Raw) HandleUDPConn(uaddr *net.UDPAddr, local *net.UDPConn) {
 			wt += i
 		}
 		web.NetWorkTransmitBytes.Add(float64(wt * 2))
-		OutboundBufferPool.Put(buf)
 		wg.Done()
 	}()
 
 	wt := 0
 	for b := range bc.Ch {
 		wt += len(b)
-		rc.SetReadDeadline(time.Now().Add(constant.MaxConKeepAlive))
 		if _, err := rc.Write(b); err != nil {
 			logger.Info(err)
 			break

@@ -120,8 +120,8 @@ func (r *Relay) RunLocalUDPServer() error {
 	}
 	defer lis.Close()
 
-	buf := transporter.InboundBufferPool.Get().([]byte)
-	defer transporter.InboundBufferPool.Put(buf)
+	buf := transporter.BufferPool.Get()
+	defer transporter.BufferPool.Put(buf)
 	for {
 		n, addr, err := lis.ReadFromUDP(buf)
 		if err != nil {
