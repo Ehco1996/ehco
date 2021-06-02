@@ -1,6 +1,7 @@
 package transporter
 
 import (
+	"context"
 	"net"
 	"net/http"
 	"sync"
@@ -22,9 +23,10 @@ type Raw struct {
 func (raw *Raw) GetOrCreateBufferCh(uaddr *net.UDPAddr) *BufferCh {
 	raw.udpmu.Lock()
 	defer raw.udpmu.Unlock()
+
 	bc, found := raw.UDPBufferChMap[uaddr.String()]
 	if !found {
-		bc := newudpBufferCh()
+		bc := newudpBufferCh(uaddr)
 		raw.UDPBufferChMap[uaddr.String()] = bc
 		return bc
 	}
@@ -36,10 +38,9 @@ func (raw *Raw) HandleUDPConn(uaddr *net.UDPAddr, local *net.UDPConn) {
 	defer web.CurUDPNum.Dec()
 
 	bc := raw.GetOrCreateBufferCh(uaddr)
-	defer close(bc.Ch)
-	remote := raw.UDPRemotes.Next()
 
-	rc, err := net.Dial("udp", remote)
+	remoteUdp, _ := net.ResolveUDPAddr("udp", raw.UDPRemotes.Next())
+	rc, err := net.DialUDP("udp", nil, remoteUdp)
 	if err != nil {
 		logger.Info(err)
 		return
@@ -49,32 +50,26 @@ func (raw *Raw) HandleUDPConn(uaddr *net.UDPAddr, local *net.UDPConn) {
 		delete(raw.UDPBufferChMap, uaddr.String())
 	}()
 
-	logger.Infof("[raw] HandleUDPConn from %s to %s", local.LocalAddr().String(), remote)
+	logger.Infof("[raw] HandleUDPConn from %s to %s", local.LocalAddr().String(), remoteUdp.String())
 
 	buf := BufferPool.Get()
 	defer BufferPool.Put(buf)
 
 	var wg sync.WaitGroup
 	wg.Add(1)
+	ctx, cancel := context.WithCancel(context.Background())
+
 	go func() {
 		defer wg.Done()
+		defer cancel()
 		wt := 0
 		for {
-			if serr := rc.SetDeadline(time.Now().Add(time.Second * 3)); serr != nil {
-				logger.Info(err)
-				break
-			}
+			rc.SetReadDeadline(time.Now().Add(time.Second * 15))
 			i, err := rc.Read(buf)
 			if err != nil {
 				logger.Info(err)
 				break
-			} else {
-				if serr := rc.SetDeadline(time.Now().Add(time.Second * 3)); serr != nil {
-					logger.Info(err)
-					break
-				}
 			}
-
 			if _, err := local.WriteToUDP(buf[0:i], uaddr); err != nil {
 				logger.Info(err)
 				break
@@ -88,11 +83,14 @@ func (raw *Raw) HandleUDPConn(uaddr *net.UDPAddr, local *net.UDPConn) {
 	go func() {
 		defer wg.Done()
 		wt := 0
-		for b := range bc.Ch {
+		select {
+		case <-ctx.Done():
+			return
+		case b := <-bc.Ch:
 			wt += len(b)
 			if _, err := rc.Write(b); err != nil {
 				logger.Info(err)
-				break
+				return
 			}
 		}
 		web.NetWorkTransmitBytes.Add(float64(wt * 2))

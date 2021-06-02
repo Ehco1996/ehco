@@ -129,9 +129,9 @@ func (r *Relay) RunLocalUDPServer() error {
 		}
 		bc := r.TP.GetOrCreateBufferCh(addr)
 		bc.Ch <- buf[0:n]
-		if !bc.Handled {
-			bc.Handled = true
-			go r.TP.HandleUDPConn(addr, lis)
+		if !bc.Handled.Load() {
+			bc.Handled.Store(true)
+			go r.TP.HandleUDPConn(bc.UDPAddr, lis)
 		}
 	}
 }

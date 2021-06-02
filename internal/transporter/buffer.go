@@ -6,6 +6,8 @@ import (
 	"net"
 	"syscall"
 
+	"go.uber.org/atomic"
+
 	"github.com/Ehco1996/ehco/internal/constant"
 	"github.com/Ehco1996/ehco/internal/web"
 )
@@ -89,12 +91,14 @@ func transport(rw1, rw2 io.ReadWriter) error {
 
 type BufferCh struct {
 	Ch      chan []byte
-	Handled bool
+	Handled atomic.Bool
+	UDPAddr *net.UDPAddr
 }
 
-func newudpBufferCh() *BufferCh {
+func newudpBufferCh(clientUDPAddr *net.UDPAddr) *BufferCh {
 	return &BufferCh{
 		Ch:      make(chan []byte, 100),
-		Handled: false,
+		Handled: atomic.Bool{},
+		UDPAddr: clientUDPAddr,
 	}
 }
