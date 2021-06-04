@@ -21,8 +21,9 @@ var RemoteAddr string
 var UDPRemoteAddr string
 var TransportType string
 var ConfigPath string
-var WebfPort string
+var WebfPort int
 var WebToken string
+var EnablePing bool
 var SystemFilePath = "/etc/systemd/system/ehco.service"
 
 const SystemDTMPL = `# Ehco service
@@ -86,12 +87,19 @@ func main() {
 			Usage:       "配置文件地址",
 			Destination: &ConfigPath,
 		},
-		&cli.StringFlag{
+		&cli.IntFlag{
 			Name:        "web_port",
-			Usage:       "web监听端口",
+			Usage:       "promtheus web expoter 的监听端口",
 			EnvVars:     []string{"EHCO_WEB_PORT"},
-			Value:       "",
+			Value:       0,
 			Destination: &WebfPort,
+		},
+		&cli.BoolFlag{
+			Name:        "enable_ping",
+			Usage:       "是否打开 ping metrics",
+			EnvVars:     []string{"EHCO_ENABLE_PING"},
+			Value:       true,
+			Destination: &EnablePing,
 		},
 		&cli.StringFlag{
 			Name:        "web_token",
@@ -143,7 +151,10 @@ func start(ctx *cli.Context) error {
 		}
 	} else {
 		cfg = &config.Config{
-			PATH: ConfigPath,
+			WebPort:    WebfPort,
+			WebToken:   WebToken,
+			EnablePing: EnablePing,
+			PATH:       ConfigPath,
 			Configs: []config.RelayConfig{
 				{
 					Listen:        LocalAddr,
@@ -154,10 +165,6 @@ func start(ctx *cli.Context) error {
 				},
 			},
 		}
-	}
-
-	if WebfPort != "" {
-		go web.StartWebServer(WebfPort, WebToken, cfg)
 	}
 
 	initTls := false
@@ -171,6 +178,7 @@ func start(ctx *cli.Context) error {
 		}
 		go serveRelay(cfg, ch)
 	}
+	go web.StartWebServer(cfg)
 	return <-ch
 }
 

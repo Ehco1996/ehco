@@ -20,11 +20,11 @@ ehco is a network relay tool and a typo :)
 
 ### brew
 
-`brew install ehco`
+ `brew install ehco`
 
 ### go get
 
-``` bash
+```bash
 go get -u "github.com/Ehco1996/ehco/cmd/ehco"
 ```
 
@@ -34,7 +34,7 @@ go get -u "github.com/Ehco1996/ehco/cmd/ehco"
 
 ### docker image
 
-`docker pull ehco1996/ehco`
+ `docker pull ehco1996/ehco`
 
 ## 主要功能
 
@@ -77,8 +77,11 @@ go get -u "github.com/Ehco1996/ehco/cmd/ehco"
 
 配置文件格式要求如下(更多例子可以参考项目里的 `config.json` 文件):
 
-``` json
+```json
 {
+    "web_port": 9000, // prometheus 的 web 监听端口
+    "web_token": "", // 鉴权 token
+    "enable_ping": false, // 是否开启 ping metrics
     "relay_configs": [
         {
             "listen": "127.0.0.1:1234", // 监听端口
@@ -99,7 +102,7 @@ go get -u "github.com/Ehco1996/ehco/cmd/ehco"
 
 iperf:
 
-``` sh
+```sh
 # run iperf server on 5201
 iperf3 -s
 

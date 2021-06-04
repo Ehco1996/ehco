@@ -11,6 +11,6 @@ require (
 	github.com/prometheus/client_golang v1.9.0
 	github.com/urfave/cli/v2 v2.3.0
 	github.com/xtaci/smux v1.5.15
-	go.uber.org/atomic v1.7.0 // indirect
+	go.uber.org/atomic v1.7.0
 	go.uber.org/zap v1.16.0
 )

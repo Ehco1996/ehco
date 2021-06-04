@@ -44,10 +44,12 @@ func registerMetrics(cfg *config.Config) {
 	prometheus.MustRegister(NetWorkTransmitBytes)
 
 	//ping
-	pg := NewPingGroup(cfg)
-	prometheus.MustRegister(PingResponseDurationSeconds)
-	prometheus.MustRegister(pg)
-	go pg.Run()
+	if cfg.EnablePing {
+		pg := NewPingGroup(cfg)
+		prometheus.MustRegister(PingResponseDurationSeconds)
+		prometheus.MustRegister(pg)
+		go pg.Run()
+	}
 }
 
 func simpleTokenAuthMiddleware(token string, h http.Handler) http.Handler {
@@ -68,17 +70,20 @@ func simpleTokenAuthMiddleware(token string, h http.Handler) http.Handler {
 	})
 }
 
-func StartWebServer(port, token string, cfg *config.Config) {
-	time.Sleep(time.Second)
-	addr := "0.0.0.0:" + port
+func StartWebServer(cfg *config.Config) {
+	if cfg.WebPort <= 0 {
+		return
+	}
+	time.Sleep(time.Second) // wait main relay thread up
+	addr := fmt.Sprintf("0.0.0.0:%d", cfg.WebPort)
 	logger.Infof("[web] Start Web Server at http://%s/", addr)
 	r := mux.NewRouter()
 	AttachProfiler(r)
 	registerMetrics(cfg)
 	r.Handle("/", http.HandlerFunc(Welcome))
 	r.Handle("/metrics/", promhttp.Handler())
-	if token != "" {
-		logger.Fatal(http.ListenAndServe(addr, simpleTokenAuthMiddleware(token, r)))
+	if cfg.WebToken != "" {
+		logger.Fatal(http.ListenAndServe(addr, simpleTokenAuthMiddleware(cfg.WebToken, r)))
 	} else {
 		logger.Fatal(http.ListenAndServe(addr, r))
 	}

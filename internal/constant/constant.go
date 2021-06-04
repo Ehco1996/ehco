@@ -5,7 +5,7 @@ import "time"
 const (
 	Version = "1.0.6"
 
-	MaxMWSSStreamCnt = 10
+	MaxMWSSStreamCnt = 100
 	DialTimeOut      = 3 * time.Second
 
 	Listen_RAW  = "raw"

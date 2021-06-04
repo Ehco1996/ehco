@@ -150,8 +150,9 @@ func TestRelayOverWss(t *testing.T) {
 func TestRelayOverMwss(t *testing.T) {
 	msg := []byte("hello")
 	var wg sync.WaitGroup
-	wg.Add(constant.MaxMWSSStreamCnt * 2)
-	for i := 0; i < constant.MaxMWSSStreamCnt*2; i++ {
+	testCnt := 50
+	wg.Add(testCnt)
+	for i := 0; i < testCnt; i++ {
 		go func(i int) {
 			t.Logf("run no: %d test.", i)
 			res := SendTcpMsg(msg, MWSS_LISTEN)

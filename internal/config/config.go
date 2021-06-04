@@ -20,10 +20,18 @@ type RelayConfig struct {
 }
 
 type JsonConfig struct {
+	WebPort    int    `json:"web_port,omitempty"`
+	WebToken   string `json:"web_token,omitempty"`
+	EnablePing bool   `json:"enable_ping,omitempty"`
+
 	Configs []RelayConfig `json:"relay_configs"`
 }
 type Config struct {
-	PATH    string
+	PATH       string
+	WebPort    int
+	WebToken   string
+	EnablePing bool
+
 	Configs []RelayConfig
 }
 
@@ -52,6 +60,9 @@ func (c *Config) readFromFile() error {
 		return err
 	}
 	c.Configs = jsonConfig.Configs
+	c.EnablePing = jsonConfig.EnablePing
+	c.WebPort = jsonConfig.WebPort
+	c.WebToken = jsonConfig.WebToken
 	logger.Info("[cfg] Load Config From file:", c.PATH)
 	return nil
 }

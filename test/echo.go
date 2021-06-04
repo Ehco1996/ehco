@@ -19,18 +19,14 @@ func echo(conn net.Conn) {
 	for {
 		buf := make([]byte, 512)
 		i, err := conn.Read(buf)
-		log.Printf("recv echo msg: %s", string(buf))
 		if err == io.EOF {
-			log.Print("in eof")
 			return
 		}
 		if err != nil {
 			fmt.Println(err)
 			continue
 		}
-
 		_, err = conn.Write(buf[:i])
-		log.Printf("send echo msg: %s err: %s", string(buf), err)
 		if err != nil {
 			continue
 		}
@@ -111,7 +107,6 @@ func SendTcpMsg(msg []byte, address string) []byte {
 	buf := make([]byte, len(msg))
 	time.Sleep(time.Second * 1)
 	n, _ := conn.Read(buf)
-	log.Printf("msg: %s", string(buf))
 	return buf[:n]
 }
 
@@ -127,6 +122,5 @@ func SendUdpMsg(msg []byte, address string) []byte {
 	buf := make([]byte, len(msg))
 	time.Sleep(time.Second * 1)
 	n, _ := conn.Read(buf)
-	log.Printf("msg: %s", string(buf))
 	return buf[:n]
 }
