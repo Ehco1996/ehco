@@ -23,15 +23,15 @@ func (s *Ws) HandleUDPConn(uaddr *net.UDPAddr, local *net.UDPConn) {
 
 func (s *Ws) HandleTCPConn(c *net.TCPConn) error {
 	defer c.Close()
-	web.CurTCPNum.Inc()
-	defer web.CurTCPNum.Dec()
-
 	remote := s.raw.TCPRemotes.Next()
+	web.CurTCPNum.WithLabelValues(remote).Inc()
+	defer web.CurTCPNum.WithLabelValues(remote).Dec()
+
 	wsc, _, _, err := ws.Dial(context.TODO(), remote+"/ws/")
 	if err != nil {
 		return err
 	}
 	defer wsc.Close()
 	logger.Infof("[ws] HandleTCPConn from %s to %s", c.LocalAddr().String(), remote)
-	return transport(c, wsc)
+	return transport(c, wsc, remote)
 }

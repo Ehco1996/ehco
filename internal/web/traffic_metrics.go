@@ -8,28 +8,32 @@ import (
 
 var (
 	Hostname, _ = os.Hostname()
+
 	ConstLabels = map[string]string{
 		"hostname": Hostname,
 	}
 
-	CurTCPNum = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace:   "traffic",
-		Help:        "当前tcp链接数",
+	CurTCPNum = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace:   METRIC_NS,
+		Subsystem:   METRIC_SUBSYSTEM_TRAFFIC,
 		Name:        "current_tcp_num",
+		Help:        "当前tcp链接数",
 		ConstLabels: ConstLabels,
-	})
+	}, []string{METRIC_LABEL_REMOTE})
 
-	CurUDPNum = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace:   "traffic",
+	CurUDPNum = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace:   METRIC_NS,
+		Subsystem:   METRIC_SUBSYSTEM_TRAFFIC,
 		Help:        "当前udp链接数",
 		Name:        "current_udp_num",
 		ConstLabels: ConstLabels,
-	})
+	}, []string{METRIC_LABEL_REMOTE})
 
-	NetWorkTransmitBytes = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace:   "traffic",
+	NetWorkTransmitBytes = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Namespace:   METRIC_NS,
+		Subsystem:   METRIC_SUBSYSTEM_TRAFFIC,
 		Name:        "network_transmit_bytes",
 		Help:        "传输流量总量bytes",
 		ConstLabels: ConstLabels,
-	})
+	}, []string{METRIC_LABEL_REMOTE})
 )

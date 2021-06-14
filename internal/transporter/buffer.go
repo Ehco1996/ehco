@@ -57,22 +57,22 @@ func (bp *BytePool) Put(b []byte) {
 	}
 }
 
-func transport(rw1, rw2 io.ReadWriter) error {
+func transport(rw1, rw2 io.ReadWriter, remote string) error {
 	errc := make(chan error, 2)
 
 	go func() {
 		buf := BufferPool.Get()
 		defer BufferPool.Put(buf)
-		written, err := io.CopyBuffer(rw1, rw2, buf)
-		web.NetWorkTransmitBytes.Add(float64(written * 2))
+		wt, err := io.CopyBuffer(rw1, rw2, buf)
+		web.NetWorkTransmitBytes.WithLabelValues(remote).Add(float64(wt * 2))
 		errc <- err
 	}()
 
 	go func() {
 		buf := BufferPool.Get()
 		defer BufferPool.Put(buf)
-		written, err := io.CopyBuffer(rw2, rw1, buf)
-		web.NetWorkTransmitBytes.Add(float64(written * 2))
+		wt, err := io.CopyBuffer(rw2, rw1, buf)
+		web.NetWorkTransmitBytes.WithLabelValues(remote).Add(float64(wt * 2))
 		errc <- err
 	}()
 

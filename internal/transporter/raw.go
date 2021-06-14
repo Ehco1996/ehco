@@ -34,12 +34,12 @@ func (raw *Raw) GetOrCreateBufferCh(uaddr *net.UDPAddr) *BufferCh {
 }
 
 func (raw *Raw) HandleUDPConn(uaddr *net.UDPAddr, local *net.UDPConn) {
-	web.CurUDPNum.Inc()
-	defer web.CurUDPNum.Dec()
+	remote := raw.UDPRemotes.Next()
+	web.CurUDPNum.WithLabelValues(remote).Inc()
+	defer web.CurUDPNum.WithLabelValues(remote).Dec()
 
 	bc := raw.GetOrCreateBufferCh(uaddr)
-
-	remoteUdp, _ := net.ResolveUDPAddr("udp", raw.UDPRemotes.Next())
+	remoteUdp, _ := net.ResolveUDPAddr("udp", remote)
 	rc, err := net.DialUDP("udp", nil, remoteUdp)
 	if err != nil {
 		logger.Info(err)
@@ -76,7 +76,7 @@ func (raw *Raw) HandleUDPConn(uaddr *net.UDPAddr, local *net.UDPConn) {
 			}
 			wt += i
 		}
-		web.NetWorkTransmitBytes.Add(float64(wt * 2))
+		web.NetWorkTransmitBytes.WithLabelValues(remote).Add(float64(wt * 2))
 	}()
 
 	wg.Add(1)
@@ -93,7 +93,7 @@ func (raw *Raw) HandleUDPConn(uaddr *net.UDPAddr, local *net.UDPConn) {
 				return
 			}
 		}
-		web.NetWorkTransmitBytes.Add(float64(wt * 2))
+		web.NetWorkTransmitBytes.WithLabelValues(remote).Add(float64(wt * 2))
 	}()
 
 	wg.Wait()
@@ -101,9 +101,9 @@ func (raw *Raw) HandleUDPConn(uaddr *net.UDPAddr, local *net.UDPConn) {
 
 func (raw *Raw) HandleTCPConn(c *net.TCPConn) error {
 	defer c.Close()
-	web.CurTCPNum.Inc()
-	defer web.CurTCPNum.Dec()
 	remote := raw.TCPRemotes.Next()
+	web.CurTCPNum.WithLabelValues(remote).Inc()
+	defer web.CurTCPNum.WithLabelValues(remote).Dec()
 
 	rc, err := net.Dial("tcp", remote)
 	if err != nil {
@@ -112,18 +112,18 @@ func (raw *Raw) HandleTCPConn(c *net.TCPConn) error {
 	logger.Infof("[raw] HandleTCPConn from %s to %s", c.LocalAddr().String(), remote)
 	defer rc.Close()
 
-	return transport(c, rc)
+	return transport(c, rc, remote)
 }
 
 func (raw *Raw) HandleWsRequset(w http.ResponseWriter, req *http.Request) {
-	web.CurTCPNum.Inc()
-	defer web.CurTCPNum.Dec()
 	wsc, _, _, err := ws.UpgradeHTTP(req, w)
 	if err != nil {
 		return
 	}
 	defer wsc.Close()
 	remote := raw.TCPRemotes.Next()
+	web.CurTCPNum.WithLabelValues(remote).Inc()
+	defer web.CurTCPNum.WithLabelValues(remote).Dec()
 
 	rc, err := net.Dial("tcp", remote)
 	if err != nil {
@@ -133,20 +133,20 @@ func (raw *Raw) HandleWsRequset(w http.ResponseWriter, req *http.Request) {
 	defer rc.Close()
 
 	logger.Infof("[tun] HandleWsRequset from:%s to:%s", wsc.RemoteAddr(), rc.RemoteAddr())
-	if err := transport(rc, wsc); err != nil {
+	if err := transport(rc, wsc, remote); err != nil {
 		logger.Infof("[tun] HandleWsRequset err: %s", err.Error())
 	}
 }
 
 func (raw *Raw) HandleWssRequset(w http.ResponseWriter, req *http.Request) {
-	web.CurTCPNum.Inc()
-	defer web.CurTCPNum.Dec()
 	wsc, _, _, err := ws.UpgradeHTTP(req, w)
 	if err != nil {
 		return
 	}
 	defer wsc.Close()
 	remote := raw.TCPRemotes.Next()
+	web.CurTCPNum.WithLabelValues(remote).Inc()
+	defer web.CurTCPNum.WithLabelValues(remote).Dec()
 
 	rc, err := net.Dial("tcp", remote)
 	if err != nil {
@@ -156,16 +156,16 @@ func (raw *Raw) HandleWssRequset(w http.ResponseWriter, req *http.Request) {
 	defer rc.Close()
 
 	logger.Infof("[tun] HandleWssRequset from:%s to:%s", wsc.RemoteAddr(), rc.RemoteAddr())
-	if err := transport(rc, wsc); err != nil {
+	if err := transport(rc, wsc, remote); err != nil {
 		logger.Infof("[tun] HandleWssRequset err: %s", err.Error())
 	}
 }
 
 func (raw *Raw) HandleMWssRequset(c net.Conn) {
-	web.CurTCPNum.Inc()
-	defer web.CurTCPNum.Dec()
 	defer c.Close()
 	remote := raw.TCPRemotes.Next()
+	web.CurTCPNum.WithLabelValues(remote).Inc()
+	defer web.CurTCPNum.WithLabelValues(remote).Dec()
 
 	rc, err := net.Dial("tcp", remote)
 	if err != nil {
@@ -175,7 +175,7 @@ func (raw *Raw) HandleMWssRequset(c net.Conn) {
 	defer rc.Close()
 
 	logger.Infof("[tun] HandleMWssRequset from:%s to:%s", c.RemoteAddr(), rc.RemoteAddr())
-	if err := transport(rc, c); err != nil {
+	if err := transport(rc, c, remote); err != nil {
 		logger.Infof("[tun] HandleMWssRequset err: %s", err.Error())
 	}
 }

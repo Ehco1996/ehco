@@ -24,10 +24,9 @@ func (s *Wss) HandleUDPConn(uaddr *net.UDPAddr, local *net.UDPConn) {
 
 func (s *Wss) HandleTCPConn(c *net.TCPConn) error {
 	defer c.Close()
-	web.CurTCPNum.Inc()
-	defer web.CurTCPNum.Dec()
-
 	remote := s.raw.TCPRemotes.Next()
+	web.CurTCPNum.WithLabelValues(remote).Inc()
+	defer web.CurTCPNum.WithLabelValues(remote).Dec()
 
 	d := ws.Dialer{TLSConfig: tls.DefaultTLSConfig}
 	wsc, _, _, err := d.Dial(context.TODO(), remote+"/wss/")
@@ -36,5 +35,5 @@ func (s *Wss) HandleTCPConn(c *net.TCPConn) error {
 	}
 	defer wsc.Close()
 	logger.Infof("[ws] HandleTCPConn from %s to %s", c.LocalAddr().String(), remote)
-	return transport(c, wsc)
+	return transport(c, wsc, remote)
 }

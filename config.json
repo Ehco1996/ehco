@@ -1,7 +1,7 @@
 {
   "web_port": 9000,
   "web_token": "",
-  "enable_ping": false,
+  "enable_ping": true,
 
   "relay_configs": [
     {

@@ -13,8 +13,6 @@ import (
 )
 
 var (
-	namespace      = "ping"
-	subsystem      = ""
 	pingLabelNames = []string{"ip", "host", "label"}
 	pingBuckets    = []float64{
 		float64(5e-05),
@@ -42,8 +40,8 @@ var (
 
 	PingResponseDurationSeconds = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
-			Namespace:   namespace,
-			Subsystem:   subsystem,
+			Namespace:   METRIC_NS,
+			Subsystem:   METRIC_SUBSYSTEM_PING,
 			Name:        "response_duration_seconds",
 			Help:        "A histogram of latencies for ping responses.",
 			Buckets:     pingBuckets,
@@ -52,7 +50,7 @@ var (
 		pingLabelNames,
 	)
 	PingRequestTotal = prometheus.NewDesc(
-		prometheus.BuildFQName(namespace, subsystem, "requests_total"),
+		prometheus.BuildFQName(METRIC_NS, METRIC_SUBSYSTEM_PING, "requests_total"),
 		"Number of ping requests sent",
 		pingLabelNames,
 		ConstLabels,
