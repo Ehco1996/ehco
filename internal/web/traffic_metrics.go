@@ -12,6 +12,12 @@ var (
 	ConstLabels = map[string]string{
 		"hostname": Hostname,
 	}
+	EhcoAlive = prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace:   METRIC_NS,
+		Subsystem:   "",
+		Name:        "alive_state",
+		Help:        "ehco 存活状态",
+		ConstLabels: ConstLabels})
 
 	CurTCPNum = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace:   METRIC_NS,
