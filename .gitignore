@@ -20,3 +20,4 @@ dist/
 cert.pem
 key.pem
 .DS_Store
+monitor/data/

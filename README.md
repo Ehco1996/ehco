@@ -30,7 +30,7 @@ go get -u "github.com/Ehco1996/ehco/cmd/ehco"
 
 ### 从release下载编译好的文件
 
-> ehco的可执行文件可以从项目的[release](https://github.com/Ehco1996/ehco/releases)页面下载
+> ehco 的可执行文件可以从项目的[release](https://github.com/Ehco1996/ehco/releases)页面下载
 
 ### docker image
 
@@ -43,6 +43,7 @@ go get -u "github.com/Ehco1996/ehco/cmd/ehco"
 * 从配置文件启动 支持多端口转发
 * 从远程启动
 * benchmark
+* grafana 监控报警
 
 ## 使用说明
 
@@ -97,6 +98,20 @@ go get -u "github.com/Ehco1996/ehco/cmd/ehco"
     ]
 }
 ```
+
+## 监控报警
+
+* dashboard 和 prometheus 规则可以从`monitor`文件夹下找到，可以自行导入
+
+
+* 类似 Smokeing Ping 的延迟监控
+
+![](monitor/ping.png)
+
+* 流量监控
+
+![](monitor/traffic.png)
+
 
 ## Benchmark(Apple m1)
 
