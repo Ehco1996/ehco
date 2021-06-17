@@ -4,6 +4,8 @@ on:
   push:
     tags:
       - "*"
+    branches:
+      - test-ci
 
 jobs:
   ci-ci-ci:

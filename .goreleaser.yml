@@ -2,8 +2,8 @@
 # Make sure to check the documentation at http://goreleaser.com
 before:
   hooks:
-    # you may remove this if you don't use vgo
     - go mod download
+    - sudo apt-get install -y upx
 builds:
   - id: ehco
     main: ./cmd/ehco/main.go
@@ -20,6 +20,8 @@ builds:
       - linux
       - darwin
       - windows
+    hooks:
+      post: ls dist/ && upx dist/*
 archives:
   - format: binary
 changelog:
