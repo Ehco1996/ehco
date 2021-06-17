@@ -34,6 +34,12 @@ jobs:
       - name: Build
         run: make build
 
+      - name: Run UPX
+        uses: crazy-max/ghaction-upx@v1
+        with:
+          version: latest
+          files: .dist/ehco
+
       - uses: actions/upload-artifact@master
         with:
           name: my-artifact
