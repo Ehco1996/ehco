@@ -4,9 +4,7 @@ go 1.16
 
 require (
 	github.com/go-ping/ping v0.0.0-20210216210419-25d1413fb7bb
-	github.com/gobwas/httphead v0.1.0 // indirect
-	github.com/gobwas/pool v0.2.1 // indirect
-	github.com/gobwas/ws v1.0.4
+	github.com/gobwas/ws v1.1.0
 	github.com/gorilla/mux v1.8.0
 	github.com/prometheus/client_golang v1.9.0
 	github.com/urfave/cli/v2 v2.3.0
