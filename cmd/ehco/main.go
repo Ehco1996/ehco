@@ -32,6 +32,7 @@ Description=ehco
 After=network.target
 
 [Service]
+LimitNOFILE=65535
 ExecStart=/root/ehco -c ""
 Restart=always
 
