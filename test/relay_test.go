@@ -95,13 +95,14 @@ func init() {
 		},
 	}
 	ch := make(chan error)
+	readych := make(chan bool)
 	for _, c := range cfg.Configs {
 		go func(c config.RelayConfig) {
 			r, err := relay.NewRelay(&c)
 			if err != nil {
 				logger.Fatal(err)
 			}
-			ch <- r.ListenAndServe()
+			ch <- r.ListenAndServe(ch, readych)
 		}(c)
 	}
 

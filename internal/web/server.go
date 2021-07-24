@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"net/http/pprof"
 	_ "net/http/pprof"
-	"time"
 
 	"github.com/Ehco1996/ehco/internal/config"
 	"github.com/Ehco1996/ehco/internal/constant"
@@ -72,10 +71,6 @@ func simpleTokenAuthMiddleware(token string, h http.Handler) http.Handler {
 }
 
 func StartWebServer(cfg *config.Config) {
-	if cfg.WebPort <= 0 {
-		return
-	}
-	time.Sleep(time.Second) // wait main relay thread up
 	addr := fmt.Sprintf("0.0.0.0:%d", cfg.WebPort)
 	logger.Infof("[web] Start Web Server at http://%s/", addr)
 	r := mux.NewRouter()

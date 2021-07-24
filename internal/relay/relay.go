@@ -55,34 +55,34 @@ func NewRelay(cfg *config.RelayConfig) (*Relay, error) {
 	return r, nil
 }
 
-func (r *Relay) ListenAndServe() error {
-	errChan := make(chan error)
+func (r *Relay) ListenAndServe(errch chan error, readych chan bool) error {
 
 	switch r.ListenType {
 	case constant.Listen_RAW:
 		go func() {
-			errChan <- r.RunLocalTCPServer()
+			errch <- r.RunLocalTCPServer()
 		}()
 	case constant.Listen_WS:
 		go func() {
-			errChan <- r.RunLocalWSServer()
+			errch <- r.RunLocalWSServer()
 		}()
 	case constant.Listen_WSS:
 		go func() {
-			errChan <- r.RunLocalWSSServer()
+			errch <- r.RunLocalWSSServer()
 		}()
 	case constant.Listen_MWSS:
 		go func() {
-			errChan <- r.RunLocalMWSSServer()
+			errch <- r.RunLocalMWSSServer()
 		}()
 	}
 	if len(r.cfg.UDPRemotes) > 0 {
 		// 直接启动udp转发
 		go func() {
-			errChan <- r.RunLocalUDPServer()
+			errch <- r.RunLocalUDPServer()
 		}()
 	}
-	return <-errChan
+	readych <- true
+	return <-errch
 }
 
 func (r *Relay) LogRelay() {

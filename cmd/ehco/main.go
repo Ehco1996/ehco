@@ -142,7 +142,8 @@ func main() {
 }
 
 func start(ctx *cli.Context) error {
-	ch := make(chan error)
+	errch := make(chan error)
+	readych := make(chan bool)
 	var cfg *config.Config
 
 	if ConfigPath != "" {
@@ -168,7 +169,7 @@ func start(ctx *cli.Context) error {
 		}
 	}
 
-	initTls := false
+	initTls := false // make sure only initTls once
 	for _, cfg := range cfg.Configs {
 		if !initTls && (cfg.ListenType == constant.Listen_WSS ||
 			cfg.ListenType == constant.Listen_MWSS ||
@@ -177,16 +178,25 @@ func start(ctx *cli.Context) error {
 			initTls = true
 			tls.InitTlsCfg()
 		}
-		go serveRelay(cfg, ch)
+		go serveRelay(cfg, errch, readych)
 	}
-	go web.StartWebServer(cfg)
-	return <-ch
+
+	select {
+	case <-readych:
+		logger.Info("Main Relay thread is started")
+		if cfg.WebPort > 0 {
+			go web.StartWebServer(cfg)
+		}
+	case err := <-errch:
+		return err
+	}
+	return <-errch
 }
 
-func serveRelay(cfg config.RelayConfig, ch chan error) {
+func serveRelay(cfg config.RelayConfig, errch chan error, readych chan bool) {
 	r, err := relay.NewRelay(&cfg)
 	if err != nil {
 		logger.Fatal(err)
 	}
-	ch <- r.ListenAndServe()
+	errch <- r.ListenAndServe(errch, readych)
 }
