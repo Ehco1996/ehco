@@ -82,9 +82,6 @@ func transport(rw1, rw2 io.ReadWriter, remote string) error {
 		if err == io.EOF || errors.Is(err, syscall.EPIPE) || errors.Is(err, syscall.ECONNRESET) {
 			err = nil
 		}
-		if _, ok := err.(*net.OpError); ok {
-			err = nil
-		}
 	}
 	return err
 }
