@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Ehco1996/ehco/internal/constant"
 	"github.com/Ehco1996/ehco/internal/lb"
 	"github.com/Ehco1996/ehco/internal/logger"
 	"github.com/Ehco1996/ehco/internal/web"
@@ -64,7 +65,7 @@ func (raw *Raw) HandleUDPConn(uaddr *net.UDPAddr, local *net.UDPConn) {
 		defer cancel()
 		wt := 0
 		for {
-			rc.SetReadDeadline(time.Now().Add(time.Second * 15))
+			_ = rc.SetDeadline(time.Now().Add(constant.DefaultDeadline))
 			i, err := rc.Read(buf)
 			if err != nil {
 				logger.Info(err)
@@ -92,6 +93,7 @@ func (raw *Raw) HandleUDPConn(uaddr *net.UDPAddr, local *net.UDPConn) {
 				logger.Info(err)
 				return
 			}
+			_ = rc.SetDeadline(time.Now().Add(constant.DefaultDeadline))
 		}
 		web.NetWorkTransmitBytes.WithLabelValues(remote).Add(float64(wt * 2))
 	}()
@@ -133,7 +135,7 @@ func (raw *Raw) HandleWsRequset(w http.ResponseWriter, req *http.Request) {
 	defer rc.Close()
 
 	logger.Infof("[tun] HandleWsRequset from:%s to:%s", wsc.RemoteAddr(), rc.RemoteAddr())
-	if err := transport(rc, wsc, remote); err != nil {
+	if err := transportWithTimeOut(rc, wsc, remote); err != nil {
 		logger.Infof("[tun] HandleWsRequset err: %s", err.Error())
 	}
 }

@@ -5,6 +5,7 @@ import (
 	"io"
 	"net"
 	"syscall"
+	"time"
 
 	"go.uber.org/atomic"
 
@@ -77,7 +78,62 @@ func transport(rw1, rw2 io.ReadWriter, remote string) error {
 	}()
 
 	err := <-errc
-	// NOTE 我们不关心operror 比如 eof/reset/broken pipe
+	// NOTE 我们不关心 operror 比如 eof/reset/broken pipe
+	if err != nil {
+		if err == io.EOF || errors.Is(err, syscall.EPIPE) || errors.Is(err, syscall.ECONNRESET) {
+			err = nil
+		}
+	}
+	return err
+}
+
+func transportWithTimeOut(conn1 net.Conn, conn2 io.ReadWriteCloser, remote string) error {
+	// only set oneway deadline is enough
+	errChan := make(chan error, 2)
+	// conn1 to conn2
+	go func() {
+		buf := BufferPool.Get()
+		defer BufferPool.Put(buf)
+		for {
+			_ = conn1.SetDeadline(time.Now().Add(constant.DefaultDeadline))
+			rn, err := conn1.Read(buf)
+			if rn > 0 {
+				_, err := conn2.Write(buf[:rn])
+				if err != nil {
+					errChan <- err
+					return
+				}
+				web.NetWorkTransmitBytes.WithLabelValues(remote).Add(float64(rn * 2))
+			}
+			if err != nil {
+				errChan <- err
+				return
+			}
+		}
+	}()
+	// conn2 to conn1
+	go func() {
+		buf := BufferPool.Get()
+		defer BufferPool.Put(buf)
+		for {
+			rn, err := conn2.Read(buf)
+			if rn > 0 {
+				_, err := conn1.Write(buf[:rn])
+				if err != nil {
+					errChan <- err
+					return
+				}
+				web.NetWorkTransmitBytes.WithLabelValues(remote).Add(float64(rn * 2))
+				_ = conn1.SetDeadline(time.Now().Add(constant.DefaultDeadline))
+			}
+			if err != nil {
+				errChan <- err
+				return
+			}
+		}
+	}()
+	err := <-errChan
+	// NOTE 我们不关心 operror 比如 eof/reset/broken pipe
 	if err != nil {
 		if err == io.EOF || errors.Is(err, syscall.EPIPE) || errors.Is(err, syscall.ECONNRESET) {
 			err = nil

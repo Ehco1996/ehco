@@ -7,6 +7,7 @@ const (
 
 	MaxMWSSStreamCnt = 100
 	DialTimeOut      = 3 * time.Second
+	DefaultDeadline  = 15 * time.Second
 
 	Listen_RAW  = "raw"
 	Listen_WS   = "ws"
