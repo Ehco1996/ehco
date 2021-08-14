@@ -1,9 +1,14 @@
 package main
 
 import (
+	"context"
 	"fmt"
+	"net"
 	"os"
 	"os/exec"
+	"os/signal"
+	"sync"
+	"syscall"
 
 	cli "github.com/urfave/cli/v2"
 
@@ -138,14 +143,77 @@ func main() {
 	if err != nil {
 		logger.Fatal(err)
 	}
-
 }
 
 func start(ctx *cli.Context) error {
-	errch := make(chan error)
-	readych := make(chan bool)
-	var cfg *config.Config
+	cfg := loadConfig()
+	initTls(cfg)
 
+	if cfg.WebPort > 0 {
+		go web.StartWebServer(cfg)
+	}
+	return startAndWatchRelayServers(cfg.Configs)
+}
+
+func startAndWatchRelayServers(relayConfigList []config.RelayConfig) error {
+	// relay name -> relay
+	relayM := make(map[string]*relay.Relay)
+	for idx := range relayConfigList {
+		r, err := relay.NewRelay(&relayConfigList[idx])
+		if err != nil {
+			return err
+		}
+		relayM[r.Name] = r
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	for name := range relayM {
+		go func(name string) {
+			err := relayM[name].ListenAndServe()
+			if err != nil {
+				if _, ok := err.(*net.OpError); !ok {
+					logger.Errorf("[relay] name=%s ListenAndServe err=%s", name, err)
+				}
+			}
+			cancel()
+		}(name)
+	}
+
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func(ctx context.Context) {
+		defer wg.Done()
+
+		select {
+		case <-ctx.Done():
+			logger.Info("Relay server exit")
+		case <-sigs:
+			for name := range relayM {
+				logger.Infof("[relay] Stop %s ...", name)
+				relayM[name].Close()
+			}
+		}
+	}(ctx)
+
+	wg.Wait()
+	return nil
+}
+
+func initTls(cfg *config.Config) {
+	for _, cfg := range cfg.Configs {
+		if cfg.ListenType == constant.Listen_WSS || cfg.ListenType == constant.Listen_MWSS ||
+			cfg.TransportType == constant.Transport_WSS || cfg.TransportType == constant.Transport_MWSS {
+			tls.InitTlsCfg()
+			break
+		}
+	}
+}
+
+func loadConfig() (cfg *config.Config) {
 	if ConfigPath != "" {
 		cfg = config.NewConfigByPath(ConfigPath)
 		if err := cfg.LoadConfig(); err != nil {
@@ -168,35 +236,5 @@ func start(ctx *cli.Context) error {
 			},
 		}
 	}
-
-	initTls := false // make sure only initTls once
-	for _, cfg := range cfg.Configs {
-		if !initTls && (cfg.ListenType == constant.Listen_WSS ||
-			cfg.ListenType == constant.Listen_MWSS ||
-			cfg.TransportType == constant.Transport_WSS ||
-			cfg.TransportType == constant.Transport_MWSS) {
-			initTls = true
-			tls.InitTlsCfg()
-		}
-		go serveRelay(cfg, errch, readych)
-	}
-
-	select {
-	case <-readych:
-		logger.Info("Main Relay thread is started")
-		if cfg.WebPort > 0 {
-			go web.StartWebServer(cfg)
-		}
-	case err := <-errch:
-		return err
-	}
-	return <-errch
-}
-
-func serveRelay(cfg config.RelayConfig, errch chan error, readych chan bool) {
-	r, err := relay.NewRelay(&cfg)
-	if err != nil {
-		logger.Fatal(err)
-	}
-	errch <- r.ListenAndServe(errch, readych)
+	return cfg
 }

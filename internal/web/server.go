@@ -55,7 +55,7 @@ func registerMetrics(cfg *config.Config) {
 func simpleTokenAuthMiddleware(token string, h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if t := r.URL.Query().Get("token"); t != token {
-			msg := fmt.Sprintf("[web] unauthorsied from %s", r.RemoteAddr)
+			msg := fmt.Sprintf("[web] unauthored from %s", r.RemoteAddr)
 			logger.Logger.Error(msg)
 			hj, ok := w.(http.Hijacker)
 			if ok {

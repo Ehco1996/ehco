@@ -1,6 +1,7 @@
 package test
 
 import (
+	"context"
 	"sync"
 	"testing"
 	"time"
@@ -94,16 +95,19 @@ func init() {
 			},
 		},
 	}
-	ch := make(chan error)
-	readych := make(chan bool)
+
 	for _, c := range cfg.Configs {
-		go func(c config.RelayConfig) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		println(ctx, cancel)
+
+		go func(ctx context.Context, c config.RelayConfig) {
 			r, err := relay.NewRelay(&c)
 			if err != nil {
 				logger.Fatal(err)
 			}
-			ch <- r.ListenAndServe(ch, readych)
-		}(c)
+			logger.Fatal(r.ListenAndServe())
+		}(ctx, c)
 	}
 
 	// wait for  init
