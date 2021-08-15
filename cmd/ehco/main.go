@@ -198,7 +198,8 @@ func startAndWatchRelayServers(relayConfigList []config.RelayConfig) error {
 			}
 		}
 	}(ctx)
-
+	//TODO refine this
+	web.EhcoAlive.Set(web.EhcoAliveStateRunning)
 	wg.Wait()
 	return nil
 }

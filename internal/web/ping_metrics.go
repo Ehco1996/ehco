@@ -36,7 +36,7 @@ var (
 		float64(13.1072),
 		float64(26.2144),
 	}
-	pingInerval = time.Second * 30
+	pingInterval = time.Second * 30
 
 	PingResponseDurationSeconds = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
@@ -69,7 +69,7 @@ func initPinger(host string) *ping.Pinger {
 		return nil
 	}
 	logger.Infof("[ping] Resolved %s as %s", host, pinger.IPAddr())
-	pinger.Interval = pingInerval
+	pinger.Interval = pingInterval
 	pinger.Timeout = time.Duration(math.MaxInt64)
 	pinger.RecordRtts = false
 	if runtime.GOOS != "darwin" {
@@ -141,7 +141,7 @@ func (pg *PingGroup) Collect(ch chan<- prometheus.Metric) {
 }
 
 func (pg *PingGroup) Run() {
-	splay := time.Duration(pingInerval.Nanoseconds() / int64(len(pg.Pingers)))
+	splay := time.Duration(pingInterval.Nanoseconds() / int64(len(pg.Pingers)))
 	logger.Infof("[ping] Waiting %s between starting pingers", splay)
 	for idx := range pg.Pingers {
 		go func() {

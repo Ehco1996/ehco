@@ -6,4 +6,7 @@ const (
 	METRIC_SUBSYSTEM_PING    = "ping"
 
 	METRIC_LABEL_REMOTE = "remote"
+
+	EhcoAliveStateInit    = 0
+	EhcoAliveStateRunning = 1
 )

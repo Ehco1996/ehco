@@ -43,6 +43,8 @@ func registerMetrics(cfg *config.Config) {
 	prometheus.MustRegister(CurUDPNum)
 	prometheus.MustRegister(NetWorkTransmitBytes)
 
+	EhcoAlive.Set(EhcoAliveStateInit)
+
 	//ping
 	if cfg.EnablePing {
 		pg := NewPingGroup(cfg)
