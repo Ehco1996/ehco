@@ -32,5 +32,5 @@ func (s *Mwss) HandleTCPConn(c *net.TCPConn) error {
 	}
 	defer muxwsc.Close()
 	logger.Infof("[mwss] HandleTCPConn from:%s to:%s", c.RemoteAddr(), muxwsc.RemoteAddr())
-	return transport(muxwsc, c, remote)
+	return transportWithTimeOut(muxwsc, c, remote)
 }

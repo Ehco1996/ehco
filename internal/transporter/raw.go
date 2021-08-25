@@ -114,7 +114,7 @@ func (raw *Raw) HandleTCPConn(c *net.TCPConn) error {
 	logger.Infof("[raw] HandleTCPConn from %s to %s", c.LocalAddr().String(), remote)
 	defer rc.Close()
 
-	return transport(c, rc, remote)
+	return transportWithTimeOut(c, rc, remote)
 }
 
 func (raw *Raw) HandleWsRequset(w http.ResponseWriter, req *http.Request) {
@@ -158,7 +158,7 @@ func (raw *Raw) HandleWssRequset(w http.ResponseWriter, req *http.Request) {
 	defer rc.Close()
 
 	logger.Infof("[tun] HandleWssRequset from:%s to:%s", wsc.RemoteAddr(), rc.RemoteAddr())
-	if err := transport(rc, wsc, remote); err != nil {
+	if err := transportWithTimeOut(rc, wsc, remote); err != nil {
 		logger.Infof("[tun] HandleWssRequset err: %s", err.Error())
 	}
 }
@@ -177,7 +177,7 @@ func (raw *Raw) HandleMWssRequset(c net.Conn) {
 	defer rc.Close()
 
 	logger.Infof("[tun] HandleMWssRequset from:%s to:%s", c.RemoteAddr(), rc.RemoteAddr())
-	if err := transport(rc, c, remote); err != nil {
+	if err := transportWithTimeOut(rc, c, remote); err != nil {
 		logger.Infof("[tun] HandleMWssRequset err: %s", err.Error())
 	}
 }
