@@ -46,6 +46,14 @@ WantedBy=multi-user.target
 `
 
 func main() {
+	cli.VersionPrinter = func(c *cli.Context) {
+		println("Welcome to ehco (ehco is a network relay tool and a typo)")
+		println(fmt.Sprintf("Version=%s", constant.Version))
+		println(fmt.Sprintf("GitBranch=%s", constant.GitBranch))
+		println(fmt.Sprintf("GitRevision=%s", constant.GitRevision))
+		println(fmt.Sprintf("BuildTime=%s", constant.BuildTime))
+	}
+
 	app := cli.NewApp()
 	app.Name = "ehco"
 	app.Version = constant.Version

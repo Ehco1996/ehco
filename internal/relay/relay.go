@@ -46,14 +46,14 @@ func NewRelay(cfg *config.RelayConfig) (*Relay, error) {
 	for idx, addr := range cfg.TCPRemotes {
 		tcpNodeList[idx] = &lb.Node{
 			Address: addr,
-			Label:   fmt.Sprintf("%s-%s-tcp", cfg.Label, addr),
+			Label:   fmt.Sprintf("%s-%s", cfg.Label, addr),
 		}
 	}
 	udpNodeList := make([]*lb.Node, len(cfg.UDPRemotes))
 	for idx, addr := range cfg.UDPRemotes {
 		udpNodeList[idx] = &lb.Node{
 			Address: addr,
-			Label:   fmt.Sprintf("%s-%s-udp", cfg.Label, addr),
+			Label:   fmt.Sprintf("%s-%s", cfg.Label, addr),
 		}
 	}
 
