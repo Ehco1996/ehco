@@ -87,7 +87,7 @@ func transport(rw1, rw2 io.ReadWriter, remote string) error {
 	return err
 }
 
-func transportWithTimeOut(conn1 net.Conn, conn2 io.ReadWriteCloser, remote string) error {
+func transportWithDeadline(conn1, conn2 net.Conn, remote string) error {
 	// only set oneway deadline is enough
 	errChan := make(chan error, 2)
 	// conn1 to conn2
@@ -97,18 +97,17 @@ func transportWithTimeOut(conn1 net.Conn, conn2 io.ReadWriteCloser, remote strin
 		for {
 			_ = conn1.SetDeadline(time.Now().Add(constant.DefaultDeadline))
 			rn, err := conn1.Read(buf)
-			if rn > 0 {
-				_, err := conn2.Write(buf[:rn])
-				if err != nil {
-					errChan <- err
-					return
-				}
-				web.NetWorkTransmitBytes.WithLabelValues(remote).Add(float64(rn * 2))
-			}
 			if err != nil {
 				errChan <- err
 				return
 			}
+			_ = conn1.SetDeadline(time.Time{})
+			_, err = conn2.Write(buf[:rn])
+			if err != nil {
+				errChan <- err
+				return
+			}
+			web.NetWorkTransmitBytes.WithLabelValues(remote).Add(float64(rn * 2))
 		}
 	}()
 	// conn2 to conn1
@@ -117,19 +116,16 @@ func transportWithTimeOut(conn1 net.Conn, conn2 io.ReadWriteCloser, remote strin
 		defer BufferPool.Put(buf)
 		for {
 			rn, err := conn2.Read(buf)
-			if rn > 0 {
-				_, err := conn1.Write(buf[:rn])
-				if err != nil {
-					errChan <- err
-					return
-				}
-				web.NetWorkTransmitBytes.WithLabelValues(remote).Add(float64(rn * 2))
-				_ = conn1.SetDeadline(time.Now().Add(constant.DefaultDeadline))
-			}
 			if err != nil {
 				errChan <- err
 				return
 			}
+			_, err = conn1.Write(buf[:rn])
+			if err != nil {
+				errChan <- err
+				return
+			}
+			web.NetWorkTransmitBytes.WithLabelValues(remote).Add(float64(rn * 2))
 		}
 	}()
 	err := <-errChan

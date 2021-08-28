@@ -2,6 +2,8 @@ package test
 
 import (
 	"context"
+	"log"
+	"net"
 	"sync"
 	"testing"
 	"time"
@@ -99,7 +101,6 @@ func init() {
 	for _, c := range cfg.Configs {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
-		println(ctx, cancel)
 
 		go func(ctx context.Context, c config.RelayConfig) {
 			r, err := relay.NewRelay(&c)
@@ -114,7 +115,7 @@ func init() {
 	time.Sleep(time.Second)
 }
 
-func TestRelay(t *testing.T) {
+func TestRelayOverRaw(t *testing.T) {
 
 	msg := []byte("hello")
 	// test tcp
@@ -130,6 +131,27 @@ func TestRelay(t *testing.T) {
 		t.Fatal(res)
 	}
 	t.Log("test udp done!")
+}
+
+func TestRelayWithDeadline(t *testing.T) {
+
+	msg := []byte("hello")
+	conn, err := net.Dial("tcp", RAW_LISTEN)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer conn.Close()
+	if _, err := conn.Write(msg); err != nil {
+		log.Fatal(err)
+	}
+
+	buf := make([]byte, len(msg))
+	constant.DefaultDeadline = time.Second // change for test
+	time.Sleep(constant.DefaultDeadline)
+	_, err = conn.Read(buf)
+	if err != nil {
+		log.Fatalf("need error here")
+	}
 }
 
 func TestRelayOverWs(t *testing.T) {

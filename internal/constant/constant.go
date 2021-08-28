@@ -2,12 +2,15 @@ package constant
 
 import "time"
 
+var (
+	DefaultDeadline = 30 * time.Second
+)
+
 const (
 	Version = "1.0.7"
 
 	MaxMWSSStreamCnt = 100
 	DialTimeOut      = 3 * time.Second
-	DefaultDeadline  = 15 * time.Second
 
 	Listen_RAW  = "raw"
 	Listen_WS   = "ws"
