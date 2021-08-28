@@ -42,6 +42,21 @@ func NewRelay(cfg *config.RelayConfig) (*Relay, error) {
 		return nil, err
 	}
 
+	tcpNodeList := make([]*lb.Node, len(cfg.TCPRemotes))
+	for idx, addr := range cfg.TCPRemotes {
+		tcpNodeList[idx] = &lb.Node{
+			Address: addr,
+			Label:   fmt.Sprintf("%s-%s-tcp", cfg.Label, addr),
+		}
+	}
+	udpNodeList := make([]*lb.Node, len(cfg.UDPRemotes))
+	for idx, addr := range cfg.UDPRemotes {
+		udpNodeList[idx] = &lb.Node{
+			Address: addr,
+			Label:   fmt.Sprintf("%s-%s-udp", cfg.Label, addr),
+		}
+	}
+
 	r := &Relay{
 		cfg: cfg,
 
@@ -51,8 +66,8 @@ func NewRelay(cfg *config.RelayConfig) (*Relay, error) {
 		TransportType: cfg.TransportType,
 		TP: transporter.PickTransporter(
 			cfg.TransportType,
-			lb.NewRBRemotes(cfg.TCPRemotes),
-			lb.NewRBRemotes(cfg.UDPRemotes),
+			lb.NewRoundRobin(tcpNodeList),
+			lb.NewRoundRobin(udpNodeList),
 		),
 	}
 	r.Name = fmt.Sprintf("[At=%s Over=%s To=%s Through=%s]",

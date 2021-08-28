@@ -10,10 +10,15 @@ func Test_roundrobin_Next(t *testing.T) {
 		"127.0.0.2",
 		"127.0.0.3",
 	}
-	rb := NewRBRemotes(remotes)
+	nodeList := make([]*Node, len(remotes))
+	for i := range remotes {
+		nodeList[i] = &Node{Address: remotes[i]}
+	}
+	rb := NewRoundRobin(nodeList)
+
 	for i := 0; i < len(remotes); i++ {
-		if res := rb.Next(); res != remotes[i] {
-			t.Fatalf("need %s got %s", remotes[i], res)
+		if node := rb.Next(); node.Address != remotes[i] {
+			t.Fatalf("need %s got %s", remotes[i], node.Address)
 		}
 	}
 }

@@ -16,7 +16,7 @@ fmt:
 	golangci-lint run --fix
 
 test:
-	go test -count=1  -coverpkg=./internal -timeout=10s ./...
+	go test -v -count=1  -coverpkg=./internal -timeout=10s ./...
 
 build:
 	${GOBUILD} -o $(BINDIR)/$(NAME) cmd/ehco/main.go
