@@ -25,8 +25,8 @@ func (s *Wss) HandleUDPConn(uaddr *net.UDPAddr, local *net.UDPConn) {
 func (s *Wss) HandleTCPConn(c *net.TCPConn) error {
 	defer c.Close()
 	remote := s.raw.TCPRemotes.Next()
-	web.CurTCPNum.WithLabelValues(remote.Label).Inc()
-	defer web.CurTCPNum.WithLabelValues(remote.Label).Dec()
+	web.CurConnectionCount.WithLabelValues(remote.Label, web.METRIC_CONN_TCP).Inc()
+	defer web.CurConnectionCount.WithLabelValues(remote.Label, web.METRIC_CONN_TCP).Dec()
 
 	d := ws.Dialer{TLSConfig: tls.DefaultTLSConfig}
 	wsc, _, _, err := d.Dial(context.TODO(), remote.Address+"/wss/")

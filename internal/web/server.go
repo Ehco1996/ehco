@@ -39,8 +39,7 @@ func AttachProfiler(router *mux.Router) {
 func registerMetrics(cfg *config.Config) {
 	// traffic
 	prometheus.MustRegister(EhcoAlive)
-	prometheus.MustRegister(CurTCPNum)
-	prometheus.MustRegister(CurUDPNum)
+	prometheus.MustRegister(CurConnectionCount)
 	prometheus.MustRegister(NetWorkTransmitBytes)
 
 	EhcoAlive.Set(EhcoAliveStateInit)

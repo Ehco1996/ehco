@@ -24,8 +24,8 @@ func (s *Ws) HandleUDPConn(uaddr *net.UDPAddr, local *net.UDPConn) {
 func (s *Ws) HandleTCPConn(c *net.TCPConn) error {
 	defer c.Close()
 	remote := s.raw.TCPRemotes.Next()
-	web.CurTCPNum.WithLabelValues(remote.Label).Inc()
-	defer web.CurTCPNum.WithLabelValues(remote.Label).Dec()
+	web.CurConnectionCount.WithLabelValues(remote.Label, web.METRIC_CONN_TCP).Inc()
+	defer web.CurConnectionCount.WithLabelValues(remote.Label, web.METRIC_CONN_TCP).Dec()
 
 	wsc, _, _, err := ws.Dial(context.TODO(), remote.Address+"/ws/")
 	if err != nil {

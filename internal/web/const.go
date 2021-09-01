@@ -7,6 +7,10 @@ const (
 
 	METRIC_LABEL_REMOTE = "remote"
 
+	METRIC_LABEL_CONN_TYPE = "type"
+	METRIC_CONN_TCP        = "tcp"
+	METRIC_CONN_UDP        = "udp"
+
 	EhcoAliveStateInit    = 0
 	EhcoAliveStateRunning = 1
 )

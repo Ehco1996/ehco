@@ -65,7 +65,7 @@ func transport(rw1, rw2 io.ReadWriter, remote string) error {
 		buf := BufferPool.Get()
 		defer BufferPool.Put(buf)
 		wt, err := io.CopyBuffer(rw1, rw2, buf)
-		web.NetWorkTransmitBytes.WithLabelValues(remote).Add(float64(wt * 2))
+		web.NetWorkTransmitBytes.WithLabelValues(remote, web.METRIC_CONN_TCP).Add(float64(wt * 2))
 		errc <- err
 	}()
 
@@ -73,7 +73,7 @@ func transport(rw1, rw2 io.ReadWriter, remote string) error {
 		buf := BufferPool.Get()
 		defer BufferPool.Put(buf)
 		wt, err := io.CopyBuffer(rw2, rw1, buf)
-		web.NetWorkTransmitBytes.WithLabelValues(remote).Add(float64(wt * 2))
+		web.NetWorkTransmitBytes.WithLabelValues(remote, web.METRIC_CONN_TCP).Add(float64(wt * 2))
 		errc <- err
 	}()
 
@@ -107,7 +107,7 @@ func transportWithDeadline(conn1, conn2 net.Conn, remote string) error {
 				errChan <- err
 				return
 			}
-			web.NetWorkTransmitBytes.WithLabelValues(remote).Add(float64(rn * 2))
+			web.NetWorkTransmitBytes.WithLabelValues(remote, web.METRIC_CONN_TCP).Add(float64(rn * 2))
 		}
 	}()
 	// conn2 to conn1
@@ -125,7 +125,7 @@ func transportWithDeadline(conn1, conn2 net.Conn, remote string) error {
 				errChan <- err
 				return
 			}
-			web.NetWorkTransmitBytes.WithLabelValues(remote).Add(float64(rn * 2))
+			web.NetWorkTransmitBytes.WithLabelValues(remote, web.METRIC_CONN_TCP).Add(float64(rn * 2))
 		}
 	}()
 	err := <-errChan

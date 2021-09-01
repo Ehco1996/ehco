@@ -14,29 +14,8 @@ import (
 
 var (
 	pingLabelNames = []string{"ip", "host", "label"}
-	pingBuckets    = []float64{
-		float64(5e-05),
-		float64(0.0001),
-		float64(0.0002),
-		float64(0.0004),
-		float64(0.0008),
-		float64(0.0016),
-		float64(0.0032),
-		float64(0.0064),
-		float64(0.0128),
-		float64(0.0256),
-		float64(0.0512),
-		float64(0.1024),
-		float64(0.2048),
-		float64(0.4096),
-		float64(0.8192),
-		float64(1.6384),
-		float64(3.2768),
-		float64(6.5536),
-		float64(13.1072),
-		float64(26.2144),
-	}
-	pingInterval = time.Second * 30
+	pingBuckets    = prometheus.ExponentialBuckets(0.001, 2, 12) // 1ms ~ 4s
+	pingInterval   = time.Second * 30
 
 	PingResponseDurationSeconds = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{

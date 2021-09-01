@@ -23,8 +23,8 @@ func (s *Mwss) HandleUDPConn(uaddr *net.UDPAddr, local *net.UDPConn) {
 func (s *Mwss) HandleTCPConn(c *net.TCPConn) error {
 	defer c.Close()
 	remote := s.raw.TCPRemotes.Next()
-	web.CurTCPNum.WithLabelValues(remote.Label).Inc()
-	defer web.CurTCPNum.WithLabelValues(remote.Label).Dec()
+	web.CurConnectionCount.WithLabelValues(remote.Label, web.METRIC_CONN_TCP).Inc()
+	defer web.CurConnectionCount.WithLabelValues(remote.Label, web.METRIC_CONN_TCP).Dec()
 
 	muxwsc, err := s.mtp.Dial(remote.Address + "/mwss/")
 	if err != nil {

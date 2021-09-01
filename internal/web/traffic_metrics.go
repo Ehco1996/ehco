@@ -19,21 +19,13 @@ var (
 		Help:        "ehco 存活状态",
 		ConstLabels: ConstLabels})
 
-	CurTCPNum = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+	CurConnectionCount = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace:   METRIC_NS,
 		Subsystem:   METRIC_SUBSYSTEM_TRAFFIC,
-		Name:        "current_tcp_num",
-		Help:        "当前tcp链接数",
+		Name:        "current_connection_count",
+		Help:        "当前链接数",
 		ConstLabels: ConstLabels,
-	}, []string{METRIC_LABEL_REMOTE})
-
-	CurUDPNum = prometheus.NewGaugeVec(prometheus.GaugeOpts{
-		Namespace:   METRIC_NS,
-		Subsystem:   METRIC_SUBSYSTEM_TRAFFIC,
-		Help:        "当前udp链接数",
-		Name:        "current_udp_num",
-		ConstLabels: ConstLabels,
-	}, []string{METRIC_LABEL_REMOTE})
+	}, []string{METRIC_LABEL_REMOTE, METRIC_LABEL_CONN_TYPE})
 
 	NetWorkTransmitBytes = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Namespace:   METRIC_NS,
@@ -41,5 +33,5 @@ var (
 		Name:        "network_transmit_bytes",
 		Help:        "传输流量总量bytes",
 		ConstLabels: ConstLabels,
-	}, []string{METRIC_LABEL_REMOTE})
+	}, []string{METRIC_LABEL_REMOTE, METRIC_LABEL_CONN_TYPE})
 )
