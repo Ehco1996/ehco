@@ -43,6 +43,7 @@ func (raw *Raw) HandleUDPConn(uaddr *net.UDPAddr, local *net.UDPConn) {
 	remoteUdp, _ := net.ResolveUDPAddr("udp", remote.Address)
 	rc, err := net.DialUDP("udp", nil, remoteUdp)
 	if err != nil {
+		remote.BlockForSomeTime()
 		logger.Info(err)
 		return
 	}
@@ -110,6 +111,7 @@ func (raw *Raw) HandleTCPConn(c *net.TCPConn) error {
 
 	rc, err := net.Dial("tcp", remote.Address)
 	if err != nil {
+		remote.BlockForSomeTime()
 		return err
 	}
 	logger.Infof("[raw] HandleTCPConn from %s to %s", c.LocalAddr().String(), remote.Label)
@@ -130,6 +132,7 @@ func (raw *Raw) HandleWsRequset(w http.ResponseWriter, req *http.Request) {
 
 	rc, err := net.Dial("tcp", remote.Address)
 	if err != nil {
+		remote.BlockForSomeTime()
 		logger.Infof("dial error: %s", err)
 		return
 	}
@@ -153,6 +156,7 @@ func (raw *Raw) HandleWssRequset(w http.ResponseWriter, req *http.Request) {
 
 	rc, err := net.Dial("tcp", remote.Address)
 	if err != nil {
+		remote.BlockForSomeTime()
 		logger.Infof("dial error: %s", err)
 		return
 	}
@@ -172,6 +176,7 @@ func (raw *Raw) HandleMWssRequset(c net.Conn) {
 
 	rc, err := net.Dial("tcp", remote.Address)
 	if err != nil {
+		remote.BlockForSomeTime()
 		logger.Infof("dial error: %s", err)
 		return
 	}

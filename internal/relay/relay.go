@@ -15,6 +15,7 @@ import (
 	"github.com/Ehco1996/ehco/internal/transporter"
 	"github.com/Ehco1996/ehco/internal/web"
 	"github.com/gorilla/mux"
+	"go.uber.org/atomic"
 )
 
 type Relay struct {
@@ -45,15 +46,17 @@ func NewRelay(cfg *config.RelayConfig) (*Relay, error) {
 	tcpNodeList := make([]*lb.Node, len(cfg.TCPRemotes))
 	for idx, addr := range cfg.TCPRemotes {
 		tcpNodeList[idx] = &lb.Node{
-			Address: addr,
-			Label:   fmt.Sprintf("%s-%s", cfg.Label, addr),
+			Address:    addr,
+			Label:      fmt.Sprintf("%s-%s", cfg.Label, addr),
+			BlockTimes: atomic.NewInt64(0),
 		}
 	}
 	udpNodeList := make([]*lb.Node, len(cfg.UDPRemotes))
 	for idx, addr := range cfg.UDPRemotes {
 		udpNodeList[idx] = &lb.Node{
-			Address: addr,
-			Label:   fmt.Sprintf("%s-%s", cfg.Label, addr),
+			Address:    addr,
+			Label:      fmt.Sprintf("%s-%s", cfg.Label, addr),
+			BlockTimes: atomic.NewInt64(0),
 		}
 	}
 
