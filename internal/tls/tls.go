@@ -23,6 +23,9 @@ var (
 )
 
 func InitTlsCfg() {
+	if DefaultTLSConfig != nil {
+		return
+	}
 	cert, err := genCertificate()
 	if err != nil {
 		panic(err)

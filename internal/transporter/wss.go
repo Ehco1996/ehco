@@ -34,6 +34,6 @@ func (s *Wss) HandleTCPConn(c *net.TCPConn) error {
 		return err
 	}
 	defer wsc.Close()
-	logger.Infof("[ws] HandleTCPConn from %s to %s", c.LocalAddr().String(), remote.Label)
+	logger.Infof("[wss] HandleTCPConn from %s to %s", c.LocalAddr().String(), remote.Label)
 	return transportWithDeadline(c, wsc, remote.Label)
 }

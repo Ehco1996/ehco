@@ -30,7 +30,8 @@ type Relay struct {
 	closeTcpF func() error
 	closeUdpF func() error
 
-	Name string
+	Name          string
+	ListenAddress string
 }
 
 func NewRelay(cfg *config.RelayConfig) (*Relay, error) {
@@ -73,8 +74,9 @@ func NewRelay(cfg *config.RelayConfig) (*Relay, error) {
 			lb.NewRoundRobin(udpNodeList),
 		),
 	}
-	r.Name = fmt.Sprintf("[At=%s Over=%s To=%s Through=%s]",
-		r.LocalTCPAddr, r.ListenType, r.cfg.TCPRemotes, r.TransportType)
+	r.ListenAddress = r.LocalTCPAddr.String()
+	r.Name = fmt.Sprintf("[At=%s Over=%s TCP-To=%s UDP-To=%s Through=%s]",
+		r.LocalTCPAddr, r.ListenType, r.cfg.TCPRemotes, r.cfg.UDPRemotes, r.TransportType)
 	return r, nil
 }
 
@@ -108,6 +110,7 @@ func (r *Relay) ListenAndServe() error {
 }
 
 func (r *Relay) Close() {
+	logger.Infof("[relay] Close relay %s", r.Name)
 	if r.closeUdpF != nil {
 		err := r.closeUdpF()
 		if err != nil {
@@ -120,7 +123,6 @@ func (r *Relay) Close() {
 			logger.Errorf(err.Error())
 		}
 	}
-
 }
 
 func (r *Relay) RunLocalTCPServer() error {

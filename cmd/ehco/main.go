@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -155,71 +156,119 @@ func main() {
 
 func start(ctx *cli.Context) error {
 	cfg := loadConfig()
-	initTls(cfg)
 
 	if cfg.WebPort > 0 {
 		go web.StartWebServer(cfg)
 	}
-	return startAndWatchRelayServers(cfg.Configs)
+	return startAndWatchRelayServers(cfg)
 }
 
-func startAndWatchRelayServers(relayConfigList []config.RelayConfig) error {
-	// relay name -> relay
-	relayM := make(map[string]*relay.Relay)
-	for idx := range relayConfigList {
-		r, err := relay.NewRelay(&relayConfigList[idx])
+func startAndWatchRelayServers(cfg *config.Config) error {
+	// init main ctx
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// relay ListenAddress -> relay
+	var relayM sync.Map
+
+	// func used to start one relay
+	var startOneRelayFunc = func(r *relay.Relay) {
+		addr := r.ListenAddress
+		relayM.Store(addr, r)
+		if err := r.ListenAndServe(); err != nil && !errors.Is(err, net.ErrClosed) {
+			logger.Errorf("[relay] Name=%s ListenAndServe err=%s", r.Name, err)
+		}
+	}
+
+	var stopOneRelayFunc = func(r *relay.Relay) {
+		addr := r.ListenAddress
+		r.Close()
+		relayM.Delete(addr)
+	}
+
+	// init relay map
+	for idx := range cfg.Configs {
+		r, err := relay.NewRelay(&cfg.Configs[idx])
 		if err != nil {
 			return err
 		}
-		relayM[r.Name] = r
+		go startOneRelayFunc(r)
 	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	for name := range relayM {
-		go func(name string) {
-			err := relayM[name].ListenAndServe()
-			if err != nil {
-				if _, ok := err.(*net.OpError); !ok {
-					logger.Errorf("[relay] name=%s ListenAndServe err=%s", name, err)
-				}
-			}
-			cancel()
-		}(name)
-	}
+	// wg to control sub goroutine
+	var wg sync.WaitGroup
 
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
-
-	var wg sync.WaitGroup
 	wg.Add(1)
 	go func(ctx context.Context) {
 		defer wg.Done()
-
 		select {
 		case <-ctx.Done():
-			logger.Info("Relay server exit")
+			logger.Info("ctx cancelled relay server exit")
 		case <-sigs:
-			for name := range relayM {
-				logger.Infof("[relay] Stop %s ...", name)
-				relayM[name].Close()
+			relayM.Range(func(key, value interface{}) bool {
+				r := value.(*relay.Relay)
+				r.Close()
+				return true
+			})
+			cancel()
+		}
+	}(ctx)
+
+	// start reload loop
+	reloadCH := make(chan os.Signal, 1)
+	signal.Notify(reloadCH, syscall.SIGHUP)
+	wg.Add(1)
+	go func(ctx context.Context) {
+		defer wg.Done()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-reloadCH:
+				logger.Info("[cfg-reload] Got A HUP Signal! Now Reloading Conf ...")
+				newCfg := loadConfig()
+
+				var newRelayAddrList []string
+				for idx := range newCfg.Configs {
+					r, err := relay.NewRelay(&newCfg.Configs[idx])
+					if err != nil {
+						logger.Fatalf("[cfg-reload] reload new relay failed err=%s", err.Error())
+					}
+					newRelayAddrList = append(newRelayAddrList, r.ListenAddress)
+
+					// reload old relay
+					if oldR, ok := relayM.Load(r.ListenAddress); ok {
+						oldR := oldR.(*relay.Relay)
+						if oldR.ListenAddress != r.ListenAddress {
+							logger.Infof("[cfg-reload] close old relay name=%s", oldR.Name)
+							stopOneRelayFunc(oldR)
+							go startOneRelayFunc(r)
+						}
+						continue // no need to reload
+					}
+					// start bread new relay that not in old relayM
+					logger.Infof("[cfg-reload] starr new relay name=%s", r.Name)
+					go startOneRelayFunc(r)
+				}
+				// closed relay not in new config
+				relayM.Range(func(key, value interface{}) bool {
+					oldAddr := key.(string)
+					if !InArray(oldAddr, newRelayAddrList) {
+						v, _ := relayM.Load(oldAddr)
+						oldR := v.(*relay.Relay)
+						stopOneRelayFunc(oldR)
+					}
+					return true
+				})
 			}
 		}
 	}(ctx)
+
 	//TODO refine this
 	web.EhcoAlive.Set(web.EhcoAliveStateRunning)
 	wg.Wait()
 	return nil
-}
-
-func initTls(cfg *config.Config) {
-	for _, cfg := range cfg.Configs {
-		if cfg.ListenType == constant.Listen_WSS || cfg.ListenType == constant.Listen_MWSS ||
-			cfg.TransportType == constant.Transport_WSS || cfg.TransportType == constant.Transport_MWSS {
-			tls.InitTlsCfg()
-			break
-		}
-	}
 }
 
 func loadConfig() (cfg *config.Config) {
@@ -245,5 +294,24 @@ func loadConfig() (cfg *config.Config) {
 			},
 		}
 	}
+
+	// init tls
+	for _, cfg := range cfg.Configs {
+		if cfg.ListenType == constant.Listen_WSS || cfg.ListenType == constant.Listen_MWSS ||
+			cfg.TransportType == constant.Transport_WSS || cfg.TransportType == constant.Transport_MWSS {
+			tls.InitTlsCfg()
+			break
+		}
+	}
+
 	return cfg
+}
+
+func InArray(ele string, array []string) bool {
+	for _, v := range array {
+		if v == ele {
+			return true
+		}
+	}
+	return false
 }
