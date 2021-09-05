@@ -5,7 +5,7 @@ import "time"
 var (
 	DefaultDeadline = 30 * time.Second
 
-	Version     = "1.0.7"
+	Version     = "1.1.0"
 	GitBranch   string
 	GitRevision string
 	BuildTime   string
@@ -47,5 +47,4 @@ const (
 
 	BUFFER_POOL_SIZE = 128      // 128 * 4kb
 	BUFFER_SIZE      = 4 * 1024 // 4kb
-
 )

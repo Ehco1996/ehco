@@ -44,6 +44,7 @@ go get -u "github.com/Ehco1996/ehco/cmd/ehco"
 * 从远程启动
 * benchmark
 * grafana 监控报警
+* 热重载配置
 
 ## 使用说明
 
@@ -99,10 +100,29 @@ go get -u "github.com/Ehco1996/ehco/cmd/ehco"
 }
 ```
 
+### 热重载配置
+
+> 大于 1.1.0 版本的 ehco 支持热重载配置
+
+```sh
+# 使用配置文件启动 ehco
+ehco  -c config.json
+
+# 更新配置文件后可以使用 kill -HUP pid 命令来重新加载配置
+kill -HUP pid
+
+# 重载成功可以看到如下信息
+[cfg-reload] Got A HUP Signal! Now Reloading Conf ...
+[cfg] Load Config From file:config.json
+[cfg-reload] starr new relay name=[At=127.0.0.1:12342 Over=raw TCP-To=[0.0.0.0:5201] UDP-To=[0.0.0.0:5201] Through=raw]
+[relay] Close relay [At=127.0.0.1:1234 Over=raw TCP-To=[0.0.0.0:5201] UDP-To=[0.0.0.0:5201] Through=raw]
+[relay] Start UDP relay [At=127.0.0.1:12342 Over=raw TCP-To=[0.0.0.0:5201] UDP-To=[0.0.0.0:5201] Through=raw]
+[relay] Start TCP relay [At=127.0.0.1:12342 Over=raw TCP-To=[0.0.0.0:5201] UDP-To=[0.0.0.0:5201] Through=raw]
+```
+
 ## 监控报警
 
 * dashboard 和 prometheus 规则可以从`monitor`文件夹下找到，可以自行导入
-
 
 * 类似 Smokeing Ping 的延迟监控
 
@@ -111,7 +131,6 @@ go get -u "github.com/Ehco1996/ehco/cmd/ehco"
 * 流量监控
 
 ![](monitor/traffic.png)
-
 
 ## Benchmark(Apple m1)
 
