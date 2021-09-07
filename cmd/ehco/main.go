@@ -84,7 +84,6 @@ func main() {
 		},
 		&cli.StringFlag{
 			Name:        "ur,udp_remote",
-			Value:       "0.0.0.0:9001",
 			Usage:       "UDP转发地址",
 			EnvVars:     []string{"EHCO_UDP_REMOTE_ADDR"},
 			Destination: &UDPRemoteAddr,
@@ -288,10 +287,12 @@ func loadConfig() (cfg *config.Config) {
 					Listen:        LocalAddr,
 					ListenType:    ListenType,
 					TCPRemotes:    []string{RemoteAddr},
-					UDPRemotes:    []string{UDPRemoteAddr},
 					TransportType: TransportType,
 				},
 			},
+		}
+		if UDPRemoteAddr != "" {
+			cfg.Configs[0].UDPRemotes = []string{UDPRemoteAddr}
 		}
 	}
 
