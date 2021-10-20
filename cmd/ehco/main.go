@@ -27,7 +27,7 @@ var RemoteAddr string
 var UDPRemoteAddr string
 var TransportType string
 var ConfigPath string
-var WebfPort int
+var WebPort int
 var WebToken string
 var EnablePing bool
 var SystemFilePath = "/etc/systemd/system/ehco.service"
@@ -106,7 +106,7 @@ func main() {
 			Usage:       "promtheus web expoter 的监听端口",
 			EnvVars:     []string{"EHCO_WEB_PORT"},
 			Value:       0,
-			Destination: &WebfPort,
+			Destination: &WebPort,
 		},
 		&cli.BoolFlag{
 			Name:        "enable_ping",
@@ -155,7 +155,6 @@ func main() {
 
 func start(ctx *cli.Context) error {
 	cfg := loadConfig()
-
 	if cfg.WebPort > 0 {
 		go web.StartWebServer(cfg)
 	}
@@ -278,7 +277,7 @@ func loadConfig() (cfg *config.Config) {
 		}
 	} else {
 		cfg = &config.Config{
-			WebPort:    WebfPort,
+			WebPort:    WebPort,
 			WebToken:   WebToken,
 			EnablePing: EnablePing,
 			PATH:       ConfigPath,

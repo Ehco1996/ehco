@@ -19,20 +19,12 @@ type RelayConfig struct {
 	Label         string   `json:"label"`
 }
 
-type JsonConfig struct {
-	WebPort    int    `json:"web_port,omitempty"`
-	WebToken   string `json:"web_token,omitempty"`
-	EnablePing bool   `json:"enable_ping,omitempty"`
-
-	Configs []RelayConfig `json:"relay_configs"`
-}
 type Config struct {
 	PATH       string
-	WebPort    int
-	WebToken   string
-	EnablePing bool
-
-	Configs []RelayConfig
+	WebPort    int           `json:"web_port,omitempty"`
+	WebToken   string        `json:"web_token,omitempty"`
+	EnablePing bool          `json:"enable_ping,omitempty"`
+	Configs    []RelayConfig `json:"relay_configs"`
 }
 
 func NewConfigByPath(path string) *Config {
@@ -54,15 +46,10 @@ func (c *Config) readFromFile() error {
 	if err != nil {
 		return err
 	}
-	jsonConfig := JsonConfig{}
-	err = json.Unmarshal([]byte(file), &jsonConfig)
+	err = json.Unmarshal([]byte(file), &c)
 	if err != nil {
 		return err
 	}
-	c.Configs = jsonConfig.Configs
-	c.EnablePing = jsonConfig.EnablePing
-	c.WebPort = jsonConfig.WebPort
-	c.WebToken = jsonConfig.WebToken
 	logger.Info("[cfg] Load Config From file:", c.PATH)
 	return nil
 }
@@ -74,11 +61,9 @@ func (c *Config) readFromHttp() error {
 		return err
 	}
 	defer r.Body.Close()
-	jsonConfig := JsonConfig{}
-	if err := json.NewDecoder(r.Body).Decode(&jsonConfig); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&c); err != nil {
 		return err
 	}
-	c.Configs = jsonConfig.Configs
 	logger.Info("[cfg] Load Config From http:", c.PATH, c.Configs)
 	return nil
 }
