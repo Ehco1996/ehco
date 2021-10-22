@@ -171,17 +171,15 @@ func startAndWatchRelayServers(cfg *config.Config) error {
 
 	// func used to start one relay
 	var startOneRelayFunc = func(r *relay.Relay) {
-		addr := r.ListenAddress
-		relayM.Store(addr, r)
+		relayM.Store(r.Name, r)
 		if err := r.ListenAndServe(); err != nil && !errors.Is(err, net.ErrClosed) {
 			logger.Errorf("[relay] Name=%s ListenAndServe err=%s", r.Name, err)
 		}
 	}
 
 	var stopOneRelayFunc = func(r *relay.Relay) {
-		addr := r.ListenAddress
 		r.Close()
-		relayM.Delete(addr)
+		relayM.Delete(r.Name)
 	}
 
 	// init relay map
@@ -233,12 +231,12 @@ func startAndWatchRelayServers(cfg *config.Config) error {
 					if err != nil {
 						logger.Fatalf("[cfg-reload] reload new relay failed err=%s", err.Error())
 					}
-					newRelayAddrList = append(newRelayAddrList, r.ListenAddress)
+					newRelayAddrList = append(newRelayAddrList, r.Name)
 
 					// reload old relay
-					if oldR, ok := relayM.Load(r.ListenAddress); ok {
+					if oldR, ok := relayM.Load(r.Name); ok {
 						oldR := oldR.(*relay.Relay)
-						if oldR.ListenAddress != r.ListenAddress {
+						if oldR.Name != r.Name {
 							logger.Infof("[cfg-reload] close old relay name=%s", oldR.Name)
 							stopOneRelayFunc(oldR)
 							go startOneRelayFunc(r)
