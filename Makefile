@@ -30,6 +30,5 @@ tidy:
 ensure: tidy
 	go mod download
 
-
 release:
 	goreleaser build --skip-validate --rm-dist

@@ -1,16 +1,19 @@
 # This is an example goreleaser.yaml file with some sane defaults.
 # Make sure to check the documentation at http://goreleaser.com
-before:
-  hooks:
-    - go mod download
-    - sudo apt-get install -y upx
+# before:
+hooks:
+  - go mod download
+  - sudo apt-get install -y upx
 builds:
   - id: ehco
     main: ./cmd/ehco/main.go
     flags:
       - -trimpath
     ldflags:
-      - -w -s -X ${PACKAGE}.GitBranch=${BRANCH} -X ${PACKAGE}.GitRevision=${REVISION} -X ${PACKAGE}.BuildTime=${BUILDTIME}
+      - -w -s
+      - -X github.com/Ehco1996/ehco/internal/constant.GitBranch={{.Branch}}
+      - -X github.com/Ehco1996/ehco/internal/constant.GitRevision={{.ShortCommit}}
+      - -X github.com/Ehco1996/ehco/internal/constant.BuildTime={{.Date}}
     goarch:
       - amd64
       - arm64
