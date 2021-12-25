@@ -5,7 +5,7 @@ import "time"
 var (
 	DefaultDeadline = 30 * time.Second
 
-	Version     = "1.1.0"
+	Version     = "1.1.1"
 	GitBranch   string
 	GitRevision string
 	BuildTime   string

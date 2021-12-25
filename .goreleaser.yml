@@ -10,7 +10,7 @@ builds:
     flags:
       - -trimpath
     ldflags:
-      - -s -w -X github.com/Ehco1996/ehco/internal/constant/constant.Version=$(VERSION)
+      - -w -s -X ${PACKAGE}.GitBranch=${BRANCH} -X ${PACKAGE}.GitRevision=${REVISION} -X ${PACKAGE}.BuildTime=${BUILDTIME}
     goarch:
       - amd64
       - arm64

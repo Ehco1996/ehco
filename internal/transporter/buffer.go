@@ -1,10 +1,8 @@
 package transporter
 
 import (
-	"errors"
 	"io"
 	"net"
-	"syscall"
 	"time"
 
 	"go.uber.org/atomic"
@@ -58,84 +56,34 @@ func (bp *BytePool) Put(b []byte) {
 	}
 }
 
-func transport(rw1, rw2 io.ReadWriter, remote string) error {
-	errc := make(chan error, 2)
-
-	go func() {
-		buf := BufferPool.Get()
-		defer BufferPool.Put(buf)
-		wt, err := io.CopyBuffer(rw1, rw2, buf)
-		web.NetWorkTransmitBytes.WithLabelValues(remote, web.METRIC_CONN_TCP).Add(float64(wt * 2))
-		errc <- err
-	}()
-
-	go func() {
-		buf := BufferPool.Get()
-		defer BufferPool.Put(buf)
-		wt, err := io.CopyBuffer(rw2, rw1, buf)
-		web.NetWorkTransmitBytes.WithLabelValues(remote, web.METRIC_CONN_TCP).Add(float64(wt * 2))
-		errc <- err
-	}()
-
-	err := <-errc
-	// NOTE 我们不关心 operror 比如 eof/reset/broken pipe
-	if err != nil {
-		if err == io.EOF || errors.Is(err, syscall.EPIPE) || errors.Is(err, syscall.ECONNRESET) {
-			err = nil
-		}
-	}
-	return err
+type ReadOnlyReader struct {
+	io.Reader
 }
 
-func transportWithDeadline(conn1, conn2 net.Conn, remote string) error {
-	// only set oneway deadline is enough
-	errChan := make(chan error, 2)
+type WriteOnlyWriter struct {
+	io.Writer
+}
+
+func transport(conn1, conn2 net.Conn, remote string) error {
+	errChan := make(chan error, 1)
 	// conn1 to conn2
 	go func() {
 		buf := BufferPool.Get()
 		defer BufferPool.Put(buf)
-		for {
-			_ = conn1.SetDeadline(time.Now().Add(constant.DefaultDeadline))
-			rn, err := conn1.Read(buf)
-			if err != nil {
-				errChan <- err
-				return
-			}
-			_ = conn1.SetDeadline(time.Time{})
-			_, err = conn2.Write(buf[:rn])
-			if err != nil {
-				errChan <- err
-				return
-			}
-			web.NetWorkTransmitBytes.WithLabelValues(remote, web.METRIC_CONN_TCP).Add(float64(rn * 2))
-		}
+		rn, err := io.CopyBuffer(WriteOnlyWriter{Writer: conn1}, ReadOnlyReader{Reader: conn2}, buf)
+		web.NetWorkTransmitBytes.WithLabelValues(remote, web.METRIC_CONN_TCP).Add(float64(rn * 2))
+		conn1.SetReadDeadline(time.Now())
+		errChan <- err
 	}()
+
 	// conn2 to conn1
-	go func() {
-		buf := BufferPool.Get()
-		defer BufferPool.Put(buf)
-		for {
-			rn, err := conn2.Read(buf)
-			if err != nil {
-				errChan <- err
-				return
-			}
-			_, err = conn1.Write(buf[:rn])
-			if err != nil {
-				errChan <- err
-				return
-			}
-			web.NetWorkTransmitBytes.WithLabelValues(remote, web.METRIC_CONN_TCP).Add(float64(rn * 2))
-		}
-	}()
-	err := <-errChan
-	// NOTE 我们不关心 operror 比如 eof/reset/broken pipe
-	if err != nil {
-		if err == io.EOF || errors.Is(err, syscall.EPIPE) || errors.Is(err, syscall.ECONNRESET) {
-			err = nil
-		}
-	}
-	return err
+	buf := BufferPool.Get()
+	defer BufferPool.Put(buf)
+	rn, _ := io.CopyBuffer(WriteOnlyWriter{Writer: conn2}, ReadOnlyReader{Reader: conn1}, buf)
+	// 可以忽略一次error，因为当conn1关闭时，conn2也会关闭
+	conn2.SetReadDeadline(time.Now())
+	web.NetWorkTransmitBytes.WithLabelValues(remote, web.METRIC_CONN_TCP).Add(float64(rn * 2))
+	return <-errChan
 }
 
 type BufferCh struct {
