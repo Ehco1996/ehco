@@ -17,16 +17,6 @@ jobs:
           tag_names: true
           dockerfile: build/Dockerfile
 
-      - uses: actions/checkout@master
-      - name: Build arm image
-        uses: elgohr/Publish-Docker-Github-Action@master
-        with:
-          name: ehco1996/ehco
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
-          tag_names: true
-          dockerfile: build/arm.Dockerfile
-
       - name: Update Homebrew formula
         uses: dawidd6/action-homebrew-bump-formula@v3
         with:
