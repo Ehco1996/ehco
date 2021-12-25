@@ -1,9 +1,9 @@
 # This is an example goreleaser.yaml file with some sane defaults.
 # Make sure to check the documentation at http://goreleaser.com
-# before:
-hooks:
-  - go mod download
-  - sudo apt-get install -y upx
+before:
+  hooks:
+    - go mod download
+    - sudo apt-get install -y upx
 builds:
   - id: ehco
     main: ./cmd/ehco/main.go
