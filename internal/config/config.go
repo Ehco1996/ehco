@@ -27,7 +27,7 @@ type Config struct {
 	EnablePing   bool          `json:"enable_ping,omitempty"`
 	RelayConfigs []RelayConfig `json:"relay_configs"`
 
-	XRayConfig *xray.Config `json:"xray_configs,omitempty"`
+	XRayConfig *xray.Config `json:"xray_config,omitempty"`
 }
 
 func NewConfigByPath(path string) *Config {
@@ -53,7 +53,7 @@ func (c *Config) readFromFile() error {
 	if err != nil {
 		return err
 	}
-	logger.Info("[cfg] Load Config From file:", c.PATH)
+	logger.Info("[cfg] Load Config From file: ", c.PATH)
 	return nil
 }
 

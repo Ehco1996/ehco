@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"net"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -196,7 +198,9 @@ func inArray(ele string, array []string) bool {
 
 func startOneRelay(r *relay.Relay, relayM *sync.Map, errCh chan error) {
 	relayM.Store(r.Name, r)
-	errCh <- r.ListenAndServe()
+	if err := r.ListenAndServe(); !errors.Is(err, net.ErrClosed) { // mute use closed network error
+		errCh <- err
+	}
 }
 
 func stopOneRelay(r *relay.Relay, relayM *sync.Map) {
@@ -225,7 +229,7 @@ func startRelayServers(ctx context.Context, cfg *config.Config) error {
 	case err := <-errCH:
 		return err
 	case <-ctx.Done():
-		logger.Info("start to stop relay servers")
+		logger.Info("[relay]start to stop relay servers")
 		relayM.Range(func(key, value interface{}) bool {
 			r := value.(*relay.Relay)
 			r.Close()
@@ -236,7 +240,7 @@ func startRelayServers(ctx context.Context, cfg *config.Config) error {
 }
 
 func watchAndReloadConfig(ctx context.Context, relayM *sync.Map, errCh chan error) {
-	logger.Errorf("[cfg-reload] Start to watch config file: %s ", ConfigPath)
+	logger.Errorf("[cfg] Start to watch config file: %s ", ConfigPath)
 
 	reloadCH := make(chan os.Signal, 1)
 	signal.Notify(reloadCH, syscall.SIGHUP)
@@ -246,17 +250,17 @@ func watchAndReloadConfig(ctx context.Context, relayM *sync.Map, errCh chan erro
 		case <-ctx.Done():
 			return
 		case <-reloadCH:
-			logger.Info("[cfg-reload] Got A HUP Signal! Now Reloading Conf")
+			logger.Info("[cfg] Got A HUP Signal! Now Reloading Conf")
 			newCfg, err := loadConfig()
 			if err != nil {
-				logger.Errorf("[cfg-reload] Reloading Conf meet error: %s ", err)
+				logger.Errorf("[cfg] Reloading Conf meet error: %s ", err)
 			}
 
 			var newRelayAddrList []string
 			for idx := range newCfg.RelayConfigs {
 				r, err := relay.NewRelay(&newCfg.RelayConfigs[idx])
 				if err != nil {
-					logger.Fatalf("[cfg-reload] reload new relay failed err=%s", err.Error())
+					logger.Fatalf("[cfg] reload new relay failed err=%s", err.Error())
 				}
 				newRelayAddrList = append(newRelayAddrList, r.Name)
 
@@ -264,14 +268,14 @@ func watchAndReloadConfig(ctx context.Context, relayM *sync.Map, errCh chan erro
 				if oldR, ok := relayM.Load(r.Name); ok {
 					oldR := oldR.(*relay.Relay)
 					if oldR.Name != r.Name {
-						logger.Infof("[cfg-reload] close old relay name=%s", oldR.Name)
+						logger.Infof("[cfg] close old relay name=%s", oldR.Name)
 						stopOneRelay(oldR, relayM)
 						go startOneRelay(r, relayM, errCh)
 					}
 					continue // no need to reload
 				}
 				// start bread new relay that not in old relayM
-				logger.Infof("[cfg-reload] starr new relay name=%s", r.Name)
+				logger.Infof("[cfg] starr new relay name=%s", r.Name)
 				go startOneRelay(r, relayM, errCh)
 			}
 			// closed relay not in new config
@@ -315,16 +319,12 @@ func start(ctx *cli.Context) error {
 
 	if len(cfg.RelayConfigs) > 0 {
 		go func() {
-			logger.Fatalf("[xray] StartRelayServers meet err=%s", startRelayServers(mainCtx, cfg))
+			logger.Fatalf("[relay] StartRelayServers meet err=%v", startRelayServers(mainCtx, cfg))
 		}()
 	}
 
-	select {
-	case <-ctx.Done():
-		logger.Info("ctx cancelled relay server exit")
-	case <-sigs:
-		cancel()
-	}
+	<-sigs
+	cancel()
 	return nil
 }
 
