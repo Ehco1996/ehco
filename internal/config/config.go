@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/Ehco1996/ehco/internal/logger"
+	xray "github.com/xtls/xray-core/core"
 )
 
 type RelayConfig struct {
@@ -20,15 +21,17 @@ type RelayConfig struct {
 }
 
 type Config struct {
-	PATH       string
-	WebPort    int           `json:"web_port,omitempty"`
-	WebToken   string        `json:"web_token,omitempty"`
-	EnablePing bool          `json:"enable_ping,omitempty"`
-	Configs    []RelayConfig `json:"relay_configs"`
+	PATH         string
+	WebPort      int           `json:"web_port,omitempty"`
+	WebToken     string        `json:"web_token,omitempty"`
+	EnablePing   bool          `json:"enable_ping,omitempty"`
+	RelayConfigs []RelayConfig `json:"relay_configs"`
+
+	XRayConfig *xray.Config `json:"xray_configs,omitempty"`
 }
 
 func NewConfigByPath(path string) *Config {
-	return &Config{PATH: path, Configs: []RelayConfig{}}
+	return &Config{PATH: path, RelayConfigs: []RelayConfig{}}
 }
 
 func (c *Config) LoadConfig() error {
@@ -64,6 +67,6 @@ func (c *Config) readFromHttp() error {
 	if err := json.NewDecoder(r.Body).Decode(&c); err != nil {
 		return err
 	}
-	logger.Info("[cfg] Load Config From http:", c.PATH, c.Configs)
+	logger.Info("[cfg] Load Config From http:", c.PATH, c.RelayConfigs)
 	return nil
 }

@@ -61,7 +61,7 @@ func NewPingGroup(cfg *config.Config) *PingGroup {
 	seen := make(map[string]*ping.Pinger)
 	labelMap := make(map[string]string)
 
-	for _, relayCfg := range cfg.Configs {
+	for _, relayCfg := range cfg.RelayConfigs {
 		// NOTE (https/ws/wss)://xxx.com -> xxx.com
 		for _, host := range relayCfg.TCPRemotes {
 			if strings.Contains(host, "//") {

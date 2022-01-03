@@ -1,5 +1,5 @@
 NAME=ehco
-BINDIR=.dist
+BINDIR=dist
 
 PACKAGE=github.com/Ehco1996/ehco/internal/constant
 BUILDTIME=$(shell date +"%m-%d-%y-%T")

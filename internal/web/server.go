@@ -56,7 +56,7 @@ func registerMetrics(cfg *config.Config) {
 func simpleTokenAuthMiddleware(token string, h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if t := r.URL.Query().Get("token"); t != token {
-			msg := fmt.Sprintf("[web] unauthored from %s", r.RemoteAddr)
+			msg := fmt.Sprintf("[web] unauthed request from %s", r.RemoteAddr)
 			logger.Logger.Error(msg)
 			hj, ok := w.(http.Hijacker)
 			if ok {
@@ -71,7 +71,7 @@ func simpleTokenAuthMiddleware(token string, h http.Handler) http.Handler {
 	})
 }
 
-func StartWebServer(cfg *config.Config) {
+func StartWebServer(cfg *config.Config) error {
 	addr := fmt.Sprintf("0.0.0.0:%d", cfg.WebPort)
 	logger.Infof("[web] Start Web Server at http://%s/", addr)
 	r := mux.NewRouter()
@@ -80,8 +80,8 @@ func StartWebServer(cfg *config.Config) {
 	r.Handle("/", http.HandlerFunc(Welcome))
 	r.Handle("/metrics/", promhttp.Handler())
 	if cfg.WebToken != "" {
-		logger.Fatal(http.ListenAndServe(addr, simpleTokenAuthMiddleware(cfg.WebToken, r)))
+		return http.ListenAndServe(addr, simpleTokenAuthMiddleware(cfg.WebToken, r))
 	} else {
-		logger.Fatal(http.ListenAndServe(addr, r))
+		return http.ListenAndServe(addr, r)
 	}
 }

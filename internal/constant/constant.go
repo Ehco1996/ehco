@@ -45,6 +45,6 @@ const (
 	Transport_WSS  = "wss"
 	Transport_MWSS = "mwss"
 
-	BUFFER_POOL_SIZE = 128      // 128 * 4kb
-	BUFFER_SIZE      = 4 * 1024 // 4kb
+	BUFFER_POOL_SIZE = 128
+	BUFFER_SIZE      = 128 * 1024 // 128KB
 )

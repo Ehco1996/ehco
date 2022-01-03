@@ -1,0 +1,122 @@
+{
+  "web_port": 9000,
+  "web_token": "",
+  "enable_ping": false,
+
+  "relay_configs": [
+    {
+      "listen": "127.0.0.1:1234",
+      "listen_type": "raw",
+      "transport_type": "raw",
+      "tcp_remotes": ["0.0.0.0:5201"],
+      "udp_remotes": ["0.0.0.0:5201"]
+    }
+  ],
+
+  "xray_config": {
+    "stats": {},
+    "api": {
+      "tag": "api",
+      "services": ["StatsService"]
+    },
+    "log": {
+      "loglevel": "debug"
+    },
+    "policy": {
+      "levels": {
+        "0": {
+          "statsUserUplink": true,
+          "statsUserDownlink": true
+        }
+      },
+      "system": {
+        "statsInboundUplink": true,
+        "statsInboundDownlink": true,
+        "statsOutboundUplink": true,
+        "statsOutboundDownlink": true
+      }
+    },
+    "inbounds": [
+      {
+        "listen": "127.0.0.1",
+        "port": 8080,
+        "protocol": "dokodemo-door",
+        "settings": {
+          "address": "127.0.0.1"
+        },
+        "tag": "api"
+      },
+      {
+        "port": 12345,
+        "protocol": "shadowsocks",
+        "settings": {
+          "clients": [
+            {
+              "email": "auser",
+              "id": "e731f153-4f31-49d3-9e8f-ff8f396135ef",
+              "password": "example_user_1",
+              "method": "aes-128-gcm",
+              "level": 0
+            },
+            {
+              "email": "buser",
+              "id": "e731f153-4f31-49d3-9e8f-ff8f396135e1",
+              "password": "example_user_2",
+              "method": "aes-128-gcm",
+              "level": 0
+            },
+            {
+              "email": "cuser",
+              "id": "e731f153-4f31-49d3-9e8f-ff8f396135e2",
+              "password": "example_user_3",
+              "method": "aes-128-gcm",
+              "level": 0
+            }
+          ],
+          "network": "tcp,udp"
+        }
+      },
+      {
+        "port": 10801,
+        "protocol": "socks",
+        "settings": {
+          "udp": true
+        }
+      },
+      {
+        "port": 10802,
+        "protocol": "http"
+      }
+    ],
+    "outbounds": [
+      {
+        "protocol": "freedom",
+        "settings": {}
+      },
+      {
+        "protocol": "shadowsocks",
+        "settings": {
+          "servers": [
+            {
+              "address": "127.0.0.1",
+              "port": 12345,
+              "password": "example_user_1",
+              "method": "aes-128-gcm"
+            }
+          ]
+        }
+      }
+    ],
+    "routing": {
+      "settings": {
+        "rules": [
+          {
+            "type": "field",
+            "inboundTag": ["api"],
+            "outboundTag": "api"
+          }
+        ]
+      }
+    }
+  }
+}

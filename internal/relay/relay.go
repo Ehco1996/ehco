@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/Ehco1996/ehco/internal/config"
@@ -17,6 +18,8 @@ import (
 	"github.com/gorilla/mux"
 	"go.uber.org/atomic"
 )
+
+var doOnce sync.Once
 
 type Relay struct {
 	cfg *config.RelayConfig
@@ -79,6 +82,10 @@ func NewRelay(cfg *config.RelayConfig) (*Relay, error) {
 }
 
 func (r *Relay) ListenAndServe() error {
+	doOnce.Do(func() {
+		web.EhcoAlive.Set(web.EhcoAliveStateRunning)
+	})
+
 	errCh := make(chan error)
 	switch r.ListenType {
 	case constant.Listen_RAW:

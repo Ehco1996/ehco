@@ -2,9 +2,7 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"net"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -19,6 +17,7 @@ import (
 	"github.com/Ehco1996/ehco/internal/relay"
 	"github.com/Ehco1996/ehco/internal/tls"
 	"github.com/Ehco1996/ehco/internal/web"
+	"github.com/Ehco1996/ehco/pkg/xray"
 )
 
 var LocalAddr string
@@ -46,7 +45,7 @@ Restart=always
 WantedBy=multi-user.target
 `
 
-func main() {
+func createCliAPP() *cli.App {
 	cli.VersionPrinter = func(c *cli.Context) {
 		println("Welcome to ehco (ehco is a network relay tool and a typo)")
 		println(fmt.Sprintf("Version=%s", constant.Version))
@@ -145,141 +144,23 @@ func main() {
 			},
 		},
 	}
-
-	app.Action = start
-	err := app.Run(os.Args)
-	if err != nil {
-		logger.Fatal(err)
-	}
+	return app
 }
 
-func start(ctx *cli.Context) error {
-	cfg := loadConfig()
-	if cfg.WebPort > 0 {
-		go web.StartWebServer(cfg)
-	}
-	return startAndWatchRelayServers(cfg)
-}
-
-func startAndWatchRelayServers(cfg *config.Config) error {
-	// init main ctx
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	// relay ListenAddress -> relay
-	var relayM sync.Map
-
-	// func used to start one relay
-	var startOneRelayFunc = func(r *relay.Relay) {
-		relayM.Store(r.Name, r)
-		if err := r.ListenAndServe(); err != nil && !errors.Is(err, net.ErrClosed) {
-			logger.Errorf("[relay] Name=%s ListenAndServe err=%s", r.Name, err)
-		}
-	}
-
-	var stopOneRelayFunc = func(r *relay.Relay) {
-		r.Close()
-		relayM.Delete(r.Name)
-	}
-
-	// init relay map
-	for idx := range cfg.Configs {
-		r, err := relay.NewRelay(&cfg.Configs[idx])
-		if err != nil {
-			return err
-		}
-		go startOneRelayFunc(r)
-	}
-	// wg to control sub goroutine
-	var wg sync.WaitGroup
-
-	sigs := make(chan os.Signal, 1)
-	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
-	wg.Add(1)
-	go func(ctx context.Context) {
-		defer wg.Done()
-		select {
-		case <-ctx.Done():
-			logger.Info("ctx cancelled relay server exit")
-		case <-sigs:
-			relayM.Range(func(key, value interface{}) bool {
-				r := value.(*relay.Relay)
-				r.Close()
-				return true
-			})
-			cancel()
-		}
-	}(ctx)
-
-	// start reload loop
-	reloadCH := make(chan os.Signal, 1)
-	signal.Notify(reloadCH, syscall.SIGHUP)
-	wg.Add(1)
-	go func(ctx context.Context) {
-		defer wg.Done()
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-reloadCH:
-				logger.Info("[cfg-reload] Got A HUP Signal! Now Reloading Conf ...")
-				newCfg := loadConfig()
-
-				var newRelayAddrList []string
-				for idx := range newCfg.Configs {
-					r, err := relay.NewRelay(&newCfg.Configs[idx])
-					if err != nil {
-						logger.Fatalf("[cfg-reload] reload new relay failed err=%s", err.Error())
-					}
-					newRelayAddrList = append(newRelayAddrList, r.Name)
-
-					// reload old relay
-					if oldR, ok := relayM.Load(r.Name); ok {
-						oldR := oldR.(*relay.Relay)
-						if oldR.Name != r.Name {
-							logger.Infof("[cfg-reload] close old relay name=%s", oldR.Name)
-							stopOneRelayFunc(oldR)
-							go startOneRelayFunc(r)
-						}
-						continue // no need to reload
-					}
-					// start bread new relay that not in old relayM
-					logger.Infof("[cfg-reload] starr new relay name=%s", r.Name)
-					go startOneRelayFunc(r)
-				}
-				// closed relay not in new config
-				relayM.Range(func(key, value interface{}) bool {
-					oldAddr := key.(string)
-					if !InArray(oldAddr, newRelayAddrList) {
-						v, _ := relayM.Load(oldAddr)
-						oldR := v.(*relay.Relay)
-						stopOneRelayFunc(oldR)
-					}
-					return true
-				})
-			}
-		}
-	}(ctx)
-
-	//TODO refine this
-	web.EhcoAlive.Set(web.EhcoAliveStateRunning)
-	wg.Wait()
-	return nil
-}
-
-func loadConfig() (cfg *config.Config) {
+func loadConfig() (cfg *config.Config, err error) {
 	if ConfigPath != "" {
 		cfg = config.NewConfigByPath(ConfigPath)
 		if err := cfg.LoadConfig(); err != nil {
-			logger.Fatal(err)
+			return nil, err
 		}
 	} else {
+		// prepare config from cli args
 		cfg = &config.Config{
 			WebPort:    WebPort,
 			WebToken:   WebToken,
 			EnablePing: EnablePing,
 			PATH:       ConfigPath,
-			Configs: []config.RelayConfig{
+			RelayConfigs: []config.RelayConfig{
 				{
 					Listen:        LocalAddr,
 					ListenType:    ListenType,
@@ -289,27 +170,168 @@ func loadConfig() (cfg *config.Config) {
 			},
 		}
 		if UDPRemoteAddr != "" {
-			cfg.Configs[0].UDPRemotes = []string{UDPRemoteAddr}
+			cfg.RelayConfigs[0].UDPRemotes = []string{UDPRemoteAddr}
 		}
 	}
 
 	// init tls
-	for _, cfg := range cfg.Configs {
+	for _, cfg := range cfg.RelayConfigs {
 		if cfg.ListenType == constant.Listen_WSS || cfg.ListenType == constant.Listen_MWSS ||
 			cfg.TransportType == constant.Transport_WSS || cfg.TransportType == constant.Transport_MWSS {
 			tls.InitTlsCfg()
 			break
 		}
 	}
-
-	return cfg
+	return cfg, nil
 }
 
-func InArray(ele string, array []string) bool {
+func inArray(ele string, array []string) bool {
 	for _, v := range array {
 		if v == ele {
 			return true
 		}
 	}
 	return false
+}
+
+func startOneRelay(r *relay.Relay, relayM *sync.Map, errCh chan error) {
+	relayM.Store(r.Name, r)
+	errCh <- r.ListenAndServe()
+}
+
+func stopOneRelay(r *relay.Relay, relayM *sync.Map) {
+	r.Close()
+	relayM.Delete(r.Name)
+}
+
+func startRelayServers(ctx context.Context, cfg *config.Config) error {
+	// relay ListenAddress -> relay
+	relayM := &sync.Map{}
+	errCH := make(chan error, 1)
+	// init and relay servers
+	for idx := range cfg.RelayConfigs {
+		r, err := relay.NewRelay(&cfg.RelayConfigs[idx])
+		if err != nil {
+			return err
+		}
+		go startOneRelay(r, relayM, errCH)
+	}
+	// start watch config file TODO support reload from http , refine the ConfigPath global var
+	if ConfigPath != "" {
+		go watchAndReloadConfig(ctx, relayM, errCH)
+	}
+
+	select {
+	case err := <-errCH:
+		return err
+	case <-ctx.Done():
+		logger.Info("start to stop relay servers")
+		relayM.Range(func(key, value interface{}) bool {
+			r := value.(*relay.Relay)
+			r.Close()
+			return true
+		})
+		return nil
+	}
+}
+
+func watchAndReloadConfig(ctx context.Context, relayM *sync.Map, errCh chan error) {
+	logger.Errorf("[cfg-reload] Start to watch config file: %s ", ConfigPath)
+
+	reloadCH := make(chan os.Signal, 1)
+	signal.Notify(reloadCH, syscall.SIGHUP)
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-reloadCH:
+			logger.Info("[cfg-reload] Got A HUP Signal! Now Reloading Conf")
+			newCfg, err := loadConfig()
+			if err != nil {
+				logger.Errorf("[cfg-reload] Reloading Conf meet error: %s ", err)
+			}
+
+			var newRelayAddrList []string
+			for idx := range newCfg.RelayConfigs {
+				r, err := relay.NewRelay(&newCfg.RelayConfigs[idx])
+				if err != nil {
+					logger.Fatalf("[cfg-reload] reload new relay failed err=%s", err.Error())
+				}
+				newRelayAddrList = append(newRelayAddrList, r.Name)
+
+				// reload old relay
+				if oldR, ok := relayM.Load(r.Name); ok {
+					oldR := oldR.(*relay.Relay)
+					if oldR.Name != r.Name {
+						logger.Infof("[cfg-reload] close old relay name=%s", oldR.Name)
+						stopOneRelay(oldR, relayM)
+						go startOneRelay(r, relayM, errCh)
+					}
+					continue // no need to reload
+				}
+				// start bread new relay that not in old relayM
+				logger.Infof("[cfg-reload] starr new relay name=%s", r.Name)
+				go startOneRelay(r, relayM, errCh)
+			}
+			// closed relay not in new config
+			relayM.Range(func(key, value interface{}) bool {
+				oldAddr := key.(string)
+				if !inArray(oldAddr, newRelayAddrList) {
+					v, _ := relayM.Load(oldAddr)
+					oldR := v.(*relay.Relay)
+					stopOneRelay(oldR, relayM)
+				}
+				return true
+			})
+		}
+	}
+}
+
+func start(ctx *cli.Context) error {
+	cfg, err := loadConfig()
+	if err != nil {
+		return err
+	}
+
+	// init main ctx
+	mainCtx, cancel := context.WithCancel(ctx.Context)
+	defer cancel()
+
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
+
+	if cfg.WebPort > 0 {
+		go func() {
+			logger.Fatalf("[web] StartWebServer meet err=%s", web.StartWebServer(cfg))
+		}()
+	}
+
+	if cfg.XRayConfig != nil {
+		go func() {
+			logger.Fatalf("[xray] StartXrayServer meet err=%s", xray.StartXrayServer(mainCtx, cfg.XRayConfig))
+		}()
+	}
+
+	if len(cfg.RelayConfigs) > 0 {
+		go func() {
+			logger.Fatalf("[xray] StartRelayServers meet err=%s", startRelayServers(mainCtx, cfg))
+		}()
+	}
+
+	select {
+	case <-ctx.Done():
+		logger.Info("ctx cancelled relay server exit")
+	case <-sigs:
+		cancel()
+	}
+	return nil
+}
+
+func main() {
+	app := createCliAPP()
+	// register start command
+	app.Action = start
+	// main thread start
+	logger.Fatal(app.Run(os.Args))
 }

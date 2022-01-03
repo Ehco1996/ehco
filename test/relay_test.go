@@ -44,7 +44,7 @@ func init() {
 
 	cfg := config.Config{
 		PATH: "",
-		Configs: []config.RelayConfig{
+		RelayConfigs: []config.RelayConfig{
 			// raw cfg
 			{
 				Listen:        RAW_LISTEN,
@@ -98,7 +98,7 @@ func init() {
 		},
 	}
 
-	for _, c := range cfg.Configs {
+	for _, c := range cfg.RelayConfigs {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
