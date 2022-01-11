@@ -8,7 +8,7 @@ require (
 	github.com/gorilla/mux v1.8.0
 	github.com/prometheus/client_golang v1.11.0
 	github.com/urfave/cli/v2 v2.3.0
-	github.com/xtaci/smux v1.5.16
+	github.com/xtaci/smux v2.0.1+incompatible
 	github.com/xtls/xray-core v1.5.2
 	go.uber.org/atomic v1.9.0
 	go.uber.org/zap v1.19.1
@@ -23,6 +23,7 @@ require (
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.1 // indirect
 	github.com/pires/go-proxyproto v0.6.1 // indirect
+	github.com/pkg/errors v0.9.1 // indirect
 	github.com/prometheus/client_model v0.2.0 // indirect
 	github.com/prometheus/common v0.26.0 // indirect
 	github.com/prometheus/procfs v0.6.0 // indirect
