@@ -17,10 +17,10 @@
     "stats": {},
     "api": {
       "tag": "api",
-      "services": ["StatsService"]
+      "services": ["StatsService", "HandlerService"]
     },
     "log": {
-      "loglevel": "debug"
+      "loglevel": "info"
     },
     "policy": {
       "levels": {

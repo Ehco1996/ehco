@@ -313,7 +313,7 @@ func start(ctx *cli.Context) error {
 
 	if cfg.XRayConfig != nil {
 		go func() {
-			logger.Fatalf("[xray] StartXrayServer meet err=%s", xray.StartXrayServer(mainCtx, cfg.XRayConfig))
+			logger.Fatalf("[xray] StartXrayServer meet err=%s", xray.StartXrayServer(mainCtx, cfg))
 		}()
 	}
 
