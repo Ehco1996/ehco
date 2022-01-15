@@ -39,8 +39,8 @@ func AddInboundUser(ctx context.Context, c proxy.HandlerServiceClient, tag strin
 }
 
 //RemoveInboundUser remove user from inbound by tag
-func RemoveInboundUser(c proxy.HandlerServiceClient, tag string, user *User) error {
-	resp, err := c.AlterInbound(context.Background(), &proxy.AlterInboundRequest{
+func RemoveInboundUser(ctx context.Context, c proxy.HandlerServiceClient, tag string, user *User) error {
+	resp, err := c.AlterInbound(ctx, &proxy.AlterInboundRequest{
 		Tag: tag,
 		Operation: serial.ToTypedMessage(&proxy.RemoveUserOperation{
 			Email: user.GetEmail(),

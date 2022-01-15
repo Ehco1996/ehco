@@ -2,8 +2,6 @@ package xray
 
 import (
 	"context"
-	"errors"
-	"fmt"
 	"net/http"
 	"strconv"
 	"sync"
@@ -29,6 +27,22 @@ type User struct {
 	DownloadTraffic int64 `json:"download_traffic"`
 }
 
+type UserTraffic struct {
+	UploadTraffic   int64    `json:"upload_traffic"`
+	DownloadTraffic int64    `json:"download_traffic"`
+	IPList          []string `json:"ip_list"`
+	TcpCount        int64    `json:"tcp_conn_num"`
+}
+
+type SyncTrafficReq struct {
+	Data []*UserTraffic `json:"data"`
+}
+
+type SyncUserConfigsResp struct {
+	// TODO support other protocol
+	Users []*User `json:"users"`
+}
+
 // NOTE we user user id as email
 func (u *User) GetEmail() string {
 	return string(u.ID)
@@ -37,6 +51,25 @@ func (u *User) GetEmail() string {
 func (u *User) ResetTraffic() {
 	u.DownloadTraffic = 0
 	u.UploadTraffic = 0
+}
+
+func (u *User) GenTraffic() *UserTraffic {
+	return &UserTraffic{
+		UploadTraffic:   u.UploadTraffic,
+		DownloadTraffic: u.DownloadTraffic,
+		IPList:          []string{},
+		TcpCount:        0,
+	}
+}
+
+func (u *User) UpdateFromServer(serverSideUser *User) {
+	u.Method = serverSideUser.Method
+	u.Enable = serverSideUser.Enable
+	u.Password = serverSideUser.Password
+}
+
+func (u *User) Equal(new *User) bool {
+	return u.Method == new.Method && u.Enable == new.Enable && u.Password == new.Password
 }
 
 // UserPool user pool
@@ -88,15 +121,11 @@ func (up *UserPool) CreateUser(userId, level int, password string, enable bool) 
 	return u
 }
 
-func (up *UserPool) GetUser(id int) (*User, error) {
+func (up *UserPool) GetUser(id int) (*User, bool) {
 	up.RLock()
 	defer up.RUnlock()
-
-	if user, found := up.users[id]; found {
-		return user, nil
-	} else {
-		return nil, errors.New(fmt.Sprintf("User Not Found Id: %s", id))
-	}
+	user, ok := up.users[id]
+	return user, ok
 }
 
 func (up *UserPool) RemoveUser(id int) {
@@ -116,7 +145,7 @@ func (up *UserPool) GetAllUsers() []*User {
 	return users
 }
 
-func (up *UserPool) syncTrafficToServer(ctx context.Context) error {
+func (up *UserPool) syncTrafficToServer(ctx context.Context, endpoint string) error {
 	// sync traffic from xray server
 	// V2ray的stats的统计模块设计的非常奇怪，具体规则如下
 	// 上传流量："user>>>" + user.Email + ">>>traffic>>>uplink"
@@ -132,9 +161,9 @@ func (up *UserPool) syncTrafficToServer(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-		user, err := up.GetUser(userID)
-		if err != nil {
-			return err
+		user, found := up.GetUser(userID)
+		if !found {
+			logger.Logger.Panicf("user not found, user id: %d", userID)
 		}
 		switch trafficType {
 		case "uplink":
@@ -149,15 +178,48 @@ func (up *UserPool) syncTrafficToServer(ctx context.Context) error {
 		tf := user.DownloadTraffic + user.UploadTraffic
 		if tf > 0 {
 			logger.Infof("[xray] User: %v Now Used Total Traffic: %v", user.ID, tf)
-			tfs = append(tfs, &UserTraffic{
-				UserId:          user.ID,
-				DownloadTraffic: user.DownloadTraffic,
-				UploadTraffic:   user.UploadTraffic,
-			})
+			tfs = append(tfs, user.GenTraffic())
 			user.ResetTraffic()
 		}
 	}
-	postJson(up.httpClient, API_ENDPOINT, &syncReq{UserTraffics: tfs})
-	logger.Infof("[xray] Call syncUserTrafficToServer ONLINE USER COUNT: %d", len(tfs))
+	if err := postJson(up.httpClient, endpoint, &SyncTrafficReq{Data: tfs}); err != nil {
+		return err
+	}
+	logger.Infof("[xray] Call syncTrafficToServer ONLINE USER COUNT: %d", len(tfs))
 	return nil
+}
+
+func (up *UserPool) syncUserConfigsFromServer(ctx context.Context, endpoint string) error {
+	resp := SyncUserConfigsResp{}
+	if err := getJson(up.httpClient, endpoint, &resp); err != nil {
+		return err
+	}
+
+	for _, newUser := range resp.Users {
+		oldUser, found := up.GetUser(newUser.ID)
+		if !found {
+			newUser := up.CreateUser(newUser.ID, newUser.Level, newUser.Password, newUser.Enable)
+			if newUser.Enable {
+				if err := AddInboundUser(ctx, up.proxyClient, XraySSProxyTag, newUser); err != nil {
+					return err
+				}
+			}
+		} else {
+			if !oldUser.Equal(newUser) {
+				if err := RemoveInboundUser(ctx, up.proxyClient, XraySSProxyTag, oldUser); err != nil {
+					return err
+				}
+				oldUser.UpdateFromServer(newUser)
+				if err := AddInboundUser(ctx, up.proxyClient, XraySSProxyTag, oldUser); err != nil {
+					return err
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+func (up *UserPool) StartSyncUserTask(ctx context.Context) {
+
 }

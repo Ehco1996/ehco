@@ -14,7 +14,8 @@ import (
 )
 
 const (
-	XrayAPITag = "api"
+	XrayAPITag     = "api"
+	XraySSProxyTag = "ss_proxy"
 )
 
 func StartXrayServer(ctx context.Context, cfg *config.Config) error {
