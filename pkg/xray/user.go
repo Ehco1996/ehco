@@ -2,6 +2,7 @@ package xray
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"strconv"
 	"sync"
@@ -18,7 +19,7 @@ type User struct {
 	running bool
 
 	ID       int    `json:"user_id"`
-	Method   int    `json:"method"`
+	Method   string `json:"method"`
 	Password string `json:"password"`
 
 	Level           int   `json:"level"`
@@ -28,6 +29,7 @@ type User struct {
 }
 
 type UserTraffic struct {
+	ID              int      `json:"user_id"`
 	UploadTraffic   int64    `json:"upload_traffic"`
 	DownloadTraffic int64    `json:"download_traffic"`
 	IPList          []string `json:"ip_list"`
@@ -45,7 +47,7 @@ type SyncUserConfigsResp struct {
 
 // NOTE we user user id as email
 func (u *User) GetEmail() string {
-	return string(u.ID)
+	return fmt.Sprintf("%d", u.ID)
 }
 
 func (u *User) ResetTraffic() {
@@ -55,6 +57,7 @@ func (u *User) ResetTraffic() {
 
 func (u *User) GenTraffic() *UserTraffic {
 	return &UserTraffic{
+		ID:              u.ID,
 		UploadTraffic:   u.UploadTraffic,
 		DownloadTraffic: u.DownloadTraffic,
 		IPList:          []string{},
@@ -107,7 +110,7 @@ func NewUserPool(ctx context.Context, xrayEndPoint string) (*UserPool, error) {
 }
 
 // CreateUser get create user
-func (up *UserPool) CreateUser(userId, level int, password string, enable bool) *User {
+func (up *UserPool) CreateUser(userId, level int, password, method string, enable bool) *User {
 	up.Lock()
 	defer up.Unlock()
 	u := &User{
@@ -116,6 +119,7 @@ func (up *UserPool) CreateUser(userId, level int, password string, enable bool) 
 		Password: password,
 		Level:    level,
 		Enable:   enable,
+		Method:   method,
 	}
 	up.users[u.ID] = u
 	return u
@@ -194,11 +198,10 @@ func (up *UserPool) syncUserConfigsFromServer(ctx context.Context, endpoint stri
 	if err := getJson(up.httpClient, endpoint, &resp); err != nil {
 		return err
 	}
-
 	for _, newUser := range resp.Users {
 		oldUser, found := up.GetUser(newUser.ID)
 		if !found {
-			newUser := up.CreateUser(newUser.ID, newUser.Level, newUser.Password, newUser.Enable)
+			newUser := up.CreateUser(newUser.ID, newUser.Level, newUser.Password, newUser.Method, newUser.Enable)
 			if newUser.Enable {
 				if err := AddInboundUser(ctx, up.proxyClient, XraySSProxyTag, newUser); err != nil {
 					return err
@@ -210,16 +213,36 @@ func (up *UserPool) syncUserConfigsFromServer(ctx context.Context, endpoint stri
 					return err
 				}
 				oldUser.UpdateFromServer(newUser)
+			}
+			if oldUser.Enable && !oldUser.running {
 				if err := AddInboundUser(ctx, up.proxyClient, XraySSProxyTag, oldUser); err != nil {
 					return err
 				}
 			}
 		}
 	}
-
 	return nil
 }
 
-func (up *UserPool) StartSyncUserTask(ctx context.Context) {
+func (up *UserPool) StartSyncUserTask(ctx context.Context, endpoint string) {
+	logger.Infof("[xray] Start Sync User Task")
 
+	syncOnce := func() {
+		if err := up.syncUserConfigsFromServer(ctx, endpoint); err != nil {
+			logger.Errorf("[xray] Sync User Configs From Server Error: %v", err)
+		}
+		if err := up.syncTrafficToServer(ctx, endpoint); err != nil {
+			logger.Errorf("[xray] Sync Traffic From Server Error: %v", err)
+		}
+	}
+	syncOnce()
+	ticker := time.NewTicker(time.Second * SyncTime)
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			syncOnce()
+		}
+	}
 }

@@ -16,16 +16,28 @@ func getEmailAndTrafficType(input string) (string, string) {
 	return s[1], s[len(s)-1]
 }
 
+func mappingCipher(in string) shadowsocks.CipherType {
+	switch in {
+	case "aes-128-cfb":
+		return shadowsocks.CipherType_AES_128_GCM
+	case "aes-256-cfb":
+		return shadowsocks.CipherType_AES_256_GCM
+	case "chacha20-ietf-poly1305":
+		return shadowsocks.CipherType_CHACHA20_POLY1305
+	}
+	return shadowsocks.CipherType_UNKNOWN
+}
+
 // AddInboundUser add user to inbound by tag
 func AddInboundUser(ctx context.Context, c proxy.HandlerServiceClient, tag string, user *User) error {
-	resp, err := c.AlterInbound(ctx, &proxy.AlterInboundRequest{
+	_, err := c.AlterInbound(ctx, &proxy.AlterInboundRequest{
 		Tag: tag,
 		Operation: serial.ToTypedMessage(&proxy.AddUserOperation{
 			User: &protocol.User{
 				Level: uint32(user.Level),
 				Email: user.GetEmail(),
 				Account: serial.ToTypedMessage(&shadowsocks.Account{
-					CipherType: shadowsocks.CipherType(user.Method),
+					CipherType: mappingCipher(user.Method),
 					Password:   user.Password}),
 			},
 		}),
@@ -33,14 +45,14 @@ func AddInboundUser(ctx context.Context, c proxy.HandlerServiceClient, tag strin
 	if err != nil {
 		return err
 	}
-	logger.Infof("[xray] Add User: %v To Server Tag: %v resp: %s", user.ID, tag, resp)
+	logger.Infof("[xray] Add User: %s To Server Tag: %s", user.GetEmail(), tag)
 	user.running = true
 	return nil
 }
 
 //RemoveInboundUser remove user from inbound by tag
 func RemoveInboundUser(ctx context.Context, c proxy.HandlerServiceClient, tag string, user *User) error {
-	resp, err := c.AlterInbound(ctx, &proxy.AlterInboundRequest{
+	_, err := c.AlterInbound(ctx, &proxy.AlterInboundRequest{
 		Tag: tag,
 		Operation: serial.ToTypedMessage(&proxy.RemoveUserOperation{
 			Email: user.GetEmail(),
@@ -50,7 +62,7 @@ func RemoveInboundUser(ctx context.Context, c proxy.HandlerServiceClient, tag st
 		return err
 
 	}
-	logger.Infof("[xray] Remove User: %v From Server Tag: %v resp: %s", user.ID, tag, resp)
+	logger.Infof("[xray] Remove User: %v From Server Tag: %s resp: %s", user.ID)
 	user.running = false
 	return nil
 }

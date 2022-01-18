@@ -311,7 +311,7 @@ func start(ctx *cli.Context) error {
 		}()
 	}
 
-	if cfg.XRayConfig != nil {
+	if cfg.XRayConfig != nil && cfg.SyncTrafficEndPoint != "" {
 		go func() {
 			logger.Fatalf("[xray] StartXrayServer meet err=%s", xray.StartXrayServer(mainCtx, cfg))
 		}()

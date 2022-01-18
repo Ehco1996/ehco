@@ -27,8 +27,9 @@ type Config struct {
 	WebToken   string `json:"web_token,omitempty"`
 	EnablePing bool   `json:"enable_ping,omitempty"`
 
-	RelayConfigs []RelayConfig `json:"relay_configs"`
-	XRayConfig   *conf.Config  `json:"xray_config,omitempty"`
+	RelayConfigs        []RelayConfig `json:"relay_configs"`
+	XRayConfig          *conf.Config  `json:"xray_config,omitempty"`
+	SyncTrafficEndPoint string        `json:"sync_traffic_endpoint"`
 }
 
 func NewConfigByPath(path string) *Config {
