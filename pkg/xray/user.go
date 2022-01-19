@@ -209,8 +209,10 @@ func (up *UserPool) syncUserConfigsFromServer(ctx context.Context, endpoint stri
 			}
 		} else {
 			if !oldUser.Equal(newUser) {
-				if err := RemoveInboundUser(ctx, up.proxyClient, XraySSProxyTag, oldUser); err != nil {
-					return err
+				if oldUser.running {
+					if err := RemoveInboundUser(ctx, up.proxyClient, XraySSProxyTag, oldUser); err != nil {
+						return err
+					}
 				}
 				oldUser.UpdateFromServer(newUser)
 			}
