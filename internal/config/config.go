@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/Ehco1996/ehco/internal/logger"
-	xray "github.com/xtls/xray-core/core"
+	"github.com/xtls/xray-core/infra/conf"
 )
 
 type RelayConfig struct {
@@ -21,27 +21,30 @@ type RelayConfig struct {
 }
 
 type Config struct {
-	PATH         string
-	WebPort      int           `json:"web_port,omitempty"`
-	WebToken     string        `json:"web_token,omitempty"`
-	EnablePing   bool          `json:"enable_ping,omitempty"`
-	RelayConfigs []RelayConfig `json:"relay_configs"`
+	PATH string
 
-	XRayConfig *xray.Config `json:"xray_config,omitempty"`
+	WebPort    int    `json:"web_port,omitempty"`
+	WebToken   string `json:"web_token,omitempty"`
+	EnablePing bool   `json:"enable_ping,omitempty"`
+
+	RelayConfigs        []RelayConfig `json:"relay_configs"`
+	XRayConfig          *conf.Config  `json:"xray_config,omitempty"`
+	SyncTrafficEndPoint string        `json:"sync_traffic_endpoint"`
 }
 
 func NewConfigByPath(path string) *Config {
 	return &Config{PATH: path, RelayConfigs: []RelayConfig{}}
 }
 
+func (c *Config) NeedSyncUserFromServer() bool {
+	return strings.Contains(c.PATH, "http")
+}
+
 func (c *Config) LoadConfig() error {
-	var err error
-	if strings.Contains(c.PATH, "http") {
-		err = c.readFromHttp()
-	} else {
-		err = c.readFromFile()
+	if c.NeedSyncUserFromServer() {
+		return c.readFromHttp()
 	}
-	return err
+	return c.readFromFile()
 }
 
 func (c *Config) readFromFile() error {
@@ -49,24 +52,20 @@ func (c *Config) readFromFile() error {
 	if err != nil {
 		return err
 	}
-	err = json.Unmarshal([]byte(file), &c)
+	logger.Info("[cfg] Load Config From file: ", c.PATH)
 	if err != nil {
 		return err
 	}
-	logger.Info("[cfg] Load Config From file: ", c.PATH)
-	return nil
+	return json.Unmarshal([]byte(file), &c)
 }
 
 func (c *Config) readFromHttp() error {
-	var myClient = &http.Client{Timeout: 10 * time.Second}
-	r, err := myClient.Get(c.PATH)
+	var httpc = &http.Client{Timeout: 10 * time.Second}
+	r, err := httpc.Get(c.PATH)
 	if err != nil {
 		return err
 	}
 	defer r.Body.Close()
-	if err := json.NewDecoder(r.Body).Decode(&c); err != nil {
-		return err
-	}
-	logger.Info("[cfg] Load Config From http:", c.PATH, c.RelayConfigs)
-	return nil
+	logger.Info("[cfg] Load Config From http:", c.PATH)
+	return json.NewDecoder(r.Body).Decode(&c)
 }

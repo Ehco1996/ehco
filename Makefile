@@ -21,6 +21,9 @@ test:
 build:
 	${GOBUILD} -o $(BINDIR)/$(NAME) cmd/ehco/main.go
 
+build-linux-amd64:
+	GOARCH=amd64 GOOS=linux ${GOBUILD} -o $(BINDIR)/$(NAME)_amd64 cmd/ehco/main.go
+
 tidy:
 	cat go.mod | grep -v ' indirect' > direct.mod
 	mv direct.mod go.mod

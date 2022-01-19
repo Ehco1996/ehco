@@ -13,14 +13,15 @@
     }
   ],
 
+  "sync_traffic_endpoint": "http://127.0.0.1:8000/api/proxy_configs/1/?token=youowntoken",
   "xray_config": {
     "stats": {},
     "api": {
       "tag": "api",
-      "services": ["StatsService"]
+      "services": ["StatsService", "HandlerService"]
     },
     "log": {
-      "loglevel": "debug"
+      "loglevel": "error"
     },
     "policy": {
       "levels": {
@@ -47,32 +48,12 @@
         "tag": "api"
       },
       {
+        "listen": "127.0.0.1",
         "port": 12345,
         "protocol": "shadowsocks",
+        "tag": "ss_proxy",
         "settings": {
-          "clients": [
-            {
-              "email": "auser",
-              "id": "e731f153-4f31-49d3-9e8f-ff8f396135ef",
-              "password": "example_user_1",
-              "method": "aes-128-gcm",
-              "level": 0
-            },
-            {
-              "email": "buser",
-              "id": "e731f153-4f31-49d3-9e8f-ff8f396135e1",
-              "password": "example_user_2",
-              "method": "aes-128-gcm",
-              "level": 0
-            },
-            {
-              "email": "cuser",
-              "id": "e731f153-4f31-49d3-9e8f-ff8f396135e2",
-              "password": "example_user_3",
-              "method": "aes-128-gcm",
-              "level": 0
-            }
-          ],
+          "clients": [],
           "network": "tcp,udp"
         }
       },
@@ -92,19 +73,6 @@
       {
         "protocol": "freedom",
         "settings": {}
-      },
-      {
-        "protocol": "shadowsocks",
-        "settings": {
-          "servers": [
-            {
-              "address": "127.0.0.1",
-              "port": 12345,
-              "password": "example_user_1",
-              "method": "aes-128-gcm"
-            }
-          ]
-        }
       }
     ],
     "routing": {
