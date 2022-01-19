@@ -48,6 +48,7 @@
         "tag": "api"
       },
       {
+        "listen": "127.0.0.1",
         "port": 12345,
         "protocol": "shadowsocks",
         "tag": "ss_proxy",
