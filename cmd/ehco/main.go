@@ -308,19 +308,21 @@ func start(ctx *cli.Context) error {
 	if cfg.WebPort > 0 {
 		go func() {
 			logger.Fatalf("[web] StartWebServer meet err=%s", web.StartWebServer(cfg))
+			cancel()
 		}()
 	}
 
 	if cfg.XRayConfig != nil && cfg.SyncTrafficEndPoint != "" {
 		go func() {
 			logger.Fatalf("[xray] StartXrayServer meet err=%s", xray.StartXrayServer(mainCtx, cfg))
+			cancel()
 		}()
 	}
 
 	if len(cfg.RelayConfigs) > 0 {
 		go func() {
 			logger.Fatalf("[relay] StartRelayServers meet err=%v", startRelayServers(mainCtx, cfg))
-			cancel() // when all relay servers stop, mainCtx will be canceled
+			cancel()
 		}()
 	}
 
