@@ -14,7 +14,7 @@
     {
       "listen": "127.0.0.1:1235",
       "listen_type": "raw",
-      "transport_type": "mws",
+      "transport_type": "ws",
       "tcp_remotes": ["wxs://0.0.0.0:2443"],
       "udp_remotes": ["0.0.0.0:5201"]
     },
