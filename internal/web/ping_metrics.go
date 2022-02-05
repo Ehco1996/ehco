@@ -44,7 +44,7 @@ type PingGroup struct {
 func initPinger(host string) *ping.Pinger {
 	pinger := ping.New(host)
 	if err := pinger.Resolve(); err != nil {
-		logger.Errorf("[ping] failed to resolve pinger: %s\n", err.Error())
+		logger.Errorf("[ping] failed to resolve pinger host:%s err:%s\n", host, err.Error())
 		return nil
 	}
 	logger.Infof("[ping] Resolved %s as %s", host, pinger.IPAddr())

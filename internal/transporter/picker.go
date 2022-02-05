@@ -15,7 +15,8 @@ type RelayTransporter interface {
 	HandleUDPConn(uaddr *net.UDPAddr, local *net.UDPConn)
 
 	// TCP相关
-	HandleTCPConn(c *net.TCPConn) error
+	HandleTCPConn(c *net.TCPConn, remote *lb.Node) error
+	GetRemote() *lb.Node
 }
 
 func PickTransporter(transType string, tcpRemotes, udpRemotes lb.RoundRobin) RelayTransporter {

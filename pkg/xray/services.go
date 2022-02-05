@@ -43,7 +43,6 @@ func AddInboundUser(ctx context.Context, c proxy.HandlerServiceClient, tag strin
 		}),
 	})
 	if err != nil {
-		println("add error", err.Error())
 		return err
 	}
 	logger.Infof("[xray] Add User: %s To Server Tag: %s", user.GetEmail(), tag)

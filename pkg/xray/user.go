@@ -12,6 +12,7 @@ import (
 	proxy "github.com/xtls/xray-core/app/proxyman/command"
 	stats "github.com/xtls/xray-core/app/stats/command"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 // now only support shadownsocks user,maybe support other protocol later
@@ -88,7 +89,7 @@ type UserPool struct {
 
 // NewUserPool New UserPool
 func NewUserPool(ctx context.Context, xrayEndPoint string) (*UserPool, error) {
-	conn, err := grpc.DialContext(ctx, xrayEndPoint, grpc.WithInsecure(), grpc.WithBlock())
+	conn, err := grpc.DialContext(ctx, xrayEndPoint, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithBlock())
 	if err != nil {
 		return nil, err
 	}
