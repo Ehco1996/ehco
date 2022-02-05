@@ -2,11 +2,13 @@ package config
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"strings"
 	"time"
 
+	"github.com/Ehco1996/ehco/internal/constant"
 	"github.com/Ehco1996/ehco/internal/logger"
 	"github.com/xtls/xray-core/infra/conf"
 )
@@ -18,6 +20,23 @@ type RelayConfig struct {
 	TCPRemotes    []string `json:"tcp_remotes"`
 	UDPRemotes    []string `json:"udp_remotes"`
 	Label         string   `json:"label"`
+}
+
+func (r *RelayConfig) Validate() error {
+	if r.ListenType != constant.Listen_RAW &&
+		r.ListenType != constant.Listen_WS &&
+		r.ListenType != constant.Listen_WSS &&
+		r.ListenType != constant.Listen_MWSS {
+		return fmt.Errorf("invalid listen type:%s", r.ListenType)
+	}
+
+	if r.TransportType != constant.Transport_RAW &&
+		r.TransportType != constant.Transport_WS &&
+		r.TransportType != constant.Transport_WSS &&
+		r.TransportType != constant.Transport_MWSS {
+		return fmt.Errorf("invalid transport type:%s", r.ListenType)
+	}
+	return nil
 }
 
 type Config struct {
@@ -42,9 +61,14 @@ func (c *Config) NeedSyncUserFromServer() bool {
 
 func (c *Config) LoadConfig() error {
 	if c.NeedSyncUserFromServer() {
-		return c.readFromHttp()
+		if err := c.readFromHttp(); err != nil {
+			return err
+		}
 	}
-	return c.readFromFile()
+	if err := c.readFromFile(); err != nil {
+		return err
+	}
+	return c.Validate()
 }
 
 func (c *Config) readFromFile() error {
@@ -68,4 +92,14 @@ func (c *Config) readFromHttp() error {
 	defer r.Body.Close()
 	logger.Info("[cfg] Load Config From http:", c.PATH)
 	return json.NewDecoder(r.Body).Decode(&c)
+}
+
+func (c *Config) Validate() error {
+	// validate relay configs
+	for _, r := range c.RelayConfigs {
+		if err := r.Validate(); err != nil {
+			return err
+		}
+	}
+	return nil
 }

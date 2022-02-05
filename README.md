@@ -12,9 +12,7 @@ ehco is a network relay tool and a typo :)
 
 * 面板视频安装教程: [地址](https://youtu.be/BRHcdGeufvY)
 
-* 后端对接视频教程: [地址](https://youtu.be/QNbnya1HHU0)
-
-* 隧道对接视频教程: [地址](https://youtu.be/R4U0NZaMUeY)
+* 隧道后端对接视频教程: [地址](https://youtu.be/R4U0NZaMUeY)
 
 ## 安装
 
@@ -45,6 +43,7 @@ go get -u "github.com/Ehco1996/ehco/cmd/ehco"
 * benchmark
 * grafana 监控报警
 * 热重载配置
+* 内嵌了完整版本的 [xray](https://github.com/XTLS/Xray-core) 后端
 
 ## 使用说明
 
@@ -77,7 +76,7 @@ go get -u "github.com/Ehco1996/ehco/cmd/ehco"
 
 > ehco支持从 `配置文件` / `http接口` 里读取 `json` 格式的配置并启动
 
-配置文件格式要求如下(更多例子可以参考项目里的 `config.json` 文件):
+配置文件格式要求如下(更多例子可以参考项目里的 [config.json](https://github.com/Ehco1996/ehco/blob/master/config.json) 文件):
 
 ```json
 {
