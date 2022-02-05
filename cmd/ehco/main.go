@@ -104,7 +104,7 @@ func createCliAPP() *cli.App {
 		},
 		&cli.IntFlag{
 			Name:        "web_port",
-			Usage:       "promtheus web expoter 的监听端口",
+			Usage:       "prometheus web expoter 的监听端口",
 			EnvVars:     []string{"EHCO_WEB_PORT"},
 			Value:       0,
 			Destination: &WebPort,
@@ -320,6 +320,7 @@ func start(ctx *cli.Context) error {
 	if len(cfg.RelayConfigs) > 0 {
 		go func() {
 			logger.Fatalf("[relay] StartRelayServers meet err=%v", startRelayServers(mainCtx, cfg))
+			cancel() // when all relay servers stop, mainCtx will be canceled
 		}()
 	}
 

@@ -201,6 +201,7 @@ func (r *Relay) RunLocalWSServer() error {
 	r.closeTcpF = func() error {
 		return lis.Close()
 	}
+	logger.Infof("[relay] Start WS relay %s", r.Name)
 	return server.Serve(lis)
 }
 
@@ -224,6 +225,7 @@ func (r *Relay) RunLocalWSSServer() error {
 	r.closeTcpF = func() error {
 		return lis.Close()
 	}
+	logger.Infof("[relay] Start WSS relay %s", r.Name)
 	return server.Serve(tls.NewListener(lis, server.TLSConfig))
 }
 
@@ -249,6 +251,7 @@ func (r *Relay) RunLocalMWSSServer() error {
 	r.closeTcpF = func() error {
 		return lis.Close()
 	}
+	logger.Infof("[relay] Start MWSS relay %s", r.Name)
 	go func() {
 		err := httpServer.Serve(tls.NewListener(lis, httpServer.TLSConfig))
 		if err != nil {
