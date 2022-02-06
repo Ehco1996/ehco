@@ -253,7 +253,7 @@ func watchAndReloadConfig(ctx context.Context, relayM *sync.Map, errCh chan erro
 			logger.Info("[cfg] Got A HUP Signal! Now Reloading Conf")
 			newCfg, err := loadConfig()
 			if err != nil {
-				logger.Errorf("[cfg] Reloading Conf meet error: %s ", err)
+				logger.Fatalf("[cfg] Reloading Conf meet error: %s ", err)
 			}
 
 			var newRelayAddrList []string
