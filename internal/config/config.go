@@ -64,9 +64,10 @@ func (c *Config) LoadConfig() error {
 		if err := c.readFromHttp(); err != nil {
 			return err
 		}
-	}
-	if err := c.readFromFile(); err != nil {
-		return err
+	} else {
+		if err := c.readFromFile(); err != nil {
+			return err
+		}
 	}
 	return c.Validate()
 }
