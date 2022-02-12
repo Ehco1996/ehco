@@ -60,8 +60,6 @@ func (i *IPRateLimiter) GetOreCreateLimiter(ip string) *rate.Limiter {
 		return limiter
 	}
 
-	i.gc()
-
 	// init new one
 	limiter = rate.NewLimiter(i.limit, i.burst)
 	i.currentRateM[ip] = limiter
@@ -70,16 +68,20 @@ func (i *IPRateLimiter) GetOreCreateLimiter(ip string) *rate.Limiter {
 }
 
 func (i *IPRateLimiter) gc() {
+	i.Lock()
+	defer i.Unlock()
 	now := time.Now()
-	if now.Sub(i.lastGcTime) > GCInterval {
-		// todo refine this logger
-		fmt.Printf("IPRateLimiter gc now=%s alive limter count=%d", now, len(i.currentRateM))
-		i.previousRateM = i.currentRateM
-		i.currentRateM = make(map[string]*rate.Limiter)
-	}
+	// todo refine this logger
+	fmt.Printf("[IPRateLimiter] gc now=%s alive count=%d", now, len(i.currentRateM))
+	i.lastGcTime = now
+	i.previousRateM = i.currentRateM
+	i.currentRateM = make(map[string]*rate.Limiter)
 }
 
 func (i *IPRateLimiter) CanServe(ip string) bool {
 	ipl := i.GetOreCreateLimiter(ip)
+	if time.Now().Sub(i.lastGcTime) > GCInterval {
+		i.gc()
+	}
 	return ipl.Allow()
 }
