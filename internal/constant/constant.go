@@ -32,8 +32,9 @@ var (
 )
 
 const (
+	DialTimeOut = 3 * time.Second
+
 	MaxMWSSStreamCnt = 100
-	DialTimeOut      = 3 * time.Second
 
 	Listen_RAW  = "raw"
 	Listen_WS   = "ws"

@@ -31,9 +31,8 @@ func StartXrayServer(ctx context.Context, cfg *config.Config) error {
 	if err := server.Start(); err != nil {
 		return err
 	}
-	go StartSyncTask(ctx, cfg)
-	<-ctx.Done()
-	return server.Close()
+	defer server.Close()
+	return StartSyncTask(ctx, cfg)
 }
 
 func StartSyncTask(ctx context.Context, cfg *config.Config) error {
