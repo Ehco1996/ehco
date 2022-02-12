@@ -32,6 +32,8 @@ var (
 )
 
 const (
+	TCP_RATE_LIMIT = 60 // 每秒每个 IP 可以处理 60 个链接  TODO support config this
+
 	DialTimeOut = 3 * time.Second
 
 	MaxMWSSStreamCnt = 100

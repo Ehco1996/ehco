@@ -5,6 +5,7 @@ import (
 
 	"github.com/Ehco1996/ehco/internal/constant"
 	"github.com/Ehco1996/ehco/internal/lb"
+	"github.com/Ehco1996/ehco/pkg/limiter"
 )
 
 // RelayTransporter
@@ -24,6 +25,8 @@ func PickTransporter(transType string, tcpRemotes, udpRemotes lb.RoundRobin) Rel
 		TCPRemotes:     tcpRemotes,
 		UDPRemotes:     udpRemotes,
 		UDPBufferChMap: make(map[string]*BufferCh),
+
+		ipLimiter: limiter.NewIPRateLimiter(constant.TCP_RATE_LIMIT, constant.TCP_RATE_LIMIT),
 	}
 	switch transType {
 	case constant.Transport_RAW:

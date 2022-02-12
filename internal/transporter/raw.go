@@ -11,6 +11,7 @@ import (
 	"github.com/Ehco1996/ehco/internal/lb"
 	"github.com/Ehco1996/ehco/internal/logger"
 	"github.com/Ehco1996/ehco/internal/web"
+	"github.com/Ehco1996/ehco/pkg/limiter"
 	"github.com/gobwas/ws"
 )
 
@@ -19,6 +20,8 @@ type Raw struct {
 	TCPRemotes     lb.RoundRobin
 	UDPRemotes     lb.RoundRobin
 	UDPBufferChMap map[string]*BufferCh
+
+	ipLimiter *limiter.IPRateLimiter
 }
 
 func (raw *Raw) GetOrCreateBufferCh(uaddr *net.UDPAddr) *BufferCh {
@@ -120,6 +123,12 @@ func (raw *Raw) DialRemote(remote *lb.Node) (net.Conn, error) {
 
 func (raw *Raw) HandleTCPConn(c *net.TCPConn, remote *lb.Node) error {
 	defer c.Close()
+
+	fromIP := c.RemoteAddr().(*net.TCPAddr).IP.String()
+	if !raw.ipLimiter.CanServe(fromIP) {
+		logger.Logger.Warnf("[raw] ip %s reach the rate limit, closed now", fromIP)
+		return nil
+	}
 	rc, err := raw.DialRemote(remote)
 	if err != nil {
 		return err
