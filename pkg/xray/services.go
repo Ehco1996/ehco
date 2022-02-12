@@ -18,9 +18,9 @@ func getEmailAndTrafficType(input string) (string, string) {
 
 func mappingCipher(in string) shadowsocks.CipherType {
 	switch in {
-	case "aes-128-cfb":
+	case "aes-128-gcm":
 		return shadowsocks.CipherType_AES_128_GCM
-	case "aes-256-cfb":
+	case "aes-256-gcm":
 		return shadowsocks.CipherType_AES_256_GCM
 	case "chacha20-ietf-poly1305":
 		return shadowsocks.CipherType_CHACHA20_POLY1305
