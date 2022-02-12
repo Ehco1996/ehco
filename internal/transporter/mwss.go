@@ -22,15 +22,19 @@ func (s *Mwss) HandleUDPConn(uaddr *net.UDPAddr, local *net.UDPConn) {
 
 func (s *Mwss) HandleTCPConn(c *net.TCPConn, remote *lb.Node) error {
 	defer c.Close()
-	muxwsc, err := s.mtp.Dial(remote.Address + "/mwss/")
+	mwsc, err := s.mtp.Dial(remote.Address + "/mwss/")
 	if err != nil {
 		return err
 	}
-	defer muxwsc.Close()
+	defer mwsc.Close()
 	logger.Infof("[mwss] HandleTCPConn from:%s to:%s", c.RemoteAddr(), remote.Address)
-	return transport(muxwsc, c, remote.Label)
+	return transport(c, mwsc, remote.Label)
 }
 
 func (s *Mwss) GetRemote() *lb.Node {
-	return s.raw.TCPRemotes.Next()
+	return s.raw.GetRemote()
+}
+
+func (s *Mwss) LimitByIp(c *net.TCPConn) error {
+	return s.raw.LimitByIp(c)
 }

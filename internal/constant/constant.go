@@ -48,6 +48,7 @@ const (
 	Transport_WSS  = "wss"
 	Transport_MWSS = "mwss"
 
-	BUFFER_POOL_SIZE = 128
-	BUFFER_SIZE      = 128 * 1024 // 128KB
+	// todo add udp buffer size
+	BUFFER_POOL_SIZE = 1024      // suport 512 connections
+	BUFFER_SIZE      = 20 * 1024 // 20KB the maximum packet size of shadowsocks is about 16 KiB
 )

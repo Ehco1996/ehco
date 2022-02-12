@@ -145,6 +145,12 @@ func (r *Relay) RunLocalTCPServer() error {
 		if err != nil {
 			return err
 		}
+		defer c.Close()
+		if err := r.TP.LimitByIp(c); err != nil {
+			logger.Errorf("reach tcp rate limit err:%s", c.RemoteAddr())
+			continue
+		}
+
 		go func(c *net.TCPConn) {
 			remote := r.TP.GetRemote()
 			web.CurConnectionCount.WithLabelValues(remote.Label, web.METRIC_CONN_TCP).Inc()

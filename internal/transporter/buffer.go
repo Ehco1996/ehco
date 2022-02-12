@@ -65,25 +65,23 @@ type WriteOnlyWriter struct {
 }
 
 func transport(conn1, conn2 net.Conn, remote string) error {
-	errChan := make(chan error, 1)
 	// conn1 to conn2
 	go func() {
 		buf := BufferPool.Get()
-		defer BufferPool.Put(buf)
-		rn, err := io.CopyBuffer(WriteOnlyWriter{Writer: conn1}, ReadOnlyReader{Reader: conn2}, buf)
+		rn, _ := io.CopyBuffer(WriteOnlyWriter{Writer: conn1}, ReadOnlyReader{Reader: conn2}, buf)
+		BufferPool.Put(buf)
 		web.NetWorkTransmitBytes.WithLabelValues(remote, web.METRIC_CONN_TCP).Add(float64(rn * 2))
 		conn1.SetReadDeadline(time.Now())
-		errChan <- err
 	}()
 
 	// conn2 to conn1
 	buf := BufferPool.Get()
-	defer BufferPool.Put(buf)
-	rn, _ := io.CopyBuffer(WriteOnlyWriter{Writer: conn2}, ReadOnlyReader{Reader: conn1}, buf)
+	rn, err := io.CopyBuffer(WriteOnlyWriter{Writer: conn2}, ReadOnlyReader{Reader: conn1}, buf)
+	BufferPool.Put(buf)
 	// 可以忽略一次error，因为当conn1关闭时，conn2也会关闭
 	conn2.SetReadDeadline(time.Now())
 	web.NetWorkTransmitBytes.WithLabelValues(remote, web.METRIC_CONN_TCP).Add(float64(rn * 2))
-	return <-errChan
+	return err
 }
 
 type BufferCh struct {

@@ -2,6 +2,7 @@ package transporter
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"net/http"
 	"sync"
@@ -121,21 +122,23 @@ func (raw *Raw) DialRemote(remote *lb.Node) (net.Conn, error) {
 	return rc, nil
 }
 
-func (raw *Raw) HandleTCPConn(c *net.TCPConn, remote *lb.Node) error {
-	defer c.Close()
-
+func (raw *Raw) LimitByIp(c *net.TCPConn) error {
 	fromIP := c.RemoteAddr().(*net.TCPAddr).IP.String()
 	if !raw.ipLimiter.CanServe(fromIP) {
-		logger.Logger.Warnf("[raw] ip %s reach the rate limit, closed now", fromIP)
-		return nil
+		return fmt.Errorf("ip %s reach the rate limit", fromIP)
 	}
+	return nil
+}
+
+func (raw *Raw) HandleTCPConn(c *net.TCPConn, remote *lb.Node) error {
+	defer c.Close()
 	rc, err := raw.DialRemote(remote)
 	if err != nil {
 		return err
 	}
 	logger.Infof("[raw] HandleTCPConn from %s to %s", c.RemoteAddr(), remote.Address)
 	defer rc.Close()
-	return transport(c, rc, remote.Label)
+	return transport(rc, c, remote.Label)
 }
 
 func (raw *Raw) HandleWsRequest(w http.ResponseWriter, req *http.Request) {
