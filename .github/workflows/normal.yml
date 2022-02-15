@@ -38,12 +38,12 @@ jobs:
         uses: crazy-max/ghaction-upx@v1
         with:
           version: latest
-          files: .dist/ehco
+          files: dist/ehco
 
       - uses: actions/upload-artifact@master
         with:
           name: my-artifact
-          path: .dist/ehco
+          path: dist/ehco
 
   build-image:
     runs-on: ubuntu-latest
