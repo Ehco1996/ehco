@@ -198,7 +198,7 @@ func inArray(ele string, array []string) bool {
 
 func startOneRelay(r *relay.Relay, relayM *sync.Map, errCh chan error) {
 	relayM.Store(r.Name, r)
-	if err := r.ListenAndServe(); !errors.Is(err, net.ErrClosed) { // mute use closed network error
+	if err := r.ListenAndServe(); err != nil && !errors.Is(err, net.ErrClosed) { // mute use closed network error
 		errCh <- err
 	}
 }

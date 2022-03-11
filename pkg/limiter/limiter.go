@@ -72,7 +72,7 @@ func (i *IPRateLimiter) gc() {
 	defer i.Unlock()
 	now := time.Now()
 	// todo refine this logger
-	fmt.Printf("[IPRateLimiter] gc alive count=%d", len(i.currentRateM))
+	fmt.Printf("[IPRateLimiter] gc alive count=%d\n", len(i.currentRateM))
 	i.lastGcTime = now
 	i.previousRateM = i.currentRateM
 	i.currentRateM = make(map[string]*rate.Limiter)
