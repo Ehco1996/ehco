@@ -3,7 +3,8 @@ package constant
 import "time"
 
 var (
-	DefaultDeadline = 30 * time.Second
+	// allow change in test
+	IdleTimeOut = 10 * time.Second
 
 	Version     = "1.1.2"
 	GitBranch   string

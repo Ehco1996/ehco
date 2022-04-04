@@ -72,7 +72,7 @@ func (raw *Raw) HandleUDPConn(uaddr *net.UDPAddr, local *net.UDPConn) {
 		defer cancel()
 		wt := 0
 		for {
-			_ = rc.SetDeadline(time.Now().Add(constant.DefaultDeadline))
+			_ = rc.SetDeadline(time.Now().Add(constant.IdleTimeOut))
 			i, err := rc.Read(buf)
 			if err != nil {
 				logger.Info(err)
@@ -101,7 +101,7 @@ func (raw *Raw) HandleUDPConn(uaddr *net.UDPAddr, local *net.UDPConn) {
 				logger.Info(err)
 				return
 			}
-			_ = rc.SetDeadline(time.Now().Add(constant.DefaultDeadline))
+			_ = rc.SetDeadline(time.Now().Add(constant.IdleTimeOut))
 		}
 	}()
 	wg.Wait()
@@ -178,7 +178,7 @@ func (raw *Raw) HandleWssRequest(w http.ResponseWriter, req *http.Request) {
 	defer rc.Close()
 	logger.Infof("[tun] HandleWssRequest from:%s to:%s", wsc.RemoteAddr(), remote.Address)
 	if err := transport(rc, wsc, remote.Label); err != nil {
-		logger.Infof("[tun] HandleWssRequest meet error from:%s to:%s err:", wsc.LocalAddr(), remote.Label, err.Error())
+		logger.Infof("[tun] HandleWssRequest meet error from:%s to:%s err:%s", wsc.LocalAddr(), remote.Label, err.Error())
 	}
 }
 

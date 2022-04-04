@@ -25,7 +25,6 @@ func init() {
 		zapcore.InfoLevel,
 	)
 	Logger = zap.New(core).Sugar()
-
 }
 
 func Info(args ...interface{}) {

@@ -146,8 +146,8 @@ func TestRelayWithDeadline(t *testing.T) {
 	}
 
 	buf := make([]byte, len(msg))
-	constant.DefaultDeadline = time.Second // change for test
-	time.Sleep(constant.DefaultDeadline)
+	constant.IdleTimeOut = time.Second // change for test
+	time.Sleep(constant.IdleTimeOut)
 	_, err = conn.Read(buf)
 	if err != nil {
 		log.Fatalf("need error here")
