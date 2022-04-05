@@ -1,13 +1,16 @@
 package transporter
 
 import (
+	"errors"
 	"io"
 	"net"
+	"syscall"
 	"time"
 
 	"go.uber.org/atomic"
 
 	"github.com/Ehco1996/ehco/internal/constant"
+	"github.com/Ehco1996/ehco/internal/logger"
 	"github.com/Ehco1996/ehco/internal/web"
 )
 
@@ -64,22 +67,30 @@ type WriteOnlyWriter struct {
 	io.Writer
 }
 
+// mute broken pipe or connection reset err.
+func ErrCanMute(err error) bool {
+	return errors.Is(err, syscall.ECONNRESET) || errors.Is(err, syscall.EPIPE) || err == nil
+}
+
 func transport(conn1, conn2 net.Conn, remote string) error {
 	// conn1 to conn2
 	go func() {
-		rn, _ := io.Copy(WriteOnlyWriter{Writer: conn1}, ReadOnlyReader{Reader: conn2})
+		rn, err := io.Copy(WriteOnlyWriter{Writer: conn1}, ReadOnlyReader{Reader: conn2})
 		web.NetWorkTransmitBytes.WithLabelValues(remote, web.METRIC_CONN_TCP).Add(float64(rn * 2))
-		conn1.SetReadDeadline(time.Now()) // let conn1 timeout
+		if !ErrCanMute(err) {
+			logger.Errorf("err in transport 1 err:%s", err)
+		}
+		conn1.SetReadDeadline(time.Now().Add(constant.IdleTimeOut))
 	}()
 
 	// conn2 to conn1
 	rn, err := io.Copy(WriteOnlyWriter{Writer: conn2}, ReadOnlyReader{Reader: conn1})
-	// 可以忽略一次error，因为当conn1关闭时，conn2也会关闭
-	conn2.SetReadDeadline(time.Now().Add(constant.IdleTimeOut))
 	web.NetWorkTransmitBytes.WithLabelValues(remote, web.METRIC_CONN_TCP).Add(float64(rn * 2))
-	if err == io.EOF {
+	if ErrCanMute(err) {
 		err = nil
 	}
+	conn2.SetReadDeadline(time.Now().Add(constant.IdleTimeOut))
+	time.Sleep(constant.IdleTimeOut)
 	return err
 }
 
