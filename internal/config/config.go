@@ -36,6 +36,14 @@ func (r *RelayConfig) Validate() error {
 		r.TransportType != constant.Transport_MWSS {
 		return fmt.Errorf("invalid transport type:%s", r.ListenType)
 	}
+
+	if r.Listen == "" {
+		return fmt.Errorf("invalid listen:%s", r.Listen)
+	}
+
+	if len(r.TCPRemotes) == 0 {
+		return fmt.Errorf("invalid remote:%s", r.TCPRemotes)
+	}
 	return nil
 }
 

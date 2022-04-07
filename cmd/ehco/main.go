@@ -62,37 +62,36 @@ func createCliAPP() *cli.App {
 	app.Usage = "ehco is a network relay tool and a typo :)"
 	app.Flags = []cli.Flag{
 		&cli.StringFlag{
-			Name:        "l, local",
-			Value:       "0.0.0.0:1234",
-			Usage:       "监听地址",
+			Name:        "l,local",
+			Usage:       "监听地址，例如 0.0.0.0:1234",
 			EnvVars:     []string{"EHCO_LOCAL_ADDR"},
 			Destination: &LocalAddr,
+			Required:    true,
 		},
 		&cli.StringFlag{
 			Name:        "lt,listen_type",
 			Value:       "raw",
-			Usage:       "监听类型",
+			Usage:       "监听类型，可选项有 raw,ws,wss,mwss",
 			EnvVars:     []string{"EHCO_LISTEN_TYPE"},
 			Destination: &ListenType,
 			Required:    false,
 		},
 		&cli.StringFlag{
 			Name:        "r,remote",
-			Value:       "0.0.0.0:9001",
-			Usage:       "转发地址",
+			Usage:       "TCP 转发地址，例如 0.0.0.0:5201，通过 ws 隧道转发时应为 ws://0.0.0.0:2443",
 			EnvVars:     []string{"EHCO_REMOTE_ADDR"},
 			Destination: &RemoteAddr,
 		},
 		&cli.StringFlag{
 			Name:        "ur,udp_remote",
-			Usage:       "UDP转发地址",
+			Usage:       "UDP 转发地址，例如 0.0.0.0:1234",
 			EnvVars:     []string{"EHCO_UDP_REMOTE_ADDR"},
 			Destination: &UDPRemoteAddr,
 		},
 		&cli.StringFlag{
 			Name:        "tt,transport_type",
 			Value:       "raw",
-			Usage:       "传输类型",
+			Usage:       "传输类型，可选选有 raw,ws,wss,mwss",
 			EnvVars:     []string{"EHCO_TRANSPORT_TYPE"},
 			Destination: &TransportType,
 			Required:    false,
@@ -130,7 +129,6 @@ func createCliAPP() *cli.App {
 			Usage: "install ehco systemd service",
 			Action: func(c *cli.Context) error {
 				fmt.Printf("Install ehco systemd file to `%s`\n", SystemFilePath)
-
 				if _, err := os.Stat(SystemFilePath); err != nil && os.IsNotExist(err) {
 					f, _ := os.OpenFile(SystemFilePath, os.O_CREATE|os.O_WRONLY, 0644)
 					if _, err := f.WriteString(SystemDTMPL); err != nil {
@@ -173,6 +171,9 @@ func loadConfig() (cfg *config.Config, err error) {
 		}
 		if UDPRemoteAddr != "" {
 			cfg.RelayConfigs[0].UDPRemotes = []string{UDPRemoteAddr}
+		}
+		if err := cfg.Validate(); err != nil {
+			return nil, err
 		}
 	}
 
