@@ -199,6 +199,7 @@ func (up *UserPool) syncUserConfigsFromServer(ctx context.Context, endpoint stri
 	if err := getJson(up.httpClient, endpoint, &resp); err != nil {
 		return err
 	}
+	userM := make(map[int]struct{})
 	for _, newUser := range resp.Users {
 		oldUser, found := up.GetUser(newUser.ID)
 		if !found {
@@ -209,6 +210,7 @@ func (up *UserPool) syncUserConfigsFromServer(ctx context.Context, endpoint stri
 				}
 			}
 		} else {
+			// update user configs
 			if !oldUser.Equal(newUser) {
 				if oldUser.running {
 					if err := RemoveInboundUser(ctx, up.proxyClient, XraySSProxyTag, oldUser); err != nil {
@@ -222,6 +224,16 @@ func (up *UserPool) syncUserConfigsFromServer(ctx context.Context, endpoint stri
 					return err
 				}
 			}
+		}
+		userM[newUser.ID] = struct{}{}
+	}
+	// remove user not in server
+	for _, user := range up.GetAllUsers() {
+		if _, ok := userM[user.ID]; !ok {
+			if err := RemoveInboundUser(ctx, up.proxyClient, XraySSProxyTag, user); err != nil {
+				return err
+			}
+			up.RemoveUser(user.ID)
 		}
 	}
 	return nil
