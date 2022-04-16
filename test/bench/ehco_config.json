@@ -1,0 +1,63 @@
+{
+    "web_port": 9000,
+    "web_token": "",
+    "enable_ping": false,
+    "relay_configs": [
+        {
+            "listen": "127.0.0.1:1234",
+            "listen_type": "raw",
+            "transport_type": "raw",
+            "tcp_remotes": [
+                "0.0.0.0:1090"
+            ]
+        },
+        {
+            "listen": "127.0.0.1:1235",
+            "listen_type": "raw",
+            "transport_type": "ws",
+            "tcp_remotes": [
+                "ws://0.0.0.0:2443"
+            ]
+        },
+        {
+            "listen": "127.0.0.1:1236",
+            "listen_type": "raw",
+            "transport_type": "wss",
+            "tcp_remotes": [
+                "wss://0.0.0.0:3443"
+            ]
+        },
+        {
+            "listen": "127.0.0.1:1237",
+            "listen_type": "raw",
+            "transport_type": "mwss",
+            "tcp_remotes": [
+                "wss://0.0.0.0:4443"
+            ]
+        },
+        {
+            "listen": "127.0.0.1:2443",
+            "listen_type": "ws",
+            "transport_type": "raw",
+            "tcp_remotes": [
+                "0.0.0.0:1090"
+            ]
+        },
+        {
+            "listen": "127.0.0.1:3443",
+            "listen_type": "wss",
+            "transport_type": "raw",
+            "tcp_remotes": [
+                "0.0.0.0:1090"
+            ]
+        },
+        {
+            "listen": "127.0.0.1:4443",
+            "listen_type": "mwss",
+            "transport_type": "raw",
+            "tcp_remotes": [
+                "0.0.0.0:1090"
+            ]
+        }
+    ]
+}

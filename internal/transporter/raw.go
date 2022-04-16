@@ -182,8 +182,8 @@ func (raw *Raw) HandleWssRequest(w http.ResponseWriter, req *http.Request) {
 	}
 }
 
-func (raw *Raw) HandleMWssRequest(c net.Conn) {
-	defer c.Close()
+func (raw *Raw) HandleMWssRequest(wsc net.Conn) {
+	defer wsc.Close()
 	remote := raw.TCPRemotes.Next()
 	web.CurConnectionCount.WithLabelValues(remote.Label, web.METRIC_CONN_TCP).Inc()
 	defer web.CurConnectionCount.WithLabelValues(remote.Label, web.METRIC_CONN_TCP).Dec()
@@ -193,8 +193,8 @@ func (raw *Raw) HandleMWssRequest(c net.Conn) {
 		return
 	}
 	defer rc.Close()
-	logger.Infof("[tun] HandleMWssRequest from:%s to:%s", c.RemoteAddr(), remote.Address)
-	if err := transport(rc, c, remote.Label); err != nil {
-		logger.Infof("[tun] HandleMWssRequest meet error from:%s to:%s err:%s", c.RemoteAddr(), remote.Label, err.Error())
+	logger.Infof("[tun] HandleMWssRequest from:%s to:%s", wsc.RemoteAddr(), remote.Address)
+	if err := transport(wsc, rc, remote.Label); err != nil {
+		logger.Infof("[tun] HandleMWssRequest meet error from:%s to:%s err:%s", wsc.RemoteAddr(), remote.Label, err.Error())
 	}
 }

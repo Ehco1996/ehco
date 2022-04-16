@@ -68,30 +68,31 @@ type WriteOnlyWriter struct {
 }
 
 // mute broken pipe or connection reset err.
-func ErrCanMute(err error) bool {
-	return errors.Is(err, syscall.ECONNRESET) || errors.Is(err, syscall.EPIPE) || err == nil
+func MuteErr(err error) error {
+	if errors.Is(err, syscall.ECONNRESET) || errors.Is(err, syscall.EPIPE) || err == nil {
+		return nil
+	}
+	return err
 }
 
 func transport(conn1, conn2 net.Conn, remote string) error {
+	errCH := make(chan error, 1)
 	// conn1 to conn2
 	go func() {
 		rn, err := io.Copy(WriteOnlyWriter{Writer: conn1}, ReadOnlyReader{Reader: conn2})
 		web.NetWorkTransmitBytes.WithLabelValues(remote, web.METRIC_CONN_TCP).Add(float64(rn * 2))
-		if !ErrCanMute(err) {
-			logger.Errorf("err in transport 1 err:%s", err)
-		}
-		conn1.SetReadDeadline(time.Now().Add(constant.IdleTimeOut))
+		conn1.SetReadDeadline(time.Now().Add(constant.IdleTimeOut)) // unblock read on conn1
+		errCH <- err
 	}()
 
 	// conn2 to conn1
 	rn, err := io.Copy(WriteOnlyWriter{Writer: conn2}, ReadOnlyReader{Reader: conn1})
 	web.NetWorkTransmitBytes.WithLabelValues(remote, web.METRIC_CONN_TCP).Add(float64(rn * 2))
-	if ErrCanMute(err) {
-		err = nil
+	if err2 := MuteErr(err); err2 != nil {
+		logger.Errorf("[transport] from:%s to:%s meet error:%s", conn2.LocalAddr(), conn1.RemoteAddr(), err2.Error())
 	}
-	conn2.SetReadDeadline(time.Now().Add(constant.IdleTimeOut))
-	time.Sleep(constant.IdleTimeOut)
-	return err
+	conn2.SetReadDeadline(time.Now().Add(constant.IdleTimeOut)) // unblock read on conn2
+	return MuteErr(<-errCH)
 }
 
 type BufferCh struct {

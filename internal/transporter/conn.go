@@ -120,13 +120,13 @@ func (s *MWSSServer) mux(conn net.Conn) {
 
 	session, err := smux.Server(conn, nil)
 	if err != nil {
-		logger.Infof("[mwss server err] %s - %s : %s", conn.RemoteAddr(), s.Server.Addr, err)
+		logger.Infof("[mwss] server err %s - %s : %s", conn.RemoteAddr(), s.Server.Addr, err)
 		return
 	}
 	defer session.Close()
 
-	logger.Infof("[mwss server init] %s  %s", conn.RemoteAddr(), s.Server.Addr)
-	defer logger.Infof("[mwss server close] %s >-< %s", conn.RemoteAddr(), s.Server.Addr)
+	logger.Infof("[mwss] server init %s  %s", conn.RemoteAddr(), s.Server.Addr)
+	defer logger.Infof("[mwss] server close %s >-< %s", conn.RemoteAddr(), s.Server.Addr)
 
 	for {
 		stream, err := session.AcceptStream()
