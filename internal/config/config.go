@@ -2,6 +2,7 @@ package config
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -41,8 +42,20 @@ func (r *RelayConfig) Validate() error {
 		return fmt.Errorf("invalid listen:%s", r.Listen)
 	}
 
-	if len(r.TCPRemotes) == 0 {
-		return fmt.Errorf("invalid remote:%s", r.TCPRemotes)
+	for _, addr := range r.TCPRemotes {
+		if addr == "" {
+			return fmt.Errorf("invalid tcp remote addr:%s", addr)
+		}
+	}
+
+	for _, addr := range r.UDPRemotes {
+		if addr == "" {
+			return fmt.Errorf("invalid udp remote addr:%s", addr)
+		}
+	}
+
+	if len(r.TCPRemotes) == 0 && len(r.UDPRemotes) == 0 {
+		return errors.New("both tcp and udp remotes are empty")
 	}
 	return nil
 }

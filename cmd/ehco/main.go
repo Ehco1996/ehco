@@ -24,7 +24,7 @@ import (
 
 var LocalAddr string
 var ListenType string
-var RemoteAddr string
+var TCPRemoteAddr string
 var UDPRemoteAddr string
 var TransportType string
 var ConfigPath string
@@ -64,7 +64,6 @@ func createCliAPP() *cli.App {
 		&cli.StringFlag{
 			Name:        "l,local",
 			Usage:       "监听地址，例如 0.0.0.0:1234",
-			EnvVars:     []string{"EHCO_LOCAL_ADDR"},
 			Destination: &LocalAddr,
 			Required:    true,
 		},
@@ -72,53 +71,46 @@ func createCliAPP() *cli.App {
 			Name:        "lt,listen_type",
 			Value:       "raw",
 			Usage:       "监听类型，可选项有 raw,ws,wss,mwss",
-			EnvVars:     []string{"EHCO_LISTEN_TYPE"},
 			Destination: &ListenType,
 			Required:    false,
 		},
 		&cli.StringFlag{
 			Name:        "r,remote",
 			Usage:       "TCP 转发地址，例如 0.0.0.0:5201，通过 ws 隧道转发时应为 ws://0.0.0.0:2443",
-			EnvVars:     []string{"EHCO_REMOTE_ADDR"},
-			Destination: &RemoteAddr,
+			Destination: &TCPRemoteAddr,
 		},
 		&cli.StringFlag{
 			Name:        "ur,udp_remote",
 			Usage:       "UDP 转发地址，例如 0.0.0.0:1234",
-			EnvVars:     []string{"EHCO_UDP_REMOTE_ADDR"},
 			Destination: &UDPRemoteAddr,
 		},
 		&cli.StringFlag{
 			Name:        "tt,transport_type",
 			Value:       "raw",
 			Usage:       "传输类型，可选选有 raw,ws,wss,mwss",
-			EnvVars:     []string{"EHCO_TRANSPORT_TYPE"},
 			Destination: &TransportType,
 			Required:    false,
 		},
 		&cli.StringFlag{
 			Name:        "c,config",
-			Usage:       "配置文件地址",
+			Usage:       "配置文件地址，支持文件类型或 http api",
 			Destination: &ConfigPath,
 		},
 		&cli.IntFlag{
 			Name:        "web_port",
 			Usage:       "prometheus web expoter 的监听端口",
-			EnvVars:     []string{"EHCO_WEB_PORT"},
 			Value:       0,
 			Destination: &WebPort,
 		},
 		&cli.BoolFlag{
 			Name:        "enable_ping",
 			Usage:       "是否打开 ping metrics",
-			EnvVars:     []string{"EHCO_ENABLE_PING"},
 			Value:       true,
 			Destination: &EnablePing,
 		},
 		&cli.StringFlag{
 			Name:        "web_token",
-			Usage:       "访问web的token,如果访问不带着正确的token，会直接reset连接",
-			EnvVars:     []string{"EHCO_WEB_TOKEN"},
+			Usage:       "如果访问webui时不带着正确的token，会直接reset连接",
 			Destination: &WebToken,
 		},
 	}
@@ -164,10 +156,12 @@ func loadConfig() (cfg *config.Config, err error) {
 				{
 					Listen:        LocalAddr,
 					ListenType:    ListenType,
-					TCPRemotes:    []string{RemoteAddr},
 					TransportType: TransportType,
 				},
 			},
+		}
+		if TCPRemoteAddr != "" {
+			cfg.RelayConfigs[0].TCPRemotes = []string{TCPRemoteAddr}
 		}
 		if UDPRemoteAddr != "" {
 			cfg.RelayConfigs[0].UDPRemotes = []string{UDPRemoteAddr}
@@ -337,5 +331,7 @@ func main() {
 	// register start command
 	app.Action = start
 	// main thread start
-	logger.Fatal(app.Run(os.Args))
+	if err := app.Run(os.Args); err != nil {
+		logger.Fatal(err)
+	}
 }

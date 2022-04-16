@@ -87,23 +87,26 @@ func (r *Relay) ListenAndServe() error {
 	})
 
 	errCh := make(chan error)
-	switch r.ListenType {
-	case constant.Listen_RAW:
-		go func() {
-			errCh <- r.RunLocalTCPServer()
-		}()
-	case constant.Listen_WS:
-		go func() {
-			errCh <- r.RunLocalWSServer()
-		}()
-	case constant.Listen_WSS:
-		go func() {
-			errCh <- r.RunLocalWSSServer()
-		}()
-	case constant.Listen_MWSS:
-		go func() {
-			errCh <- r.RunLocalMWSSServer()
-		}()
+
+	if len(r.cfg.TCPRemotes) > 0 {
+		switch r.ListenType {
+		case constant.Listen_RAW:
+			go func() {
+				errCh <- r.RunLocalTCPServer()
+			}()
+		case constant.Listen_WS:
+			go func() {
+				errCh <- r.RunLocalWSServer()
+			}()
+		case constant.Listen_WSS:
+			go func() {
+				errCh <- r.RunLocalWSSServer()
+			}()
+		case constant.Listen_MWSS:
+			go func() {
+				errCh <- r.RunLocalMWSSServer()
+			}()
+		}
 	}
 
 	if len(r.cfg.UDPRemotes) > 0 {
