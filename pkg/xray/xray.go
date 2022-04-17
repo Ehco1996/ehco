@@ -19,20 +19,19 @@ const (
 	SyncTime = 60
 )
 
-func StartXrayServer(ctx context.Context, cfg *config.Config) error {
+func StartXrayServer(ctx context.Context, cfg *config.Config) (*core.Instance, error) {
 	coreCfg, err := cfg.XRayConfig.Build()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	server, err := core.New(coreCfg)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if err := server.Start(); err != nil {
-		return err
+		return nil, err
 	}
-	defer server.Close()
-	return StartSyncTask(ctx, cfg)
+	return server, nil
 }
 
 func StartSyncTask(ctx context.Context, cfg *config.Config) error {

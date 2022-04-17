@@ -303,26 +303,33 @@ func start(ctx *cli.Context) error {
 	if cfg.WebPort > 0 {
 		go func() {
 			logger.Fatalf("[web] StartWebServer meet err=%s", web.StartWebServer(cfg))
-			cancel()
 		}()
 	}
 
-	if cfg.XRayConfig != nil && cfg.SyncTrafficEndPoint != "" {
+	if cfg.XRayConfig != nil {
 		go func() {
-			logger.Fatalf("[xray] StartXrayServer meet err=%s", xray.StartXrayServer(mainCtx, cfg))
-			cancel()
+			s, err := xray.StartXrayServer(mainCtx, cfg)
+			if err != nil {
+				logger.Fatalf("[xray] StartXrayServer meet err=%s", err)
+			}
+			defer s.Close()
+
+			if cfg.SyncTrafficEndPoint != "" {
+				go func() {
+					logger.Fatalf("[xray] StartSyncTask meet err=%s", xray.StartSyncTask(mainCtx, cfg))
+				}()
+			}
+			<-ctx.Done()
 		}()
 	}
 
 	if len(cfg.RelayConfigs) > 0 {
 		go func() {
 			logger.Fatalf("[relay] StartRelayServers meet err=%v", startRelayServers(mainCtx, cfg))
-			cancel()
 		}()
 	}
 
 	<-sigs
-	cancel()
 	return nil
 }
 

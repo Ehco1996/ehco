@@ -2,9 +2,8 @@
 # setup env
 
 1. run `iperf3` server by `iperf3 -s`
-2. start ss server by `start_ss_server.sh`
-3. start ss client by `start_ss_client.sh`
-4. start ehco server by `go run cmd/ehco/main.go -c test/bench/ehco_config.json`
+2. start ss client by `start_ss_client.sh`
+3. start ehco and xray(ss) server by `go run cmd/ehco/main.go -c test/bench/ehco_config.json`
 
 # run test
 

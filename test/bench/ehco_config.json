@@ -59,5 +59,33 @@
                 "0.0.0.0:1090"
             ]
         }
-    ]
+    ],
+    "xray_config": {
+        "log": {
+            "loglevel": "info"
+        },
+        "inbounds": [
+            {
+                "listen": "127.0.0.1",
+                "port": 8488,
+                "protocol": "shadowsocks",
+                "tag": "ss_proxy",
+                "settings": {
+                    "clients": [
+                        {
+                            "password": "your-password",
+                            "method": "chacha20-poly1305"
+                        }
+                    ],
+                    "network": "tcp,udp"
+                }
+            }
+        ],
+        "outbounds": [
+            {
+                "protocol": "freedom",
+                "settings": {}
+            }
+        ]
+    }
 }

@@ -18,6 +18,6 @@ let's see some examples
 
 `ehco -l 0.0.0.0:1234 -r 0.0.0.0:5201 -ur 0.0.0.0:5201`
 
-## Advance Usage
+## Advanced Usage
 
 TBD, for now, you can see more examples in [ReadmeCN](README.md)
