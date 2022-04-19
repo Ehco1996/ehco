@@ -120,6 +120,9 @@ func (pg *PingGroup) Collect(ch chan<- prometheus.Metric) {
 }
 
 func (pg *PingGroup) Run() {
+	if len(pg.Pingers) <= 0 {
+		return
+	}
 	splay := time.Duration(pingInterval.Nanoseconds() / int64(len(pg.Pingers)))
 	logger.Infof("[ping] Waiting %s between starting pingers", splay)
 	for idx := range pg.Pingers {
