@@ -148,7 +148,7 @@ go run cmd/ehco/main.go -l 0.0.0.0:1234 -r 0.0.0.0:5201
 # 直接转发END
 
 # 通过ws隧道转发
-# listen 1234 relay over ws to 1236
+# listen 1235 relay over ws to 1236
 go run cmd/ehco/main.go -l 0.0.0.0:1235  -r ws://0.0.0.0:1236 -tt ws
 
 # listen 1236 through ws relay to 5201
