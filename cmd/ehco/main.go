@@ -10,7 +10,9 @@ import (
 	"os/signal"
 	"sync"
 	"syscall"
+	"time"
 
+	"github.com/getsentry/sentry-go"
 	cli "github.com/urfave/cli/v2"
 
 	"github.com/Ehco1996/ehco/internal/config"
@@ -343,11 +345,26 @@ func start(ctx *cli.Context) error {
 }
 
 func main() {
+	defer func() {
+		err := recover()
+		if err != nil {
+			sentry.CurrentHub().Recover(err)
+			sentry.Flush(time.Second * 5)
+		}
+	}()
+
+	if dsn := os.Getenv("SENTRY_DSN"); dsn != "" {
+		logger.Info("[sentry] init sentry with dsn", dsn)
+		sentry.Init(sentry.ClientOptions{Dsn: dsn})
+	}
+
 	app := createCliAPP()
 	// register start command
 	app.Action = start
-	// main thread start
+	// main thread start)
 	if err := app.Run(os.Args); err != nil {
+		sentry.CurrentHub().CaptureException(err)
+		sentry.Flush(time.Second * 5)
 		logger.Fatal(err)
 	}
 }

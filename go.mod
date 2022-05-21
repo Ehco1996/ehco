@@ -3,6 +3,7 @@ module github.com/Ehco1996/ehco
 go 1.18
 
 require (
+	github.com/getsentry/sentry-go v0.13.0
 	github.com/go-ping/ping v0.0.0-20210216210419-25d1413fb7bb
 	github.com/gobwas/ws v1.1.0
 	github.com/gorilla/mux v1.8.0
