@@ -169,7 +169,7 @@ func (up *UserPool) syncTrafficToServer(ctx context.Context, endpoint string) er
 		user, found := up.GetUser(userID)
 		if !found {
 			logger.Logger.Warnf("user in xray not found in user pool this user maybe out of traffic, user id: %d", userID)
-			return nil
+			continue
 		}
 		switch trafficType {
 		case "uplink":
