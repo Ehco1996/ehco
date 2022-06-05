@@ -172,7 +172,7 @@ func (up *UserPool) syncTrafficToServer(ctx context.Context, endpoint string) er
 				"user in xray not found in user pool this user maybe out of traffic, user id: %d, leak traffic: %d",
 				userID, stat.Value)
 			if err := RemoveInboundUser(ctx, up.proxyClient, XraySSProxyTag, user); err != nil {
-				logger.Logger.Panicf(
+				logger.Logger.Warnf(
 					"tring remove leak user failed, user id: %d err: %s", userID, err.Error())
 			}
 			continue
