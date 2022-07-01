@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/Ehco1996/ehco/internal/constant"
-	"github.com/Ehco1996/ehco/internal/logger"
+	"github.com/Ehco1996/ehco/pkg/log"
 	"github.com/xtls/xray-core/infra/conf"
 )
 
@@ -66,6 +66,7 @@ type Config struct {
 	WebPort    int    `json:"web_port,omitempty"`
 	WebToken   string `json:"web_token,omitempty"`
 	EnablePing bool   `json:"enable_ping,omitempty"`
+	LogLeveL   string `json:"log_level,omitempty"`
 
 	RelayConfigs        []RelayConfig `json:"relay_configs"`
 	XRayConfig          *conf.Config  `json:"xray_config,omitempty"`
@@ -98,7 +99,7 @@ func (c *Config) readFromFile() error {
 	if err != nil {
 		return err
 	}
-	logger.Info("[cfg] Load Config From file: ", c.PATH)
+	log.InfoLogger.Info("[cfg] Load Config From file: ", c.PATH)
 	if err != nil {
 		return err
 	}
@@ -112,7 +113,7 @@ func (c *Config) readFromHttp() error {
 		return err
 	}
 	defer r.Body.Close()
-	logger.Info("[cfg] Load Config From http:", c.PATH)
+	log.InfoLogger.Info("[cfg] Load Config From http:", c.PATH)
 	return json.NewDecoder(r.Body).Decode(&c)
 }
 

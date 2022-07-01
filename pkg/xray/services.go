@@ -4,7 +4,6 @@ import (
 	"context"
 	"strings"
 
-	"github.com/Ehco1996/ehco/internal/logger"
 	proxy "github.com/xtls/xray-core/app/proxyman/command"
 	"github.com/xtls/xray-core/common/protocol"
 	"github.com/xtls/xray-core/common/serial"
@@ -45,7 +44,7 @@ func AddInboundUser(ctx context.Context, c proxy.HandlerServiceClient, tag strin
 	if err != nil {
 		return err
 	}
-	logger.Infof("[xray] Add User: %s To Server Tag: %s", user.GetEmail(), tag)
+	L.Info("Add User: %s To Server Tag: %s", user.GetEmail(), tag)
 	user.running = true
 	return nil
 }
@@ -62,7 +61,7 @@ func RemoveInboundUser(ctx context.Context, c proxy.HandlerServiceClient, tag st
 		return err
 
 	}
-	logger.Infof("[xray] Remove User: %v From Server", user.ID)
+	L.Info("[xray] Remove User: %v From Server", user.ID)
 	user.running = false
 	return nil
 }

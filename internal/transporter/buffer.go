@@ -10,8 +10,8 @@ import (
 	"go.uber.org/atomic"
 
 	"github.com/Ehco1996/ehco/internal/constant"
-	"github.com/Ehco1996/ehco/internal/logger"
 	"github.com/Ehco1996/ehco/internal/web"
+	"github.com/Ehco1996/ehco/pkg/log"
 )
 
 // 全局pool
@@ -89,7 +89,7 @@ func transport(conn1, conn2 net.Conn, remote string) error {
 	rn, err := io.Copy(WriteOnlyWriter{Writer: conn2}, ReadOnlyReader{Reader: conn1})
 	web.NetWorkTransmitBytes.WithLabelValues(remote, web.METRIC_CONN_TCP).Add(float64(rn * 2))
 	if err2 := MuteErr(err); err2 != nil {
-		logger.Errorf("[transport] from:%s to:%s meet error:%s", conn2.LocalAddr(), conn1.RemoteAddr(), err2.Error())
+		log.Logger.Errorf("[transport] from:%s to:%s meet error:%s", conn2.LocalAddr(), conn1.RemoteAddr(), err2.Error())
 	}
 	conn2.SetReadDeadline(time.Now().Add(constant.IdleTimeOut)) // unblock read on conn2
 	return MuteErr(<-errCH)

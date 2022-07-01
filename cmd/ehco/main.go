@@ -14,26 +14,33 @@ import (
 
 	"github.com/getsentry/sentry-go"
 	cli "github.com/urfave/cli/v2"
+	"go.uber.org/zap"
 
 	"github.com/Ehco1996/ehco/internal/config"
 	"github.com/Ehco1996/ehco/internal/constant"
-	"github.com/Ehco1996/ehco/internal/logger"
 	"github.com/Ehco1996/ehco/internal/relay"
 	"github.com/Ehco1996/ehco/internal/tls"
 	"github.com/Ehco1996/ehco/internal/web"
+	"github.com/Ehco1996/ehco/pkg/log"
 	"github.com/Ehco1996/ehco/pkg/xray"
 )
 
-var LocalAddr string
-var ListenType string
-var TCPRemoteAddr string
-var UDPRemoteAddr string
-var TransportType string
-var ConfigPath string
-var WebPort int
-var WebToken string
-var EnablePing bool
-var SystemFilePath = "/etc/systemd/system/ehco.service"
+// flags
+var (
+	LocalAddr      string
+	ListenType     string
+	TCPRemoteAddr  string
+	UDPRemoteAddr  string
+	TransportType  string
+	ConfigPath     string
+	WebPort        int
+	WebToken       string
+	EnablePing     bool
+	SystemFilePath = "/etc/systemd/system/ehco.service"
+	LogLevel       string
+)
+
+var cmdLogger *zap.SugaredLogger
 
 const SystemDTMPL = `# Ehco service
 [Unit]
@@ -124,6 +131,13 @@ func createCliAPP() *cli.App {
 			EnvVars:     []string{"EHCO_WEB_TOKEN"},
 			Destination: &WebToken,
 		},
+		&cli.StringFlag{
+			Name:        "log_level",
+			Usage:       "log level",
+			EnvVars:     []string{"EHCO_LOG_LEVEL"},
+			Destination: &WebToken,
+			DefaultText: "info",
+		},
 	}
 
 	app.Commands = []*cli.Command{
@@ -135,7 +149,7 @@ func createCliAPP() *cli.App {
 				if _, err := os.Stat(SystemFilePath); err != nil && os.IsNotExist(err) {
 					f, _ := os.OpenFile(SystemFilePath, os.O_CREATE|os.O_WRONLY, 0644)
 					if _, err := f.WriteString(SystemDTMPL); err != nil {
-						logger.Fatal(err)
+						cmdLogger.Fatal(err)
 					}
 					f.Close()
 				}
@@ -163,6 +177,7 @@ func loadConfig() (cfg *config.Config, err error) {
 			WebToken:   WebToken,
 			EnablePing: EnablePing,
 			PATH:       ConfigPath,
+			LogLeveL:   LogLevel,
 			RelayConfigs: []config.RelayConfig{
 				{
 					Listen:        LocalAddr,
@@ -235,7 +250,7 @@ func startRelayServers(ctx context.Context, cfg *config.Config) error {
 	case err := <-errCH:
 		return err
 	case <-ctx.Done():
-		logger.Info("[relay]start to stop relay servers")
+		cmdLogger.Info("[relay]start to stop relay servers")
 		relayM.Range(func(key, value interface{}) bool {
 			r := value.(*relay.Relay)
 			r.Close()
@@ -246,7 +261,7 @@ func startRelayServers(ctx context.Context, cfg *config.Config) error {
 }
 
 func watchAndReloadConfig(ctx context.Context, relayM *sync.Map, errCh chan error) {
-	logger.Errorf("[cfg] Start to watch config file: %s ", ConfigPath)
+	cmdLogger.Infof("[cfg] Start to watch config file: %s ", ConfigPath)
 
 	reloadCH := make(chan os.Signal, 1)
 	signal.Notify(reloadCH, syscall.SIGHUP)
@@ -256,17 +271,17 @@ func watchAndReloadConfig(ctx context.Context, relayM *sync.Map, errCh chan erro
 		case <-ctx.Done():
 			return
 		case <-reloadCH:
-			logger.Info("[cfg] Got A HUP Signal! Now Reloading Conf")
+			cmdLogger.Info("[cfg] Got A HUP Signal! Now Reloading Conf")
 			newCfg, err := loadConfig()
 			if err != nil {
-				logger.Fatalf("[cfg] Reloading Conf meet error: %s ", err)
+				cmdLogger.Fatalf("[cfg] Reloading Conf meet error: %s ", err)
 			}
 
 			var newRelayAddrList []string
 			for idx := range newCfg.RelayConfigs {
 				r, err := relay.NewRelay(&newCfg.RelayConfigs[idx])
 				if err != nil {
-					logger.Fatalf("[cfg] reload new relay failed err=%s", err.Error())
+					cmdLogger.Fatalf("[cfg] reload new relay failed err=%s", err.Error())
 				}
 				newRelayAddrList = append(newRelayAddrList, r.Name)
 
@@ -274,14 +289,14 @@ func watchAndReloadConfig(ctx context.Context, relayM *sync.Map, errCh chan erro
 				if oldR, ok := relayM.Load(r.Name); ok {
 					oldR := oldR.(*relay.Relay)
 					if oldR.Name != r.Name {
-						logger.Infof("[cfg] close old relay name=%s", oldR.Name)
+						cmdLogger.Infof("[cfg] close old relay name=%s", oldR.Name)
 						stopOneRelay(oldR, relayM)
 						go startOneRelay(r, relayM, errCh)
 					}
 					continue // no need to reload
 				}
 				// start bread new relay that not in old relayM
-				logger.Infof("[cfg] starr new relay name=%s", r.Name)
+				cmdLogger.Infof("[cfg] starr new relay name=%s", r.Name)
 				go startOneRelay(r, relayM, errCh)
 			}
 			// closed relay not in new config
@@ -298,9 +313,34 @@ func watchAndReloadConfig(ctx context.Context, relayM *sync.Map, errCh chan erro
 	}
 }
 
+func initSentry() error {
+	if dsn := os.Getenv("SENTRY_DSN"); dsn != "" {
+		cmdLogger.Infof("[sentry] init sentry with dsn", dsn)
+		return sentry.Init(sentry.ClientOptions{Dsn: dsn})
+	}
+	return nil
+}
+
+func initCMDLogger() error {
+	if err := log.InitLogger(LogLevel); err != nil {
+		return err
+	}
+	cmdLogger = log.Logger.Named("cmd")
+	return nil
+}
+
 func start(ctx *cli.Context) error {
+
 	cfg, err := loadConfig()
 	if err != nil {
+		return err
+	}
+
+	if err := initCMDLogger(); err != nil {
+		return err
+	}
+
+	if err := initSentry(); err != nil {
 		return err
 	}
 
@@ -313,7 +353,7 @@ func start(ctx *cli.Context) error {
 
 	if cfg.WebPort > 0 {
 		go func() {
-			logger.Fatalf("[web] StartWebServer meet err=%s", web.StartWebServer(cfg))
+			cmdLogger.Fatalf("[web] StartWebServer meet err=%s", web.StartWebServer(cfg))
 		}()
 	}
 
@@ -321,13 +361,13 @@ func start(ctx *cli.Context) error {
 		go func() {
 			s, err := xray.StartXrayServer(mainCtx, cfg)
 			if err != nil {
-				logger.Fatalf("[xray] StartXrayServer meet err=%s", err)
+				cmdLogger.Fatalf("[xray] StartXrayServer meet err=%s", err)
 			}
 			defer s.Close()
 
 			if cfg.SyncTrafficEndPoint != "" {
 				go func() {
-					logger.Fatalf("[xray] StartSyncTask meet err=%s", xray.StartSyncTask(mainCtx, cfg))
+					cmdLogger.Fatalf("[xray] StartSyncTask meet err=%s", xray.StartSyncTask(mainCtx, cfg))
 				}()
 			}
 			<-ctx.Done()
@@ -336,7 +376,7 @@ func start(ctx *cli.Context) error {
 
 	if len(cfg.RelayConfigs) > 0 {
 		go func() {
-			logger.Fatalf("[relay] StartRelayServers meet err=%v", startRelayServers(mainCtx, cfg))
+			cmdLogger.Fatalf("[relay] StartRelayServers meet err=%v", startRelayServers(mainCtx, cfg))
 		}()
 	}
 
@@ -353,13 +393,6 @@ func main() {
 		}
 	}()
 
-	if dsn := os.Getenv("SENTRY_DSN"); dsn != "" {
-		logger.Info("[sentry] init sentry with dsn", dsn)
-		if err := sentry.Init(sentry.ClientOptions{Dsn: dsn}); err != nil {
-			logger.Fatal(err)
-		}
-	}
-
 	app := createCliAPP()
 	// register start command
 	app.Action = start
@@ -367,6 +400,9 @@ func main() {
 	if err := app.Run(os.Args); err != nil {
 		sentry.CurrentHub().CaptureException(err)
 		sentry.Flush(time.Second * 5)
-		logger.Fatal(err)
+		if cmdLogger == nil {
+			cmdLogger = log.InfoLogger
+		}
+		cmdLogger.Fatal(err)
 	}
 }

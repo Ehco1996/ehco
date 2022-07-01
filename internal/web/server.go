@@ -8,14 +8,13 @@ import (
 
 	"github.com/Ehco1996/ehco/internal/config"
 	"github.com/Ehco1996/ehco/internal/constant"
-	"github.com/Ehco1996/ehco/internal/logger"
 	"github.com/gorilla/mux"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 func Index(w http.ResponseWriter, r *http.Request) {
-	logger.Infof("index call from %s", r.RemoteAddr)
+	L.Infof("index call from %s", r.RemoteAddr)
 	fmt.Fprintf(w, "access from %s \n", r.RemoteAddr)
 }
 
@@ -56,8 +55,8 @@ func registerMetrics(cfg *config.Config) {
 func simpleTokenAuthMiddleware(token string, h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if t := r.URL.Query().Get("token"); t != token {
-			msg := fmt.Sprintf("[web] unauthed request from %s", r.RemoteAddr)
-			logger.Logger.Error(msg)
+			msg := fmt.Sprintf("unauthed request from %s", r.RemoteAddr)
+			L.Error(msg)
 			hj, ok := w.(http.Hijacker)
 			if ok {
 				conn, _, _ := hj.Hijack()
@@ -73,7 +72,7 @@ func simpleTokenAuthMiddleware(token string, h http.Handler) http.Handler {
 
 func StartWebServer(cfg *config.Config) error {
 	addr := fmt.Sprintf("0.0.0.0:%d", cfg.WebPort)
-	logger.Infof("[web] Start Web Server at http://%s/", addr)
+	L.Info("Start Web Server at http://%s/", addr)
 	r := mux.NewRouter()
 	AttachProfiler(r)
 	registerMetrics(cfg)

@@ -4,7 +4,6 @@ import (
 	"net"
 
 	"github.com/Ehco1996/ehco/internal/lb"
-	"github.com/Ehco1996/ehco/internal/logger"
 )
 
 type Mwss struct {
@@ -27,7 +26,7 @@ func (s *Mwss) HandleTCPConn(c *net.TCPConn, remote *lb.Node) error {
 		return err
 	}
 	defer mwsc.Close()
-	logger.Infof("[mwss] HandleTCPConn from:%s to:%s", c.RemoteAddr(), remote.Address)
+	s.raw.L.Infof("HandleTCPConn from:%s to:%s", c.RemoteAddr(), remote.Address)
 	return transport(c, mwsc, remote.Label)
 }
 

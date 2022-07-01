@@ -9,10 +9,9 @@ import (
 
 	"github.com/Ehco1996/ehco/internal/constant"
 	"github.com/Ehco1996/ehco/internal/lb"
-	"github.com/Ehco1996/ehco/internal/logger"
 	"github.com/Ehco1996/ehco/internal/web"
-	"github.com/Ehco1996/ehco/pkg/limiter"
 	"github.com/gobwas/ws"
+	"go.uber.org/zap"
 )
 
 type Raw struct {
@@ -21,7 +20,7 @@ type Raw struct {
 	UDPRemotes     lb.RoundRobin
 	UDPBufferChMap map[string]*BufferCh
 
-	ipLimiter *limiter.IPRateLimiter
+	L *zap.SugaredLogger
 }
 
 func (raw *Raw) GetOrCreateBufferCh(uaddr *net.UDPAddr) *BufferCh {
@@ -47,7 +46,7 @@ func (raw *Raw) HandleUDPConn(uaddr *net.UDPAddr, local *net.UDPConn) {
 	rc, err := net.DialUDP("udp", nil, remoteUdp)
 	if err != nil {
 		remote.BlockForSomeTime()
-		logger.Info(err)
+		raw.L.Info(err)
 		return
 	}
 	defer func() {
@@ -57,7 +56,7 @@ func (raw *Raw) HandleUDPConn(uaddr *net.UDPAddr, local *net.UDPConn) {
 		raw.udpmu.Unlock()
 	}()
 
-	logger.Infof("[raw] HandleUDPConn from %s to %s", local.LocalAddr().String(), remote.Label)
+	raw.L.Infof("[raw] HandleUDPConn from %s to %s", local.LocalAddr().String(), remote.Label)
 
 	buf := BufferPool.Get()
 	defer BufferPool.Put(buf)
@@ -74,11 +73,11 @@ func (raw *Raw) HandleUDPConn(uaddr *net.UDPAddr, local *net.UDPConn) {
 			_ = rc.SetDeadline(time.Now().Add(constant.IdleTimeOut))
 			i, err := rc.Read(buf)
 			if err != nil {
-				logger.Info(err)
+				raw.L.Info(err)
 				break
 			}
 			if _, err := local.WriteToUDP(buf[0:i], uaddr); err != nil {
-				logger.Info(err)
+				raw.L.Info(err)
 				break
 			}
 			wt += i
@@ -97,7 +96,7 @@ func (raw *Raw) HandleUDPConn(uaddr *net.UDPAddr, local *net.UDPConn) {
 			wt += len(b)
 			web.NetWorkTransmitBytes.WithLabelValues(remote.Label, web.METRIC_CONN_UDP).Add(float64(wt * 2))
 			if _, err := rc.Write(b); err != nil {
-				logger.Info(err)
+				raw.L.Info(err)
 				return
 			}
 			_ = rc.SetDeadline(time.Now().Add(constant.IdleTimeOut))
@@ -115,7 +114,7 @@ func (raw *Raw) DialRemote(remote *lb.Node) (net.Conn, error) {
 	rc, err := d.Dial("tcp", remote.Address)
 	if err != nil {
 		remote.BlockForSomeTime()
-		logger.Errorf("dial error: %s", err)
+		raw.L.Errorf("dial error: %s", err)
 		return nil, err
 	}
 	return rc, nil
@@ -127,7 +126,7 @@ func (raw *Raw) HandleTCPConn(c *net.TCPConn, remote *lb.Node) error {
 	if err != nil {
 		return err
 	}
-	logger.Infof("[raw] HandleTCPConn from %s to %s", c.RemoteAddr(), remote.Address)
+	raw.L.Infof("[raw] HandleTCPConn from %s to %s", c.RemoteAddr(), remote.Address)
 	defer rc.Close()
 	return transport(rc, c, remote.Label)
 }
@@ -146,9 +145,9 @@ func (raw *Raw) HandleWsRequest(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	defer rc.Close()
-	logger.Infof("[tun] HandleWsRequest from:%s to:%s", wsc.RemoteAddr(), remote.Address)
+	raw.L.Infof("[tun] HandleWsRequest from:%s to:%s", wsc.RemoteAddr(), remote.Address)
 	if err := transport(rc, wsc, remote.Label); err != nil {
-		logger.Infof("[tun] HandleWsRequest meet error from:%s to:%s err:%s", wsc.RemoteAddr(), remote.Address, err.Error())
+		raw.L.Infof("[tun] HandleWsRequest meet error from:%s to:%s err:%s", wsc.RemoteAddr(), remote.Address, err.Error())
 	}
 }
 
@@ -167,9 +166,9 @@ func (raw *Raw) HandleWssRequest(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	defer rc.Close()
-	logger.Infof("[tun] HandleWssRequest from:%s to:%s", wsc.RemoteAddr(), remote.Address)
+	raw.L.Infof("[tun] HandleWssRequest from:%s to:%s", wsc.RemoteAddr(), remote.Address)
 	if err := transport(rc, wsc, remote.Label); err != nil {
-		logger.Infof("[tun] HandleWssRequest meet error from:%s to:%s err:%s", wsc.LocalAddr(), remote.Label, err.Error())
+		raw.L.Infof("[tun] HandleWssRequest meet error from:%s to:%s err:%s", wsc.LocalAddr(), remote.Label, err.Error())
 	}
 }
 
@@ -184,8 +183,8 @@ func (raw *Raw) HandleMWssRequest(wsc net.Conn) {
 		return
 	}
 	defer rc.Close()
-	logger.Infof("[tun] HandleMWssRequest from:%s to:%s", wsc.RemoteAddr(), remote.Address)
+	raw.L.Infof("[tun] HandleMWssRequest from:%s to:%s", wsc.RemoteAddr(), remote.Address)
 	if err := transport(wsc, rc, remote.Label); err != nil {
-		logger.Infof("[tun] HandleMWssRequest meet error from:%s to:%s err:%s", wsc.RemoteAddr(), remote.Label, err.Error())
+		raw.L.Infof("[tun] HandleMWssRequest meet error from:%s to:%s err:%s", wsc.RemoteAddr(), remote.Label, err.Error())
 	}
 }

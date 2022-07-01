@@ -2,7 +2,6 @@ package test
 
 import (
 	"context"
-	"log"
 	"net"
 	"sync"
 	"testing"
@@ -10,9 +9,10 @@ import (
 
 	"github.com/Ehco1996/ehco/internal/config"
 	"github.com/Ehco1996/ehco/internal/constant"
-	"github.com/Ehco1996/ehco/internal/logger"
 	"github.com/Ehco1996/ehco/internal/relay"
 	"github.com/Ehco1996/ehco/internal/tls"
+
+	"github.com/Ehco1996/ehco/pkg/log"
 )
 
 const (
@@ -36,6 +36,7 @@ const (
 )
 
 func init() {
+	_ = log.InitLogger("info")
 	// Start the new echo server.
 	go RunEchoServer(ECHO_HOST, ECHO_PORT)
 
@@ -105,9 +106,9 @@ func init() {
 		go func(ctx context.Context, c config.RelayConfig) {
 			r, err := relay.NewRelay(&c)
 			if err != nil {
-				logger.Fatal(err)
+				log.InfoLogger.Fatal(err)
 			}
-			logger.Fatal(r.ListenAndServe())
+			log.InfoLogger.Fatal(r.ListenAndServe())
 		}(ctx, c)
 	}
 
@@ -138,11 +139,11 @@ func TestRelayWithDeadline(t *testing.T) {
 	msg := []byte("hello")
 	conn, err := net.Dial("tcp", RAW_LISTEN)
 	if err != nil {
-		log.Fatal(err)
+		log.InfoLogger.Fatal(err)
 	}
 	defer conn.Close()
 	if _, err := conn.Write(msg); err != nil {
-		log.Fatal(err)
+		log.InfoLogger.Fatal(err)
 	}
 
 	buf := make([]byte, len(msg))
@@ -150,7 +151,7 @@ func TestRelayWithDeadline(t *testing.T) {
 	time.Sleep(constant.IdleTimeOut)
 	_, err = conn.Read(buf)
 	if err != nil {
-		log.Fatalf("need error here")
+		log.InfoLogger.Fatal("need error here")
 	}
 }
 

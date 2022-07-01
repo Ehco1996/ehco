@@ -1,7 +1,7 @@
 package lb
 
 import (
-	"github.com/Ehco1996/ehco/internal/logger"
+	"github.com/Ehco1996/ehco/pkg/log"
 	"go.uber.org/atomic"
 )
 
@@ -15,7 +15,7 @@ type Node struct {
 func (n *Node) BlockForSomeTime() {
 	// TODO: make this configurable
 	n.BlockTimes.Add(1000)
-	logger.Infof("[lb] block remote node for 1000 times label=%s remote=%s", n.Label, n.Address)
+	log.InfoLogger.Info("[lb] block remote node for 1000 times label=%s remote=%s", n.Label, n.Address)
 }
 
 // RoundRobin is an interface for representing round-robin balancing.

@@ -5,7 +5,6 @@ import (
 	"net"
 
 	"github.com/Ehco1996/ehco/internal/lb"
-	"github.com/Ehco1996/ehco/internal/logger"
 	"github.com/gobwas/ws"
 )
 
@@ -29,7 +28,7 @@ func (s *Ws) HandleTCPConn(c *net.TCPConn, remote *lb.Node) error {
 		return err
 	}
 	defer wsc.Close()
-	logger.Infof("[ws] HandleTCPConn from %s to %s", c.RemoteAddr(), remote.Address)
+	s.raw.L.Infof("HandleTCPConn from %s to %s", c.RemoteAddr(), remote.Address)
 	return transport(c, wsc, remote.Label)
 }
 

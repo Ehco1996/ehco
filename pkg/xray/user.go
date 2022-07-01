@@ -8,7 +8,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Ehco1996/ehco/internal/logger"
 	proxy "github.com/xtls/xray-core/app/proxyman/command"
 	stats "github.com/xtls/xray-core/app/stats/command"
 	"google.golang.org/grpc"
@@ -168,12 +167,12 @@ func (up *UserPool) syncTrafficToServer(ctx context.Context, endpoint string) er
 		}
 		user, found := up.GetUser(userID)
 		if !found {
-			logger.Logger.Warnf(
+			L.Warnf(
 				"user in xray not found in user pool this user maybe out of traffic, user id: %d, leak traffic: %d",
 				userID, stat.Value)
 			fakeUser := &User{ID: userID}
 			if err := RemoveInboundUser(ctx, up.proxyClient, XraySSProxyTag, fakeUser); err != nil {
-				logger.Logger.Warnf(
+				L.Warnf(
 					"tring remove leak user failed, user id: %d err: %s", userID, err.Error())
 			}
 			continue
@@ -190,7 +189,7 @@ func (up *UserPool) syncTrafficToServer(ctx context.Context, endpoint string) er
 	for _, user := range up.GetAllUsers() {
 		tf := user.DownloadTraffic + user.UploadTraffic
 		if tf > 0 {
-			logger.Infof("[xray] User: %v Now Used Total Traffic: %v", user.ID, tf)
+			L.Infof("User: %v Now Used Total Traffic: %v", user.ID, tf)
 			tfs = append(tfs, user.GenTraffic())
 			user.ResetTraffic()
 		}
@@ -198,7 +197,7 @@ func (up *UserPool) syncTrafficToServer(ctx context.Context, endpoint string) er
 	if err := postJson(up.httpClient, endpoint, &SyncTrafficReq{Data: tfs}); err != nil {
 		return err
 	}
-	logger.Infof("[xray] Call syncTrafficToServer ONLINE USER COUNT: %d", len(tfs))
+	L.Infof("Call syncTrafficToServer ONLINE USER COUNT: %d", len(tfs))
 	return nil
 }
 
@@ -248,14 +247,14 @@ func (up *UserPool) syncUserConfigsFromServer(ctx context.Context, endpoint stri
 }
 
 func (up *UserPool) StartSyncUserTask(ctx context.Context, endpoint string) {
-	logger.Infof("[xray] Start Sync User Task")
+	L.Infof("Start Sync User Task")
 
 	syncOnce := func() {
 		if err := up.syncUserConfigsFromServer(ctx, endpoint); err != nil {
-			logger.Errorf("[xray] Sync User Configs From Server Error: %v", err)
+			L.Errorf("Sync User Configs From Server Error: %v", err)
 		}
 		if err := up.syncTrafficToServer(ctx, endpoint); err != nil {
-			logger.Errorf("[xray] Sync Traffic From Server Error: %v", err)
+			L.Errorf("Sync Traffic From Server Error: %v", err)
 		}
 	}
 	syncOnce()

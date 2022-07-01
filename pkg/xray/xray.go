@@ -8,7 +8,6 @@ import (
 	_ "github.com/xtls/xray-core/main/distro/all" // register all features
 
 	"github.com/Ehco1996/ehco/internal/config"
-	"github.com/Ehco1996/ehco/internal/logger"
 	"github.com/xtls/xray-core/core"
 )
 
@@ -46,7 +45,7 @@ func StartSyncTask(ctx context.Context, cfg *config.Config) error {
 	if grpcEndPoint == "" {
 		return errors.New("[xray] can't find api port")
 	}
-	logger.Infof("[xray] api port: %s", grpcEndPoint)
+	L.Infof("api port: %s", grpcEndPoint)
 
 	up, err := NewUserPool(ctx, grpcEndPoint)
 	if err != nil {

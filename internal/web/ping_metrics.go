@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/Ehco1996/ehco/internal/config"
-	"github.com/Ehco1996/ehco/internal/logger"
 	"github.com/go-ping/ping"
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -44,10 +43,10 @@ type PingGroup struct {
 func initPinger(host string) *ping.Pinger {
 	pinger := ping.New(host)
 	if err := pinger.Resolve(); err != nil {
-		logger.Errorf("[ping] failed to resolve pinger host:%s err:%s\n", host, err.Error())
+		L.Errorf("failed to resolve pinger host:%s err:%s\n", host, err.Error())
 		return nil
 	}
-	logger.Infof("[ping] Resolved %s as %s", host, pinger.IPAddr())
+	L.Infof("Resolved %s as %s", host, pinger.IPAddr())
 	pinger.Interval = pingInterval
 	pinger.Timeout = time.Duration(math.MaxInt64)
 	pinger.RecordRtts = false
@@ -85,11 +84,11 @@ func NewPingGroup(cfg *config.Config) *PingGroup {
 		pinger.OnRecv = func(pkt *ping.Packet) {
 			PingResponseDurationSeconds.WithLabelValues(
 				pkt.IPAddr.String(), pkt.Addr, labelMap[pkt.Addr]).Observe(pkt.Rtt.Seconds())
-			logger.Infof("[ping] %d bytes from %s: icmp_seq=%d time=%v ttl=%v",
+			L.Infof("%d bytes from %s: icmp_seq=%d time=%v ttl=%v",
 				pkt.Nbytes, pkt.Addr, pkt.Seq, pkt.Rtt, pkt.Ttl)
 		}
 		pinger.OnDuplicateRecv = func(pkt *ping.Packet) {
-			logger.Infof("[ping] %d bytes from %s: icmp_seq=%d time=%v ttl=%v (DUP!)",
+			L.Infof("%d bytes from %s: icmp_seq=%d time=%v ttl=%v (DUP!)",
 				pkt.Nbytes, pkt.IPAddr, pkt.Seq, pkt.Rtt, pkt.Ttl)
 		}
 		pingers[i] = pinger
@@ -124,14 +123,14 @@ func (pg *PingGroup) Run() {
 		return
 	}
 	splay := time.Duration(pingInterval.Nanoseconds() / int64(len(pg.Pingers)))
-	logger.Infof("[ping] Waiting %s between starting pingers", splay)
+	L.Infof("Waiting %s between starting pingers", splay)
 	for idx := range pg.Pingers {
 		go func() {
 			pinger := pg.Pingers[idx]
 			if err := pinger.Run(); err != nil {
-				logger.Infof("[ping] Starting prober err: %s", err)
+				L.Infof("Starting prober err: %s", err)
 			}
-			logger.Infof("[ping] Starting prober for %s", pinger.Addr())
+			L.Infof("Starting prober for %s", pinger.Addr())
 		}()
 		time.Sleep(splay)
 	}

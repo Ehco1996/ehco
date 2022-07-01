@@ -11,12 +11,13 @@ import (
 	"github.com/Ehco1996/ehco/internal/config"
 	"github.com/Ehco1996/ehco/internal/constant"
 	"github.com/Ehco1996/ehco/internal/lb"
-	"github.com/Ehco1996/ehco/internal/logger"
 	mytls "github.com/Ehco1996/ehco/internal/tls"
 	"github.com/Ehco1996/ehco/internal/transporter"
 	"github.com/Ehco1996/ehco/internal/web"
+	"github.com/Ehco1996/ehco/pkg/log"
 	"github.com/gorilla/mux"
 	"go.uber.org/atomic"
+	"go.uber.org/zap"
 )
 
 var doOnce sync.Once
@@ -34,6 +35,7 @@ type Relay struct {
 	closeUdpF func() error
 
 	Name string
+	L    *zap.SugaredLogger
 }
 
 func NewRelay(cfg *config.RelayConfig) (*Relay, error) {
@@ -75,6 +77,7 @@ func NewRelay(cfg *config.RelayConfig) (*Relay, error) {
 			lb.NewRoundRobin(tcpNodeList),
 			lb.NewRoundRobin(udpNodeList),
 		),
+		L: log.Logger.Named("relay"),
 	}
 	r.Name = fmt.Sprintf("<At=%s Over=%s TCP-To=%s UDP-To=%s Through=%s>",
 		r.LocalTCPAddr, r.ListenType, r.cfg.TCPRemotes, r.cfg.UDPRemotes, r.TransportType)
@@ -118,17 +121,17 @@ func (r *Relay) ListenAndServe() error {
 }
 
 func (r *Relay) Close() {
-	logger.Infof("[relay] Close relay %s", r.Name)
+	r.L.Infof("Close relay %s", r.Name)
 	if r.closeUdpF != nil {
 		err := r.closeUdpF()
 		if err != nil {
-			logger.Errorf(err.Error())
+			r.L.Errorf(err.Error())
 		}
 	}
 	if r.closeTcpF != nil {
 		err := r.closeTcpF()
 		if err != nil {
-			logger.Errorf(err.Error())
+			r.L.Errorf(err.Error())
 		}
 	}
 }
@@ -142,7 +145,7 @@ func (r *Relay) RunLocalTCPServer() error {
 	r.closeTcpF = func() error {
 		return lis.Close()
 	}
-	logger.Infof("[relay] Start TCP relay %s", r.Name)
+	r.L.Infof("Start TCP relay %s", r.Name)
 	for {
 		c, err := lis.AcceptTCP()
 		if err != nil {
@@ -155,7 +158,7 @@ func (r *Relay) RunLocalTCPServer() error {
 			defer web.CurConnectionCount.WithLabelValues(remote.Label, web.METRIC_CONN_TCP).Dec()
 			defer c.Close()
 			if err := r.TP.HandleTCPConn(c, remote); err != nil {
-				logger.Errorf("HandleTCPConn meet error from:%s to:%s err:%s", c.RemoteAddr(), remote.Address, err)
+				r.L.Errorf("HandleTCPConn meet error from:%s to:%s err:%s", c.RemoteAddr(), remote.Address, err)
 			}
 		}(c)
 	}
@@ -170,7 +173,7 @@ func (r *Relay) RunLocalUDPServer() error {
 	r.closeUdpF = func() error {
 		return lis.Close()
 	}
-	logger.Infof("[relay] Start UDP relay %s", r.Name)
+	r.L.Infof("Start UDP relay %s", r.Name)
 
 	buf := transporter.BufferPool.Get()
 	defer transporter.BufferPool.Put(buf)
@@ -206,7 +209,7 @@ func (r *Relay) RunLocalWSServer() error {
 	r.closeTcpF = func() error {
 		return lis.Close()
 	}
-	logger.Infof("[relay] Start WS relay %s", r.Name)
+	r.L.Infof("Start WS relay %s", r.Name)
 	return server.Serve(lis)
 }
 
@@ -230,7 +233,7 @@ func (r *Relay) RunLocalWSSServer() error {
 	r.closeTcpF = func() error {
 		return lis.Close()
 	}
-	logger.Infof("[relay] Start WSS relay %s", r.Name)
+	r.L.Infof("Start WSS relay %s", r.Name)
 	return server.Serve(tls.NewListener(lis, server.TLSConfig))
 }
 
@@ -256,7 +259,7 @@ func (r *Relay) RunLocalMWSSServer() error {
 	r.closeTcpF = func() error {
 		return lis.Close()
 	}
-	logger.Infof("[relay] Start MWSS relay %s", r.Name)
+	r.L.Infof("Start MWSS relay %s", r.Name)
 	go func() {
 		err := httpServer.Serve(tls.NewListener(lis, httpServer.TLSConfig))
 		if err != nil {
