@@ -80,7 +80,7 @@ func (i *IPRateLimiter) gc() {
 
 func (i *IPRateLimiter) CanServe(ip string) bool {
 	ipl := i.GetOreCreateLimiter(ip)
-	if time.Now().Sub(i.lastGcTime) > GCInterval {
+	if time.Since(i.lastGcTime) > GCInterval {
 		i.gc()
 	}
 	return ipl.Allow()

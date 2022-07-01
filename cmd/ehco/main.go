@@ -355,7 +355,9 @@ func main() {
 
 	if dsn := os.Getenv("SENTRY_DSN"); dsn != "" {
 		logger.Info("[sentry] init sentry with dsn", dsn)
-		sentry.Init(sentry.ClientOptions{Dsn: dsn})
+		if err := sentry.Init(sentry.ClientOptions{Dsn: dsn}); err != nil {
+			logger.Fatal(err)
+		}
 	}
 
 	app := createCliAPP()

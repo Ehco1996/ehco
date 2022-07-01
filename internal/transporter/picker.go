@@ -18,9 +18,6 @@ type RelayTransporter interface {
 	// TCP相关
 	HandleTCPConn(c *net.TCPConn, remote *lb.Node) error
 	GetRemote() *lb.Node
-
-	// limit
-	LimitByIp(c *net.TCPConn) error
 }
 
 func PickTransporter(transType string, tcpRemotes, udpRemotes lb.RoundRobin) RelayTransporter {

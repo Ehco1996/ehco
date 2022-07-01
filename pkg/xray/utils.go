@@ -17,7 +17,9 @@ func getJson(c *http.Client, url string, target interface{}) error {
 
 func postJson(c *http.Client, url string, dataStruct interface{}) error {
 	buf := new(bytes.Buffer)
-	json.NewEncoder(buf).Encode(dataStruct)
+	if err := json.NewEncoder(buf).Encode(dataStruct); err != nil {
+		return err
+	}
 	r, err := http.Post(url, "application/json", buf)
 	if err != nil {
 		return err

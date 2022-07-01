@@ -148,11 +148,6 @@ func (r *Relay) RunLocalTCPServer() error {
 		if err != nil {
 			return err
 		}
-		if err := r.TP.LimitByIp(c); err != nil {
-			logger.Errorf("reach tcp rate limit err:%s", c.RemoteAddr())
-			c.Close()
-			continue
-		}
 
 		go func(c *net.TCPConn) {
 			remote := r.TP.GetRemote()
@@ -270,26 +265,11 @@ func (r *Relay) RunLocalMWSSServer() error {
 		close(mwssServer.ErrChan)
 	}()
 
-	var tempDelay time.Duration
 	for {
 		conn, e := mwssServer.Accept()
 		if e != nil {
-			if ne, ok := e.(net.Error); ok && ne.Temporary() {
-				if tempDelay == 0 {
-					tempDelay = 5 * time.Millisecond
-				} else {
-					tempDelay *= 2
-				}
-				if max := 1 * time.Second; tempDelay > max {
-					tempDelay = max
-				}
-				logger.Infof("server: Accept error: %v; retrying in %v", e, tempDelay)
-				time.Sleep(tempDelay)
-				continue
-			}
 			return e
 		}
-		tempDelay = 0
 		go tp.HandleMWssRequest(conn)
 	}
 }

@@ -2,7 +2,6 @@ package transporter
 
 import (
 	"context"
-	"fmt"
 	"net"
 	"net/http"
 	"sync"
@@ -120,14 +119,6 @@ func (raw *Raw) DialRemote(remote *lb.Node) (net.Conn, error) {
 		return nil, err
 	}
 	return rc, nil
-}
-
-func (raw *Raw) LimitByIp(c *net.TCPConn) error {
-	fromIP := c.RemoteAddr().(*net.TCPAddr).IP.String()
-	if !raw.ipLimiter.CanServe(fromIP) {
-		return fmt.Errorf("ip %s reach the rate limit", fromIP)
-	}
-	return nil
 }
 
 func (raw *Raw) HandleTCPConn(c *net.TCPConn, remote *lb.Node) error {

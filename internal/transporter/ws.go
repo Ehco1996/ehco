@@ -36,7 +36,3 @@ func (s *Ws) HandleTCPConn(c *net.TCPConn, remote *lb.Node) error {
 func (s *Ws) GetRemote() *lb.Node {
 	return s.raw.GetRemote()
 }
-
-func (s *Ws) LimitByIp(c *net.TCPConn) error {
-	return s.raw.LimitByIp(c)
-}
