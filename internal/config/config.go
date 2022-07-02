@@ -99,7 +99,7 @@ func (c *Config) readFromFile() error {
 	if err != nil {
 		return err
 	}
-	log.InfoLogger.Info("[cfg] Load Config From file: ", c.PATH)
+	log.InfoLogger.Info("Load Config From file: ", c.PATH)
 	if err != nil {
 		return err
 	}
@@ -113,7 +113,7 @@ func (c *Config) readFromHttp() error {
 		return err
 	}
 	defer r.Body.Close()
-	log.InfoLogger.Info("[cfg] Load Config From http:", c.PATH)
+	log.InfoLogger.Info("Load Config From http:", c.PATH)
 	return json.NewDecoder(r.Body).Decode(&c)
 }
 

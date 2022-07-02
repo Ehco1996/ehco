@@ -35,7 +35,7 @@ func PickTransporter(transType string, tcpRemotes, udpRemotes lb.RoundRobin) Rel
 	case constant.Transport_WSS:
 		return &Wss{raw: &raw}
 	case constant.Transport_MWSS:
-		return &Mwss{raw: &raw, mtp: NewMWSSTransporter()}
+		return &Mwss{raw: &raw, mtp: NewMWSSTransporter(raw.L)}
 	}
 	return nil
 }

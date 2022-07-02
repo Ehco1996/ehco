@@ -261,7 +261,7 @@ func startRelayServers(ctx context.Context, cfg *config.Config) error {
 }
 
 func watchAndReloadConfig(ctx context.Context, relayM *sync.Map, errCh chan error) {
-	cmdLogger.Infof("[cfg] Start to watch config file: %s ", ConfigPath)
+	cmdLogger.Infof("Start to watch config file: %s ", ConfigPath)
 
 	reloadCH := make(chan os.Signal, 1)
 	signal.Notify(reloadCH, syscall.SIGHUP)
@@ -271,17 +271,17 @@ func watchAndReloadConfig(ctx context.Context, relayM *sync.Map, errCh chan erro
 		case <-ctx.Done():
 			return
 		case <-reloadCH:
-			cmdLogger.Info("[cfg] Got A HUP Signal! Now Reloading Conf")
+			cmdLogger.Info("Got A HUP Signal! Now Reloading Conf")
 			newCfg, err := loadConfig()
 			if err != nil {
-				cmdLogger.Fatalf("[cfg] Reloading Conf meet error: %s ", err)
+				cmdLogger.Fatalf("Reloading Conf meet error: %s ", err)
 			}
 
 			var newRelayAddrList []string
 			for idx := range newCfg.RelayConfigs {
 				r, err := relay.NewRelay(&newCfg.RelayConfigs[idx])
 				if err != nil {
-					cmdLogger.Fatalf("[cfg] reload new relay failed err=%s", err.Error())
+					cmdLogger.Fatalf("reload new relay failed err=%s", err.Error())
 				}
 				newRelayAddrList = append(newRelayAddrList, r.Name)
 
@@ -289,14 +289,14 @@ func watchAndReloadConfig(ctx context.Context, relayM *sync.Map, errCh chan erro
 				if oldR, ok := relayM.Load(r.Name); ok {
 					oldR := oldR.(*relay.Relay)
 					if oldR.Name != r.Name {
-						cmdLogger.Infof("[cfg] close old relay name=%s", oldR.Name)
+						cmdLogger.Infof("close old relay name=%s", oldR.Name)
 						stopOneRelay(oldR, relayM)
 						go startOneRelay(r, relayM, errCh)
 					}
 					continue // no need to reload
 				}
 				// start bread new relay that not in old relayM
-				cmdLogger.Infof("[cfg] starr new relay name=%s", r.Name)
+				cmdLogger.Infof("starr new relay name=%s", r.Name)
 				go startOneRelay(r, relayM, errCh)
 			}
 			// closed relay not in new config

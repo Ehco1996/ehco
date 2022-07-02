@@ -4,6 +4,7 @@ import (
 	"errors"
 	"io"
 	"net"
+	"os"
 	"syscall"
 	"time"
 
@@ -12,6 +13,7 @@ import (
 	"github.com/Ehco1996/ehco/internal/constant"
 	"github.com/Ehco1996/ehco/internal/web"
 	"github.com/Ehco1996/ehco/pkg/log"
+	"github.com/xtaci/smux"
 )
 
 // 全局pool
@@ -67,9 +69,12 @@ type WriteOnlyWriter struct {
 	io.Writer
 }
 
-// mute broken pipe or connection reset err.
+// mute broken pipe connection reset timeout err.
 func MuteErr(err error) error {
-	if errors.Is(err, syscall.ECONNRESET) || errors.Is(err, syscall.EPIPE) || err == nil {
+	if errors.Is(err, syscall.ECONNRESET) ||
+		errors.Is(err, syscall.EPIPE) ||
+		errors.Is(err, smux.ErrTimeout) ||
+		os.IsTimeout(err) || err == nil {
 		return nil
 	}
 	return err
@@ -81,7 +86,7 @@ func transport(conn1, conn2 net.Conn, remote string) error {
 	go func() {
 		rn, err := io.Copy(WriteOnlyWriter{Writer: conn1}, ReadOnlyReader{Reader: conn2})
 		web.NetWorkTransmitBytes.WithLabelValues(remote, web.METRIC_CONN_TCP).Add(float64(rn * 2))
-		conn1.SetReadDeadline(time.Now().Add(constant.IdleTimeOut)) // unblock read on conn1
+		_ = conn1.SetReadDeadline(time.Now().Add(constant.IdleTimeOut)) // unblock read on conn1
 		errCH <- err
 	}()
 
@@ -89,9 +94,9 @@ func transport(conn1, conn2 net.Conn, remote string) error {
 	rn, err := io.Copy(WriteOnlyWriter{Writer: conn2}, ReadOnlyReader{Reader: conn1})
 	web.NetWorkTransmitBytes.WithLabelValues(remote, web.METRIC_CONN_TCP).Add(float64(rn * 2))
 	if err2 := MuteErr(err); err2 != nil {
-		log.Logger.Errorf("[transport] from:%s to:%s meet error:%s", conn2.LocalAddr(), conn1.RemoteAddr(), err2.Error())
+		log.Logger.Errorf("from:%s to:%s meet error:%s", conn2.LocalAddr(), conn1.RemoteAddr(), err2.Error())
 	}
-	conn2.SetReadDeadline(time.Now().Add(constant.IdleTimeOut)) // unblock read on conn2
+	_ = conn2.SetReadDeadline(time.Now().Add(constant.IdleTimeOut)) // unblock read on conn2
 	return MuteErr(<-errCH)
 }
 

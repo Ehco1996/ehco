@@ -8,23 +8,25 @@ import (
 
 	"github.com/Ehco1996/ehco/internal/constant"
 	mytls "github.com/Ehco1996/ehco/internal/tls"
-	"github.com/Ehco1996/ehco/pkg/log"
 	"github.com/gobwas/ws"
 	"github.com/xtaci/smux"
+	"go.uber.org/zap"
 )
 
 type mwssTransporter struct {
-	sessions     map[string][]*smux.Session
+	sessionM     map[string][]*smux.Session
 	sessionMutex sync.Mutex
 	dialer       ws.Dialer
+	L            *zap.SugaredLogger
 }
 
-func NewMWSSTransporter() *mwssTransporter {
+func NewMWSSTransporter(l *zap.SugaredLogger) *mwssTransporter {
 	return &mwssTransporter{
-		sessions: make(map[string][]*smux.Session),
+		sessionM: make(map[string][]*smux.Session),
 		dialer: ws.Dialer{
 			TLSConfig: mytls.DefaultTLSConfig,
 			Timeout:   constant.DialTimeOut},
+		L: l,
 	}
 }
 
@@ -37,7 +39,7 @@ func (tr *mwssTransporter) Dial(addr string) (conn net.Conn, err error) {
 	var sessions []*smux.Session
 	var ok bool
 
-	sessions, ok = tr.sessions[addr]
+	sessions, ok = tr.sessionM[addr]
 	// 找到可以用的session
 	for sessionIndex, session = range sessions {
 		if session.NumStreams() >= constant.MaxMWSSStreamCnt {
@@ -50,7 +52,7 @@ func (tr *mwssTransporter) Dial(addr string) (conn net.Conn, err error) {
 
 	// 删除已经关闭的session
 	if session != nil && session.IsClosed() {
-		log.Logger.Infof("find closed session %v idx: %d", session, sessionIndex)
+		tr.L.Infof("find closed idx: %d", sessionIndex)
 		sessions = append(sessions[:sessionIndex], sessions[sessionIndex+1:]...)
 		ok = false
 	}
@@ -62,20 +64,13 @@ func (tr *mwssTransporter) Dial(addr string) (conn net.Conn, err error) {
 			return nil, err
 		}
 		sessions = append(sessions, session)
-	} else {
-		if len(sessions) > 1 {
-			// close last not used session, but we keep one conn in session pool
-			if lastSession := sessions[len(sessions)-1]; lastSession.NumStreams() == 0 {
-				lastSession.Close()
-			}
-		}
 	}
 	stream, err := session.OpenStream()
 	if err != nil {
 		session.Close()
 		return nil, err
 	}
-	tr.sessions[addr] = sessions
+	tr.sessionM[addr] = sessions
 	return stream, nil
 }
 
@@ -85,11 +80,13 @@ func (tr *mwssTransporter) initSession(addr string) (*smux.Session, error) {
 		return nil, err
 	}
 	// stream multiplex
-	session, err := smux.Client(rc, nil)
+	cfg := smux.DefaultConfig()
+	cfg.KeepAliveDisabled = true
+	session, err := smux.Client(rc, cfg)
 	if err != nil {
 		return nil, err
 	}
-	log.Logger.Infof("[mwss] Init new session to: %s", rc.RemoteAddr())
+	tr.L.Infof("Init new session to: %s", rc.RemoteAddr())
 	return session, nil
 }
 
@@ -97,19 +94,21 @@ type MWSSServer struct {
 	Server   *http.Server
 	ConnChan chan net.Conn
 	ErrChan  chan error
+	L        *zap.SugaredLogger
 }
 
-func NewMWSSServer() *MWSSServer {
+func NewMWSSServer(l *zap.SugaredLogger) *MWSSServer {
 	return &MWSSServer{
 		ConnChan: make(chan net.Conn, 1024),
 		ErrChan:  make(chan error, 1),
+		L:        l,
 	}
 }
 
 func (s *MWSSServer) Upgrade(w http.ResponseWriter, r *http.Request) {
 	conn, _, _, err := ws.UpgradeHTTP(r, w)
 	if err != nil {
-		log.Logger.Error(err)
+		s.L.Error(err)
 		return
 	}
 	s.mux(conn)
@@ -118,27 +117,29 @@ func (s *MWSSServer) Upgrade(w http.ResponseWriter, r *http.Request) {
 func (s *MWSSServer) mux(conn net.Conn) {
 	defer conn.Close()
 
-	session, err := smux.Server(conn, nil)
+	cfg := smux.DefaultConfig()
+	cfg.KeepAliveDisabled = true
+	session, err := smux.Server(conn, cfg)
 	if err != nil {
-		log.Logger.Infof("[mwss] server err %s - %s : %s", conn.RemoteAddr(), s.Server.Addr, err)
+		s.L.Infof("server err %s - %s : %s", conn.RemoteAddr(), s.Server.Addr, err)
 		return
 	}
 	defer session.Close()
 
-	log.Logger.Infof("[mwss] server init %s  %s", conn.RemoteAddr(), s.Server.Addr)
-	defer log.Logger.Infof("[mwss] server close %s >-< %s", conn.RemoteAddr(), s.Server.Addr)
+	s.L.Infof("server init %s  %s", conn.RemoteAddr(), s.Server.Addr)
+	defer s.L.Infof("server close %s >-< %s", conn.RemoteAddr(), s.Server.Addr)
 
 	for {
 		stream, err := session.AcceptStream()
 		if err != nil {
-			log.Logger.Infof("[mwss] accept stream err: %s", err)
+			s.L.Infof("accept stream err: %s", err)
 			break
 		}
 		select {
 		case s.ConnChan <- stream:
 		default:
 			stream.Close()
-			log.Logger.Infof("[mwss] %s - %s: connection queue is full", conn.RemoteAddr(), conn.LocalAddr())
+			s.L.Infof("%s - %s: connection queue is full", conn.RemoteAddr(), conn.LocalAddr())
 		}
 	}
 }

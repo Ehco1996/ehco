@@ -239,7 +239,7 @@ func (r *Relay) RunLocalWSSServer() error {
 
 func (r *Relay) RunLocalMWSSServer() error {
 	tp := r.TP.(*transporter.Raw)
-	mwssServer := transporter.NewMWSSServer()
+	mwssServer := transporter.NewMWSSServer(r.L)
 	mux := mux.NewRouter()
 	mux.Handle("/", http.HandlerFunc(web.Index))
 	mux.Handle("/mwss/", http.HandlerFunc(mwssServer.Upgrade))
