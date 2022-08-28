@@ -81,7 +81,6 @@ func (u *User) Equal(new *User) bool {
 }
 
 func (u *User) ToXrayUser() *protocol.User {
-	println("callde", u.Protocol)
 	var account proto.Message
 	switch u.Protocol {
 	case "trojan":
