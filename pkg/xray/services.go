@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	proxy "github.com/xtls/xray-core/app/proxyman/command"
-	"github.com/xtls/xray-core/common/protocol"
 	"github.com/xtls/xray-core/common/serial"
 	"github.com/xtls/xray-core/proxy/shadowsocks"
 )
@@ -31,15 +30,8 @@ func mappingCipher(in string) shadowsocks.CipherType {
 func AddInboundUser(ctx context.Context, c proxy.HandlerServiceClient, tag string, user *User) error {
 	_, err := c.AlterInbound(ctx, &proxy.AlterInboundRequest{
 		Tag: tag,
-		Operation: serial.ToTypedMessage(&proxy.AddUserOperation{
-			User: &protocol.User{
-				Level: uint32(user.Level),
-				Email: user.GetEmail(),
-				Account: serial.ToTypedMessage(&shadowsocks.Account{
-					CipherType: mappingCipher(user.Method),
-					Password:   user.Password}),
-			},
-		}),
+		Operation: serial.ToTypedMessage(
+			&proxy.AddUserOperation{User: user.ToXrayUser()}),
 	})
 	if err != nil {
 		return err

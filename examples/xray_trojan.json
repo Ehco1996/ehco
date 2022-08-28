@@ -49,6 +49,7 @@
                     "security": "tls",
                     "tlsSettings": {
                         "alpn": [
+                            "h2",
                             "http/1.1"
                         ]
                     }

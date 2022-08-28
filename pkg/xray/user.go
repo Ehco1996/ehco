@@ -8,13 +8,17 @@ import (
 	"sync"
 	"time"
 
+	"github.com/golang/protobuf/proto"
 	proxy "github.com/xtls/xray-core/app/proxyman/command"
 	stats "github.com/xtls/xray-core/app/stats/command"
+	"github.com/xtls/xray-core/common/protocol"
+	"github.com/xtls/xray-core/common/serial"
+	"github.com/xtls/xray-core/proxy/shadowsocks"
+	"github.com/xtls/xray-core/proxy/trojan"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
 
-// now only support shadownsocks user,maybe support other protocol later
 type User struct {
 	running bool
 
@@ -26,6 +30,8 @@ type User struct {
 	Enable          bool  `json:"enable"`
 	UploadTraffic   int64 `json:"upload_traffic"`
 	DownloadTraffic int64 `json:"download_traffic"`
+
+	Protocol string `json:"protocol"`
 }
 
 type UserTraffic struct {
@@ -41,7 +47,6 @@ type SyncTrafficReq struct {
 }
 
 type SyncUserConfigsResp struct {
-	// TODO support other protocol
 	Users []*User `json:"users"`
 }
 
@@ -73,6 +78,25 @@ func (u *User) UpdateFromServer(serverSideUser *User) {
 
 func (u *User) Equal(new *User) bool {
 	return u.Method == new.Method && u.Enable == new.Enable && u.Password == new.Password
+}
+
+func (u *User) ToXrayUser() *protocol.User {
+	println("callde", u.Protocol)
+	var account proto.Message
+	switch u.Protocol {
+	case "trojan":
+		account = &trojan.Account{Password: u.Password}
+	default:
+		account = &shadowsocks.Account{
+			CipherType: mappingCipher(u.Method),
+			Password:   u.Password}
+	}
+	xu := &protocol.User{
+		Level:   uint32(u.Level),
+		Email:   u.GetEmail(),
+		Account: serial.ToTypedMessage(account),
+	}
+	return xu
 }
 
 // UserPool user pool
@@ -109,8 +133,7 @@ func NewUserPool(ctx context.Context, xrayEndPoint string) (*UserPool, error) {
 	return up, nil
 }
 
-// CreateUser get create user
-func (up *UserPool) CreateUser(userId, level int, password, method string, enable bool) *User {
+func (up *UserPool) CreateUser(userId, level int, password, method, protocol string, enable bool) *User {
 	up.Lock()
 	defer up.Unlock()
 	u := &User{
@@ -120,6 +143,7 @@ func (up *UserPool) CreateUser(userId, level int, password, method string, enabl
 		Level:    level,
 		Enable:   enable,
 		Method:   method,
+		Protocol: protocol,
 	}
 	up.users[u.ID] = u
 	return u
@@ -210,7 +234,8 @@ func (up *UserPool) syncUserConfigsFromServer(ctx context.Context, endpoint, tag
 	for _, newUser := range resp.Users {
 		oldUser, found := up.GetUser(newUser.ID)
 		if !found {
-			newUser := up.CreateUser(newUser.ID, newUser.Level, newUser.Password, newUser.Method, newUser.Enable)
+			newUser := up.CreateUser(
+				newUser.ID, newUser.Level, newUser.Password, newUser.Method, newUser.Protocol, newUser.Enable)
 			if newUser.Enable {
 				if err := AddInboundUser(ctx, up.proxyClient, tag, newUser); err != nil {
 					return err
