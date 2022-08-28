@@ -1,0 +1,65 @@
+{
+    "xray_config": {
+        "stats": {},
+        "api": {
+            "tag": "api",
+            "services": [
+                "StatsService",
+                "HandlerService"
+            ]
+        },
+        "log": {
+            "loglevel": "debug"
+        },
+        "policy": {
+            "levels": {
+                "0": {
+                    "statsUserUplink": true,
+                    "statsUserDownlink": true
+                }
+            },
+            "system": {
+                "statsInboundUplink": true,
+                "statsInboundDownlink": true,
+                "statsOutboundUplink": true,
+                "statsOutboundDownlink": true
+            }
+        },
+        "inbounds": [
+            {
+                "port": 4443,
+                "protocol": "trojan",
+                "tag": "trojan_proxy",
+                "settings": {
+                    "clients": [
+                        {
+                            "password": "123456xx",
+                            "email": "1.com"
+                        }
+                    ],
+                    "network": "tcp,udp",
+                    "fallbacks": [
+                        {
+                            "dest": "127.0.0.1:1234"
+                        }
+                    ]
+                },
+                "streamSettings": {
+                    "network": "tcp",
+                    "security": "tls",
+                    "tlsSettings": {
+                        "alpn": [
+                            "http/1.1"
+                        ]
+                    }
+                }
+            }
+        ],
+        "outbounds": [
+            {
+                "protocol": "freedom",
+                "settings": {}
+            }
+        ]
+    }
+}

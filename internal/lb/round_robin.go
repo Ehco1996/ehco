@@ -15,7 +15,7 @@ type Node struct {
 func (n *Node) BlockForSomeTime() {
 	// TODO: make this configurable
 	n.BlockTimes.Add(1000)
-	log.InfoLogger.Info("[lb] block remote node for 1000 times label=%s remote=%s", n.Label, n.Address)
+	log.InfoLogger.Infof("[lb] block remote node for 1000 times label=%s remote=%s", n.Label, n.Address)
 }
 
 // RoundRobin is an interface for representing round-robin balancing.

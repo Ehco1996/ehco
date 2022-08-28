@@ -15,7 +15,7 @@ var (
 )
 
 func init() {
-	InfoLogger, _ = initLogger(zapcore.InfoLevel.String())
+	InfoLogger, _ = initLogger(zapcore.DebugLevel.String())
 }
 
 func initLogger(logLevel string) (*zap.SugaredLogger, error) {

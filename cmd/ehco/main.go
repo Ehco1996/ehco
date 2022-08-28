@@ -113,7 +113,7 @@ func createCliAPP() *cli.App {
 		},
 		&cli.IntFlag{
 			Name:        "web_port",
-			Usage:       "prometheus web expoter 的监听端口",
+			Usage:       "prometheus web exporter 的监听端口",
 			EnvVars:     []string{"EHCO_WEB_PORT"},
 			Value:       0,
 			Destination: &WebPort,
@@ -201,7 +201,9 @@ func loadConfig() (cfg *config.Config, err error) {
 	for _, cfg := range cfg.RelayConfigs {
 		if cfg.ListenType == constant.Listen_WSS || cfg.ListenType == constant.Listen_MWSS ||
 			cfg.TransportType == constant.Transport_WSS || cfg.TransportType == constant.Transport_MWSS {
-			tls.InitTlsCfg()
+			if err := tls.InitTlsCfg(); err != nil {
+				return nil, err
+			}
 			break
 		}
 	}

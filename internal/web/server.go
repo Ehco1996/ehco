@@ -72,7 +72,7 @@ func simpleTokenAuthMiddleware(token string, h http.Handler) http.Handler {
 
 func StartWebServer(cfg *config.Config) error {
 	addr := fmt.Sprintf("0.0.0.0:%d", cfg.WebPort)
-	L.Info("Start Web Server at http://%s/", addr)
+	L.Infof("Start Web Server at http://%s/", addr)
 	r := mux.NewRouter()
 	AttachProfiler(r)
 	registerMetrics(cfg)

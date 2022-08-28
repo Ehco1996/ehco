@@ -149,7 +149,7 @@ func (up *UserPool) GetAllUsers() []*User {
 	return users
 }
 
-func (up *UserPool) syncTrafficToServer(ctx context.Context, endpoint string) error {
+func (up *UserPool) syncTrafficToServer(ctx context.Context, endpoint, tag string) error {
 	// sync traffic from xray server
 	// V2ray的stats的统计模块设计的非常奇怪，具体规则如下
 	// 上传流量："user>>>" + user.Email + ">>>traffic>>>uplink"
@@ -171,7 +171,7 @@ func (up *UserPool) syncTrafficToServer(ctx context.Context, endpoint string) er
 				"user in xray not found in user pool this user maybe out of traffic, user id: %d, leak traffic: %d",
 				userID, stat.Value)
 			fakeUser := &User{ID: userID}
-			if err := RemoveInboundUser(ctx, up.proxyClient, XraySSProxyTag, fakeUser); err != nil {
+			if err := RemoveInboundUser(ctx, up.proxyClient, tag, fakeUser); err != nil {
 				L.Warnf(
 					"tring remove leak user failed, user id: %d err: %s", userID, err.Error())
 			}
@@ -201,7 +201,7 @@ func (up *UserPool) syncTrafficToServer(ctx context.Context, endpoint string) er
 	return nil
 }
 
-func (up *UserPool) syncUserConfigsFromServer(ctx context.Context, endpoint string) error {
+func (up *UserPool) syncUserConfigsFromServer(ctx context.Context, endpoint, tag string) error {
 	resp := SyncUserConfigsResp{}
 	if err := getJson(up.httpClient, endpoint, &resp); err != nil {
 		return err
@@ -212,7 +212,7 @@ func (up *UserPool) syncUserConfigsFromServer(ctx context.Context, endpoint stri
 		if !found {
 			newUser := up.CreateUser(newUser.ID, newUser.Level, newUser.Password, newUser.Method, newUser.Enable)
 			if newUser.Enable {
-				if err := AddInboundUser(ctx, up.proxyClient, XraySSProxyTag, newUser); err != nil {
+				if err := AddInboundUser(ctx, up.proxyClient, tag, newUser); err != nil {
 					return err
 				}
 			}
@@ -220,14 +220,14 @@ func (up *UserPool) syncUserConfigsFromServer(ctx context.Context, endpoint stri
 			// update user configs
 			if !oldUser.Equal(newUser) {
 				if oldUser.running {
-					if err := RemoveInboundUser(ctx, up.proxyClient, XraySSProxyTag, oldUser); err != nil {
+					if err := RemoveInboundUser(ctx, up.proxyClient, tag, oldUser); err != nil {
 						return err
 					}
 				}
 				oldUser.UpdateFromServer(newUser)
 			}
 			if oldUser.Enable && !oldUser.running {
-				if err := AddInboundUser(ctx, up.proxyClient, XraySSProxyTag, oldUser); err != nil {
+				if err := AddInboundUser(ctx, up.proxyClient, tag, oldUser); err != nil {
 					return err
 				}
 			}
@@ -237,7 +237,7 @@ func (up *UserPool) syncUserConfigsFromServer(ctx context.Context, endpoint stri
 	// remove user not in server
 	for _, user := range up.GetAllUsers() {
 		if _, ok := userM[user.ID]; !ok {
-			if err := RemoveInboundUser(ctx, up.proxyClient, XraySSProxyTag, user); err != nil {
+			if err := RemoveInboundUser(ctx, up.proxyClient, tag, user); err != nil {
 				return err
 			}
 			up.RemoveUser(user.ID)
@@ -246,14 +246,14 @@ func (up *UserPool) syncUserConfigsFromServer(ctx context.Context, endpoint stri
 	return nil
 }
 
-func (up *UserPool) StartSyncUserTask(ctx context.Context, endpoint string) {
+func (up *UserPool) StartSyncUserTask(ctx context.Context, endpoint, tag string) {
 	L.Infof("Start Sync User Task")
 
 	syncOnce := func() {
-		if err := up.syncUserConfigsFromServer(ctx, endpoint); err != nil {
+		if err := up.syncUserConfigsFromServer(ctx, endpoint, tag); err != nil {
 			L.Errorf("Sync User Configs From Server Error: %v", err)
 		}
-		if err := up.syncTrafficToServer(ctx, endpoint); err != nil {
+		if err := up.syncTrafficToServer(ctx, endpoint, tag); err != nil {
 			L.Errorf("Sync Traffic From Server Error: %v", err)
 		}
 	}

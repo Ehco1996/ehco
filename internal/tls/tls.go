@@ -26,23 +26,28 @@ func init() {
 
 // pre built in tls cert
 var (
-	CertFileName     = os.Getenv("EHCO_CERT_FILE_NAME")
-	KeyFileName      = os.Getenv("EHCO_KEY_FILE_NAME")
-	DefaultTLSConfig *tls.Config
+	CertFileName = os.Getenv("EHCO_CERT_FILE_NAME")
+	KeyFileName  = os.Getenv("EHCO_KEY_FILE_NAME")
+
+	DefaultTLSConfig          *tls.Config
+	DefaultTLSConfigCertBytes []byte
+	DefaultTLSConfigKeyBytes  []byte
 )
 
-func InitTlsCfg() {
+func InitTlsCfg() error {
+
 	if DefaultTLSConfig != nil {
-		return
+		return nil
 	}
 	cert, err := genCertificate()
 	if err != nil {
-		panic(err)
+		return err
 	}
 	DefaultTLSConfig = &tls.Config{
 		Certificates:       []tls.Certificate{cert},
 		InsecureSkipVerify: true,
 	}
+	return nil
 }
 
 func genCertificate() (cert tls.Certificate, err error) {
@@ -86,6 +91,8 @@ func generateKeyPair() (rawCert, rawKey []byte, err error) {
 
 	rawCert = pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: derBytes})
 	rawKey = pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(priv)})
+	DefaultTLSConfigCertBytes = rawCert
+	DefaultTLSConfigKeyBytes = rawKey
 
 	if CertFileName != "" {
 		certOut, err := os.Create(CertFileName)
