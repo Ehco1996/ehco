@@ -5,6 +5,7 @@ import (
 	"net"
 	"net/http"
 	"sync"
+	"time"
 
 	"github.com/Ehco1996/ehco/internal/constant"
 	mytls "github.com/Ehco1996/ehco/internal/tls"
@@ -18,15 +19,44 @@ type mwssTransporter struct {
 	sessionMutex sync.Mutex
 	dialer       ws.Dialer
 	L            *zap.SugaredLogger
+	gcTicker     *time.Ticker
 }
 
 func NewMWSSTransporter(l *zap.SugaredLogger) *mwssTransporter {
-	return &mwssTransporter{
+	tr := &mwssTransporter{
 		sessionM: make(map[string][]*smux.Session),
 		dialer: ws.Dialer{
 			TLSConfig: mytls.DefaultTLSConfig,
 			Timeout:   constant.DialTimeOut},
-		L: l,
+		L:        l,
+		gcTicker: time.NewTicker(time.Second * 30),
+	}
+	// start gc thread for close idle sessions
+	go tr.gc()
+	return tr
+}
+
+func (tr *mwssTransporter) gc() {
+	for range tr.gcTicker.C {
+		tr.sessionMutex.Lock()
+		for addr, sl := range tr.sessionM {
+			tr.L.Debugf("doing gc for remote addr: %s total session count %d", addr, len(sl))
+			for idx := range sl {
+				tr.L.Debugf("check session: %s current stream count %d", sl[idx].LocalAddr().String(), sl[idx].NumStreams())
+				if sl[idx].NumStreams() == 0 {
+					sl[idx].Close()
+					tr.L.Debugf("close idle session:%s", sl[idx].LocalAddr().String())
+				}
+			}
+			newList := []*smux.Session{}
+			for _, s := range sl {
+				if !s.IsClosed() {
+					newList = append(newList, s)
+				}
+			}
+			tr.sessionM[addr] = newList
+		}
+		tr.sessionMutex.Unlock()
 	}
 }
 
@@ -35,42 +65,33 @@ func (tr *mwssTransporter) Dial(addr string) (conn net.Conn, err error) {
 	defer tr.sessionMutex.Unlock()
 
 	var session *smux.Session
-	var sessionIndex int
-	var sessions []*smux.Session
-	var ok bool
-
-	sessions, ok = tr.sessionM[addr]
-	// 找到可以用的session
-	for sessionIndex, session = range sessions {
-		if session.NumStreams() >= constant.MaxMWSSStreamCnt {
-			ok = false
+	sessionList := tr.sessionM[addr]
+	for _, s := range sessionList {
+		if s.IsClosed() || s.NumStreams() >= constant.MaxMWSSStreamCnt {
+			continue
 		} else {
-			ok = true
+			tr.L.Debugf("use session: %s total stream count: %d", s.LocalAddr().String(), s.NumStreams())
+			session = s
 			break
 		}
 	}
 
-	// 删除已经关闭的session
-	if session != nil && session.IsClosed() {
-		tr.L.Infof("find closed idx: %d", sessionIndex)
-		sessions = append(sessions[:sessionIndex], sessions[sessionIndex+1:]...)
-		ok = false
-	}
-
-	// 创建新的session
-	if !ok {
+	// create new one
+	if session == nil {
 		session, err = tr.initSession(addr)
 		if err != nil {
 			return nil, err
 		}
-		sessions = append(sessions, session)
+		sessionList = append(sessionList, session)
+		tr.sessionM[addr] = sessionList
 	}
+
 	stream, err := session.OpenStream()
 	if err != nil {
+		tr.L.Errorf("open stream meet error:%s", err)
 		session.Close()
 		return nil, err
 	}
-	tr.sessionM[addr] = sessions
 	return stream, nil
 }
 
@@ -121,18 +142,18 @@ func (s *MWSSServer) mux(conn net.Conn) {
 	cfg.KeepAliveDisabled = true
 	session, err := smux.Server(conn, cfg)
 	if err != nil {
-		s.L.Infof("server err %s - %s : %s", conn.RemoteAddr(), s.Server.Addr, err)
+		s.L.Debugf("server err %s - %s : %s", conn.RemoteAddr(), s.Server.Addr, err)
 		return
 	}
 	defer session.Close()
 
-	s.L.Infof("server init %s  %s", conn.RemoteAddr(), s.Server.Addr)
-	defer s.L.Infof("server close %s >-< %s", conn.RemoteAddr(), s.Server.Addr)
+	s.L.Debugf("server init %s  %s", conn.RemoteAddr(), s.Server.Addr)
+	defer s.L.Debugf("server close %s >-< %s", conn.RemoteAddr(), s.Server.Addr)
 
 	for {
 		stream, err := session.AcceptStream()
 		if err != nil {
-			s.L.Infof("accept stream err: %s", err)
+			s.L.Errorf("accept stream err: %s", err)
 			break
 		}
 		select {

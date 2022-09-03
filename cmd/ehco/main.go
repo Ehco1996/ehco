@@ -323,8 +323,8 @@ func initSentry() error {
 	return nil
 }
 
-func initCMDLogger() error {
-	if err := log.InitLogger(LogLevel); err != nil {
+func initCMDLogger(cfg *config.Config) error {
+	if err := log.InitLogger(cfg.LogLeveL); err != nil {
 		return err
 	}
 	cmdLogger = log.Logger.Named("cmd")
@@ -338,7 +338,7 @@ func start(ctx *cli.Context) error {
 		return err
 	}
 
-	if err := initCMDLogger(); err != nil {
+	if err := initCMDLogger(cfg); err != nil {
 		return err
 	}
 
