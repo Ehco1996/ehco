@@ -6,6 +6,7 @@ on:
       - "*"
     branches:
       - test-ci
+  workflow_dispatch:
 
 jobs:
   ci-ci-ci:
