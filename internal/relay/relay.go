@@ -16,7 +16,6 @@ import (
 	"github.com/Ehco1996/ehco/internal/web"
 	"github.com/Ehco1996/ehco/pkg/log"
 	"github.com/gorilla/mux"
-	"go.uber.org/atomic"
 	"go.uber.org/zap"
 )
 
@@ -51,17 +50,15 @@ func NewRelay(cfg *config.RelayConfig) (*Relay, error) {
 	tcpNodeList := make([]*lb.Node, len(cfg.TCPRemotes))
 	for idx, addr := range cfg.TCPRemotes {
 		tcpNodeList[idx] = &lb.Node{
-			Address:    addr,
-			Label:      fmt.Sprintf("%s-%s", cfg.Label, addr),
-			BlockTimes: atomic.NewInt64(0),
+			Address: addr,
+			Label:   fmt.Sprintf("%s-%s", cfg.Label, addr),
 		}
 	}
 	udpNodeList := make([]*lb.Node, len(cfg.UDPRemotes))
 	for idx, addr := range cfg.UDPRemotes {
 		udpNodeList[idx] = &lb.Node{
-			Address:    addr,
-			Label:      fmt.Sprintf("%s-%s", cfg.Label, addr),
-			BlockTimes: atomic.NewInt64(0),
+			Address: addr,
+			Label:   fmt.Sprintf("%s-%s", cfg.Label, addr),
 		}
 	}
 

@@ -70,7 +70,7 @@ func (tr *mwssTransporter) Dial(addr string) (conn net.Conn, err error) {
 		if s.IsClosed() || s.NumStreams() >= constant.MaxMWSSStreamCnt {
 			continue
 		} else {
-			tr.L.Debugf("use session: %s total stream count: %d", s.LocalAddr().String(), s.NumStreams())
+			tr.L.Debugf("use session: %s total stream count: %d", s.RemoteAddr().String(), s.NumStreams())
 			session = s
 			break
 		}

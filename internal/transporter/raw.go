@@ -45,8 +45,7 @@ func (raw *Raw) HandleUDPConn(uaddr *net.UDPAddr, local *net.UDPConn) {
 	remoteUdp, _ := net.ResolveUDPAddr("udp", remote.Address)
 	rc, err := net.DialUDP("udp", nil, remoteUdp)
 	if err != nil {
-		remote.BlockForSomeTime()
-		raw.L.Info(err)
+		raw.L.Error(err)
 		return
 	}
 	defer func() {
@@ -73,11 +72,11 @@ func (raw *Raw) HandleUDPConn(uaddr *net.UDPAddr, local *net.UDPConn) {
 			_ = rc.SetDeadline(time.Now().Add(constant.IdleTimeOut))
 			i, err := rc.Read(buf)
 			if err != nil {
-				raw.L.Info(err)
+				raw.L.Error(err)
 				break
 			}
 			if _, err := local.WriteToUDP(buf[0:i], uaddr); err != nil {
-				raw.L.Info(err)
+				raw.L.Error(err)
 				break
 			}
 			wt += i
@@ -96,7 +95,7 @@ func (raw *Raw) HandleUDPConn(uaddr *net.UDPAddr, local *net.UDPConn) {
 			wt += len(b)
 			web.NetWorkTransmitBytes.WithLabelValues(remote.Label, web.METRIC_CONN_UDP).Add(float64(wt * 2))
 			if _, err := rc.Write(b); err != nil {
-				raw.L.Info(err)
+				raw.L.Error(err)
 				return
 			}
 			_ = rc.SetDeadline(time.Now().Add(constant.IdleTimeOut))
@@ -113,7 +112,6 @@ func (raw *Raw) DialRemote(remote *lb.Node) (net.Conn, error) {
 	d := net.Dialer{Timeout: constant.DialTimeOut}
 	rc, err := d.Dial("tcp", remote.Address)
 	if err != nil {
-		remote.BlockForSomeTime()
 		raw.L.Errorf("dial error: %s", err)
 		return nil, err
 	}
