@@ -14,6 +14,7 @@ import (
 	"github.com/prometheus/common/promlog"
 	"github.com/prometheus/common/version"
 	"github.com/prometheus/node_exporter/collector"
+	"gopkg.in/alecthomas/kingpin.v2"
 )
 
 func Index(w http.ResponseWriter, r *http.Request) {
@@ -61,36 +62,13 @@ func registerNodeExporterMetrics(cfg *config.Config) error {
 	promlogConfig := &promlog.Config{Level: level}
 	logger := promlog.New(promlogConfig)
 
-	mc, err := collector.NewMeminfoCollector(logger)
-	if err != nil {
-		return err
-	}
-	cc, err := collector.NewCPUCollector(logger)
-	if err != nil {
-		return err
-	}
-	netdevc, err := collector.NewNetDevCollector(logger)
-	if err != nil {
-		return err
-	}
-	netstat, err := collector.NewNetDevCollector(logger)
-	if err != nil {
-		return err
-	}
-	collectors := map[string]collector.Collector{
-		"meminfo": mc,
-		"cpu":     cc,
-		"netdev":  netdevc,
-		"netstat": netstat,
-	}
-	// disable all collectors and set it manually
-	collector.DisableDefaultCollectors()
+	// see this https://github.com/prometheus/node_exporter/pull/2463
+	kingpin.CommandLine.Parse([]string{})
 	nc, err := collector.NewNodeCollector(logger)
 	if err != nil {
 		return fmt.Errorf("couldn't create collector: %s", err)
 	}
-
-	nc.Collectors = collectors
+	// nc.Collectors = collectors
 	prometheus.MustRegister(
 		nc,
 		version.NewCollector("node_exporter"),
@@ -101,7 +79,7 @@ func registerNodeExporterMetrics(cfg *config.Config) error {
 func simpleTokenAuthMiddleware(token string, h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if t := r.URL.Query().Get("token"); t != token {
-			msg := fmt.Sprintf("unauthed request from %s", r.RemoteAddr)
+			msg := fmt.Sprintf("un auth request from %s", r.RemoteAddr)
 			L.Error(msg)
 			hj, ok := w.(http.Hijacker)
 			if ok {
