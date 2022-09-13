@@ -11,6 +11,10 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/prometheus/common/promlog"
+	"github.com/prometheus/common/version"
+	"github.com/prometheus/node_exporter/collector"
+	"gopkg.in/alecthomas/kingpin.v2"
 )
 
 func Index(w http.ResponseWriter, r *http.Request) {
@@ -52,10 +56,30 @@ func registerMetrics(cfg *config.Config) {
 	}
 }
 
+func registerNodeExporterMetrics(cfg *config.Config) error {
+	level := &promlog.AllowedLevel{}
+	level.Set(cfg.LogLeveL)
+	promlogConfig := &promlog.Config{Level: level}
+	logger := promlog.New(promlogConfig)
+
+	// see this https://github.com/prometheus/node_exporter/pull/2463
+	kingpin.CommandLine.Parse([]string{})
+	nc, err := collector.NewNodeCollector(logger)
+	if err != nil {
+		return fmt.Errorf("couldn't create collector: %s", err)
+	}
+	// nc.Collectors = collectors
+	prometheus.MustRegister(
+		nc,
+		version.NewCollector("node_exporter"),
+	)
+	return nil
+}
+
 func simpleTokenAuthMiddleware(token string, h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if t := r.URL.Query().Get("token"); t != token {
-			msg := fmt.Sprintf("unauthed request from %s", r.RemoteAddr)
+			msg := fmt.Sprintf("un auth request from %s", r.RemoteAddr)
 			L.Error(msg)
 			hj, ok := w.(http.Hijacker)
 			if ok {
@@ -73,11 +97,16 @@ func simpleTokenAuthMiddleware(token string, h http.Handler) http.Handler {
 func StartWebServer(cfg *config.Config) error {
 	addr := fmt.Sprintf("0.0.0.0:%d", cfg.WebPort)
 	L.Infof("Start Web Server at http://%s/", addr)
+
 	r := mux.NewRouter()
 	AttachProfiler(r)
 	registerMetrics(cfg)
+	if err := registerNodeExporterMetrics(cfg); err != nil {
+		return err
+	}
 	r.Handle("/", http.HandlerFunc(Welcome))
 	r.Handle("/metrics/", promhttp.Handler())
+
 	if cfg.WebToken != "" {
 		return http.ListenAndServe(addr, simpleTokenAuthMiddleware(cfg.WebToken, r))
 	} else {

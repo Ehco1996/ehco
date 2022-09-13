@@ -124,5 +124,8 @@ func (c *Config) Validate() error {
 			return err
 		}
 	}
+	if c.LogLeveL == "" {
+		c.LogLeveL = "info"
+	}
 	return nil
 }
