@@ -118,7 +118,7 @@ func (raw *Raw) DialRemote(remote *lb.Node) (net.Conn, error) {
 	return rc, nil
 }
 
-func (raw *Raw) HandleTCPConn(c *net.TCPConn, remote *lb.Node) error {
+func (raw *Raw) HandleTCPConn(c net.Conn, remote *lb.Node) error {
 	defer c.Close()
 	rc, err := raw.DialRemote(remote)
 	if err != nil {

@@ -21,7 +21,7 @@ func (s *Wss) HandleUDPConn(uaddr *net.UDPAddr, local *net.UDPConn) {
 	s.raw.HandleUDPConn(uaddr, local)
 }
 
-func (s *Wss) HandleTCPConn(c *net.TCPConn, remote *lb.Node) error {
+func (s *Wss) HandleTCPConn(c net.Conn, remote *lb.Node) error {
 	defer c.Close()
 
 	d := ws.Dialer{TLSConfig: tls.DefaultTLSConfig}

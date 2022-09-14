@@ -27,6 +27,7 @@ func (r *RelayConfig) Validate() error {
 	if r.ListenType != constant.Listen_RAW &&
 		r.ListenType != constant.Listen_WS &&
 		r.ListenType != constant.Listen_WSS &&
+		r.ListenType != constant.Listen_MTCP &&
 		r.ListenType != constant.Listen_MWSS {
 		return fmt.Errorf("invalid listen type:%s", r.ListenType)
 	}
@@ -34,6 +35,7 @@ func (r *RelayConfig) Validate() error {
 	if r.TransportType != constant.Transport_RAW &&
 		r.TransportType != constant.Transport_WS &&
 		r.TransportType != constant.Transport_WSS &&
+		r.TransportType != constant.Transport_MTCP &&
 		r.TransportType != constant.Transport_MWSS {
 		return fmt.Errorf("invalid transport type:%s", r.ListenType)
 	}

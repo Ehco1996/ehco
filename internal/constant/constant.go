@@ -35,17 +35,20 @@ var (
 const (
 	DialTimeOut = 3 * time.Second
 
-	MaxMWSSStreamCnt = 100
+	SmuxGCDuration  = 3 * time.Second
+	MaxMuxStreamCnt = 50
 
 	Listen_RAW  = "raw"
 	Listen_WS   = "ws"
 	Listen_WSS  = "wss"
 	Listen_MWSS = "mwss"
+	Listen_MTCP = "mtcp"
 
 	Transport_RAW  = "raw"
 	Transport_WS   = "ws"
 	Transport_WSS  = "wss"
 	Transport_MWSS = "mwss"
+	Transport_MTCP = "mtcp"
 
 	// todo add udp buffer size
 	BUFFER_POOL_SIZE = 1024      // support 512 connections

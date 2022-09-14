@@ -20,7 +20,7 @@ func (s *Ws) HandleUDPConn(uaddr *net.UDPAddr, local *net.UDPConn) {
 	s.raw.HandleUDPConn(uaddr, local)
 }
 
-func (s *Ws) HandleTCPConn(c *net.TCPConn, remote *lb.Node) error {
+func (s *Ws) HandleTCPConn(c net.Conn, remote *lb.Node) error {
 	defer c.Close()
 
 	wsc, _, _, err := ws.Dial(context.TODO(), remote.Address+"/ws/")
