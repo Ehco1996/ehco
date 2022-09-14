@@ -35,7 +35,7 @@ var (
 const (
 	DialTimeOut = 3 * time.Second
 
-	SmuxGCDuration  = 3 * time.Second
+	SmuxGCDuration  = 30 * time.Second
 	MaxMuxStreamCnt = 50
 
 	Listen_RAW  = "raw"
