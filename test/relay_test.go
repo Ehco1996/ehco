@@ -33,6 +33,10 @@ const (
 	MWSS_LISTEN = "0.0.0.0:1237"
 	MWSS_REMOTE = "wss://0.0.0.0:2002"
 	MWSS_SERVER = "0.0.0.0:2002"
+
+	MTCP_LISTEN = "0.0.0.0:1238"
+	MTCP_REMOTE = "0.0.0.0:2003"
+	MTCP_SERVER = "0.0.0.0:2003"
 )
 
 func init() {
@@ -93,6 +97,20 @@ func init() {
 			{
 				Listen:        MWSS_SERVER,
 				ListenType:    constant.Listen_MWSS,
+				TCPRemotes:    []string{ECHO_SERVER},
+				TransportType: constant.Transport_RAW,
+			},
+
+			// mtcp
+			{
+				Listen:        MTCP_LISTEN,
+				ListenType:    constant.Listen_RAW,
+				TCPRemotes:    []string{MTCP_REMOTE},
+				TransportType: constant.Transport_MTCP,
+			},
+			{
+				Listen:        MTCP_SERVER,
+				ListenType:    constant.Listen_MTCP,
 				TCPRemotes:    []string{ECHO_SERVER},
 				TransportType: constant.Transport_RAW,
 			},
@@ -178,7 +196,7 @@ func TestRelayOverWss(t *testing.T) {
 func TestRelayOverMwss(t *testing.T) {
 	msg := []byte("hello")
 	var wg sync.WaitGroup
-	testCnt := 50
+	testCnt := 10
 	wg.Add(testCnt)
 	for i := 0; i < testCnt; i++ {
 		go func(i int) {
@@ -193,6 +211,27 @@ func TestRelayOverMwss(t *testing.T) {
 	}
 	wg.Wait()
 	t.Log("test tcp over mwss done!")
+}
+
+func TestRelayOverMTCP(t *testing.T) {
+	msg := []byte("hello")
+	var wg sync.WaitGroup
+
+	testCnt := 5
+	wg.Add(testCnt)
+	for i := 0; i < testCnt; i++ {
+		go func(i int) {
+			t.Logf("run no: %d test.", i)
+			res := SendTcpMsg(msg, MTCP_LISTEN)
+			wg.Done()
+			if string(res) != string(msg) {
+				t.Log(res)
+				panic(1)
+			}
+		}(i)
+	}
+	wg.Wait()
+	t.Log("test tcp over mtcp done!")
 }
 
 func BenchmarkTcpRelay(b *testing.B) {

@@ -16,7 +16,7 @@ type RelayTransporter interface {
 	HandleUDPConn(uaddr *net.UDPAddr, local *net.UDPConn)
 
 	// TCP相关
-	HandleTCPConn(c *net.TCPConn, remote *lb.Node) error
+	HandleTCPConn(c net.Conn, remote *lb.Node) error
 	GetRemote() *lb.Node
 }
 
@@ -35,7 +35,13 @@ func PickTransporter(transType string, tcpRemotes, udpRemotes lb.RoundRobin) Rel
 	case constant.Transport_WSS:
 		return &Wss{raw: &raw}
 	case constant.Transport_MWSS:
-		return &Mwss{raw: &raw, mtp: NewMWSSTransporter(raw.L)}
+		logger := raw.L.Named("MWSSClient")
+		mWSSClient := NewMWSSClient(logger)
+		return &Mwss{raw: &raw, mtp: NewSmuxTransporter(logger, mWSSClient.InitNewSession)}
+	case constant.Transport_MTCP:
+		logger := raw.L.Named("MTCPClient")
+		mTCPClient := NewMTCPClient(logger)
+		return &MTCP{raw: &raw, mtp: NewSmuxTransporter(logger, mTCPClient.InitNewSession)}
 	}
 	return nil
 }
