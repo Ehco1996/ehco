@@ -16,9 +16,22 @@ type smuxTransporter struct {
 
 	gcTicker *time.Ticker
 	L        *zap.SugaredLogger
-	sessionM map[string][]*smux.Session
+
+	// remote addr -> SessionWithMetrics
+	sessionM map[string][]*SessionWithMetrics
 
 	initSessionF func(ctx context.Context, addr string) (*smux.Session, error)
+}
+
+type SessionWithMetrics struct {
+	session     *smux.Session
+	createdTime time.Time
+}
+
+func (sm *SessionWithMetrics) CanNotServe() bool {
+	return sm.session.IsClosed() ||
+		sm.session.NumStreams() >= constant.SmuxMaxStreamCnt ||
+		time.Now().Sub(sm.createdTime) > constant.SmuxMaxAliveDuration
 }
 
 func NewSmuxTransporter(l *zap.SugaredLogger,
@@ -26,7 +39,7 @@ func NewSmuxTransporter(l *zap.SugaredLogger,
 	tr := &smuxTransporter{
 		L:            l,
 		initSessionF: initSessionF,
-		sessionM:     make(map[string][]*smux.Session),
+		sessionM:     make(map[string][]*SessionWithMetrics),
 		gcTicker:     time.NewTicker(constant.SmuxGCDuration),
 	}
 	// start gc thread for close idle sessions
@@ -40,15 +53,16 @@ func (tr *smuxTransporter) gc() {
 		for addr, sl := range tr.sessionM {
 			tr.L.Debugf("==== start doing gc for remote addr: %s total session count %d ====", addr, len(sl))
 			for idx := range sl {
-				tr.L.Debugf("check session: %s current stream count %d", sl[idx].LocalAddr().String(), sl[idx].NumStreams())
-				if sl[idx].NumStreams() == 0 {
-					sl[idx].Close()
-					tr.L.Debugf("close idle session:%s", sl[idx].LocalAddr().String())
+				sm := sl[idx]
+				tr.L.Debugf("check session: %s current stream count %d", sm.session.LocalAddr().String(), sm.session.NumStreams())
+				if sm.session.NumStreams() == 0 {
+					sm.session.Close()
+					tr.L.Debugf("close idle session:%s", sm.session.LocalAddr().String())
 				}
 			}
-			newList := []*smux.Session{}
+			newList := []*SessionWithMetrics{}
 			for _, s := range sl {
-				if !s.IsClosed() {
+				if !s.session.IsClosed() {
 					newList = append(newList, s)
 				}
 			}
@@ -63,13 +77,14 @@ func (tr *smuxTransporter) Dial(ctx context.Context, addr string) (conn net.Conn
 	tr.sessionMutex.Lock()
 	defer tr.sessionMutex.Unlock()
 	var session *smux.Session
+
 	sessionList := tr.sessionM[addr]
-	for _, s := range sessionList {
-		if s.IsClosed() || s.NumStreams() >= constant.MaxMuxStreamCnt {
+	for _, sm := range sessionList {
+		if sm.CanNotServe() {
 			continue
 		} else {
-			tr.L.Debugf("use session: %s total stream count: %d", s.RemoteAddr().String(), s.NumStreams())
-			session = s
+			tr.L.Debugf("use session: %s total stream count: %d", sm.session.RemoteAddr().String(), sm.session.NumStreams())
+			session = sm.session
 			break
 		}
 	}
@@ -80,7 +95,7 @@ func (tr *smuxTransporter) Dial(ctx context.Context, addr string) (conn net.Conn
 		if err != nil {
 			return nil, err
 		}
-		sessionList = append(sessionList, session)
+		sessionList = append(sessionList, &SessionWithMetrics{session: session, createdTime: time.Now()})
 		tr.sessionM[addr] = sessionList
 	}
 
