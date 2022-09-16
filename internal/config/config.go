@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/Ehco1996/ehco/internal/constant"
-	"github.com/Ehco1996/ehco/pkg/log"
 	"github.com/xtls/xray-core/infra/conf"
 )
 
@@ -101,7 +100,7 @@ func (c *Config) readFromFile() error {
 	if err != nil {
 		return err
 	}
-	log.InfoLogger.Info("Load Config From file: ", c.PATH)
+	println("Load Config From file:", c.PATH)
 	if err != nil {
 		return err
 	}
@@ -115,7 +114,7 @@ func (c *Config) readFromHttp() error {
 		return err
 	}
 	defer r.Body.Close()
-	log.InfoLogger.Info("Load Config From http:", c.PATH)
+	println("Load Config From http:", c.PATH)
 	return json.NewDecoder(r.Body).Decode(&c)
 }
 

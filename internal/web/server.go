@@ -8,17 +8,23 @@ import (
 
 	"github.com/Ehco1996/ehco/internal/config"
 	"github.com/Ehco1996/ehco/internal/constant"
+	"github.com/Ehco1996/ehco/pkg/log"
 	"github.com/gorilla/mux"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/prometheus/common/promlog"
 	"github.com/prometheus/common/version"
 	"github.com/prometheus/node_exporter/collector"
+	"go.uber.org/zap"
 	"gopkg.in/alecthomas/kingpin.v2"
 )
 
+var (
+	l *zap.SugaredLogger
+)
+
 func Index(w http.ResponseWriter, r *http.Request) {
-	L.Infof("index call from %s", r.RemoteAddr)
+	l.Infof("index call from %s", r.RemoteAddr)
 	fmt.Fprintf(w, "access from %s \n", r.RemoteAddr)
 }
 
@@ -58,12 +64,16 @@ func registerMetrics(cfg *config.Config) {
 
 func registerNodeExporterMetrics(cfg *config.Config) error {
 	level := &promlog.AllowedLevel{}
-	level.Set(cfg.LogLeveL)
+	if err := level.Set(cfg.LogLeveL); err != nil {
+		return err
+	}
 	promlogConfig := &promlog.Config{Level: level}
 	logger := promlog.New(promlogConfig)
 
 	// see this https://github.com/prometheus/node_exporter/pull/2463
-	kingpin.CommandLine.Parse([]string{})
+	if _, err := kingpin.CommandLine.Parse([]string{}); err != nil {
+		return err
+	}
 	nc, err := collector.NewNodeCollector(logger)
 	if err != nil {
 		return fmt.Errorf("couldn't create collector: %s", err)
@@ -80,7 +90,7 @@ func simpleTokenAuthMiddleware(token string, h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if t := r.URL.Query().Get("token"); t != token {
 			msg := fmt.Sprintf("un auth request from %s", r.RemoteAddr)
-			L.Error(msg)
+			l.Error(msg)
 			hj, ok := w.(http.Hijacker)
 			if ok {
 				conn, _, _ := hj.Hijack()
@@ -95,8 +105,12 @@ func simpleTokenAuthMiddleware(token string, h http.Handler) http.Handler {
 }
 
 func StartWebServer(cfg *config.Config) error {
+	// todo make this only doing once
+	l = log.Logger.Named("web")
+	// end todo
+
 	addr := fmt.Sprintf("0.0.0.0:%d", cfg.WebPort)
-	L.Infof("Start Web Server at http://%s/", addr)
+	l.Infof("Start Web Server at http://%s/", addr)
 
 	r := mux.NewRouter()
 	AttachProfiler(r)

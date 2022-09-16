@@ -190,12 +190,12 @@ func (up *UserPool) syncTrafficToServer(ctx context.Context, endpoint, tag strin
 		}
 		user, found := up.GetUser(userID)
 		if !found {
-			L.Warnf(
+			l.Warnf(
 				"user in xray not found in user pool this user maybe out of traffic, user id: %d, leak traffic: %d",
 				userID, stat.Value)
 			fakeUser := &User{ID: userID}
 			if err := RemoveInboundUser(ctx, up.proxyClient, tag, fakeUser); err != nil {
-				L.Warnf(
+				l.Warnf(
 					"tring remove leak user failed, user id: %d err: %s", userID, err.Error())
 			}
 			continue
@@ -212,7 +212,7 @@ func (up *UserPool) syncTrafficToServer(ctx context.Context, endpoint, tag strin
 	for _, user := range up.GetAllUsers() {
 		tf := user.DownloadTraffic + user.UploadTraffic
 		if tf > 0 {
-			L.Infof("User: %v Now Used Total Traffic: %v", user.ID, tf)
+			l.Infof("User: %v Now Used Total Traffic: %v", user.ID, tf)
 			tfs = append(tfs, user.GenTraffic())
 			user.ResetTraffic()
 		}
@@ -220,7 +220,7 @@ func (up *UserPool) syncTrafficToServer(ctx context.Context, endpoint, tag strin
 	if err := postJson(up.httpClient, endpoint, &SyncTrafficReq{Data: tfs}); err != nil {
 		return err
 	}
-	L.Infof("Call syncTrafficToServer ONLINE USER COUNT: %d", len(tfs))
+	l.Infof("Call syncTrafficToServer ONLINE USER COUNT: %d", len(tfs))
 	return nil
 }
 
@@ -271,14 +271,14 @@ func (up *UserPool) syncUserConfigsFromServer(ctx context.Context, endpoint, tag
 }
 
 func (up *UserPool) StartSyncUserTask(ctx context.Context, endpoint, tag string) {
-	L.Infof("Start Sync User Task")
+	l.Infof("Start Sync User Task")
 
 	syncOnce := func() {
 		if err := up.syncUserConfigsFromServer(ctx, endpoint, tag); err != nil {
-			L.Errorf("Sync User Configs From Server Error: %v", err)
+			l.Errorf("Sync User Configs From Server Error: %v", err)
 		}
 		if err := up.syncTrafficToServer(ctx, endpoint, tag); err != nil {
-			L.Errorf("Sync Traffic From Server Error: %v", err)
+			l.Errorf("Sync Traffic From Server Error: %v", err)
 		}
 	}
 	syncOnce()

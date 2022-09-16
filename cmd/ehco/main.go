@@ -252,7 +252,7 @@ func startRelayServers(ctx context.Context, cfg *config.Config) error {
 	case err := <-errCH:
 		return err
 	case <-ctx.Done():
-		cmdLogger.Info("[relay]start to stop relay servers")
+		cmdLogger.Info("start to stop relay servers")
 		relayM.Range(func(key, value interface{}) bool {
 			r := value.(*relay.Relay)
 			r.Close()
@@ -317,14 +317,14 @@ func watchAndReloadConfig(ctx context.Context, relayM *sync.Map, errCh chan erro
 
 func initSentry() error {
 	if dsn := os.Getenv("SENTRY_DSN"); dsn != "" {
-		cmdLogger.Infof("[sentry] init sentry with dsn", dsn)
+		cmdLogger.Infof("init sentry with dsn", dsn)
 		return sentry.Init(sentry.ClientOptions{Dsn: dsn})
 	}
 	return nil
 }
 
 func initCMDLogger(cfg *config.Config) error {
-	if err := log.InitLogger(cfg.LogLeveL); err != nil {
+	if err := log.InitGlobalLogger(cfg.LogLeveL); err != nil {
 		return err
 	}
 	cmdLogger = log.Logger.Named("cmd")
@@ -332,12 +332,10 @@ func initCMDLogger(cfg *config.Config) error {
 }
 
 func start(ctx *cli.Context) error {
-
 	cfg, err := loadConfig()
 	if err != nil {
 		return err
 	}
-
 	if err := initCMDLogger(cfg); err != nil {
 		return err
 	}
@@ -355,7 +353,7 @@ func start(ctx *cli.Context) error {
 
 	if cfg.WebPort > 0 {
 		go func() {
-			cmdLogger.Fatalf("[web] StartWebServer meet err=%s", web.StartWebServer(cfg))
+			cmdLogger.Fatalf("StartWebServer meet err=%s", web.StartWebServer(cfg))
 		}()
 	}
 
@@ -363,13 +361,13 @@ func start(ctx *cli.Context) error {
 		go func() {
 			s, err := xray.StartXrayServer(mainCtx, cfg)
 			if err != nil {
-				cmdLogger.Fatalf("[xray] StartXrayServer meet err=%s", err)
+				cmdLogger.Fatalf("StartXrayServer meet err=%s", err)
 			}
 			defer s.Close()
 
 			if cfg.SyncTrafficEndPoint != "" {
 				go func() {
-					cmdLogger.Fatalf("[xray] StartSyncTask meet err=%s", xray.StartSyncTask(mainCtx, cfg))
+					cmdLogger.Fatalf("StartSyncTask meet err=%s", xray.StartSyncTask(mainCtx, cfg))
 				}()
 			}
 			<-ctx.Done()
@@ -378,7 +376,7 @@ func start(ctx *cli.Context) error {
 
 	if len(cfg.RelayConfigs) > 0 {
 		go func() {
-			cmdLogger.Fatalf("[relay] StartRelayServers meet err=%v", startRelayServers(mainCtx, cfg))
+			cmdLogger.Fatalf("StartRelayServers meet err=%v", startRelayServers(mainCtx, cfg))
 		}()
 	}
 
@@ -402,9 +400,6 @@ func main() {
 	if err := app.Run(os.Args); err != nil {
 		sentry.CurrentHub().CaptureException(err)
 		sentry.Flush(time.Second * 5)
-		if cmdLogger == nil {
-			cmdLogger = log.InfoLogger
-		}
 		cmdLogger.Fatal(err)
 	}
 }

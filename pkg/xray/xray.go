@@ -25,6 +25,7 @@ const (
 )
 
 func StartXrayServer(ctx context.Context, cfg *config.Config) (*core.Instance, error) {
+	initXrayLogger()
 	for _, inbound := range cfg.XRayConfig.InboundConfigs {
 		// add tls certs for trojan
 		if inbound.Tag == XrayTrojanProxyTag {
@@ -57,9 +58,9 @@ func StartXrayServer(ctx context.Context, cfg *config.Config) (*core.Instance, e
 			for idx := range s.Fallbacks {
 				dest := s.Fallbacks[idx].Dest
 				go func() {
-					L.Infof("start fallback server for trojan at %s", dest)
+					l.Infof("start fallback server for trojan at %s", dest)
 					http.Handle("/", http.HandlerFunc(web.Index))
-					http.ListenAndServe(dest, nil)
+					l.Fatal(http.ListenAndServe(dest, nil))
 				}()
 			}
 		}
@@ -77,6 +78,7 @@ func StartXrayServer(ctx context.Context, cfg *config.Config) (*core.Instance, e
 }
 
 func StartSyncTask(ctx context.Context, cfg *config.Config) error {
+	initXrayLogger()
 	// find api port and server, hard code api Tag to `api`
 	var grpcEndPoint string
 	var proxyTag string
@@ -99,7 +101,7 @@ func StartSyncTask(ctx context.Context, cfg *config.Config) error {
 		return errors.New("[xray] can't find proxy tag in config")
 	}
 
-	L.Infof("api port: %s, proxy tag: %s", grpcEndPoint, proxyTag)
+	l.Infof("api port: %s, proxy tag: %s", grpcEndPoint, proxyTag)
 
 	up, err := NewUserPool(ctx, grpcEndPoint)
 	if err != nil {

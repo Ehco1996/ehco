@@ -36,7 +36,7 @@ func AddInboundUser(ctx context.Context, c proxy.HandlerServiceClient, tag strin
 	if err != nil {
 		return err
 	}
-	L.Infof("Add User: %s To Server Tag: %s", user.GetEmail(), tag)
+	l.Infof("Add User: %s To Server Tag: %s", user.GetEmail(), tag)
 	user.running = true
 	return nil
 }
@@ -53,7 +53,7 @@ func RemoveInboundUser(ctx context.Context, c proxy.HandlerServiceClient, tag st
 		return err
 
 	}
-	L.Infof("[xray] Remove User: %v From Server", user.ID)
+	l.Infof("[xray] Remove User: %v From Server", user.ID)
 	user.running = false
 	return nil
 }

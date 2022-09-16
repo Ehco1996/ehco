@@ -1,14 +1,19 @@
 package xray
 
 import (
+	"sync"
+
 	"github.com/Ehco1996/ehco/pkg/log"
 	"go.uber.org/zap"
 )
 
 var (
-	L *zap.SugaredLogger
+	l      *zap.SugaredLogger
+	doOnce sync.Once
 )
 
-func init() {
-	L = log.InfoLogger.Named("xray")
+func initXrayLogger() {
+	doOnce.Do(func() {
+		l = log.Logger.Named("xray")
+	})
 }

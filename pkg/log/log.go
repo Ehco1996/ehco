@@ -2,6 +2,7 @@ package log
 
 import (
 	"os"
+	"sync"
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -9,14 +10,8 @@ import (
 
 var (
 	Logger *zap.SugaredLogger
-
-	// auto init a info level logger
-	InfoLogger *zap.SugaredLogger
+	doOnce sync.Once
 )
-
-func init() {
-	InfoLogger, _ = initLogger(zapcore.InfoLevel.String())
-}
 
 func initLogger(logLevel string) (*zap.SugaredLogger, error) {
 	level := zapcore.InfoLevel
@@ -41,11 +36,11 @@ func initLogger(logLevel string) (*zap.SugaredLogger, error) {
 	return zap.New(core).Sugar(), nil
 }
 
-func InitLogger(logLevel string) error {
-	l, err := initLogger(logLevel)
-	if err != nil {
-		return err
-	}
-	Logger = l
-	return nil
+func InitGlobalLogger(logLevel string) error {
+	var err error
+	doOnce.Do(func() {
+		println("init logger", logLevel)
+		Logger, err = initLogger(logLevel)
+	})
+	return err
 }
