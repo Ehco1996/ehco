@@ -6,13 +6,12 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/xtls/xray-core/infra/conf"
-	_ "github.com/xtls/xray-core/main/distro/all" // register all features
-
 	"github.com/Ehco1996/ehco/internal/config"
 	"github.com/Ehco1996/ehco/internal/tls"
 	"github.com/Ehco1996/ehco/internal/web"
 	"github.com/xtls/xray-core/core"
+	"github.com/xtls/xray-core/infra/conf"
+	_ "github.com/xtls/xray-core/main/distro/all" // register all features
 	"github.com/xtls/xray-core/proxy/trojan"
 )
 
@@ -59,8 +58,10 @@ func StartXrayServer(ctx context.Context, cfg *config.Config) (*core.Instance, e
 				dest := s.Fallbacks[idx].Dest
 				go func() {
 					l.Infof("start fallback server for trojan at %s", dest)
-					http.Handle("/", http.HandlerFunc(web.Index))
-					l.Fatal(http.ListenAndServe(dest, nil))
+					mux := http.NewServeMux()
+					mux.HandleFunc("/", web.MakeIndexF(l))
+					s := &http.Server{Addr: dest, Handler: mux}
+					l.Fatal(s.ListenAndServe())
 				}()
 			}
 		}

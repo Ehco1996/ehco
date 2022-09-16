@@ -195,7 +195,7 @@ func (r *Relay) RunLocalUDPServer() error {
 func (r *Relay) RunLocalWSServer() error {
 	tp := r.TP.(*transporter.Raw)
 	mux := mux.NewRouter()
-	mux.HandleFunc("/", web.Index)
+	mux.HandleFunc("/", web.MakeIndexF(r.L))
 	mux.HandleFunc("/ws/", tp.HandleWsRequest)
 	server := &http.Server{
 		Addr:              r.LocalTCPAddr.String(),
@@ -217,7 +217,7 @@ func (r *Relay) RunLocalWSServer() error {
 func (r *Relay) RunLocalWSSServer() error {
 	tp := r.TP.(*transporter.Raw)
 	mux := mux.NewRouter()
-	mux.HandleFunc("/", web.Index)
+	mux.HandleFunc("/", web.MakeIndexF(r.L))
 	mux.HandleFunc("/wss/", tp.HandleWssRequest)
 
 	server := &http.Server{
@@ -242,7 +242,7 @@ func (r *Relay) RunLocalMWSSServer() error {
 	tp := r.TP.(*transporter.Raw)
 	mwssServer := transporter.NewMWSSServer(r.L.Named("MWSSServer"))
 	mux := mux.NewRouter()
-	mux.Handle("/", http.HandlerFunc(web.Index))
+	mux.Handle("/", web.MakeIndexF(r.L))
 	mux.Handle("/mwss/", http.HandlerFunc(mwssServer.Upgrade))
 	httpServer := &http.Server{
 		Addr:              r.LocalTCPAddr.String(),

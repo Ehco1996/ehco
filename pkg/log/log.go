@@ -39,7 +39,6 @@ func initLogger(logLevel string) (*zap.SugaredLogger, error) {
 func InitGlobalLogger(logLevel string) error {
 	var err error
 	doOnce.Do(func() {
-		println("init logger", logLevel)
 		Logger, err = initLogger(logLevel)
 	})
 	return err

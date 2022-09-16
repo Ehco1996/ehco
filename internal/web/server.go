@@ -23,9 +23,11 @@ var (
 	l *zap.SugaredLogger
 )
 
-func Index(w http.ResponseWriter, r *http.Request) {
-	l.Infof("index call from %s", r.RemoteAddr)
-	fmt.Fprintf(w, "access from %s \n", r.RemoteAddr)
+func MakeIndexF(logger *zap.SugaredLogger) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		logger.Infof("index call from %s", r.RemoteAddr)
+		fmt.Fprintf(w, "access from %s \n", r.RemoteAddr)
+	}
 }
 
 func Welcome(w http.ResponseWriter, r *http.Request) {

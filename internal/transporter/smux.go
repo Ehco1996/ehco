@@ -31,7 +31,7 @@ type SessionWithMetrics struct {
 func (sm *SessionWithMetrics) CanNotServe() bool {
 	return sm.session.IsClosed() ||
 		sm.session.NumStreams() >= constant.SmuxMaxStreamCnt ||
-		time.Now().Sub(sm.createdTime) > constant.SmuxMaxAliveDuration
+		time.Since(sm.createdTime) > constant.SmuxMaxAliveDuration
 }
 
 func NewSmuxTransporter(l *zap.SugaredLogger,
