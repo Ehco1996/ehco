@@ -135,6 +135,6 @@ func (c *MWSSClient) InitNewSession(ctx context.Context, addr string) (*smux.Ses
 	if err != nil {
 		return nil, err
 	}
-	c.l.Infof("Init new session to: %s", rc.RemoteAddr())
+	c.l.Infof("init new session to: %s", rc.RemoteAddr())
 	return session, nil
 }

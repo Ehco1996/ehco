@@ -37,7 +37,7 @@ const (
 
 	SmuxGCDuration       = 30 * time.Second
 	SmuxMaxAliveDuration = 1 * time.Hour
-	SmuxMaxStreamCnt     = 50
+	SmuxMaxStreamCnt     = 5
 
 	Listen_RAW  = "raw"
 	Listen_WS   = "ws"

@@ -121,9 +121,7 @@ type MTCPClient struct {
 }
 
 func NewMTCPClient(l *zap.SugaredLogger) *MTCPClient {
-	return &MTCPClient{
-		l: l.Named("MTCPClient"),
-	}
+	return &MTCPClient{l: l}
 }
 
 func (c *MTCPClient) InitNewSession(ctx context.Context, addr string) (*smux.Session, error) {
@@ -138,6 +136,6 @@ func (c *MTCPClient) InitNewSession(ctx context.Context, addr string) (*smux.Ses
 	if err != nil {
 		return nil, err
 	}
-	c.l.Infof("Init new session to: %s", rc.RemoteAddr())
+	c.l.Infof("init new session to: %s", rc.RemoteAddr())
 	return session, nil
 }

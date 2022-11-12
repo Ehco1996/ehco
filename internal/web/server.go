@@ -52,6 +52,7 @@ func registerMetrics(cfg *config.Config) {
 	prometheus.MustRegister(EhcoAlive)
 	prometheus.MustRegister(CurConnectionCount)
 	prometheus.MustRegister(NetWorkTransmitBytes)
+	prometheus.MustRegister(HandShakeDuration)
 
 	EhcoAlive.Set(EhcoAliveStateInit)
 
