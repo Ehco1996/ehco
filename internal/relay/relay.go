@@ -158,9 +158,11 @@ func (r *Relay) RunLocalTCPServer() error {
 			web.CurConnectionCount.WithLabelValues(remote.Label, web.METRIC_CONN_TCP).Inc()
 			defer web.CurConnectionCount.WithLabelValues(remote.Label, web.METRIC_CONN_TCP).Dec()
 			defer c.Close()
+			t1 := time.Now()
 			if err := r.TP.HandleTCPConn(c, remote); err != nil {
 				r.L.Errorf("HandleTCPConn meet error from:%s to:%s err:%s", c.RemoteAddr(), remote.Address, err)
 			}
+			web.HandShakeDuration.WithLabelValues(remote.Label).Observe(float64(time.Since(t1).Milliseconds()))
 		}(c)
 	}
 }
@@ -189,6 +191,35 @@ func (r *Relay) RunLocalUDPServer() error {
 			bc.Handled.Store(true)
 			go r.TP.HandleUDPConn(bc.UDPAddr, lis)
 		}
+	}
+}
+
+func (r *Relay) RunLocalMTCPServer() error {
+	mTCPServer := transporter.NewMTCPServer(r.L.Named("MTCPServer"), r.LocalTCPAddr)
+	r.closeTcpF = func() error {
+		return mTCPServer.Close()
+	}
+
+	go func() {
+		r.L.Infof("Start MTCP relay server %s", r.Name)
+		mTCPServer.ListenAndServe()
+	}()
+
+	tp := r.TP.(*transporter.Raw)
+	for {
+		conn, e := mTCPServer.Accept()
+		if e != nil {
+			return e
+		}
+		go func(c net.Conn) {
+			remote := tp.GetRemote()
+			web.CurConnectionCount.WithLabelValues(remote.Label, web.METRIC_CONN_TCP).Inc()
+			defer web.CurConnectionCount.WithLabelValues(remote.Label, web.METRIC_CONN_TCP).Dec()
+			defer c.Close()
+			if err := tp.HandleTCPConn(c, remote); err != nil {
+				r.L.Errorf("HandleTCPConn meet error from:%s to:%s err:%s", c.RemoteAddr(), remote.Address, err)
+			}
+		}(conn)
 	}
 }
 
@@ -234,7 +265,7 @@ func (r *Relay) RunLocalWSSServer() error {
 	r.closeTcpF = func() error {
 		return lis.Close()
 	}
-	r.L.Infof("Start WSS relay %s", r.Name)
+	r.L.Infof("Start WSS relay Server %s", r.Name)
 	return server.Serve(tls.NewListener(lis, server.TLSConfig))
 }
 
@@ -275,34 +306,5 @@ func (r *Relay) RunLocalMWSSServer() error {
 			return e
 		}
 		go tp.HandleMWssRequest(conn)
-	}
-}
-
-func (r *Relay) RunLocalMTCPServer() error {
-	mTCPServer := transporter.NewMTCPServer(r.L.Named("MTCPServer"), r.LocalTCPAddr)
-	r.closeTcpF = func() error {
-		return mTCPServer.Close()
-	}
-
-	go func() {
-		r.L.Infof("Start MTCP relay server %s", r.Name)
-		mTCPServer.ListenAndServe()
-	}()
-
-	tp := r.TP.(*transporter.Raw)
-	for {
-		conn, e := mTCPServer.Accept()
-		if e != nil {
-			return e
-		}
-		go func(c net.Conn) {
-			remote := tp.GetRemote()
-			web.CurConnectionCount.WithLabelValues(remote.Label, web.METRIC_CONN_TCP).Inc()
-			defer web.CurConnectionCount.WithLabelValues(remote.Label, web.METRIC_CONN_TCP).Dec()
-			defer c.Close()
-			if err := tp.HandleTCPConn(c, remote); err != nil {
-				r.L.Errorf("HandleTCPConn meet error from:%s to:%s err:%s", c.RemoteAddr(), remote.Address, err)
-			}
-		}(conn)
 	}
 }

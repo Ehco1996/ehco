@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/Ehco1996/ehco/internal/constant"
+	"github.com/Ehco1996/ehco/internal/web"
 	"github.com/xtaci/smux"
 	"go.uber.org/zap"
 )
@@ -90,6 +91,7 @@ func (tr *smuxTransporter) Dial(ctx context.Context, addr string) (conn net.Conn
 	}
 
 	// create new one
+	t1 := time.Now()
 	if session == nil {
 		session, err = tr.initSessionF(ctx, addr)
 		if err != nil {
@@ -105,5 +107,6 @@ func (tr *smuxTransporter) Dial(ctx context.Context, addr string) (conn net.Conn
 		session.Close()
 		return nil, err
 	}
+	web.HandShakeDuration.WithLabelValues(addr).Observe(float64(time.Since(t1).Milliseconds()))
 	return stream, nil
 }
