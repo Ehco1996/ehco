@@ -31,17 +31,21 @@ func PickTransporter(transType string, tcpRemotes, udpRemotes lb.RoundRobin) Rel
 	case constant.Transport_RAW:
 		return &raw
 	case constant.Transport_WS:
-		return &Ws{raw: &raw}
+		return &Ws{Raw: &raw}
 	case constant.Transport_WSS:
-		return &Wss{raw: &raw}
+		return &Wss{Raw: &raw}
 	case constant.Transport_MWSS:
 		logger := raw.L.Named("MWSSClient")
 		mWSSClient := NewMWSSClient(logger)
-		return &Mwss{raw: &raw, mtp: NewSmuxTransporter(logger, mWSSClient.InitNewSession)}
+		mwss := &Mwss{mtp: NewSmuxTransporter(logger, mWSSClient.InitNewSession)}
+		mwss.Raw = &raw
+		return mwss
 	case constant.Transport_MTCP:
 		logger := raw.L.Named("MTCPClient")
 		mTCPClient := NewMTCPClient(logger)
-		return &MTCP{raw: &raw, mtp: NewSmuxTransporter(logger, mTCPClient.InitNewSession)}
+		mtcp := &MTCP{mtp: NewSmuxTransporter(logger, mTCPClient.InitNewSession)}
+		mtcp.Raw = &raw
+		return mtcp
 	}
 	return nil
 }

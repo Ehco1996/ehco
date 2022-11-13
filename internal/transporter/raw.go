@@ -106,7 +106,7 @@ func (raw *Raw) GetRemote() *lb.Node {
 	return raw.TCPRemotes.Next()
 }
 
-func (raw *Raw) DialRemote(remote *lb.Node) (net.Conn, error) {
+func (raw *Raw) dialRemote(remote *lb.Node) (net.Conn, error) {
 	d := net.Dialer{Timeout: constant.DialTimeOut}
 	rc, err := d.Dial("tcp", remote.Address)
 	if err != nil {
@@ -117,8 +117,13 @@ func (raw *Raw) DialRemote(remote *lb.Node) (net.Conn, error) {
 }
 
 func (raw *Raw) HandleTCPConn(c net.Conn, remote *lb.Node) error {
+	web.CurConnectionCount.WithLabelValues(remote.Label, web.METRIC_CONN_TCP).Inc()
+	defer web.CurConnectionCount.WithLabelValues(remote.Label, web.METRIC_CONN_TCP).Dec()
+
 	defer c.Close()
-	rc, err := raw.DialRemote(remote)
+	t1 := time.Now()
+	rc, err := raw.dialRemote(remote)
+	web.HandShakeDuration.WithLabelValues(remote.Label).Observe(float64(time.Since(t1).Milliseconds()))
 	if err != nil {
 		return err
 	}
