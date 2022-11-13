@@ -2,13 +2,17 @@ package transporter
 
 import (
 	"context"
+	"crypto/tls"
 	"net"
 	"net/http"
+	"time"
 
 	"github.com/Ehco1996/ehco/internal/constant"
 	"github.com/Ehco1996/ehco/internal/lb"
 	mytls "github.com/Ehco1996/ehco/internal/tls"
+	"github.com/Ehco1996/ehco/internal/web"
 	"github.com/gobwas/ws"
+	"github.com/gorilla/mux"
 	"github.com/xtaci/smux"
 	"go.uber.org/zap"
 )
@@ -42,21 +46,61 @@ func (s *Mwss) GetRemote() *lb.Node {
 }
 
 type MWSSServer struct {
-	Server   *http.Server
-	ConnChan chan net.Conn
-	ErrChan  chan error
-	L        *zap.SugaredLogger
+	raw        *Raw
+	httpServer *http.Server
+	L          *zap.SugaredLogger
+
+	connChan chan net.Conn
+	errChan  chan error
 }
 
-func NewMWSSServer(l *zap.SugaredLogger) *MWSSServer {
-	return &MWSSServer{
-		ConnChan: make(chan net.Conn, 1024),
-		ErrChan:  make(chan error, 1),
+func NewMWSSServer(listenAddr string, raw *Raw, l *zap.SugaredLogger) *MWSSServer {
+	s := &MWSSServer{
+		raw:      raw,
 		L:        l,
+		errChan:  make(chan error, 1),
+		connChan: make(chan net.Conn, 1024),
+	}
+
+	mux := mux.NewRouter()
+	mux.Handle("/", web.MakeIndexF(l))
+	mux.Handle("/mwss/", http.HandlerFunc(s.HandleRequest))
+	s.httpServer = &http.Server{
+		Addr:              listenAddr,
+		Handler:           mux,
+		TLSConfig:         mytls.DefaultTLSConfig,
+		ReadHeaderTimeout: 30 * time.Second,
+	}
+	return s
+}
+
+func (s *MWSSServer) ListenAndServe() error {
+	lis, err := net.Listen("tcp", s.httpServer.Addr)
+	if err != nil {
+		return err
+	}
+	go func() {
+		s.errChan <- s.httpServer.Serve(tls.NewListener(lis, s.httpServer.TLSConfig))
+	}()
+
+	for {
+		conn, e := s.Accept()
+		if e != nil {
+			return e
+		}
+		go func(c net.Conn) {
+			remote := s.raw.GetRemote()
+			web.CurConnectionCount.WithLabelValues(remote.Label, web.METRIC_CONN_TCP).Inc()
+			defer web.CurConnectionCount.WithLabelValues(remote.Label, web.METRIC_CONN_TCP).Dec()
+			defer c.Close()
+			if err := s.raw.HandleTCPConn(c, remote); err != nil {
+				s.L.Errorf("HandleTCPConn meet error from:%s to:%s err:%s", c.RemoteAddr(), remote.Address, err)
+			}
+		}(conn)
 	}
 }
 
-func (s *MWSSServer) Upgrade(w http.ResponseWriter, r *http.Request) {
+func (s *MWSSServer) HandleRequest(w http.ResponseWriter, r *http.Request) {
 	conn, _, _, err := ws.UpgradeHTTP(r, w)
 	if err != nil {
 		s.L.Error(err)
@@ -72,13 +116,13 @@ func (s *MWSSServer) mux(conn net.Conn) {
 	cfg.KeepAliveDisabled = true
 	session, err := smux.Server(conn, cfg)
 	if err != nil {
-		s.L.Debugf("server err %s - %s : %s", conn.RemoteAddr(), s.Server.Addr, err)
+		s.L.Debugf("server err %s - %s : %s", conn.RemoteAddr(), s.httpServer.Addr, err)
 		return
 	}
 	defer session.Close()
 
-	s.L.Debugf("session init %s  %s", conn.RemoteAddr(), s.Server.Addr)
-	defer s.L.Debugf("session close %s >-< %s", conn.RemoteAddr(), s.Server.Addr)
+	s.L.Debugf("session init %s  %s", conn.RemoteAddr(), s.httpServer.Addr)
+	defer s.L.Debugf("session close %s >-< %s", conn.RemoteAddr(), s.httpServer.Addr)
 
 	for {
 		stream, err := session.AcceptStream()
@@ -87,7 +131,7 @@ func (s *MWSSServer) mux(conn net.Conn) {
 			break
 		}
 		select {
-		case s.ConnChan <- stream:
+		case s.connChan <- stream:
 		default:
 			stream.Close()
 			s.L.Infof("%s - %s: connection queue is full", conn.RemoteAddr(), conn.LocalAddr())
@@ -97,14 +141,14 @@ func (s *MWSSServer) mux(conn net.Conn) {
 
 func (s *MWSSServer) Accept() (conn net.Conn, err error) {
 	select {
-	case conn = <-s.ConnChan:
-	case err = <-s.ErrChan:
+	case conn = <-s.connChan:
+	case err = <-s.errChan:
 	}
 	return
 }
 
 func (s *MWSSServer) Close() error {
-	return s.Server.Close()
+	return s.httpServer.Close()
 }
 
 type MWSSClient struct {

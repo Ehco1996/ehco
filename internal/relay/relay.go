@@ -1,21 +1,17 @@
 package relay
 
 import (
-	"crypto/tls"
 	"fmt"
 	"net"
-	"net/http"
 	"sync"
 	"time"
 
 	"github.com/Ehco1996/ehco/internal/config"
 	"github.com/Ehco1996/ehco/internal/constant"
 	"github.com/Ehco1996/ehco/internal/lb"
-	mytls "github.com/Ehco1996/ehco/internal/tls"
 	"github.com/Ehco1996/ehco/internal/transporter"
 	"github.com/Ehco1996/ehco/internal/web"
 	"github.com/Ehco1996/ehco/pkg/log"
-	"github.com/gorilla/mux"
 	"go.uber.org/zap"
 )
 
@@ -195,116 +191,41 @@ func (r *Relay) RunLocalUDPServer() error {
 }
 
 func (r *Relay) RunLocalMTCPServer() error {
-	mTCPServer := transporter.NewMTCPServer(r.L.Named("MTCPServer"), r.LocalTCPAddr)
+	tp := r.TP.(*transporter.Raw)
+	mTCPServer := transporter.NewMTCPServer(r.LocalTCPAddr.String(), tp, r.L.Named("MTCPServer"))
 	r.closeTcpF = func() error {
 		return mTCPServer.Close()
 	}
-
-	go func() {
-		r.L.Infof("Start MTCP relay server %s", r.Name)
-		mTCPServer.ListenAndServe()
-	}()
-
-	tp := r.TP.(*transporter.Raw)
-	for {
-		conn, e := mTCPServer.Accept()
-		if e != nil {
-			return e
-		}
-		go func(c net.Conn) {
-			remote := tp.GetRemote()
-			web.CurConnectionCount.WithLabelValues(remote.Label, web.METRIC_CONN_TCP).Inc()
-			defer web.CurConnectionCount.WithLabelValues(remote.Label, web.METRIC_CONN_TCP).Dec()
-			defer c.Close()
-			if err := tp.HandleTCPConn(c, remote); err != nil {
-				r.L.Errorf("HandleTCPConn meet error from:%s to:%s err:%s", c.RemoteAddr(), remote.Address, err)
-			}
-		}(conn)
-	}
+	r.L.Infof("Start MTCP relay server %s", r.Name)
+	return mTCPServer.ListenAndServe()
 }
 
 func (r *Relay) RunLocalWSServer() error {
 	tp := r.TP.(*transporter.Raw)
-	mux := mux.NewRouter()
-	mux.HandleFunc("/", web.MakeIndexF(r.L))
-	mux.HandleFunc("/ws/", tp.HandleWsRequest)
-	server := &http.Server{
-		Addr:              r.LocalTCPAddr.String(),
-		ReadHeaderTimeout: 30 * time.Second,
-		Handler:           mux,
-	}
-	lis, err := net.Listen("tcp", r.LocalTCPAddr.String())
-	if err != nil {
-		return err
-	}
-	defer lis.Close()
+	wsServer := transporter.NewWSServer(r.LocalTCPAddr.String(), tp, r.L.Named("WSServer"))
 	r.closeTcpF = func() error {
-		return lis.Close()
+		return wsServer.Close()
 	}
 	r.L.Infof("Start WS relay Server %s", r.Name)
-	return server.Serve(lis)
+	return wsServer.ListenAndServe()
 }
 
 func (r *Relay) RunLocalWSSServer() error {
 	tp := r.TP.(*transporter.Raw)
-	mux := mux.NewRouter()
-	mux.HandleFunc("/", web.MakeIndexF(r.L))
-	mux.HandleFunc("/wss/", tp.HandleWssRequest)
-
-	server := &http.Server{
-		Addr:              r.LocalTCPAddr.String(),
-		TLSConfig:         mytls.DefaultTLSConfig,
-		ReadHeaderTimeout: 30 * time.Second,
-		Handler:           mux,
-	}
-	lis, err := net.Listen("tcp", r.LocalTCPAddr.String())
-	if err != nil {
-		return err
-	}
-	defer lis.Close()
+	wssServer := transporter.NewWSSServer(r.LocalTCPAddr.String(), tp, r.L.Named("NewWSSServer"))
 	r.closeTcpF = func() error {
-		return lis.Close()
+		return wssServer.Close()
 	}
 	r.L.Infof("Start WSS relay Server %s", r.Name)
-	return server.Serve(tls.NewListener(lis, server.TLSConfig))
+	return wssServer.ListenAndServe()
 }
 
 func (r *Relay) RunLocalMWSSServer() error {
 	tp := r.TP.(*transporter.Raw)
-	mwssServer := transporter.NewMWSSServer(r.L.Named("MWSSServer"))
-	mux := mux.NewRouter()
-	mux.Handle("/", web.MakeIndexF(r.L))
-	mux.Handle("/mwss/", http.HandlerFunc(mwssServer.Upgrade))
-	httpServer := &http.Server{
-		Addr:              r.LocalTCPAddr.String(),
-		Handler:           mux,
-		TLSConfig:         mytls.DefaultTLSConfig,
-		ReadHeaderTimeout: 30 * time.Second,
-	}
-	mwssServer.Server = httpServer
-
-	lis, err := net.Listen("tcp", r.LocalTCPAddr.String())
-	if err != nil {
-		return err
-	}
-	defer lis.Close()
+	mwssServer := transporter.NewMWSSServer(r.LocalTCPAddr.String(), tp, r.L.Named("MWSSServer"))
 	r.closeTcpF = func() error {
-		return lis.Close()
+		return mwssServer.Close()
 	}
 	r.L.Infof("Start MWSS relay Server %s", r.Name)
-	go func() {
-		err := httpServer.Serve(tls.NewListener(lis, httpServer.TLSConfig))
-		if err != nil {
-			mwssServer.ErrChan <- err
-		}
-		close(mwssServer.ErrChan)
-	}()
-
-	for {
-		conn, e := mwssServer.Accept()
-		if e != nil {
-			return e
-		}
-		go tp.HandleMWssRequest(conn)
-	}
+	return mwssServer.ListenAndServe()
 }
