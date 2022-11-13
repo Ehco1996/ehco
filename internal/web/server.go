@@ -67,7 +67,8 @@ func registerMetrics(cfg *config.Config) {
 
 func registerNodeExporterMetrics(cfg *config.Config) error {
 	level := &promlog.AllowedLevel{}
-	if err := level.Set(cfg.LogLeveL); err != nil {
+	// NOTE hard code node exporter to error to mute this logger
+	if err := level.Set("error"); err != nil {
 		return err
 	}
 	promlogConfig := &promlog.Config{Level: level}
