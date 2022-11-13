@@ -7,6 +7,8 @@ before:
 builds:
   - id: ehco
     main: ./cmd/ehco/main.go
+    env:
+    - CGO_ENABLED=1
     flags:
       - -trimpath
     ldflags:
@@ -21,8 +23,6 @@ builds:
       - 7
     goos:
       - linux
-      - darwin
-      - windows
     hooks:
       post: ls dist/ && upx dist/*
 archives:
