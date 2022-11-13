@@ -18,31 +18,21 @@ import (
 )
 
 type Mwss struct {
-	raw *Raw
+	*Raw
 	mtp *smuxTransporter
-}
-
-func (s *Mwss) GetOrCreateBufferCh(uaddr *net.UDPAddr) *BufferCh {
-	return s.raw.GetOrCreateBufferCh(uaddr)
-}
-
-func (s *Mwss) HandleUDPConn(uaddr *net.UDPAddr, local *net.UDPConn) {
-	s.raw.HandleUDPConn(uaddr, local)
 }
 
 func (s *Mwss) HandleTCPConn(c net.Conn, remote *lb.Node) error {
 	defer c.Close()
+	t1 := time.Now()
 	mwsc, err := s.mtp.Dial(context.TODO(), remote.Address+"/mwss/")
+	web.HandShakeDuration.WithLabelValues(remote.Label).Observe(float64(time.Since(t1).Milliseconds()))
 	if err != nil {
 		return err
 	}
 	defer mwsc.Close()
-	s.raw.L.Infof("HandleTCPConn from:%s to:%s", c.RemoteAddr(), remote.Address)
+	s.L.Infof("HandleTCPConn from:%s to:%s", c.RemoteAddr(), remote.Address)
 	return transport(c, mwsc, remote.Label)
-}
-
-func (s *Mwss) GetRemote() *lb.Node {
-	return s.raw.GetRemote()
 }
 
 type MWSSServer struct {
@@ -89,10 +79,8 @@ func (s *MWSSServer) ListenAndServe() error {
 			return e
 		}
 		go func(c net.Conn) {
-			remote := s.raw.GetRemote()
-			web.CurConnectionCount.WithLabelValues(remote.Label, web.METRIC_CONN_TCP).Inc()
-			defer web.CurConnectionCount.WithLabelValues(remote.Label, web.METRIC_CONN_TCP).Dec()
 			defer c.Close()
+			remote := s.raw.GetRemote()
 			if err := s.raw.HandleTCPConn(c, remote); err != nil {
 				s.L.Errorf("HandleTCPConn meet error from:%s to:%s err:%s", c.RemoteAddr(), remote.Address, err)
 			}
