@@ -16,17 +16,3 @@ jobs:
           password: ${{ secrets.DOCKER_PASSWORD }}
           tag_names: true
           dockerfile: build/Dockerfile
-
-      - name: Update Homebrew formula
-        uses: dawidd6/action-homebrew-bump-formula@v3
-        with:
-          # GitHub token, required, not the default one
-          token: ${{ secrets.GORELEASER_GITHUB_TOKEN }}
-          # Formula name, required
-          formula: ehco
-          # Optional, will be determined automatically
-          tag: ${{github.ref}}
-          # Optional, will be determined automatically
-          revision: ${{github.sha}}
-          # Optional, if don't want to check for already open PRs
-          force: true
