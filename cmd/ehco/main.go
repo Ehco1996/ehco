@@ -323,20 +323,21 @@ func initSentry() error {
 	return nil
 }
 
-func initCMDLogger(cfg *config.Config) error {
+func initLogger(cfg *config.Config) error {
 	if err := log.InitGlobalLogger(cfg.LogLeveL); err != nil {
 		return err
 	}
-	cmdLogger = log.Logger.Named("cmd")
 	return nil
 }
 
 func start(ctx *cli.Context) error {
+	cmdLogger = log.MustNewInfoLogger("cmd")
+
 	cfg, err := loadConfig()
 	if err != nil {
 		return err
 	}
-	if err := initCMDLogger(cfg); err != nil {
+	if err := initLogger(cfg); err != nil {
 		return err
 	}
 
@@ -396,10 +397,10 @@ func main() {
 	app := createCliAPP()
 	// register start command
 	app.Action = start
-	// main thread start)
+	// main thread start
 	if err := app.Run(os.Args); err != nil {
 		sentry.CurrentHub().CaptureException(err)
 		sentry.Flush(time.Second * 5)
-		cmdLogger.Fatal(err)
+		cmdLogger.Fatal("start ehco server failed,err=", err)
 	}
 }

@@ -43,3 +43,11 @@ func InitGlobalLogger(logLevel string) error {
 	})
 	return err
 }
+
+func MustNewInfoLogger(name string) *zap.SugaredLogger {
+	l, err := initLogger("info")
+	if err != nil {
+		panic(err)
+	}
+	return l.Named(name)
+}
