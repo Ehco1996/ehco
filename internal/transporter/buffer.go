@@ -61,12 +61,30 @@ func (bp *BytePool) Put(b []byte) {
 	}
 }
 
-type ReadOnlyReader struct {
+type ReadOnlyMetricsReader struct {
 	io.Reader
+	remoteLabel string
 }
 
-type WriteOnlyWriter struct {
+func (r ReadOnlyMetricsReader) Read(p []byte) (n int, err error) {
+	n, err = r.Reader.Read(p)
+	web.NetWorkTransmitBytes.WithLabelValues(
+		r.remoteLabel, web.METRIC_CONN_TYPE_TCP, web.METRIC_CONN_FLOW_READ,
+	).Add(float64(n))
+	return
+}
+
+type WriteOnlyMetricsWriter struct {
 	io.Writer
+	remoteLabel string
+}
+
+func (w WriteOnlyMetricsWriter) Write(p []byte) (n int, err error) {
+	n, err = w.Writer.Write(p)
+	web.NetWorkTransmitBytes.WithLabelValues(
+		w.remoteLabel, web.METRIC_CONN_TYPE_TCP, web.METRIC_CONN_FLOW_WRITE,
+	).Add(float64(n))
+	return
 }
 
 // mute broken pipe connection reset timeout err.
@@ -84,15 +102,13 @@ func transport(conn1, conn2 net.Conn, remote string) error {
 	errCH := make(chan error, 1)
 	// conn1 to conn2
 	go func() {
-		rn, err := io.Copy(WriteOnlyWriter{Writer: conn1}, ReadOnlyReader{Reader: conn2})
-		web.NetWorkTransmitBytes.WithLabelValues(remote, web.METRIC_CONN_TCP).Add(float64(rn * 2))
+		_, err := io.Copy(WriteOnlyMetricsWriter{Writer: conn1, remoteLabel: remote}, ReadOnlyMetricsReader{Reader: conn2, remoteLabel: remote})
 		_ = conn1.SetReadDeadline(time.Now().Add(constant.IdleTimeOut)) // unblock read on conn1
 		errCH <- err
 	}()
 
 	// conn2 to conn1
-	rn, err := io.Copy(WriteOnlyWriter{Writer: conn2}, ReadOnlyReader{Reader: conn1})
-	web.NetWorkTransmitBytes.WithLabelValues(remote, web.METRIC_CONN_TCP).Add(float64(rn * 2))
+	_, err := io.Copy(WriteOnlyMetricsWriter{Writer: conn2, remoteLabel: remote}, ReadOnlyMetricsReader{Reader: conn1, remoteLabel: remote})
 	if err2 := MuteErr(err); err2 != nil {
 		log.Logger.Errorf("from:%s to:%s meet error:%s", conn2.LocalAddr(), conn1.RemoteAddr(), err2.Error())
 	}

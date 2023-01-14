@@ -36,8 +36,8 @@ func (raw *Raw) GetOrCreateBufferCh(uaddr *net.UDPAddr) *BufferCh {
 
 func (raw *Raw) HandleUDPConn(uaddr *net.UDPAddr, local *net.UDPConn) {
 	remote := raw.UDPRemotes.Next()
-	web.CurConnectionCount.WithLabelValues(remote.Label, web.METRIC_CONN_UDP).Inc()
-	defer web.CurConnectionCount.WithLabelValues(remote.Label, web.METRIC_CONN_UDP).Dec()
+	web.CurConnectionCount.WithLabelValues(remote.Label, web.METRIC_CONN_TYPE_UDP).Inc()
+	defer web.CurConnectionCount.WithLabelValues(remote.Label, web.METRIC_CONN_TYPE_UDP).Dec()
 
 	bc := raw.GetOrCreateBufferCh(uaddr)
 	remoteUdp, _ := net.ResolveUDPAddr("udp", remote.Address)
@@ -65,7 +65,6 @@ func (raw *Raw) HandleUDPConn(uaddr *net.UDPAddr, local *net.UDPConn) {
 	go func() {
 		defer wg.Done()
 		defer cancel()
-		wt := 0
 		for {
 			_ = rc.SetDeadline(time.Now().Add(constant.IdleTimeOut))
 			i, err := rc.Read(buf)
@@ -73,30 +72,40 @@ func (raw *Raw) HandleUDPConn(uaddr *net.UDPAddr, local *net.UDPConn) {
 				raw.L.Error(err)
 				break
 			}
+			web.NetWorkTransmitBytes.WithLabelValues(
+				remote.Label, web.METRIC_CONN_TYPE_UDP, web.METRIC_CONN_FLOW_READ,
+			).Add(float64(i))
+
 			if _, err := local.WriteToUDP(buf[0:i], uaddr); err != nil {
 				raw.L.Error(err)
 				break
 			}
-			wt += i
+			web.NetWorkTransmitBytes.WithLabelValues(
+				remote.Label, web.METRIC_CONN_TYPE_UDP, web.METRIC_CONN_FLOW_WRITE,
+			).Add(float64(i))
 		}
-		web.NetWorkTransmitBytes.WithLabelValues(remote.Label, web.METRIC_CONN_UDP).Add(float64(wt * 2))
 	}()
 
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		wt := 0
 		select {
 		case <-ctx.Done():
 			return
 		case b := <-bc.Ch:
-			wt += len(b)
-			web.NetWorkTransmitBytes.WithLabelValues(remote.Label, web.METRIC_CONN_UDP).Add(float64(wt * 2))
+			// read from local udp listener ch
+			web.NetWorkTransmitBytes.WithLabelValues(
+				remote.Label, web.METRIC_CONN_TYPE_UDP, web.METRIC_CONN_FLOW_READ,
+			).Add(float64(len(b)))
+
+			_ = rc.SetDeadline(time.Now().Add(constant.IdleTimeOut))
 			if _, err := rc.Write(b); err != nil {
 				raw.L.Error(err)
 				return
 			}
-			_ = rc.SetDeadline(time.Now().Add(constant.IdleTimeOut))
+			web.NetWorkTransmitBytes.WithLabelValues(
+				remote.Label, web.METRIC_CONN_TYPE_UDP, web.METRIC_CONN_FLOW_WRITE,
+			).Add(float64(len(b)))
 		}
 	}()
 	wg.Wait()
@@ -117,8 +126,8 @@ func (raw *Raw) dialRemote(remote *lb.Node) (net.Conn, error) {
 }
 
 func (raw *Raw) HandleTCPConn(c net.Conn, remote *lb.Node) error {
-	web.CurConnectionCount.WithLabelValues(remote.Label, web.METRIC_CONN_TCP).Inc()
-	defer web.CurConnectionCount.WithLabelValues(remote.Label, web.METRIC_CONN_TCP).Dec()
+	web.CurConnectionCount.WithLabelValues(remote.Label, web.METRIC_CONN_TYPE_TCP).Inc()
+	defer web.CurConnectionCount.WithLabelValues(remote.Label, web.METRIC_CONN_TYPE_TCP).Dec()
 
 	defer c.Close()
 	t1 := time.Now()
