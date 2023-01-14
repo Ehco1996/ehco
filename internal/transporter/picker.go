@@ -10,14 +10,10 @@ import (
 
 // RelayTransporter
 type RelayTransporter interface {
-
-	// UDP相关
-	GetOrCreateBufferCh(uaddr *net.UDPAddr) *BufferCh
-	HandleUDPConn(uaddr *net.UDPAddr, local *net.UDPConn)
-
-	// TCP相关
-	HandleTCPConn(c net.Conn, remote *lb.Node) error
 	GetRemote() *lb.Node
+
+	HandleTCPConn(c net.Conn, remote *lb.Node) error
+	HandleUDPConn(c net.Conn, remote *lb.Node) error
 }
 
 func PickTransporter(transType string, tcpRemotes, udpRemotes lb.RoundRobin) RelayTransporter {

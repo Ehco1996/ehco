@@ -11,6 +11,7 @@ import (
 	"github.com/Ehco1996/ehco/internal/transporter"
 	"github.com/Ehco1996/ehco/internal/web"
 	"github.com/Ehco1996/ehco/pkg/log"
+	"github.com/traefik/traefik/v2/pkg/udp"
 	"go.uber.org/zap"
 )
 
@@ -149,10 +150,8 @@ func (r *Relay) RunLocalTCPServer() error {
 		}
 
 		go func(c net.Conn) {
-			remote := r.TP.GetRemote()
-			web.CurConnectionCount.WithLabelValues(remote.Label, web.METRIC_CONN_TYPE_TCP).Inc()
-			defer web.CurConnectionCount.WithLabelValues(remote.Label, web.METRIC_CONN_TYPE_TCP).Dec()
 			defer c.Close()
+			remote := r.TP.GetRemote()
 			if err := r.TP.HandleTCPConn(c, remote); err != nil {
 				r.L.Errorf("HandleTCPConn meet error from:%s to:%s err:%s", c.RemoteAddr(), remote.Address, err)
 			}
@@ -161,7 +160,7 @@ func (r *Relay) RunLocalTCPServer() error {
 }
 
 func (r *Relay) RunLocalUDPServer() error {
-	lis, err := net.ListenUDP("udp", r.LocalUDPAddr)
+	lis, err := udp.Listen("udp", r.LocalUDPAddr, constant.IdleTimeOut)
 	if err != nil {
 		return err
 	}
@@ -170,21 +169,20 @@ func (r *Relay) RunLocalUDPServer() error {
 		return lis.Close()
 	}
 	r.L.Infof("Start UDP relay Server %s", r.Name)
-
-	buf := transporter.BufferPool.Get()
-	defer transporter.BufferPool.Put(buf)
 	for {
-		n, addr, err := lis.ReadFromUDP(buf)
+		c, err := lis.Accept()
 		if err != nil {
 			return err
 		}
-		bc := r.TP.GetOrCreateBufferCh(addr)
-		bc.Ch <- buf[0:n]
-		if !bc.Handled.Load() {
-			bc.Handled.Store(true)
-			go r.TP.HandleUDPConn(bc.UDPAddr, lis)
-		}
+		go func(c net.Conn) {
+			defer c.Close()
+			remote := r.TP.GetRemote()
+			if err := r.TP.HandleUDPConn(c, remote); err != nil {
+				r.L.Errorf("HandleUDPConn meet error from:%s to:%s err:%s", c.RemoteAddr(), remote.Address, err)
+			}
+		}(transporter.NewWrapperUdpConn(c, lis.Addr(), lis.Addr()))
 	}
+
 }
 
 func (r *Relay) RunLocalMTCPServer() error {
