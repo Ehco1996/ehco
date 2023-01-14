@@ -148,10 +148,11 @@ func (r *Relay) RunLocalTCPServer() error {
 		if err != nil {
 			return err
 		}
-
 		go func(c net.Conn) {
 			defer c.Close()
 			remote := r.TP.GetRemote()
+			web.CurConnectionCount.WithLabelValues(remote.Label, web.METRIC_CONN_TYPE_TCP).Inc()
+			defer web.CurConnectionCount.WithLabelValues(remote.Label, web.METRIC_CONN_TYPE_TCP).Dec()
 			if err := r.TP.HandleTCPConn(c, remote); err != nil {
 				r.L.Errorf("HandleTCPConn meet error from:%s to:%s err:%s", c.RemoteAddr(), remote.Address, err)
 			}
@@ -174,9 +175,12 @@ func (r *Relay) RunLocalUDPServer() error {
 		if err != nil {
 			return err
 		}
+		println("accept udpc", c)
 		go func(c net.Conn) {
 			defer c.Close()
 			remote := r.TP.GetRemote()
+			web.CurConnectionCount.WithLabelValues(remote.Label, web.METRIC_CONN_TYPE_UDP).Inc()
+			defer web.CurConnectionCount.WithLabelValues(remote.Label, web.METRIC_CONN_TYPE_UDP).Dec()
 			if err := r.TP.HandleUDPConn(c, remote); err != nil {
 				r.L.Errorf("HandleUDPConn meet error from:%s to:%s err:%s", c.RemoteAddr(), remote.Address, err)
 			}

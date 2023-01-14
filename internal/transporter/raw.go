@@ -21,10 +21,7 @@ type Raw struct {
 }
 
 func (raw *Raw) HandleUDPConn(c net.Conn, remote *lb.Node) error {
-	web.CurConnectionCount.WithLabelValues(remote.Label, web.METRIC_CONN_TYPE_UDP).Inc()
-	defer web.CurConnectionCount.WithLabelValues(remote.Label, web.METRIC_CONN_TYPE_UDP).Dec()
-	remoteUdp, _ := net.ResolveUDPAddr("udp", remote.Address)
-	rc, err := net.DialUDP("udp", nil, remoteUdp)
+	rc, err := net.Dial("udp", remote.Address)
 	if err != nil {
 		return err
 	}
@@ -46,9 +43,6 @@ func (raw *Raw) dialRemote(remote *lb.Node) (net.Conn, error) {
 }
 
 func (raw *Raw) HandleTCPConn(c net.Conn, remote *lb.Node) error {
-	web.CurConnectionCount.WithLabelValues(remote.Label, web.METRIC_CONN_TYPE_TCP).Inc()
-	defer web.CurConnectionCount.WithLabelValues(remote.Label, web.METRIC_CONN_TYPE_TCP).Dec()
-
 	defer c.Close()
 	t1 := time.Now()
 	rc, err := raw.dialRemote(remote)
