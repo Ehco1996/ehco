@@ -8,7 +8,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/golang/protobuf/proto"
 	proxy "github.com/xtls/xray-core/app/proxyman/command"
 	stats "github.com/xtls/xray-core/app/stats/command"
 	"github.com/xtls/xray-core/common/protocol"
@@ -81,21 +80,14 @@ func (u *User) Equal(new *User) bool {
 }
 
 func (u *User) ToXrayUser() *protocol.User {
-	var account proto.Message
+	var account *serial.TypedMessage
 	switch u.Protocol {
 	case "trojan":
-		account = &trojan.Account{Password: u.Password}
+		account = serial.ToTypedMessage(&trojan.Account{Password: u.Password})
 	default:
-		account = &shadowsocks.Account{
-			CipherType: mappingCipher(u.Method),
-			Password:   u.Password}
+		account = serial.ToTypedMessage(&shadowsocks.Account{CipherType: mappingCipher(u.Method), Password: u.Password})
 	}
-	xu := &protocol.User{
-		Level:   uint32(u.Level),
-		Email:   u.GetEmail(),
-		Account: serial.ToTypedMessage(account),
-	}
-	return xu
+	return &protocol.User{Level: uint32(u.Level), Email: u.GetEmail(), Account: account}
 }
 
 // UserPool user pool

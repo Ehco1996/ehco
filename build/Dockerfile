@@ -1,4 +1,4 @@
-FROM golang:1.18 as builder
+FROM golang:1.19 as builder
 
 # Set Environment Variables
 ENV HOME /app

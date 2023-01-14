@@ -1,12 +1,11 @@
 module github.com/Ehco1996/ehco
 
-go 1.18
+go 1.19
 
 require (
 	github.com/getsentry/sentry-go v0.13.0
 	github.com/go-ping/ping v0.0.0-20210216210419-25d1413fb7bb
 	github.com/gobwas/ws v1.1.0
-	github.com/golang/protobuf v1.5.2
 	github.com/gorilla/mux v1.8.0
 	github.com/prometheus/client_golang v1.14.0
 	github.com/prometheus/common v0.37.0
@@ -18,6 +17,7 @@ require (
 	go.uber.org/zap v1.19.1
 	golang.org/x/time v0.3.0
 	google.golang.org/grpc v1.51.0
+	google.golang.org/protobuf v1.28.1
 	gopkg.in/alecthomas/kingpin.v2 v2.2.6
 )
 
@@ -43,6 +43,7 @@ require (
 	github.com/gobwas/pool v0.2.1 // indirect
 	github.com/godbus/dbus/v5 v5.1.0 // indirect
 	github.com/golang/mock v1.6.0 // indirect
+	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/google/btree v1.1.2 // indirect
 	github.com/google/go-cmp v0.5.9 // indirect
 	github.com/google/pprof v0.0.0-20221219190121-3cb0bae90811 // indirect
@@ -93,7 +94,6 @@ require (
 	golang.org/x/text v0.6.0 // indirect
 	golang.org/x/tools v0.5.0 // indirect
 	google.golang.org/genproto v0.0.0-20230106154932-a12b697841d9 // indirect
-	google.golang.org/protobuf v1.28.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gvisor.dev/gvisor v0.0.0-20220901235040-6ca97ef2ce1c // indirect
 	lukechampine.com/blake3 v1.1.7 // indirect

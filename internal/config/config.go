@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -96,7 +96,7 @@ func (c *Config) LoadConfig() error {
 }
 
 func (c *Config) readFromFile() error {
-	file, err := ioutil.ReadFile(c.PATH)
+	file, err := os.ReadFile(c.PATH)
 	if err != nil {
 		return err
 	}
