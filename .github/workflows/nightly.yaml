@@ -2,8 +2,7 @@ on:
   release:
     types: [created]
     name: nightly
-  dispatch:
-    name: nightly
+  workflow_dispatch:
 
 jobs:
   release-linux-amd64:
@@ -20,4 +19,3 @@ jobs:
           release_tag: nightly
           release_name: nightly
           goversion: 1.19
-
