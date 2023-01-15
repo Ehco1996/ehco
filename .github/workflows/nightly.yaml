@@ -25,7 +25,7 @@ jobs:
           github_token: ${{ secrets.GORELEASER_GITHUB_TOKEN }}
           goos: linux
           goarch: amd64
-          build_command: make build
+          build_command: make build-linux-amd64-nightly
           release_tag: nightly
           release_name: nightly
           goversion: 1.19
