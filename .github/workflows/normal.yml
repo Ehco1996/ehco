@@ -6,7 +6,7 @@ on:
       - master
 
 jobs:
-  test-and-build:
+  test:
     runs-on: ubuntu-latest
     steps:
       - name: Set up Go
@@ -28,24 +28,13 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-go-
 
+      - name: lint
+        run: make lint
+
       - name: Test
-        run: go test ./test
+        run: make-test
 
-      - name: Build
-        run: make build
-
-      - name: Run UPX
-        uses: crazy-max/ghaction-upx@v1
-        with:
-          version: latest
-          files: dist/ehco
-
-      - uses: actions/upload-artifact@master
-        with:
-          name: my-artifact
-          path: dist/ehco
-
-  build-image:
+  build-latest-image:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@master

@@ -1,3 +1,5 @@
+name: nightly
+
 on:
   release:
     types: [created]
@@ -10,6 +12,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+
+      - uses: actions/cache@v2
+        with:
+          path: ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
       - uses: wangyoucao577/go-release-action@v1.35
         with:
           github_token: ${{ secrets.GORELEASER_GITHUB_TOKEN }}
@@ -19,3 +29,4 @@ jobs:
           release_tag: nightly
           release_name: nightly
           goversion: 1.19
+          overwrite: true
