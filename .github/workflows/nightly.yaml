@@ -1,0 +1,23 @@
+on:
+  release:
+    types: [created]
+    name: nightly
+  dispatch:
+    name: nightly
+
+jobs:
+  release-linux-amd64:
+    name: release linux/amd64
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: wangyoucao577/go-release-action@v1.35
+        with:
+          github_token: ${{ secrets.GORELEASER_GITHUB_TOKEN }}
+          goos: linux
+          goarch: amd64
+          build_command: make build
+          release_tag: nightly
+          release_name: nightly
+          goversion: 1.19
+
