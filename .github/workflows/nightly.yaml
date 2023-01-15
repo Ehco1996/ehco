@@ -24,7 +24,7 @@ jobs:
 
       - uses: wangyoucao577/go-release-action@v1.35
         with:
-          github_token: ${{ secrets.EHCO_NIGHTLY_BUILD }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
           goos: linux
           goarch: amd64
           pre_command: export GODEBUG=http2client=0
