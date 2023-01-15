@@ -13,6 +13,17 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
+      - uses: wangyoucao577/go-release-action@v1.35
+        with:
+          github_token: ${{ secrets.EHCO_NIGHTLY_BUILD }}
+          goos: linux
+          goarch: amd64
+          build_command: make build-nightly
+          release_tag: nightly
+          release_name: nightly
+          goversion: 1.19
+          overwrite: true
+
       - uses: actions/cache@v3
         with:
           path: |
@@ -21,14 +32,3 @@ jobs:
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-go-
-
-      - uses: wangyoucao577/go-release-action@v1.35
-        with:
-          github_token: ${{ secrets.GORELEASER_GITHUB_TOKEN }}
-          goos: linux
-          goarch: amd64
-          build_command: make build-nightly
-          release_tag: nightly
-          release_name: nightly
-          goversion: 1.19
-          overwrite: true
