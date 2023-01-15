@@ -1,4 +1,4 @@
-name: go-releaser
+name: nightly
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  ci-ci-ci:
+  go-release:
     runs-on: ubuntu-latest
     steps:
       - name: Set up Go
@@ -25,7 +25,7 @@ jobs:
       - name: GoReleaser Action
         uses: goreleaser/goreleaser-action@v2
         with:
-          version: nightly
+          version: latest
           args: release
         env:
           GITHUB_TOKEN: ${{ secrets.GORELEASER_GITHUB_TOKEN }}
