@@ -13,9 +13,11 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - uses: actions/cache@v2
+      - uses: actions/cache@v3
         with:
-          path: ~/go/pkg/mod
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-go-
@@ -25,7 +27,7 @@ jobs:
           github_token: ${{ secrets.GORELEASER_GITHUB_TOKEN }}
           goos: linux
           goarch: amd64
-          build_command: make build-linux-amd64-nightly
+          build_command: make build-nightly
           release_tag: nightly
           release_name: nightly
           goversion: 1.19
