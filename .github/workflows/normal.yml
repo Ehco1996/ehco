@@ -33,7 +33,6 @@ jobs:
       - name: test
         run: make test
 
-
   build-latest-image:
     runs-on: ubuntu-latest
     steps:

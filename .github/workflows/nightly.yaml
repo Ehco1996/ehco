@@ -27,6 +27,7 @@ jobs:
           github_token: ${{ secrets.EHCO_NIGHTLY_BUILD }}
           goos: linux
           goarch: amd64
+          pre_command: export CGO_ENABLED=0 && export GODEBUG=http2client=0
           build_command: make build-nightly
           release_tag: nightly
           release_name: nightly
