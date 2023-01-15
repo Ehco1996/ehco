@@ -12,7 +12,7 @@ GOBUILD=CGO_ENABLED=1 go build -trimpath -ldflags="-w -s -X ${PACKAGE}.GitBranch
 
 .PHONY: fmt test build tidy ensure release
 
-fmt:
+lint:
 	golangci-lint run --fix
 
 test:
@@ -20,6 +20,9 @@ test:
 
 build:
 	${GOBUILD} -o $(BINDIR)/$(NAME) cmd/ehco/main.go
+
+build-nightly:
+	${GOBUILD} -o $(NAME)  cmd/ehco/main.go
 
 build-linux-amd64:
 	GOARCH=amd64 GOOS=linux ${GOBUILD} -o $(BINDIR)/$(NAME)_amd64 cmd/ehco/main.go

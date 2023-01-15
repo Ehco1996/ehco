@@ -6,7 +6,7 @@ on:
       - master
 
 jobs:
-  test-and-build:
+  test:
     runs-on: ubuntu-latest
     steps:
       - name: Set up Go
@@ -15,37 +15,25 @@ jobs:
           go-version: 1.19
         id: go
 
-      - name: Check out code into the Go module directory
-        uses: actions/checkout@v1
-
-      - name: Get dependencies
-        run: go mod download
-
-      - uses: actions/cache@v2
+      - uses: actions/cache@v3
         with:
-          path: ~/go/pkg/mod
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-go-
 
-      - name: Test
-        run: go test ./test
+      - name: Check out code into the Go module directory
+        uses: actions/checkout@v1
 
-      - name: Build
-        run: make build
+      - name: lint
+        run: make lint
 
-      - name: Run UPX
-        uses: crazy-max/ghaction-upx@v1
-        with:
-          version: latest
-          files: dist/ehco
+      - name: test
+        run: make test
 
-      - uses: actions/upload-artifact@master
-        with:
-          name: my-artifact
-          path: dist/ehco
-
-  build-image:
+  build-latest-image:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@master
