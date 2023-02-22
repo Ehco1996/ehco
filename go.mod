@@ -10,7 +10,7 @@ require (
 	github.com/prometheus/client_golang v1.14.0
 	github.com/prometheus/common v0.37.0
 	github.com/prometheus/node_exporter v1.4.1-0.20221010202018-e1d9172fb620
-	github.com/urfave/cli/v2 v2.3.0
+	github.com/urfave/cli/v2 v2.24.4
 	github.com/xtaci/smux v1.5.24
 	github.com/xtls/xray-core v1.7.2
 	go.uber.org/atomic v1.10.0
@@ -28,7 +28,7 @@ require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
 	github.com/coreos/go-systemd/v22 v22.3.2 // indirect
-	github.com/cpuguy83/go-md2man/v2 v2.0.0-20190314233015-f79a8a8ca69d // indirect
+	github.com/cpuguy83/go-md2man/v2 v2.0.2 // indirect
 	github.com/dennwc/btrfs v0.0.0-20220403080356-b3db0b2dedac // indirect
 	github.com/dennwc/ioctl v1.0.0 // indirect
 	github.com/dgryski/go-metro v0.0.0-20211217172704-adc40b04c140 // indirect
@@ -72,15 +72,15 @@ require (
 	github.com/prometheus/procfs v0.8.0 // indirect
 	github.com/refraction-networking/utls v1.2.0 // indirect
 	github.com/riobard/go-bloom v0.0.0-20200614022211-cdc8013cb5b3 // indirect
-	github.com/russross/blackfriday/v2 v2.0.1 // indirect
+	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/safchain/ethtool v0.2.0 // indirect
 	github.com/sagernet/sing v0.1.2 // indirect
 	github.com/sagernet/sing-shadowsocks v0.1.0 // indirect
 	github.com/sagernet/wireguard-go v0.0.0-20221116151939-c99467f53f2c // indirect
 	github.com/seiflotfy/cuckoofilter v0.0.0-20220411075957-e3b120b3f5fb // indirect
-	github.com/shurcooL/sanitized_anchor_name v1.0.0 // indirect
 	github.com/soundcloud/go-runit v0.0.0-20150630195641-06ad41a06c4a // indirect
 	github.com/v2fly/ss-bloomring v0.0.0-20210312155135-28617310f63e // indirect
+	github.com/xrash/smetrics v0.0.0-20201216005158-039620a65673 // indirect
 	github.com/xtls/go v0.0.0-20220914232946-0441cf4cf837 // indirect
 	go.starlark.net v0.0.0-20230105143730-d7da88764354 // indirect
 	go.uber.org/multierr v1.6.0 // indirect
