@@ -11,13 +11,12 @@ require (
 	github.com/prometheus/common v0.37.0
 	github.com/prometheus/node_exporter v1.4.1-0.20221010202018-e1d9172fb620
 	github.com/urfave/cli/v2 v2.3.0
-	github.com/xtaci/smux v1.5.16
+	github.com/xtaci/smux v1.5.24
 	github.com/xtls/xray-core v1.7.2
 	go.uber.org/atomic v1.10.0
 	go.uber.org/zap v1.19.1
 	golang.org/x/time v0.3.0
 	google.golang.org/grpc v1.51.0
-	google.golang.org/protobuf v1.28.1
 	gopkg.in/alecthomas/kingpin.v2 v2.2.6
 )
 
@@ -94,6 +93,7 @@ require (
 	golang.org/x/text v0.6.0 // indirect
 	golang.org/x/tools v0.5.0 // indirect
 	google.golang.org/genproto v0.0.0-20230106154932-a12b697841d9 // indirect
+	google.golang.org/protobuf v1.28.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gvisor.dev/gvisor v0.0.0-20220901235040-6ca97ef2ce1c // indirect
 	lukechampine.com/blake3 v1.1.7 // indirect
