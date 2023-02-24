@@ -1,11 +1,10 @@
+header-icon
 package xray
-
 import (
 	"context"
 	"errors"
 	"fmt"
 	"net/http"
-
 	"github.com/Ehco1996/ehco/internal/config"
 	"github.com/Ehco1996/ehco/internal/tls"
 	"github.com/Ehco1996/ehco/internal/web"
@@ -13,16 +12,19 @@ import (
 	"github.com/xtls/xray-core/infra/conf"
 	_ "github.com/xtls/xray-core/main/distro/all" // register all features
 	"github.com/xtls/xray-core/proxy/trojan"
+	"github.com/xtls/xray-core/proxy/vless"
+	"github.com/xtls/xray-core/proxy/vmess"
+	"github.com/xtls/xray-core/proxy/ssr"
 )
-
 const (
 	XrayAPITag         = "api"
 	XraySSProxyTag     = "ss_proxy"
 	XrayTrojanProxyTag = "trojan_proxy"
-
+	XrayVmessProxyTag  = "vmess_proxy"
+	XrayVlessProxyTag  = "vless_proxy"
+	XraySSRProxyTag    = "ssr_proxy"
 	SyncTime = 60
 )
-
 func StartXrayServer(ctx context.Context, cfg *config.Config) (*core.Instance, error) {
 	initXrayLogger()
 	for _, inbound := range cfg.XRayConfig.InboundConfigs {
@@ -39,13 +41,35 @@ func StartXrayServer(ctx context.Context, cfg *config.Config) (*core.Instance, e
 			}
 			inbound.StreamSetting.TLSSettings.Certs = tlsConfigs
 		}
+		if inbound.Tag == XrayVmessProxyTag {
+			if err := tls.InitTlsCfg(); err != nil {
+				return nil, err
+			}
+			tlsConfigs := []*conf.TLSCertConfig{
+				{
+					CertStr: []string{string(tls.DefaultTLSConfigCertBytes)},
+					KeyStr:  []string{string(tls.DefaultTLSConfigKeyBytes)},
+				},
+			}
+			inbound.StreamSetting.TLSSettings.Certs = tlsConfigs
+		}
+		if inbound.Tag == XrayVlessProxyTag {
+			if err := tls.InitTlsCfg(); err != nil {
+				return nil, err
+			}
+			tlsConfigs := []*conf.TLSCertConfig{
+				{
+					CertStr: []string{string(tls.DefaultTLSConfigCertBytes)},
+					KeyStr:  []string{string(tls.DefaultTLSConfigKeyBytes)},
+				},
+			}
+			inbound.StreamSetting.TLSSettings.Certs = tlsConfigs
+		}
 	}
-
 	coreCfg, err := cfg.XRayConfig.Build()
 	if err != nil {
 		return nil, err
 	}
-
 	for _, inbound := range coreCfg.Inbound {
 		if inbound.Tag == XrayTrojanProxyTag {
 			ins, err := inbound.ProxySettings.GetInstance()
@@ -66,12 +90,10 @@ func StartXrayServer(ctx context.Context, cfg *config.Config) (*core.Instance, e
 			}
 		}
 	}
-
 	server, err := core.New(coreCfg)
 	if err != nil {
 		return nil, err
 	}
-
 	if err := server.Start(); err != nil {
 		return nil, err
 	}
