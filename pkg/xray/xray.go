@@ -12,9 +12,6 @@ import (
 	"github.com/xtls/xray-core/infra/conf"
 	_ "github.com/xtls/xray-core/main/distro/all" // register all features
 	"github.com/xtls/xray-core/proxy/trojan"
-	"github.com/xtls/xray-core/proxy/vless"
-	"github.com/xtls/xray-core/proxy/vmess"
-	"github.com/xtls/xray-core/proxy/ssr"
 )
 const (
 	XrayAPITag         = "api"
