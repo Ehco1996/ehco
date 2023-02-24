@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	
+
 	"github.com/Ehco1996/ehco/internal/config"
 	"github.com/Ehco1996/ehco/internal/tls"
 	"github.com/Ehco1996/ehco/internal/web"
@@ -67,12 +67,12 @@ func StartXrayServer(ctx context.Context, cfg *config.Config) (*core.Instance, e
 			inbound.StreamSetting.TLSSettings.Certs = tlsConfigs
 		}
 	}
-	
+
 	coreCfg, err := cfg.XRayConfig.Build()
 	if err != nil {
 		return nil, err
 	}
-	
+
 	for _, inbound := range coreCfg.Inbound {
 		if inbound.Tag == XrayTrojanProxyTag {
 			ins, err := inbound.ProxySettings.GetInstance()
@@ -93,12 +93,12 @@ func StartXrayServer(ctx context.Context, cfg *config.Config) (*core.Instance, e
 			}
 		}
 	}
-	
+
 	server, err := core.New(coreCfg)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	if err := server.Start(); err != nil {
 		return nil, err
 	}
