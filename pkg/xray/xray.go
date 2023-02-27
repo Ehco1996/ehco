@@ -19,7 +19,10 @@ const (
 	XrayAPITag         = "api"
 	XraySSProxyTag     = "ss_proxy"
 	XrayTrojanProxyTag = "trojan_proxy"
-
+	XrayVmessProxyTag  = "vmess_proxy"
+	XrayVlessProxyTag  = "vless_proxy"
+	XraySSRProxyTag    = "ssr_proxy"
+	
 	SyncTime = 60
 )
 
@@ -28,6 +31,30 @@ func StartXrayServer(ctx context.Context, cfg *config.Config) (*core.Instance, e
 	for _, inbound := range cfg.XRayConfig.InboundConfigs {
 		// add tls certs for trojan
 		if inbound.Tag == XrayTrojanProxyTag {
+			if err := tls.InitTlsCfg(); err != nil {
+				return nil, err
+			}
+			tlsConfigs := []*conf.TLSCertConfig{
+				{
+					CertStr: []string{string(tls.DefaultTLSConfigCertBytes)},
+					KeyStr:  []string{string(tls.DefaultTLSConfigKeyBytes)},
+				},
+			}
+			inbound.StreamSetting.TLSSettings.Certs = tlsConfigs
+		}
+		if inbound.Tag == XrayVmessProxyTag {
+			if err := tls.InitTlsCfg(); err != nil {
+				return nil, err
+			}
+			tlsConfigs := []*conf.TLSCertConfig{
+				{
+					CertStr: []string{string(tls.DefaultTLSConfigCertBytes)},
+					KeyStr:  []string{string(tls.DefaultTLSConfigKeyBytes)},
+				},
+			}
+			inbound.StreamSetting.TLSSettings.Certs = tlsConfigs
+		}
+		if inbound.Tag == XrayVlessProxyTag {
 			if err := tls.InitTlsCfg(); err != nil {
 				return nil, err
 			}
