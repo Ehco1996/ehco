@@ -8,7 +8,7 @@ require (
 	github.com/gobwas/ws v1.1.0
 	github.com/gorilla/mux v1.8.0
 	github.com/prometheus/client_golang v1.14.0
-	github.com/prometheus/common v0.37.0
+	github.com/prometheus/common v0.41.0
 	github.com/prometheus/node_exporter v1.4.1-0.20221010202018-e1d9172fb620
 	github.com/urfave/cli/v2 v2.3.0
 	github.com/xtaci/smux v1.5.24
@@ -22,7 +22,7 @@ require (
 
 require (
 	github.com/alecthomas/template v0.0.0-20190718012654-fb15b899a751 // indirect
-	github.com/alecthomas/units v0.0.0-20190924025748-f65c72e2690d // indirect
+	github.com/alecthomas/units v0.0.0-20211218093645-b94a6e3cc137 // indirect
 	github.com/andybalholm/brotli v1.0.4 // indirect
 	github.com/beevik/ntp v0.3.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
@@ -59,7 +59,7 @@ require (
 	github.com/marten-seemann/qtls-go1-18 v0.1.4 // indirect
 	github.com/marten-seemann/qtls-go1-19 v0.1.2 // indirect
 	github.com/mattn/go-xmlrpc v0.0.3 // indirect
-	github.com/matttproud/golang_protobuf_extensions v1.0.1 // indirect
+	github.com/matttproud/golang_protobuf_extensions v1.0.4 // indirect
 	github.com/mdlayher/genetlink v1.2.0 // indirect
 	github.com/mdlayher/netlink v1.6.0 // indirect
 	github.com/mdlayher/socket v0.2.2 // indirect
@@ -87,10 +87,10 @@ require (
 	golang.org/x/crypto v0.5.0 // indirect
 	golang.org/x/exp v0.0.0-20230105202349-8879d0199aa3 // indirect
 	golang.org/x/mod v0.7.0 // indirect
-	golang.org/x/net v0.5.0 // indirect
+	golang.org/x/net v0.7.0 // indirect
 	golang.org/x/sync v0.1.0 // indirect
-	golang.org/x/sys v0.4.0 // indirect
-	golang.org/x/text v0.6.0 // indirect
+	golang.org/x/sys v0.5.0 // indirect
+	golang.org/x/text v0.7.0 // indirect
 	golang.org/x/tools v0.5.0 // indirect
 	google.golang.org/genproto v0.0.0-20230106154932-a12b697841d9 // indirect
 	google.golang.org/protobuf v1.28.1 // indirect
