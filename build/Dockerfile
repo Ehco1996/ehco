@@ -17,6 +17,8 @@ RUN --mount=type=bind,target=.,rw \
     --mount=type=cache,target=/go/pkg/mod \
     make build
 
+RUN pwd && ls -alh
+
 FROM alpine:latest
 RUN apk --no-cache add ca-certificates
 # Copy the pre-built binary file from the previous stage
