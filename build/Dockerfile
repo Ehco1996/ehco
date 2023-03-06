@@ -11,7 +11,7 @@ RUN go mod download
 COPY . .
 
 # Build the Go app
-RUN go build -v -a -installsuffix cgo -o ehco cmd/ehco/main.go
+RUN make build
 
 FROM alpine:latest
 
@@ -20,6 +20,6 @@ RUN apk --no-cache add ca-certificates
 WORKDIR /bin/
 
 # Copy the pre-built binary file from the previous stage
-COPY --from=builder /app/ehco .
+COPY --from=builder /app/dist/ehco .
 
 ENTRYPOINT ["/bin/ehco"]
