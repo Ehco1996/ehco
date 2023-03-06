@@ -47,7 +47,7 @@ jobs:
         uses: docker/build-push-action@v4
         with:
           context: .
-          tags: "nightly"
+          tags: "ehco1996/ehco:nightly"
           dockerfile: build/Dockerfile
-          cache-from: type=registry,ref=user/app:buildcache
-          cache-to: type=registry,ref=user/app:buildcache,mode=max
+          cache-from: type=registry,ref=ehco1996/ehco:buildcache
+          cache-to: type=registry,ref=ehco1996/ehco:buildcache,mode=max
