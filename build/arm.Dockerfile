@@ -20,6 +20,6 @@ FROM multiarch/alpine:armhf-edge
 WORKDIR /bin/
 
 # Copy the pre-built binary file from the previous stage
-COPY --from=builder /app/dist/ehco .
+COPY --from=builder /app/dist/ehco /bin/ehco
 
 ENTRYPOINT ["/bin/ehco"]
