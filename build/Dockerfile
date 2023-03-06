@@ -11,6 +11,7 @@ COPY . .
 
 # RUN GOOS=linux make build
 FROM build-base AS builder
+WORKDIR /app
 RUN --mount=type=bind,target=.,rw \
     --mount=type=cache,target=/root/.cache/go-build \
     --mount=type=cache,target=/go/pkg/mod \
