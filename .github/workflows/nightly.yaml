@@ -1,9 +1,8 @@
 name: nightly
 
 on:
-  release:
-    types: [created]
-    name: nightly
+  schedule:
+    - cron: "0 0 * * *" # nightly At 00:00
   workflow_dispatch:
 
 jobs:
@@ -13,24 +12,34 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cache/go-build
-            ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
+      # - uses: actions/cache@v3
+      #   with:
+      #     path: |
+      #       ~/.cache/go-build
+      #       ~/go/pkg/mod
+      #     key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+      #     restore-keys: |
+      #       ${{ runner.os }}-go-
 
-      - uses: wangyoucao577/go-release-action@v1.35
+      # - uses: wangyoucao577/go-release-action@v1.35
+      #   with:
+      #     github_token: ${{ secrets.GITHUB_TOKEN }}
+      #     goos: linux
+      #     goarch: amd64
+      #     pre_command: export GODEBUG=http2client=0
+      #     build_command: make build-nightly
+      #     release_tag: nightly
+      #     release_name: nightly
+      #     goversion: 1.19
+      #     overwrite: true
+      #     retry: 10
+
+      - name: Build nightly image
+        uses: elgohr/Publish-Docker-Github-Action@v5
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          goos: linux
-          goarch: amd64
-          pre_command: export GODEBUG=http2client=0
-          build_command: make build-nightly
-          release_tag: nightly
-          release_name: nightly
-          goversion: 1.19
-          overwrite: true
-          retry: 10
+          name: ehco1996/ehco
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+          tags: "nightly"
+          dockerfile: build/Dockerfile
+          cache: ${{ github.event_name != 'schedule' }}
