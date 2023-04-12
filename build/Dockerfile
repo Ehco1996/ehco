@@ -8,4 +8,4 @@ FROM alpine:latest
 RUN apk --no-cache add ca-certificates
 # Copy the pre-built binary file from the previous stage
 COPY --from=builder /app/dist/ehco /ehco
-ENTRYPOINT ["/ehco"]
+CMD ["/ehco"]

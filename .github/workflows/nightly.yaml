@@ -20,6 +20,14 @@ jobs:
       - name: download dependencies
         run: make ensure
 
+      - name: Save Golang cache
+        uses: actions/cache/save@v3
+        with:
+          path: |
+            ${{ steps.golang-with-cache.outputs.build-cache-path }}
+            ${{ steps.golang-with-cache.outputs.module-cache-path }}
+          key: ${{ steps.golang-with-cache.outputs.cache-key }}
+
       # - uses: wangyoucao577/go-release-action@v1.35
       #   with:
       #     github_token: ${{ secrets.GITHUB_TOKEN }}
