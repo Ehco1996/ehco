@@ -12,14 +12,11 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      # - uses: actions/cache@v3
-      #   with:
-      #     path: |
-      #       ~/.cache/go-build
-      #       ~/go/pkg/mod
-      #     key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-      #     restore-keys: |
-      #       ${{ runner.os }}-go-
+      - name: Setup Golang with cache
+        uses: magnetikonline/action-golang-cache@v4
+        with:
+          go-version-file: go.mod
+
 
       # - uses: wangyoucao577/go-release-action@v1.35
       #   with:
@@ -50,5 +47,5 @@ jobs:
           tags: "ehco1996/ehco:nightly"
           push: true
           file: build/Dockerfile
-          cache-from: type=registry,ref=ehco1996/ehco:buildcache
-          cache-to: type=registry,ref=ehco1996/ehco:buildcache,mode=max
+          cache-from: type=local,src=/tmp/.buildx-cache
+          cache-to: type=local,dest=/tmp/.buildx-cache
