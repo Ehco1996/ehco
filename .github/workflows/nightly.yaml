@@ -50,5 +50,5 @@ jobs:
           tags: "ehco1996/ehco:nightly"
           push: true
           file: build/Dockerfile
-          cache-from: type=local,src=${{ steps.golang-with-cache.outputs.build-cache-path }}
-          cache-to: type=local,dest=${{ steps.golang-with-cache.outputs.build-cache-path }}
+          # cache-from: type=local,src=${{ steps.golang-with-cache.outputs.build-cache-path }}
+          # cache-to: type=local,dest=${{ steps.golang-with-cache.outputs.build-cache-path }}
