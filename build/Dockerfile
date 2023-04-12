@@ -1,5 +1,6 @@
 FROM golang:1.19 as builder
 WORKDIR /app
+COPY . .
 RUN make build
 RUN pwd && ls -alh
 
