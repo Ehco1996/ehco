@@ -1,8 +1,11 @@
 FROM golang:1.19 as builder
 WORKDIR /app
 COPY . .
-RUN make build
-RUN pwd && ls -alh
+
+RUN --mount=type=cache,target=/root/go/pkg/mod \
+    make build
+
+RUN ./dist/ehco -v
 
 FROM alpine:latest
 RUN apk --no-cache add ca-certificates
