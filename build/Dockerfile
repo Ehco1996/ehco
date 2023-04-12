@@ -1,5 +1,4 @@
-FROM golang:1.19 as build-base
-
+FROM golang:1.19 as builder
 WORKDIR /app
 RUN make build
 RUN pwd && ls -alh
