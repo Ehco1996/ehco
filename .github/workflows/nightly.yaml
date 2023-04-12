@@ -17,6 +17,8 @@ jobs:
         with:
           go-version-file: go.mod
 
+      - name: download dependencies
+        run: make ensure
 
       # - uses: wangyoucao577/go-release-action@v1.35
       #   with:

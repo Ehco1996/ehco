@@ -1,11 +1,6 @@
 FROM golang:1.19 as build-base
 
 WORKDIR /app
-COPY . .
-RUN make ensure
-
-FROM build-base AS builder
-WORKDIR /app
 RUN make build
 RUN pwd && ls -alh
 
