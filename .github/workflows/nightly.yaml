@@ -21,18 +21,18 @@ jobs:
       - name: trigger build
         run: make build
 
-      # - uses: wangyoucao577/go-release-action@v1.35
-      #   with:
-      #     github_token: ${{ secrets.GITHUB_TOKEN }}
-      #     goos: linux
-      #     goarch: amd64
-      #     pre_command: export GODEBUG=http2client=0
-      #     build_command: make build-nightly
-      #     release_tag: nightly
-      #     release_name: nightly
-      #     goversion: 1.19
-      #     overwrite: true
-      #     retry: 10
+      - uses: wangyoucao577/go-release-action@v1.35
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          goos: linux
+          goarch: amd64
+          pre_command: export GODEBUG=http2client=0
+          build_command: make build-nightly
+          release_tag: nightly
+          release_name: nightly
+          goversion: 1.19
+          overwrite: true
+          retry: 10
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
@@ -50,5 +50,3 @@ jobs:
           tags: "ehco1996/ehco:nightly"
           push: true
           file: build/Dockerfile
-          # cache-from: type=local,src=${{ steps.golang-with-cache.outputs.build-cache-path }}
-          # cache-to: type=local,dest=${{ steps.golang-with-cache.outputs.build-cache-path }}
