@@ -1,26 +1,25 @@
 name: nightly
 
 on:
-  release:
-    types: [created]
-    name: nightly
+  schedule:
+    - cron: "0 0 * * *" # nightly At 00:00
   workflow_dispatch:
 
 jobs:
-  release-linux-amd64:
-    name: release linux/amd64
+  nightly-build:
+    name: nightly-build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
 
-      - uses: actions/cache@v3
+      - name: Setup Golang with cache
+        id: golang-with-cache
+        uses: magnetikonline/action-golang-cache@v4
         with:
-          path: |
-            ~/.cache/go-build
-            ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
+          go-version-file: go.mod
+
+      - name: trigger build
+        run: make build
 
       - uses: wangyoucao577/go-release-action@v1.35
         with:
@@ -34,3 +33,20 @@ jobs:
           goversion: 1.19
           overwrite: true
           retry: 10
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build nightly image
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          tags: "ehco1996/ehco:nightly"
+          push: true
+          file: build/Dockerfile

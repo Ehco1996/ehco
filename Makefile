@@ -21,6 +21,9 @@ test:
 build:
 	${GOBUILD} -o $(BINDIR)/$(NAME) cmd/ehco/main.go
 
+build-arm:
+	GOARCH=arm GOOS=linux ${GOBUILD} -o $(BINDIR)/$(NAME) cmd/ehco/main.go
+
 build-nightly:
 	${GOBUILD} -o $(NAME)  cmd/ehco/main.go
 

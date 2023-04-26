@@ -1,25 +1,18 @@
 FROM golang:1.19 as builder
-
-# Set Environment Variables
-ENV HOME /app
-ENV CGO_ENABLED 0
-ENV GOOS linux
-ENV GOARCH=arm
-ENV GOROOT_BOOTSTRAP=/usr/local/go
-
 WORKDIR /app
+
 COPY go.mod go.sum ./
 RUN go mod download
-COPY . .
 
 # Build the Go app
-RUN export GOOS=linux GOARCH=arm && go build -v -a -installsuffix cgo -o ehco cmd/ehco/main.go
+COPY . .
+RUN --mount=type=cache,target=/home/runner/go/pkg/mod \
+    --mount=type=cache,target=/home/runner/.cache/go-build \
+    make build
 
-FROM multiarch/alpine:armhf-edge
+RUN GOOS=linux GOARCH=arm make build
 
-WORKDIR /bin/
-
+FROM debian:buster-slim
 # Copy the pre-built binary file from the previous stage
-COPY --from=builder /app/ehco .
-
-ENTRYPOINT ["/bin/ehco"]
+COPY --from=builder /app/dist/ehco /ehco
+ENTRYPOINT ["/ehco"]
