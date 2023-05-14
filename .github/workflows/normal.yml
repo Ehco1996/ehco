@@ -59,10 +59,11 @@ jobs:
           push: true
           file: build/Dockerfile
 
-      - name: Build arm image
-        uses: docker/build-push-action@v4
-        with:
-          context: .
-          tags: "ehco1996/ehco:arm64"
-          push: true
-          file: build/arm.Dockerfile
+      # TODO fix the arm build error  gcc: error: unrecognized command-line option '-marm'; did you mean '-mabm'?
+      # - name: Build arm image
+      #   uses: docker/build-push-action@v4
+      #   with:
+      #     context: .
+      #     tags: "ehco1996/ehco:arm64"
+      #     push: true
+      #     file: build/arm.Dockerfile
