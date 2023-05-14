@@ -30,8 +30,9 @@ jobs:
       - name: tidy
         run: make tidy
 
-      - name: lint
-        run: make lint
+      # - name: lint
+      #   run: make lint
+      # TODO: fix download golangci-lint
 
       - name: test
         run: make test
@@ -40,21 +41,28 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@master
-      - name: Build x86 image
-        uses: elgohr/Publish-Docker-Github-Action@master
-        with:
-          name: ehco1996/ehco
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
-          tags: "latest"
-          dockerfile: build/Dockerfile
 
-      - uses: actions/checkout@master
-      - name: Build arm image
-        uses: elgohr/Publish-Docker-Github-Action@master
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v2
         with:
-          name: ehco1996/ehco
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
-          tags: "arm64"
-          dockerfile: build/arm.Dockerfile
+
+      - name: Build x86 image
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          tags: "ehco1996/ehco:latest"
+          push: true
+          file: build/Dockerfile
+
+      - name: Build arm image
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          tags: "ehco1996/ehco:arm64"
+          push: true
+          file: build/arm.Dockerfile
