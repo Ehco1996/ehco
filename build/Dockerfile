@@ -8,8 +8,7 @@ RUN --mount=type=cache,target=/home/runner/go/pkg/mod \
 
 FROM debian:buster-slim
 
-RUN apt update &&
-    apt install -y --no-install-recommends ca-certificates curl
+RUN apt update && apt install -y --no-install-recommends ca-certificates curl
 
 WORKDIR /bin/
 
