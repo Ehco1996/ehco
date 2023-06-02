@@ -145,19 +145,19 @@ ehco 会每隔 60s 发送一次 POST 请求至 `sync_traffic_endpoint` ，上报
 
 ```json
 {
-    "web_port": 9000, // prometheus 的 web 监听端口
-    "web_token": "", // 鉴权 token
-    "enable_ping": false, // 是否开启 ping metrics
+    "web_port": 9000,
+    "web_token": "",
+    "enable_ping": false,
     "relay_configs": [
         {
-            "listen": "127.0.0.1:1234", // 监听端口
-            "listen_type": "raw", // 监听类型
-            "transport_type": "raw", // 传输类型
-            "tcp_remotes": [ // tcp转发节点 ，支持配置多个节点，配置多个节点时会自动负载均衡
+            "listen": "127.0.0.1:1234",
+            "listen_type": "raw",
+            "transport_type": "raw",
+            "tcp_remotes": [
                 "0.0.0.0:5201"
             ],
             "udp_remotes": [
-                "0.0.0.0:5201" // udp转发节点 ，支持配置多个节点，配置多个节点时会自动负载均衡
+                "0.0.0.0:5201"
             ]
         },
     ]
