@@ -8,11 +8,15 @@ RUN go mod download
 COPY . .
 RUN --mount=type=cache,target=/home/runner/go/pkg/mod \
     --mount=type=cache,target=/home/runner/.cache/go-build \
-    make build
-
-RUN GOOS=linux GOARCH=arm make build
+    build-arm
 
 FROM debian:buster-slim
+
+RUN apt update && apt install -y --no-install-recommends ca-certificates curl glibc-source
+
+WORKDIR /bin/
+
 # Copy the pre-built binary file from the previous stage
-COPY --from=builder /app/dist/ehco /ehco
-ENTRYPOINT ["/ehco"]
+COPY --from=builder /app/dist/ehco .
+
+ENTRYPOINT ["ehco"]
