@@ -22,7 +22,7 @@ const (
 	XrayVmessProxyTag  = "vmess_proxy"
 	XrayVlessProxyTag  = "vless_proxy"
 	XraySSRProxyTag    = "ssr_proxy"
-	
+
 	SyncTime = 60
 )
 
