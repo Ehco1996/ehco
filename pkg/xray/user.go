@@ -235,12 +235,12 @@ func (up *UserPool) syncUserConfigsFromServer(ctx context.Context, endpoint, tag
 		} else {
 			// update user configs
 			if !oldUser.Equal(newUser) {
+				oldUser.UpdateFromServer(newUser)
 				if oldUser.running {
 					if err := RemoveInboundUser(ctx, up.proxyClient, tag, oldUser); err != nil {
 						return err
 					}
 				}
-				oldUser.UpdateFromServer(newUser)
 			}
 			if oldUser.Enable && !oldUser.running {
 				if err := AddInboundUser(ctx, up.proxyClient, tag, oldUser); err != nil {
