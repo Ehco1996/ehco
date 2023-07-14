@@ -4,7 +4,7 @@ go 1.20
 
 require (
 	github.com/getsentry/sentry-go v0.13.0
-	github.com/go-ping/ping v0.0.0-20210216210419-25d1413fb7bb
+	github.com/go-ping/ping v1.1.0
 	github.com/gobwas/ws v1.2.1
 	github.com/gorilla/mux v1.8.0
 	github.com/prometheus/client_golang v1.16.0
@@ -48,6 +48,7 @@ require (
 	github.com/google/btree v1.1.2 // indirect
 	github.com/google/go-cmp v0.5.9 // indirect
 	github.com/google/pprof v0.0.0-20230602150820-91b7bce49751 // indirect
+	github.com/google/uuid v1.3.0 // indirect
 	github.com/gorilla/websocket v1.5.0 // indirect
 	github.com/hashicorp/go-envparse v0.1.0 // indirect
 	github.com/hodgesds/perf-utils v0.7.0 // indirect
