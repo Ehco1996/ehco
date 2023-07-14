@@ -6,9 +6,9 @@ RUN --mount=type=cache,target=/home/runner/go/pkg/mod \
     --mount=type=cache,target=/home/runner/.cache/go-build \
     make build
 
-FROM debian:buster-slim
+FROM debian:12-slim
 
-RUN apt update && apt install -y --no-install-recommends ca-certificates curl glibc-source
+RUN apt update && apt install -y --no-install-recommends ca-certificates curl glibc-source libc6
 
 WORKDIR /bin/
 
