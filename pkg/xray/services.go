@@ -52,7 +52,7 @@ func RemoveInboundUser(ctx context.Context, c proxy.HandlerServiceClient, tag st
 	})
 
 	// mute not found error
-	if strings.Contains(err.Error(), "not found") {
+	if err != nil && strings.Contains(err.Error(), "not found") {
 		l.Warnf("User Not Found  %s", user.GetEmail())
 		err = nil
 	}
