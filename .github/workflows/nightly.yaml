@@ -2,7 +2,7 @@ name: nightly
 
 on:
   # schedule:
-    # - cron: "0 0 * * *" # nightly At 00:00
+  # - cron: "0 0 * * *" # nightly At 00:00
   workflow_dispatch:
 
 jobs:
@@ -21,7 +21,7 @@ jobs:
       - name: trigger build
         run: make build
 
-      - uses: wangyoucao577/go-release-action@v1.35
+      - uses: wangyoucao577/go-release-action@v1
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           goos: linux
