@@ -1,6 +1,6 @@
 module github.com/Ehco1996/ehco
 
-go 1.20
+go 1.21
 
 require (
 	github.com/getsentry/sentry-go v0.13.0
