@@ -139,7 +139,7 @@ func (c *Config) GetMetricURL() string {
 	if !c.NeedStartWebServer() {
 		return ""
 	}
-	url := fmt.Sprintf("http://127.0.0.1:%d/metrics/", c.WebPort)
+	url := fmt.Sprintf("http://0.0.0.0:%d/metrics/", c.WebPort)
 	if c.WebToken != "" {
 		url += fmt.Sprintf("?token=%s", c.WebToken)
 	}
