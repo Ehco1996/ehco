@@ -352,7 +352,7 @@ func start(ctx *cli.Context) error {
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
 
-	if cfg.WebPort > 0 {
+	if cfg.NeedStartWebServer() {
 		go func() {
 			cmdLogger.Fatalf("StartWebServer meet err=%s", web.StartWebServer(cfg))
 		}()

@@ -15,17 +15,6 @@ import (
 	"github.com/xtls/xray-core/proxy/trojan"
 )
 
-const (
-	XrayAPITag         = "api"
-	XraySSProxyTag     = "ss_proxy"
-	XrayTrojanProxyTag = "trojan_proxy"
-	XrayVmessProxyTag  = "vmess_proxy"
-	XrayVlessProxyTag  = "vless_proxy"
-	XraySSRProxyTag    = "ssr_proxy"
-
-	SyncTime = 60
-)
-
 func StartXrayServer(ctx context.Context, cfg *config.Config) (*core.Instance, error) {
 	initXrayLogger()
 	for _, inbound := range cfg.XRayConfig.InboundConfigs {
@@ -130,8 +119,7 @@ func StartSyncTask(ctx context.Context, cfg *config.Config) error {
 	}
 
 	l.Infof("api port: %s, proxy tag: %s", grpcEndPoint, proxyTag)
-
-	up, err := NewUserPool(ctx, grpcEndPoint)
+	up, err := NewUserPool(ctx, grpcEndPoint, cfg.GetMetricURL())
 	if err != nil {
 		return err
 	}

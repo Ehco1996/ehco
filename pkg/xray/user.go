@@ -42,7 +42,9 @@ type UserTraffic struct {
 }
 
 type SyncTrafficReq struct {
-	Data []*UserTraffic `json:"data"`
+	Data              []*UserTraffic `json:"data"`
+	UploadBandwidth   float64        `json:"upload_bandwidth"`
+	DownloadBandwidth float64        `json:"download_bandwidth"`
 }
 
 type SyncUserConfigsResp struct {
@@ -99,10 +101,12 @@ type UserPool struct {
 	httpClient  *http.Client
 	proxyClient proxy.HandlerServiceClient
 	statsClient stats.StatsServiceClient
+
+	br *bandwidthRecorder
 }
 
 // NewUserPool New UserPool
-func NewUserPool(ctx context.Context, xrayEndPoint string) (*UserPool, error) {
+func NewUserPool(ctx context.Context, xrayEndPoint, metricURL string) (*UserPool, error) {
 	conn, err := grpc.DialContext(ctx, xrayEndPoint, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithBlock())
 	if err != nil {
 		return nil, err
@@ -114,13 +118,14 @@ func NewUserPool(ctx context.Context, xrayEndPoint string) (*UserPool, error) {
 	httpClient := http.Client{Timeout: 30 * time.Second}
 
 	up := &UserPool{
-		users: make(map[int]*User),
-
+		users:       make(map[int]*User),
 		httpClient:  &httpClient,
 		proxyClient: proxyClient,
 		statsClient: statsClient,
 	}
-
+	if metricURL != "" {
+		up.br = NewBandwidthRecorder(metricURL)
+	}
 	return up, nil
 }
 
@@ -209,7 +214,18 @@ func (up *UserPool) syncTrafficToServer(ctx context.Context, endpoint, tag strin
 			user.ResetTraffic()
 		}
 	}
-	if err := postJson(up.httpClient, endpoint, &SyncTrafficReq{Data: tfs}); err != nil {
+	req := &SyncTrafficReq{Data: tfs}
+	if up.br != nil {
+		// record bandwidth
+		if err := up.br.RecordOnce(ctx); err != nil {
+			return err
+		}
+		req.UploadBandwidth = up.br.GetUploadBandwidth()
+		req.DownloadBandwidth = up.br.GetDownloadBandwidth()
+		l.Debug("UploadBandwidth", PrettyByteSize(req.UploadBandwidth),
+			"DownloadBandwidth", PrettyByteSize(req.DownloadBandwidth))
+	}
+	if err := postJson(up.httpClient, endpoint, req); err != nil {
 		return err
 	}
 	l.Infof("Call syncTrafficToServer ONLINE USER COUNT: %d", len(tfs))

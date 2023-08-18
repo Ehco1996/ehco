@@ -130,3 +130,18 @@ func (c *Config) Validate() error {
 	}
 	return nil
 }
+
+func (c *Config) NeedStartWebServer() bool {
+	return c.WebPort != 0
+}
+
+func (c *Config) GetMetricURL() string {
+	if !c.NeedStartWebServer() {
+		return ""
+	}
+	url := fmt.Sprintf("http://127.0.0.1:%d/metrics/", c.WebPort)
+	if c.WebToken != "" {
+		url += fmt.Sprintf("?token=%s", c.WebToken)
+	}
+	return url
+}
