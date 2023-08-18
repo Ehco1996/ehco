@@ -9,6 +9,7 @@ import (
 	"github.com/Ehco1996/ehco/internal/config"
 	"github.com/Ehco1996/ehco/internal/constant"
 	"github.com/Ehco1996/ehco/pkg/log"
+	"github.com/alecthomas/kingpin/v2"
 	"github.com/gorilla/mux"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -16,7 +17,6 @@ import (
 	"github.com/prometheus/common/version"
 	"github.com/prometheus/node_exporter/collector"
 	"go.uber.org/zap"
-	"gopkg.in/alecthomas/kingpin.v2"
 )
 
 var (
@@ -67,13 +67,11 @@ func registerMetrics(cfg *config.Config) {
 
 func registerNodeExporterMetrics(cfg *config.Config) error {
 	level := &promlog.AllowedLevel{}
-	// NOTE hard code node exporter to error to mute this logger
-	if err := level.Set("error"); err != nil {
+	if err := level.Set(cfg.LogLeveL); err != nil {
 		return err
 	}
 	promlogConfig := &promlog.Config{Level: level}
 	logger := promlog.New(promlogConfig)
-
 	// see this https://github.com/prometheus/node_exporter/pull/2463
 	if _, err := kingpin.CommandLine.Parse([]string{}); err != nil {
 		return err

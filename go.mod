@@ -3,6 +3,7 @@ module github.com/Ehco1996/ehco
 go 1.20
 
 require (
+	github.com/alecthomas/kingpin/v2 v2.3.2
 	github.com/getsentry/sentry-go v0.13.0
 	github.com/go-ping/ping v0.0.0-20210216210419-25d1413fb7bb
 	github.com/gobwas/ws v1.2.1
@@ -17,12 +18,9 @@ require (
 	go.uber.org/zap v1.19.1
 	golang.org/x/time v0.3.0
 	google.golang.org/grpc v1.56.0
-	gopkg.in/alecthomas/kingpin.v2 v2.2.6
 )
 
 require (
-	github.com/alecthomas/kingpin/v2 v2.3.2 // indirect
-	github.com/alecthomas/template v0.0.0-20190718012654-fb15b899a751 // indirect
 	github.com/alecthomas/units v0.0.0-20211218093645-b94a6e3cc137 // indirect
 	github.com/andybalholm/brotli v1.0.5 // indirect
 	github.com/beevik/ntp v1.2.0 // indirect
