@@ -43,8 +43,8 @@ type UserTraffic struct {
 
 type SyncTrafficReq struct {
 	Data              []*UserTraffic `json:"data"`
-	UploadBandwidth   float64        `json:"upload_bandwidth"`
-	DownloadBandwidth float64        `json:"download_bandwidth"`
+	UploadBandwidth   int64          `json:"upload_bandwidth"`
+	DownloadBandwidth int64          `json:"download_bandwidth"`
 }
 
 type SyncUserConfigsResp struct {
@@ -220,10 +220,13 @@ func (up *UserPool) syncTrafficToServer(ctx context.Context, endpoint, tag strin
 		if err := up.br.RecordOnce(ctx); err != nil {
 			return err
 		}
-		req.UploadBandwidth = up.br.GetUploadBandwidth()
-		req.DownloadBandwidth = up.br.GetDownloadBandwidth()
-		l.Debug("UploadBandwidth", PrettyByteSize(req.UploadBandwidth),
-			"DownloadBandwidth", PrettyByteSize(req.DownloadBandwidth))
+
+		ub := up.br.GetUploadBandwidth()
+		req.UploadBandwidth = int64(ub)
+		db := up.br.GetDownloadBandwidth()
+		req.DownloadBandwidth = int64(db)
+		l.Debug("Upload Bandwidth :", PrettyByteSize(ub),
+			"Download Bandwidth :", PrettyByteSize(db))
 	}
 	if err := postJson(up.httpClient, endpoint, req); err != nil {
 		return err
@@ -280,7 +283,6 @@ func (up *UserPool) syncUserConfigsFromServer(ctx context.Context, endpoint, tag
 
 func (up *UserPool) StartSyncUserTask(ctx context.Context, endpoint, tag string) {
 	l.Infof("Start Sync User Task")
-
 	syncOnce := func() {
 		if err := up.syncUserConfigsFromServer(ctx, endpoint, tag); err != nil {
 			l.Errorf("Sync User Configs From Server Error: %v", err)

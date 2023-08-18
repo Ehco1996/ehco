@@ -73,8 +73,6 @@ func (b *bandwidthRecorder) RecordOnce(ctx context.Context) error {
 	if !b.lastRecordTime.IsZero() {
 		// calculate bandwidth
 		elapsed := now.Sub(b.lastRecordTime).Seconds()
-
-
 		b.uploadBandwidthBytes = (send - b.currentSendBytes) / elapsed
 		b.downloadBandwidthBytes = (recv - b.currentRecvBytes) / elapsed
 	}
