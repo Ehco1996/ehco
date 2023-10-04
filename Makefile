@@ -2,7 +2,7 @@ NAME=ehco
 BINDIR=dist
 
 PACKAGE=github.com/Ehco1996/ehco/internal/constant
-BUILDTIME=$(shell date +"%Y-%m-%d %T")
+BUILDTIME=$(shell date +"%Y-%m-%d-%T")
 BRANCH=$(shell git rev-parse --abbrev-ref HEAD | tr -d '\040\011\012\015\n')
 REVISION=$(shell git rev-parse HEAD)
 
