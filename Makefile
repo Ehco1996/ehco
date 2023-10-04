@@ -2,9 +2,9 @@ NAME=ehco
 BINDIR=dist
 
 PACKAGE=github.com/Ehco1996/ehco/internal/constant
-BUILDTIME=$(shell date +"%m-%d-%y-%T")
+BUILDTIME=$(shell date +"%Y-%m-%d %T")
 BRANCH=$(shell git rev-parse --abbrev-ref HEAD | tr -d '\040\011\012\015\n')
-REVISION=$(shell git rev-parse --short HEAD)
+REVISION=$(shell git rev-parse HEAD)
 
 # -w -s 参数的解释：You will get the smallest binaries if you compile with -ldflags '-w -s'. The -w turns off DWARF debugging information
 # for more information, please refer to https://stackoverflow.com/questions/22267189/what-does-the-w-flag-mean-when-passed-in-via-the-ldflags-option-to-the-go-comman
