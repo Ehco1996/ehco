@@ -4,7 +4,7 @@ go 1.21
 
 require (
 	github.com/alecthomas/kingpin/v2 v2.3.2
-	github.com/getsentry/sentry-go v0.13.0
+	github.com/getsentry/sentry-go v0.25.0
 	github.com/go-ping/ping v0.0.0-20210216210419-25d1413fb7bb
 	github.com/gobwas/ws v1.2.1
 	github.com/gorilla/mux v1.8.0
@@ -73,13 +73,12 @@ require (
 	github.com/quic-go/quic-go v0.38.1 // indirect
 	github.com/refraction-networking/utls v1.4.3 // indirect
 	github.com/riobard/go-bloom v0.0.0-20200614022211-cdc8013cb5b3 // indirect
-	github.com/russross/blackfriday/v2 v2.0.1 // indirect
+	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/safchain/ethtool v0.3.0 // indirect
 	github.com/sagernet/sing v0.2.9 // indirect
 	github.com/sagernet/sing-shadowsocks v0.2.4 // indirect
 	github.com/sagernet/wireguard-go v0.0.0-20221116151939-c99467f53f2c // indirect
 	github.com/seiflotfy/cuckoofilter v0.0.0-20220411075957-e3b120b3f5fb // indirect
-	github.com/shurcooL/sanitized_anchor_name v1.0.0 // indirect
 	github.com/v2fly/ss-bloomring v0.0.0-20210312155135-28617310f63e // indirect
 	github.com/xhit/go-str2duration/v2 v2.1.0 // indirect
 	github.com/xtls/reality v0.0.0-20230828171259-e426190d57f6 // indirect
