@@ -1,4 +1,4 @@
-.PHONY: lint fmt test build tidy release
+.PHONY: tools lint fmt test build tidy release
 
 NAME=ehco
 BINDIR=dist
@@ -20,16 +20,18 @@ FAIL_ON_STDOUT := awk '{ print } END { if (NR > 0) { exit 1 } }'
 GOBUILD=CGO_ENABLED=1 go build -trimpath -ldflags="-w -s -X ${PACKAGE}.GitBranch=${BRANCH} -X ${PACKAGE}.GitRevision=${REVISION} -X ${PACKAGE}.BuildTime=${BUILDTIME}"
 
 tools:
-	make -C setup-tools
+	@echo "run setup tools"
+	make -C tools setup-tools
 
 lint: tools
+	@echo "run lint"
 	tools/bin/golangci-lint run
 
 fmt: tools
 	@echo "golangci-lint run --fix"
-	tools/bin/golangci-lint run --fix
+	@tools/bin/golangci-lint run --fix
 	@echo "gofmt (simplify)"
-	tools/bin/gofumpt -l -w $(FILES) 2>&1 | $(FAIL_ON_STDOUT)
+	@tools/bin/gofumpt -l -w $(FILES) 2>&1 | $(FAIL_ON_STDOUT)
 
 test:
 	go test -v -count=1  -coverpkg=./internal -timeout=10s ./...
