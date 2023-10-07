@@ -33,9 +33,8 @@ jobs:
       - name: tidy
         run: make tidy
 
-      # - name: lint
-      #   run: make lint
-      # TODO: fix download golangci-lint
+      - name: lint
+        run: make lint
 
       - name: test
         run: make test
@@ -45,6 +44,7 @@ jobs:
 
   build-latest-image:
     runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/master'
     steps:
       - uses: actions/checkout@master
 

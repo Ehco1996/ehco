@@ -112,7 +112,7 @@ func (c *Config) readFromFile() error {
 }
 
 func (c *Config) readFromHttp() error {
-	var httpc = &http.Client{Timeout: 10 * time.Second}
+	httpc := &http.Client{Timeout: 10 * time.Second}
 	r, err := httpc.Get(c.PATH)
 	if err != nil {
 		return err

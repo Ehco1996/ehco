@@ -17,7 +17,8 @@ var (
 		Subsystem:   "",
 		Name:        "alive_state",
 		Help:        "ehco 存活状态",
-		ConstLabels: ConstLabels})
+		ConstLabels: ConstLabels,
+	})
 
 	CurConnectionCount = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace:   METRIC_NS,

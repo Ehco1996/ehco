@@ -1,3 +1,4 @@
+// nolint: errcheck
 package transporter
 
 import (
@@ -147,7 +148,8 @@ type MWSSClient struct {
 func NewMWSSClient(l *zap.SugaredLogger) *MWSSClient {
 	dialer := &ws.Dialer{
 		TLSConfig: mytls.DefaultTLSConfig,
-		Timeout:   constant.DialTimeOut}
+		Timeout:   constant.DialTimeOut,
+	}
 
 	return &MWSSClient{
 		dialer: dialer,

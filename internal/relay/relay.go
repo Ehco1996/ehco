@@ -137,7 +137,7 @@ func (r *Relay) RunLocalTCPServer() error {
 	if err != nil {
 		return err
 	}
-	defer lis.Close()
+	defer lis.Close() //nolint: errcheck
 	r.closeTcpF = func() error {
 		return lis.Close()
 	}
@@ -165,7 +165,7 @@ func (r *Relay) RunLocalUDPServer() error {
 	if err != nil {
 		return err
 	}
-	defer lis.Close()
+	defer lis.Close() //nolint: errcheck
 	r.closeUdpF = func() error {
 		return lis.Close()
 	}
