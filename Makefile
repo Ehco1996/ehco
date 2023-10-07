@@ -1,3 +1,5 @@
+.PHONY: lint fmt test build tidy release
+
 NAME=ehco
 BINDIR=dist
 
@@ -17,12 +19,13 @@ FAIL_ON_STDOUT := awk '{ print } END { if (NR > 0) { exit 1 } }'
 # we need CGO_ENABLED=1 because we import the node_exporter ,and we need install `glibc-source,libc6` to make it work
 GOBUILD=CGO_ENABLED=1 go build -trimpath -ldflags="-w -s -X ${PACKAGE}.GitBranch=${BRANCH} -X ${PACKAGE}.GitRevision=${REVISION} -X ${PACKAGE}.BuildTime=${BUILDTIME}"
 
-.PHONY: fmt test build tidy ensure release
+tools:
+	make -C setup-tools
 
-lint: tools/bin/golangci-lint
+lint: tools
 	tools/bin/golangci-lint run
 
-fmt: tools/bin/golangci-lint tools/bin/gofumpt
+fmt: tools
 	@echo "golangci-lint run --fix"
 	tools/bin/golangci-lint run --fix
 	@echo "gofmt (simplify)"
@@ -45,9 +48,6 @@ build-linux-amd64:
 
 tidy:
 	go mod tidy
-
-ensure: tidy
-	go mod download
 
 release:
 	goreleaser build --skip-validate --rm-dist
