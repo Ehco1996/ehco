@@ -11,6 +11,7 @@ import (
 
 	"github.com/Ehco1996/ehco/internal/constant"
 	"github.com/xtls/xray-core/infra/conf"
+	"go.uber.org/zap"
 )
 
 type RelayConfig struct {
@@ -64,18 +65,21 @@ func (r *RelayConfig) Validate() error {
 type Config struct {
 	PATH string
 
-	WebPort    int    `json:"web_port,omitempty"`
-	WebToken   string `json:"web_token,omitempty"`
-	EnablePing bool   `json:"enable_ping,omitempty"`
-	LogLeveL   string `json:"log_level,omitempty"`
+	WebPort        int    `json:"web_port,omitempty"`
+	WebToken       string `json:"web_token,omitempty"`
+	EnablePing     bool   `json:"enable_ping,omitempty"`
+	LogLeveL       string `json:"log_level,omitempty"`
+	ReloadInterval int    `json:"reload_interval,omitempty"`
 
 	RelayConfigs        []RelayConfig `json:"relay_configs"`
 	XRayConfig          *conf.Config  `json:"xray_config,omitempty"`
 	SyncTrafficEndPoint string        `json:"sync_traffic_endpoint"`
+
+	L *zap.SugaredLogger
 }
 
-func NewConfigByPath(path string) *Config {
-	return &Config{PATH: path, RelayConfigs: []RelayConfig{}}
+func NewConfig(path string) *Config {
+	return &Config{PATH: path, RelayConfigs: []RelayConfig{}, L: zap.L().Sugar().Named("cfg")}
 }
 
 func (c *Config) NeedSyncUserFromServer() bool {
@@ -100,7 +104,7 @@ func (c *Config) readFromFile() error {
 	if err != nil {
 		return err
 	}
-	println("Load Config From file:", c.PATH)
+	c.L.Infof("Load Config From file: %s", c.PATH)
 	if err != nil {
 		return err
 	}
@@ -114,7 +118,7 @@ func (c *Config) readFromHttp() error {
 		return err
 	}
 	defer r.Body.Close()
-	println("Load Config From http:", c.PATH)
+	c.L.Infof("Load Config From HTTP: %s", c.PATH)
 	return json.NewDecoder(r.Body).Decode(&c)
 }
 

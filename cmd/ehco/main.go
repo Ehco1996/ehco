@@ -27,17 +27,18 @@ import (
 
 // flags
 var (
-	LocalAddr      string
-	ListenType     string
-	TCPRemoteAddr  string
-	UDPRemoteAddr  string
-	TransportType  string
-	ConfigPath     string
-	WebPort        int
-	WebToken       string
-	EnablePing     bool
-	SystemFilePath = "/etc/systemd/system/ehco.service"
-	LogLevel       string
+	LocalAddr            string
+	ListenType           string
+	TCPRemoteAddr        string
+	UDPRemoteAddr        string
+	TransportType        string
+	ConfigPath           string
+	WebPort              int
+	WebToken             string
+	EnablePing           bool
+	SystemFilePath       = "/etc/systemd/system/ehco.service"
+	LogLevel             string
+	ConfigReloadInterval int
 )
 
 var cmdLogger *zap.SugaredLogger
@@ -138,6 +139,13 @@ func createCliAPP() *cli.App {
 			Destination: &WebToken,
 			DefaultText: "info",
 		},
+		&cli.IntFlag{
+			Name:        "config_reload_interval",
+			Usage:       "config reload interval",
+			EnvVars:     []string{"EHCO_CONFIG_RELOAD_INTERVAL"},
+			Destination: &ConfigReloadInterval,
+			DefaultText: "60",
+		},
 	}
 
 	app.Commands = []*cli.Command{
@@ -166,18 +174,18 @@ func createCliAPP() *cli.App {
 
 func loadConfig() (cfg *config.Config, err error) {
 	if ConfigPath != "" {
-		cfg = config.NewConfigByPath(ConfigPath)
+		cfg = config.NewConfig(ConfigPath)
 		if err := cfg.LoadConfig(); err != nil {
 			return nil, err
 		}
 	} else {
-		// prepare config from cli args
 		cfg = &config.Config{
-			WebPort:    WebPort,
-			WebToken:   WebToken,
-			EnablePing: EnablePing,
-			PATH:       ConfigPath,
-			LogLeveL:   LogLevel,
+			WebPort:        WebPort,
+			WebToken:       WebToken,
+			EnablePing:     EnablePing,
+			PATH:           ConfigPath,
+			LogLeveL:       LogLevel,
+			ReloadInterval: ConfigReloadInterval,
 			RelayConfigs: []config.RelayConfig{
 				{
 					Listen:        LocalAddr,
@@ -245,7 +253,7 @@ func startRelayServers(ctx context.Context, cfg *config.Config) error {
 	}
 	// start watch config file TODO support reload from http , refine the ConfigPath global var
 	if ConfigPath != "" {
-		go watchAndReloadConfig(ctx, relayM, errCH)
+		go watchAndReloadRelayConfig(ctx, cfg, relayM, errCH)
 	}
 
 	select {
@@ -262,55 +270,92 @@ func startRelayServers(ctx context.Context, cfg *config.Config) error {
 	}
 }
 
-func watchAndReloadConfig(ctx context.Context, relayM *sync.Map, errCh chan error) {
+func watchAndReloadRelayConfig(ctx context.Context, curCfg *config.Config, relayM *sync.Map, errCh chan error) {
 	cmdLogger.Infof("Start to watch config file: %s ", ConfigPath)
+	reladRelay := func() error {
+		newCfg, err := loadConfig()
+		if err != nil {
+			cmdLogger.Errorf("Reloading Realy Conf meet error: %s ", err)
+			return err
+		}
+		var newRelayAddrList []string
+		for idx := range newCfg.RelayConfigs {
+			r, err := relay.NewRelay(&newCfg.RelayConfigs[idx])
+			if err != nil {
+				cmdLogger.Errorf("reload new relay failed err=%s", err.Error())
+				return err
+			}
+			newRelayAddrList = append(newRelayAddrList, r.Name)
+			// reload old relay
+			if oldR, ok := relayM.Load(r.Name); ok {
+				oldR := oldR.(*relay.Relay)
+				if oldR.Name != r.Name {
+					cmdLogger.Infof("close old relay name=%s", oldR.Name)
+					stopOneRelay(oldR, relayM)
+					go startOneRelay(r, relayM, errCh)
+				}
+				continue // no need to reload
+			}
+			// start bread new relay that not in old relayM
+			cmdLogger.Infof("starr new relay name=%s", r.Name)
+			go startOneRelay(r, relayM, errCh)
+		}
+		// closed relay not in new config
+		relayM.Range(func(key, value interface{}) bool {
+			oldAddr := key.(string)
+			if !inArray(oldAddr, newRelayAddrList) {
+				v, _ := relayM.Load(oldAddr)
+				oldR := v.(*relay.Relay)
+				stopOneRelay(oldR, relayM)
+			}
+			return true
+		})
+		return nil
+	}
 
-	reloadCH := make(chan os.Signal, 1)
-	signal.Notify(reloadCH, syscall.SIGHUP)
+	reloadCH := make(chan struct{}, 1)
+
+	// listen syscall.SIGHUP to trigger reload
+	sigHubCH := make(chan os.Signal, 1)
+	signal.Notify(sigHubCH, syscall.SIGHUP)
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-sigHubCH:
+				cmdLogger.Info("Now Reloading Relay Conf By HUP Signal! ")
+				reloadCH <- struct{}{}
+			}
+		}
+	}()
+
+	// ticker to reload config
+	if curCfg.ReloadInterval > 0 {
+		ticker := time.NewTicker(time.Second * time.Duration(curCfg.ReloadInterval))
+		defer ticker.Stop()
+		go func() {
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-ticker.C:
+					cmdLogger.Info("Now Reloading Relay Conf By Ticker! ")
+					reloadCH <- struct{}{}
+				}
+			}
+		}()
+	}
 
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case <-reloadCH:
-			cmdLogger.Info("Got A HUP Signal! Now Reloading Conf")
-			newCfg, err := loadConfig()
-			if err != nil {
-				cmdLogger.Fatalf("Reloading Conf meet error: %s ", err)
+			if err := reladRelay(); err != nil {
+				cmdLogger.Errorf("Reloading Relay Conf meet error: %s ", err)
+				errCh <- err
 			}
-
-			var newRelayAddrList []string
-			for idx := range newCfg.RelayConfigs {
-				r, err := relay.NewRelay(&newCfg.RelayConfigs[idx])
-				if err != nil {
-					cmdLogger.Fatalf("reload new relay failed err=%s", err.Error())
-				}
-				newRelayAddrList = append(newRelayAddrList, r.Name)
-
-				// reload old relay
-				if oldR, ok := relayM.Load(r.Name); ok {
-					oldR := oldR.(*relay.Relay)
-					if oldR.Name != r.Name {
-						cmdLogger.Infof("close old relay name=%s", oldR.Name)
-						stopOneRelay(oldR, relayM)
-						go startOneRelay(r, relayM, errCh)
-					}
-					continue // no need to reload
-				}
-				// start bread new relay that not in old relayM
-				cmdLogger.Infof("starr new relay name=%s", r.Name)
-				go startOneRelay(r, relayM, errCh)
-			}
-			// closed relay not in new config
-			relayM.Range(func(key, value interface{}) bool {
-				oldAddr := key.(string)
-				if !inArray(oldAddr, newRelayAddrList) {
-					v, _ := relayM.Load(oldAddr)
-					oldR := v.(*relay.Relay)
-					stopOneRelay(oldR, relayM)
-				}
-				return true
-			})
 		}
 	}
 }

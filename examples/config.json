@@ -3,6 +3,7 @@
   "web_token": "",
   "enable_ping": false,
   "log_level": "debug",
+  "reload_interval": 5,
   "relay_configs": [
     {
       "listen": "127.0.0.1:1234",
