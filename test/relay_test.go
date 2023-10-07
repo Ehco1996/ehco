@@ -134,7 +134,6 @@ func init() {
 }
 
 func TestRelayOverRaw(t *testing.T) {
-
 	msg := []byte("hello")
 	// test tcp
 	res := SendTcpMsg(msg, RAW_LISTEN)
@@ -152,7 +151,6 @@ func TestRelayOverRaw(t *testing.T) {
 }
 
 func TestRelayWithDeadline(t *testing.T) {
-
 	msg := []byte("hello")
 	conn, err := net.Dial("tcp", RAW_LISTEN)
 	if err != nil {

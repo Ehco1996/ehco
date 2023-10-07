@@ -155,11 +155,11 @@ func createCliAPP() *cli.App {
 			Action: func(c *cli.Context) error {
 				fmt.Printf("Install ehco systemd file to `%s`\n", SystemFilePath)
 				if _, err := os.Stat(SystemFilePath); err != nil && os.IsNotExist(err) {
-					f, _ := os.OpenFile(SystemFilePath, os.O_CREATE|os.O_WRONLY, 0644)
+					f, _ := os.OpenFile(SystemFilePath, os.O_CREATE|os.O_WRONLY, 0o644)
 					if _, err := f.WriteString(SystemDTMPL); err != nil {
 						cmdLogger.Fatal(err)
 					}
-					f.Close()
+					return f.Close()
 				}
 
 				command := exec.Command("vi", SystemFilePath)
@@ -409,7 +409,7 @@ func start(ctx *cli.Context) error {
 			if err != nil {
 				cmdLogger.Fatalf("StartXrayServer meet err=%s", err)
 			}
-			defer s.Close()
+			defer s.Close() //nolint: errcheck
 
 			if cfg.SyncTrafficEndPoint != "" {
 				go func() {

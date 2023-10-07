@@ -26,7 +26,6 @@ var (
 )
 
 func InitTlsCfg() error {
-
 	if DefaultTLSConfig != nil {
 		return nil
 	}
@@ -94,18 +93,24 @@ func generateKeyPair() (rawCert, rawKey []byte, err error) {
 		if err = pem.Encode(certOut, &pem.Block{Type: "CERTIFICATE", Bytes: derBytes}); err != nil {
 			log.Logger.Info("failed to pem encode:", err)
 		}
-		certOut.Close()
+		if err := certOut.Close(); err != nil {
+			log.Logger.Error("error closing cert.pem:", err)
+			return nil, nil, err
+		}
 		log.Logger.Infof("write cert to %s", CertFileName)
 	}
 	if KeyFileName != "" {
-		keyOut, err := os.OpenFile(KeyFileName, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
+		keyOut, err := os.OpenFile(KeyFileName, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
 		if err != nil {
 			log.Logger.Info("failed to open key.pem for writing:", err)
 		}
 		if err = pem.Encode(keyOut, mustPemBlockForKey(priv)); err != nil {
 			log.Logger.Info("failed to pem encode:", err)
 		}
-		keyOut.Close()
+		if err := keyOut.Close(); err != nil {
+			log.Logger.Error("error closing key.pem:", err)
+			return nil, nil, err
+		}
 		log.Logger.Infof("write key to %s", KeyFileName)
 	}
 	return

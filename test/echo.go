@@ -10,8 +10,7 @@ import (
 	"time"
 )
 
-//TODO support random timeouts
-
+// TODO support random timeouts
 func echo(conn net.Conn) {
 	defer conn.Close()
 	defer fmt.Println("conn closed", conn.RemoteAddr().String())
@@ -44,7 +43,6 @@ func ServeTcp(l net.Listener) {
 }
 
 func ServeUdp(conn *net.UDPConn) {
-
 	buf := make([]byte, 1500)
 	for {
 		number, remote, err := conn.ReadFromUDP(buf)

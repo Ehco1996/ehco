@@ -10,7 +10,6 @@ import (
 
 // RelayTransporter
 type RelayTransporter interface {
-
 	// UDP相关
 	GetOrCreateBufferCh(uaddr *net.UDPAddr) *BufferCh
 	HandleUDPConn(uaddr *net.UDPAddr, local *net.UDPConn)

@@ -19,9 +19,7 @@ import (
 	"go.uber.org/zap"
 )
 
-var (
-	l *zap.SugaredLogger
-)
+var l *zap.SugaredLogger
 
 func MakeIndexF(logger *zap.SugaredLogger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -56,7 +54,7 @@ func registerMetrics(cfg *config.Config) {
 
 	EhcoAlive.Set(EhcoAliveStateInit)
 
-	//ping
+	// ping
 	if cfg.EnablePing {
 		pg := NewPingGroup(cfg)
 		prometheus.MustRegister(PingResponseDurationSeconds)

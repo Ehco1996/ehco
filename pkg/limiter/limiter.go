@@ -20,9 +20,9 @@ type IPRateLimiter struct {
 	currentRateM  map[string]*rate.Limiter
 
 	limit rate.Limit // 表示每秒可以放入多少个token到桶中
-	burst int        //表示桶容量大小,即同一时刻能取到的最大token数量
+	burst int        // 表示桶容量大小,即同一时刻能取到的最大token数量
 
-	lastGcTime time.Time //上次gc的时间
+	lastGcTime time.Time // 上次gc的时间
 }
 
 // NewIPRateLimiter .
@@ -64,7 +64,6 @@ func (i *IPRateLimiter) GetOreCreateLimiter(ip string) *rate.Limiter {
 	limiter = rate.NewLimiter(i.limit, i.burst)
 	i.currentRateM[ip] = limiter
 	return limiter
-
 }
 
 func (i *IPRateLimiter) gc() {

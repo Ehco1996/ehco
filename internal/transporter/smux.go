@@ -1,3 +1,4 @@
+// nolint: errcheck
 package transporter
 
 import (
@@ -35,7 +36,8 @@ func (sm *SessionWithMetrics) CanNotServe() bool {
 }
 
 func NewSmuxTransporter(l *zap.SugaredLogger,
-	initSessionF func(ctx context.Context, addr string) (*smux.Session, error)) *smuxTransporter {
+	initSessionF func(ctx context.Context, addr string) (*smux.Session, error),
+) *smuxTransporter {
 	tr := &smuxTransporter{
 		L:            l,
 		initSessionF: initSessionF,
