@@ -8,14 +8,6 @@ ehco is a network relay tool and a typo :)
 
 [see Readme in English here](README_EN.md)
 
-## 视频安装教程
-
-本隧道和 [django-sspanel](https://github.com/Ehco1996/django-sspanel)深度对接，可以很方便的管理中转节点
-
-* 面板视频安装教程: [地址](https://youtu.be/BRHcdGeufvY)
-
-* 隧道后端对接视频教程: [地址](https://youtu.be/R4U0NZaMUeY)
-
 ## 安装
 
 ### go get
