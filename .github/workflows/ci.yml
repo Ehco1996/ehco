@@ -4,10 +4,17 @@ on:
   push:
     branches:
       - master
+    paths:
+      - "cmd/**"
+      - "internal/**"
+      - "pkg/**"
   pull_request:
     branches:
       - master
-
+    paths:
+      - "cmd/**"
+      - "internal/**"
+      - "pkg/**"
 jobs:
   test:
     runs-on: ubuntu-latest
