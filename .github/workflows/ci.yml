@@ -55,6 +55,9 @@ jobs:
     steps:
       - uses: actions/checkout@master
 
+      - name: set up qemu
+        uses: docker/setup-qemu-action@v2
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
@@ -64,19 +67,11 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Build x86 image
+      - name: Build multi-platform image
         uses: docker/build-push-action@v4
         with:
           context: .
           tags: "ehco1996/ehco:latest"
           push: true
           file: build/Dockerfile
-
-      # TODO fix the arm build error  gcc: error: unrecognized command-line option '-marm'; did you mean '-mabm'?
-      # - name: Build arm image
-      #   uses: docker/build-push-action@v4
-      #   with:
-      #     context: .
-      #     tags: "ehco1996/ehco:arm64"
-      #     push: true
-      #     file: build/arm.Dockerfile
+          platforms: linux/amd64,linux/arm64
