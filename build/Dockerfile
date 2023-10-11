@@ -1,11 +1,3 @@
-FROM golang:1.21 as builder
-WORKDIR /app
-COPY . .
-
-RUN --mount=type=cache,target=/home/runner/go/pkg/mod \
-    --mount=type=cache,target=/home/runner/.cache/go-build \
-    make build
-
 FROM debian:12-slim
 
 RUN apt update && apt install -y --no-install-recommends ca-certificates curl glibc-source libc6
@@ -13,6 +5,7 @@ RUN apt update && apt install -y --no-install-recommends ca-certificates curl gl
 WORKDIR /bin/
 
 # Copy the pre-built binary file from the previous stage
-COPY --from=builder /app/dist/ehco .
+COPY ehco .
+RUN chmod +x ehco
 
 ENTRYPOINT ["ehco"]
