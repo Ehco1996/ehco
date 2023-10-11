@@ -1,4 +1,4 @@
-name: go-releaser
+name: release-tag
 
 on:
   push:
