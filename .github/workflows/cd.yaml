@@ -139,7 +139,6 @@ jobs:
   merge:
     runs-on: ubuntu-latest
     needs:
-      - build
       - build-image
     steps:
       - name: Download digests
