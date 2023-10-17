@@ -205,11 +205,12 @@ func (up *UserPool) syncTrafficToServer(ctx context.Context, endpoint, tag strin
 			}
 			continue
 		}
+		// Note v2ray 只会统计 inbound 的流量，所以这里乘以2 以补偿 outbound 的流量
 		switch trafficType {
 		case "uplink":
-			user.UploadTraffic = stat.Value
+			user.UploadTraffic = stat.Value * 2
 		case "downlink":
-			user.DownloadTraffic = stat.Value
+			user.DownloadTraffic = stat.Value * 2
 		}
 	}
 
