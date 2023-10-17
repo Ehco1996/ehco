@@ -71,10 +71,9 @@ func registerNodeExporterMetrics(cfg *config.Config) error {
 	promlogConfig := &promlog.Config{Level: level}
 	logger := promlog.New(promlogConfig)
 	// see this https://github.com/prometheus/node_exporter/pull/2463
-	if _, err := kingpin.CommandLine.Parse([]string{"--collector.boottime"}); err != nil {
+	if _, err := kingpin.CommandLine.Parse([]string{}); err != nil {
 		return err
 	}
-	collector.DisableDefaultCollectors()
 	nc, err := collector.NewNodeCollector(logger)
 	if err != nil {
 		return fmt.Errorf("couldn't create collector: %s", err)
