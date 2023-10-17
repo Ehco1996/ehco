@@ -35,16 +35,16 @@ func NewBandwidthRecorder(metricsURL string) *bandwidthRecorder {
 	}
 }
 
-func (b *bandwidthRecorder) RecordOnce(ctx context.Context) error {
+func (b *bandwidthRecorder) RecordOnce(ctx context.Context) (uploadIncr float64, downloadIncr float64, err error) {
 	response, err := b.httpClient.Get(b.metricsURL)
 	if err != nil {
-		return err
+		return
 	}
 	defer response.Body.Close()
 
 	body, err := io.ReadAll(response.Body)
 	if err != nil {
-		return err
+		return
 	}
 	lines := strings.Split(string(body), "\n")
 
@@ -73,13 +73,15 @@ func (b *bandwidthRecorder) RecordOnce(ctx context.Context) error {
 	if !b.lastRecordTime.IsZero() {
 		// calculate bandwidth
 		elapsed := now.Sub(b.lastRecordTime).Seconds()
-		b.uploadBandwidthBytes = (send - b.currentSendBytes) / elapsed
-		b.downloadBandwidthBytes = (recv - b.currentRecvBytes) / elapsed
+		uploadIncr = (send - b.currentSendBytes)
+		downloadIncr = (recv - b.currentRecvBytes)
+		b.uploadBandwidthBytes = uploadIncr / elapsed
+		b.downloadBandwidthBytes = downloadIncr / elapsed
 	}
 	b.lastRecordTime = now
 	b.currentRecvBytes = recv
 	b.currentSendBytes = send
-	return nil
+	return
 }
 
 func parseFloat(s string) float64 {

@@ -4,11 +4,12 @@ import (
 	"testing"
 	"time"
 
+	"go.uber.org/zap"
 	"golang.org/x/time/rate"
 )
 
 func TestIPRateLimiter_CanServe(t *testing.T) {
-	ipr := NewIPRateLimiter(rate.Limit(1), 1) // 1/s 处理一个请求
+	ipr := NewIPRateLimiter(rate.Limit(1), 1, zap.NewExample()) // 1/s 处理一个请求
 
 	ip1 := "1.1.1.1"
 	ip2 := "1.2.2.2"
