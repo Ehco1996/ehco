@@ -30,7 +30,7 @@ jobs:
           build_command: make build-nightly
           release_tag: nightly
           release_name: nightly
-          goversion: "1.21"
+          goversion: "1.21.1"
           overwrite: true
           retry: 10
 
