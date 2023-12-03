@@ -10,3 +10,9 @@ const (
 
 	SyncTime = 60
 )
+
+func InProxyTags(tag string) bool {
+	return tag == XraySSProxyTag || tag == XrayTrojanProxyTag ||
+		tag == XrayVmessProxyTag || tag == XrayVlessProxyTag ||
+		tag == XraySSRProxyTag
+}

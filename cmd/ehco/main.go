@@ -403,8 +403,6 @@ func start(ctx *cli.Context) error {
 		}()
 	}
 
-	zap.L().Debug("StartRelayServers")
-	println(zap.L())
 	if cfg.XRayConfig != nil {
 		xrayS, err := xray.NewXrayServer(cfg)
 		if err != nil {

@@ -33,7 +33,9 @@ func initLogger(logLevel string) (*zap.SugaredLogger, error) {
 		zapcore.NewMultiWriteSyncer(writers...),
 		level,
 	)
-	return zap.New(core).Sugar(), nil
+	l := zap.New(core)
+	zap.ReplaceGlobals(l)
+	return l.Sugar(), nil
 }
 
 func InitGlobalLogger(logLevel string) error {

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"math"
 	"net/http"
 )
@@ -27,6 +28,7 @@ func postJson(c *http.Client, url string, dataStruct interface{}) error {
 		return err
 	}
 	defer r.Body.Close()
+	_, err = io.ReadAll(r.Body)
 	return err
 }
 

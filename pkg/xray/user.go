@@ -202,7 +202,7 @@ func (up *UserPool) syncTrafficToServer(ctx context.Context, proxyTag string) er
 			}
 			continue
 		}
-		// Note v2ray 只会统计 inbound 的流量，所以这里乘以2 以补偿 outbound 的流量
+		// Note v2ray 只会统计 inbound 的流量，所以这里乘 2 以补偿 outbound 的流量
 		switch trafficType {
 		case "uplink":
 			user.UploadTraffic = stat.Value * 2
@@ -215,7 +215,7 @@ func (up *UserPool) syncTrafficToServer(ctx context.Context, proxyTag string) er
 	for _, user := range up.GetAllUsers() {
 		tf := user.DownloadTraffic + user.UploadTraffic
 		if tf > 0 {
-			// l.Infof("User: %v Now Used Total Traffic: %v", user.ID, tf)
+			up.l.Sugar().Infof("User: %v Now Used Total Traffic: %v", user.ID, tf)
 			tfs = append(tfs, user.GenTraffic())
 			user.ResetTraffic()
 		}
@@ -227,24 +227,23 @@ func (up *UserPool) syncTrafficToServer(ctx context.Context, proxyTag string) er
 		if err != nil {
 			return err
 		}
-		println(uploadIncr, downloadIncr)
 
 		ub := up.br.GetUploadBandwidth()
 		req.UploadBandwidth = int64(ub)
 		db := up.br.GetDownloadBandwidth()
 		req.DownloadBandwidth = int64(db)
-		// l.Debug(
-		// 	"Upload Bandwidth :", PrettyByteSize(ub),
-		// 	"Download Bandwidth :", PrettyByteSize(db),
-		// 	"Total Bandwidth :", PrettyByteSize(ub+db),
-		// 	"Total Increment By BR", PrettyByteSize(uploadIncr+downloadIncr),
-		// 	"Total Increment By Xray :", PrettyByteSize(float64(req.GetTotalTraffic())),
-		// )
+		up.l.Sugar().Debug(
+			"Upload Bandwidth :", PrettyByteSize(ub),
+			"Download Bandwidth :", PrettyByteSize(db),
+			"Total Bandwidth :", PrettyByteSize(ub+db),
+			"Total Increment By BR", PrettyByteSize(uploadIncr+downloadIncr),
+			"Total Increment By Xray :", PrettyByteSize(float64(req.GetTotalTraffic())),
+		)
 	}
 	if err := postJson(up.httpClient, up.remoteConfigURL, req); err != nil {
 		return err
 	}
-	// l.Infof("Call syncTrafficToServer ONLINE USER COUNT: %d", len(tfs))
+	up.l.Sugar().Infof("Call syncTrafficToServer ONLINE USER COUNT: %d", len(tfs))
 	return nil
 }
 
@@ -307,11 +306,11 @@ func (up *UserPool) Start(ctx context.Context) error {
 	syncOnce := func() error {
 		for _, tag := range up.proxyTags {
 			if err := up.syncUserConfigsFromServer(ctx, tag); err != nil {
-				// l.Errorf("Sync User Configs From Server Error: %v", err)
+				up.l.Sugar().Errorf("Sync User Configs From Server Error: %v", err)
 				return err
 			}
 			if err := up.syncTrafficToServer(ctx, tag); err != nil {
-				// l.Errorf("Sync Traffic From Server Error: %v", err)
+				up.l.Sugar().Errorf("Sync Traffic From Server Error: %v", err)
 				return err
 			}
 		}

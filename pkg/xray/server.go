@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/Ehco1996/ehco/internal/config"
 	"github.com/Ehco1996/ehco/internal/tls"
@@ -126,14 +127,33 @@ func (xs *XrayServer) Start(ctx context.Context) error {
 		}
 		xs.l.Info("Start Xray User Pool")
 	}
+
+	if xs.cfg.ReloadInterval > 0 {
+		go func() {
+			ticker := time.NewTicker(time.Second * time.Duration(xs.cfg.ReloadInterval))
+			defer ticker.Stop()
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-ticker.C:
+					if err := xs.ReloadProxyInbound(); err != nil {
+						xs.l.Error("Reload Config meet error", zap.Error(err))
+					}
+				}
+			}
+		}()
+	}
 	return nil
 }
 
-func (xs *XrayServer) Reload() error {
-	// Tag -> InboundCfg
+func (xs *XrayServer) ReloadProxyInbound() error {
 	oldCfgM := make(map[string]*conf.InboundDetourConfig)
 	for _, inbound := range xs.cfg.XRayConfig.InboundConfigs {
-		oldCfgM[inbound.Tag] = &inbound
+		if InProxyTags(inbound.Tag) {
+			oldCfgM[inbound.Tag] = &inbound
+			println("oldCfgM", inbound.Tag, &inbound)
+		}
 	}
 
 	newCfg := config.NewConfig(xs.cfg.PATH)
@@ -141,16 +161,20 @@ func (xs *XrayServer) Reload() error {
 		xs.l.Error("Reload Config meet error", zap.Error(err))
 		return err
 	}
-
 	for _, inbound := range newCfg.XRayConfig.InboundConfigs {
-		if oldCfg, ok := oldCfgM[inbound.Tag]; ok {
-			// now only support change listen port
-			if oldCfg.ListenOn.String() != inbound.ListenOn.String() {
-				xs.l.Warn("find listen port changed, need restart xray server",
-					zap.String("old", oldCfg.ListenOn.String()),
-					zap.String("new", inbound.ListenOn.String()),
-					zap.String("tag", inbound.Tag))
-			}
+		if !InProxyTags(inbound.Tag) {
+			continue
+		}
+		oldCfg, ok := oldCfgM[inbound.Tag]
+		if !ok {
+			xs.l.Info("find new inbound config", zap.String("tag", inbound.Tag))
+			continue
+		}
+		if oldCfg.PortList.Build().String() != inbound.PortList.Build().String() {
+			xs.l.Warn("find listen port changed, need restart xray server",
+				zap.String("old", oldCfg.PortList.Build().String()),
+				zap.String("new", inbound.PortList.Build().String()),
+				zap.String("tag", inbound.Tag))
 		}
 	}
 	return nil
