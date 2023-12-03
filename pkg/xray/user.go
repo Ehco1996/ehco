@@ -192,9 +192,9 @@ func (up *UserPool) syncTrafficToServer(ctx context.Context, proxyTag string) er
 		}
 		user, found := up.GetUser(userID)
 		if !found {
-			// l.Warnf(
-			// 	"user in xray not found in user pool this user maybe out of traffic, user id: %d, leak traffic: %d",
-			// 	userID, stat.Value)
+			up.l.Sugar().Warnf(
+				"user in xray not found in user pool this user maybe out of traffic, user id: %d, leak traffic: %d",
+				userID, stat.Value)
 			fakeUser := &User{ID: userID}
 			if err := RemoveInboundUser(ctx, up.proxyClient, proxyTag, fakeUser); err != nil {
 				up.l.Warn("tring remove leak user failed, user id: %d err: %s",

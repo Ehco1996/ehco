@@ -86,9 +86,7 @@ func NewXrayServer(cfg *config.Config) (*XrayServer, error) {
 			if inbound.Tag == XrayAPITag {
 				grpcEndPoint = fmt.Sprintf("%s:%d", inbound.ListenOn.String(), inbound.PortList.Range[0].From)
 			}
-			if inbound.Tag == XraySSProxyTag || inbound.Tag == XrayTrojanProxyTag ||
-				inbound.Tag == XrayVmessProxyTag || inbound.Tag == XrayVlessProxyTag ||
-				inbound.Tag == XraySSRProxyTag {
+			if InProxyTags(inbound.Tag) {
 				proxyTags = append(proxyTags, inbound.Tag)
 			}
 		}
@@ -148,11 +146,14 @@ func (xs *XrayServer) Start(ctx context.Context) error {
 }
 
 func (xs *XrayServer) ReloadProxyInbound() error {
+	// todo: implement reload proxy inbound
+	// 1. close old proxy inbound when not in new config
+	// 2. add new proxy inbound when not in old config
+	// 3. update proxy inbound when port changed
 	oldCfgM := make(map[string]*conf.InboundDetourConfig)
 	for _, inbound := range xs.cfg.XRayConfig.InboundConfigs {
 		if InProxyTags(inbound.Tag) {
 			oldCfgM[inbound.Tag] = &inbound
-			println("oldCfgM", inbound.Tag, &inbound)
 		}
 	}
 
