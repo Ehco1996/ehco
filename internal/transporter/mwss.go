@@ -54,7 +54,7 @@ func NewMWSSServer(listenAddr string, raw *Raw, l *zap.SugaredLogger) *MWSSServe
 	}
 
 	mux := mux.NewRouter()
-	mux.Handle("/", web.MakeIndexF(l))
+	mux.Handle("/", web.MakeIndexF())
 	mux.Handle("/mwss/", http.HandlerFunc(s.HandleRequest))
 	s.httpServer = &http.Server{
 		Addr:              listenAddr,

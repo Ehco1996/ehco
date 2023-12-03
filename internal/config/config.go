@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/Ehco1996/ehco/internal/constant"
-	"github.com/xtls/xray-core/infra/conf"
+	xrayCfg "github.com/xtls/xray-core/infra/conf"
 	"go.uber.org/zap"
 )
 
@@ -71,15 +71,16 @@ type Config struct {
 	LogLeveL       string `json:"log_level,omitempty"`
 	ReloadInterval int    `json:"reload_interval,omitempty"`
 
-	RelayConfigs        []RelayConfig `json:"relay_configs"`
-	XRayConfig          *conf.Config  `json:"xray_config,omitempty"`
-	SyncTrafficEndPoint string        `json:"sync_traffic_endpoint"`
+	RelayConfigs []*RelayConfig `json:"relay_configs"`
+
+	XRayConfig          *xrayCfg.Config `json:"xray_config,omitempty"`
+	SyncTrafficEndPoint string          `json:"sync_traffic_endpoint"`
 
 	L *zap.SugaredLogger
 }
 
 func NewConfig(path string) *Config {
-	return &Config{PATH: path, RelayConfigs: []RelayConfig{}, L: zap.L().Sugar().Named("cfg")}
+	return &Config{PATH: path, RelayConfigs: []*RelayConfig{}, L: zap.L().Sugar().Named("cfg")}
 }
 
 func (c *Config) NeedSyncUserFromServer() bool {

@@ -186,7 +186,7 @@ func loadConfig() (cfg *config.Config, err error) {
 			PATH:           ConfigPath,
 			LogLeveL:       LogLevel,
 			ReloadInterval: ConfigReloadInterval,
-			RelayConfigs: []config.RelayConfig{
+			RelayConfigs: []*config.RelayConfig{
 				{
 					Listen:        LocalAddr,
 					ListenType:    ListenType,
@@ -245,7 +245,7 @@ func startRelayServers(ctx context.Context, cfg *config.Config) error {
 	errCH := make(chan error, 1)
 	// init and relay servers
 	for idx := range cfg.RelayConfigs {
-		r, err := relay.NewRelay(&cfg.RelayConfigs[idx])
+		r, err := relay.NewRelay(cfg.RelayConfigs[idx])
 		if err != nil {
 			return err
 		}
@@ -280,13 +280,13 @@ func watchAndReloadRelayConfig(ctx context.Context, curCfg *config.Config, relay
 		}
 		var newRelayAddrList []string
 		for idx := range newCfg.RelayConfigs {
-			r, err := relay.NewRelay(&newCfg.RelayConfigs[idx])
+			r, err := relay.NewRelay(newCfg.RelayConfigs[idx])
 			if err != nil {
 				cmdLogger.Errorf("reload new relay failed err=%s", err.Error())
 				return err
 			}
 			newRelayAddrList = append(newRelayAddrList, r.Name)
-			// reload old relay
+			// reload relay when name change
 			if oldR, ok := relayM.Load(r.Name); ok {
 				oldR := oldR.(*relay.Relay)
 				if oldR.Name != r.Name {
@@ -404,20 +404,13 @@ func start(ctx *cli.Context) error {
 	}
 
 	if cfg.XRayConfig != nil {
-		go func() {
-			s, err := xray.StartXrayServer(mainCtx, cfg)
-			if err != nil {
-				cmdLogger.Fatalf("StartXrayServer meet err=%s", err)
-			}
-			defer s.Close() //nolint: errcheck
-
-			if cfg.SyncTrafficEndPoint != "" {
-				go func() {
-					cmdLogger.Fatalf("StartSyncTask meet err=%s", xray.StartSyncTask(mainCtx, cfg))
-				}()
-			}
-			<-ctx.Done()
-		}()
+		xrayS, err := xray.NewXrayServer(cfg)
+		if err != nil {
+			return err
+		}
+		if err := xrayS.Start(mainCtx); err != nil {
+			cmdLogger.Fatalf("StartXrayServer meet err=%v", err)
+		}
 	}
 
 	if len(cfg.RelayConfigs) > 0 {

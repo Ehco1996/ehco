@@ -7,6 +7,7 @@ import (
 	proxy "github.com/xtls/xray-core/app/proxyman/command"
 	"github.com/xtls/xray-core/common/serial"
 	"github.com/xtls/xray-core/proxy/shadowsocks"
+	"go.uber.org/zap"
 )
 
 func getEmailAndTrafficType(input string) (string, string) {
@@ -34,11 +35,11 @@ func AddInboundUser(ctx context.Context, c proxy.HandlerServiceClient, tag strin
 			&proxy.AddUserOperation{User: user.ToXrayUser()}),
 	})
 	if err != nil {
-		l.Error("Failed to Add User: %s To Server Tag: %s", user.GetEmail(), tag)
+		zap.L().Sugar().Named("xray").Errorf("Failed to Add User: %s To Server Tag: %s", user.GetEmail(), tag)
 		return err
 	}
 	user.running = true
-	l.Infof("Add User: %s To Server Tag: %s", user.GetEmail(), tag)
+	zap.L().Sugar().Named("xray").Infof("Add User: %s To Server Tag: %s", user.GetEmail(), tag)
 	return nil
 }
 
@@ -53,15 +54,15 @@ func RemoveInboundUser(ctx context.Context, c proxy.HandlerServiceClient, tag st
 
 	// mute not found error
 	if err != nil && strings.Contains(err.Error(), "not found") {
-		l.Warnf("User Not Found  %s", user.GetEmail())
+		zap.L().Sugar().Named("xray").Warnf("User Not Found  %s", user.GetEmail())
 		err = nil
 	}
 
 	if err != nil {
-		l.Error("Failed to Remove User: %s To Server", user.GetEmail())
+		zap.L().Sugar().Named("xray").Error("Failed to Remove User: %s To Server", user.GetEmail())
 		return err
 	}
 	user.running = false
-	l.Infof("[xray] Remove User: %v From Server", user.ID)
+	zap.L().Sugar().Named("xray").Infof("[xray] Remove User: %v From Server", user.ID)
 	return nil
 }

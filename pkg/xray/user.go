@@ -14,6 +14,7 @@ import (
 	"github.com/xtls/xray-core/common/serial"
 	"github.com/xtls/xray-core/proxy/shadowsocks"
 	"github.com/xtls/xray-core/proxy/trojan"
+	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -59,7 +60,7 @@ type SyncUserConfigsResp struct {
 	Users []*User `json:"users"`
 }
 
-// NOTE we user user id as email
+// NOTE we use user id as email
 func (u *User) GetEmail() string {
 	return fmt.Sprintf("%d", u.ID)
 }
@@ -102,6 +103,7 @@ func (u *User) ToXrayUser() *protocol.User {
 
 // UserPool user pool
 type UserPool struct {
+	l *zap.Logger
 	sync.RWMutex
 	// map key : ID
 	users map[int]*User
@@ -111,30 +113,25 @@ type UserPool struct {
 	statsClient stats.StatsServiceClient
 
 	br *bandwidthRecorder
+
+	proxyTags       []string
+	cancel          context.CancelFunc
+	grpcEndPoint    string
+	remoteConfigURL string
 }
 
-// NewUserPool New UserPool
-func NewUserPool(ctx context.Context, xrayEndPoint, metricURL string) (*UserPool, error) {
-	conn, err := grpc.DialContext(ctx, xrayEndPoint, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithBlock())
-	if err != nil {
-		return nil, err
-	}
-
-	// Init Client
-	proxyClient := proxy.NewHandlerServiceClient(conn)
-	statsClient := stats.NewStatsServiceClient(conn)
-	httpClient := http.Client{Timeout: 30 * time.Second}
-
+func NewUserPool(grpcEndPoint, remoteConfigURL, metricURL string, proxyTags []string) *UserPool {
 	up := &UserPool{
-		users:       make(map[int]*User),
-		httpClient:  &httpClient,
-		proxyClient: proxyClient,
-		statsClient: statsClient,
+		l:               zap.L().Named("user_pool"),
+		users:           make(map[int]*User),
+		proxyTags:       proxyTags,
+		grpcEndPoint:    grpcEndPoint,
+		remoteConfigURL: remoteConfigURL,
 	}
 	if metricURL != "" {
 		up.br = NewBandwidthRecorder(metricURL)
 	}
-	return up, nil
+	return up
 }
 
 func (up *UserPool) CreateUser(userId, level int, password, method, protocol string, enable bool) *User {
@@ -177,7 +174,7 @@ func (up *UserPool) GetAllUsers() []*User {
 	return users
 }
 
-func (up *UserPool) syncTrafficToServer(ctx context.Context, endpoint, tag string) error {
+func (up *UserPool) syncTrafficToServer(ctx context.Context, proxyTag string) error {
 	// sync traffic from xray server
 	// V2ray的stats的统计模块设计的非常奇怪，具体规则如下
 	// 上传流量："user>>>" + user.Email + ">>>traffic>>>uplink"
@@ -195,17 +192,17 @@ func (up *UserPool) syncTrafficToServer(ctx context.Context, endpoint, tag strin
 		}
 		user, found := up.GetUser(userID)
 		if !found {
-			l.Warnf(
+			up.l.Sugar().Warnf(
 				"user in xray not found in user pool this user maybe out of traffic, user id: %d, leak traffic: %d",
 				userID, stat.Value)
 			fakeUser := &User{ID: userID}
-			if err := RemoveInboundUser(ctx, up.proxyClient, tag, fakeUser); err != nil {
-				l.Warnf(
-					"tring remove leak user failed, user id: %d err: %s", userID, err.Error())
+			if err := RemoveInboundUser(ctx, up.proxyClient, proxyTag, fakeUser); err != nil {
+				up.l.Warn("tring remove leak user failed, user id: %d err: %s",
+					zap.Int("user_id", userID), zap.Error(err))
 			}
 			continue
 		}
-		// Note v2ray 只会统计 inbound 的流量，所以这里乘以2 以补偿 outbound 的流量
+		// Note v2ray 只会统计 inbound 的流量，所以这里乘 2 以补偿 outbound 的流量
 		switch trafficType {
 		case "uplink":
 			user.UploadTraffic = stat.Value * 2
@@ -218,7 +215,7 @@ func (up *UserPool) syncTrafficToServer(ctx context.Context, endpoint, tag strin
 	for _, user := range up.GetAllUsers() {
 		tf := user.DownloadTraffic + user.UploadTraffic
 		if tf > 0 {
-			l.Infof("User: %v Now Used Total Traffic: %v", user.ID, tf)
+			up.l.Sugar().Infof("User: %v Now Used Total Traffic: %v", user.ID, tf)
 			tfs = append(tfs, user.GenTraffic())
 			user.ResetTraffic()
 		}
@@ -235,7 +232,7 @@ func (up *UserPool) syncTrafficToServer(ctx context.Context, endpoint, tag strin
 		req.UploadBandwidth = int64(ub)
 		db := up.br.GetDownloadBandwidth()
 		req.DownloadBandwidth = int64(db)
-		l.Debug(
+		up.l.Sugar().Debug(
 			"Upload Bandwidth :", PrettyByteSize(ub),
 			"Download Bandwidth :", PrettyByteSize(db),
 			"Total Bandwidth :", PrettyByteSize(ub+db),
@@ -243,16 +240,16 @@ func (up *UserPool) syncTrafficToServer(ctx context.Context, endpoint, tag strin
 			"Total Increment By Xray :", PrettyByteSize(float64(req.GetTotalTraffic())),
 		)
 	}
-	if err := postJson(up.httpClient, endpoint, req); err != nil {
+	if err := postJson(up.httpClient, up.remoteConfigURL, req); err != nil {
 		return err
 	}
-	l.Infof("Call syncTrafficToServer ONLINE USER COUNT: %d", len(tfs))
+	up.l.Sugar().Infof("Call syncTrafficToServer ONLINE USER COUNT: %d", len(tfs))
 	return nil
 }
 
-func (up *UserPool) syncUserConfigsFromServer(ctx context.Context, endpoint, tag string) error {
+func (up *UserPool) syncUserConfigsFromServer(ctx context.Context, proxyTag string) error {
 	resp := SyncUserConfigsResp{}
-	if err := getJson(up.httpClient, endpoint, &resp); err != nil {
+	if err := getJson(up.httpClient, up.remoteConfigURL, &resp); err != nil {
 		return err
 	}
 	userM := make(map[int]struct{})
@@ -262,7 +259,7 @@ func (up *UserPool) syncUserConfigsFromServer(ctx context.Context, endpoint, tag
 			newUser := up.CreateUser(
 				newUser.ID, newUser.Level, newUser.Password, newUser.Method, newUser.Protocol, newUser.Enable)
 			if newUser.Enable {
-				if err := AddInboundUser(ctx, up.proxyClient, tag, newUser); err != nil {
+				if err := AddInboundUser(ctx, up.proxyClient, proxyTag, newUser); err != nil {
 					return err
 				}
 			}
@@ -271,13 +268,13 @@ func (up *UserPool) syncUserConfigsFromServer(ctx context.Context, endpoint, tag
 			if !oldUser.Equal(newUser) {
 				oldUser.UpdateFromServer(newUser)
 				if oldUser.running {
-					if err := RemoveInboundUser(ctx, up.proxyClient, tag, oldUser); err != nil {
+					if err := RemoveInboundUser(ctx, up.proxyClient, proxyTag, oldUser); err != nil {
 						return err
 					}
 				}
 			}
 			if oldUser.Enable && !oldUser.running {
-				if err := AddInboundUser(ctx, up.proxyClient, tag, oldUser); err != nil {
+				if err := AddInboundUser(ctx, up.proxyClient, proxyTag, oldUser); err != nil {
 					return err
 				}
 			}
@@ -287,7 +284,7 @@ func (up *UserPool) syncUserConfigsFromServer(ctx context.Context, endpoint, tag
 	// remove user not in server
 	for _, user := range up.GetAllUsers() {
 		if _, ok := userM[user.ID]; !ok {
-			if err := RemoveInboundUser(ctx, up.proxyClient, tag, user); err != nil {
+			if err := RemoveInboundUser(ctx, up.proxyClient, proxyTag, user); err != nil {
 				return err
 			}
 			up.RemoveUser(user.ID)
@@ -296,24 +293,53 @@ func (up *UserPool) syncUserConfigsFromServer(ctx context.Context, endpoint, tag
 	return nil
 }
 
-func (up *UserPool) StartSyncUserTask(ctx context.Context, endpoint, tag string) {
-	l.Infof("Start Sync User Task")
-	syncOnce := func() {
-		if err := up.syncUserConfigsFromServer(ctx, endpoint, tag); err != nil {
-			l.Errorf("Sync User Configs From Server Error: %v", err)
-		}
-		if err := up.syncTrafficToServer(ctx, endpoint, tag); err != nil {
-			l.Errorf("Sync Traffic From Server Error: %v", err)
-		}
+func (up *UserPool) Start(ctx context.Context) error {
+	conn, err := grpc.DialContext(
+		context.Background(), up.grpcEndPoint, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithBlock())
+	if err != nil {
+		return err
 	}
-	syncOnce()
-	ticker := time.NewTicker(time.Second * SyncTime)
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			syncOnce()
+	up.proxyClient = proxy.NewHandlerServiceClient(conn)
+	up.statsClient = stats.NewStatsServiceClient(conn)
+	up.httpClient = &http.Client{Timeout: time.Second * 10}
+
+	syncOnce := func() error {
+		for _, tag := range up.proxyTags {
+			if err := up.syncUserConfigsFromServer(ctx, tag); err != nil {
+				up.l.Sugar().Errorf("Sync User Configs From Server Error: %v", err)
+				return err
+			}
+			if err := up.syncTrafficToServer(ctx, tag); err != nil {
+				up.l.Sugar().Errorf("Sync Traffic From Server Error: %v", err)
+				return err
+			}
 		}
+		return nil
+	}
+	if err := syncOnce(); err != nil {
+		return err
+	}
+
+	ctx2, cancel := context.WithCancel(ctx)
+	up.cancel = cancel
+	go func() {
+		ticker := time.NewTicker(time.Second * SyncTime)
+		for {
+			select {
+			case <-ctx2.Done():
+				return
+			case <-ticker.C:
+				if err := syncOnce(); err != nil {
+					up.l.Error("Sync User Configs From Server Error: %v", zap.Error(err))
+				}
+			}
+		}
+	}()
+	return nil
+}
+
+func (up *UserPool) Stop() {
+	if up.cancel != nil {
+		up.cancel()
 	}
 }

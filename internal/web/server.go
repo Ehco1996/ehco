@@ -21,9 +21,9 @@ import (
 
 var l *zap.SugaredLogger
 
-func MakeIndexF(logger *zap.SugaredLogger) http.HandlerFunc {
+func MakeIndexF() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		logger.Infof("index call from %s", r.RemoteAddr)
+		l.Infof("index call from %s", r.RemoteAddr)
 		fmt.Fprintf(w, "access from %s \n", r.RemoteAddr)
 	}
 }
