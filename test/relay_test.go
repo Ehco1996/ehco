@@ -48,7 +48,7 @@ func init() {
 
 	cfg := config.Config{
 		PATH: "",
-		RelayConfigs: []config.RelayConfig{
+		RelayConfigs: []*config.RelayConfig{
 			// raw cfg
 			{
 				Listen:        RAW_LISTEN,
@@ -120,8 +120,8 @@ func init() {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		go func(ctx context.Context, c config.RelayConfig) {
-			r, err := relay.NewRelay(&c)
+		go func(ctx context.Context, c *config.RelayConfig) {
+			r, err := relay.NewRelay(c)
 			if err != nil {
 				log.Logger.Fatal(err)
 			}

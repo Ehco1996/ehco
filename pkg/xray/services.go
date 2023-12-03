@@ -34,11 +34,11 @@ func AddInboundUser(ctx context.Context, c proxy.HandlerServiceClient, tag strin
 			&proxy.AddUserOperation{User: user.ToXrayUser()}),
 	})
 	if err != nil {
-		l.Error("Failed to Add User: %s To Server Tag: %s", user.GetEmail(), tag)
+		// l.Error("Failed to Add User: %s To Server Tag: %s", user.GetEmail(), tag)
 		return err
 	}
 	user.running = true
-	l.Infof("Add User: %s To Server Tag: %s", user.GetEmail(), tag)
+	// l.Infof("Add User: %s To Server Tag: %s", user.GetEmail(), tag)
 	return nil
 }
 
@@ -53,15 +53,15 @@ func RemoveInboundUser(ctx context.Context, c proxy.HandlerServiceClient, tag st
 
 	// mute not found error
 	if err != nil && strings.Contains(err.Error(), "not found") {
-		l.Warnf("User Not Found  %s", user.GetEmail())
+		// l.Warnf("User Not Found  %s", user.GetEmail())
 		err = nil
 	}
 
 	if err != nil {
-		l.Error("Failed to Remove User: %s To Server", user.GetEmail())
+		// l.Error("Failed to Remove User: %s To Server", user.GetEmail())
 		return err
 	}
 	user.running = false
-	l.Infof("[xray] Remove User: %v From Server", user.ID)
+	// l.Infof("[xray] Remove User: %v From Server", user.ID)
 	return nil
 }

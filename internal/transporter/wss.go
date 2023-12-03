@@ -44,7 +44,7 @@ type WSSServer struct {
 func NewWSSServer(listenAddr string, raw *Raw, l *zap.SugaredLogger) *WSSServer {
 	s := &WSSServer{raw: raw, L: l}
 	mux := mux.NewRouter()
-	mux.HandleFunc("/", web.MakeIndexF(l))
+	mux.HandleFunc("/", web.MakeIndexF())
 	mux.HandleFunc("/wss/", s.HandleRequest)
 
 	s.httpServer = &http.Server{

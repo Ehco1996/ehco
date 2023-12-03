@@ -38,7 +38,7 @@ type WSServer struct {
 func NewWSServer(listenAddr string, raw *Raw, l *zap.SugaredLogger) *WSServer {
 	s := &WSServer{raw: raw, L: l}
 	mux := mux.NewRouter()
-	mux.HandleFunc("/", web.MakeIndexF(l))
+	mux.HandleFunc("/", web.MakeIndexF())
 	mux.HandleFunc("/ws/", s.HandleRequest)
 	s.httpServer = &http.Server{
 		Addr:              listenAddr,
