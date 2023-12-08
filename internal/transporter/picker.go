@@ -5,7 +5,7 @@ import (
 
 	"github.com/Ehco1996/ehco/internal/constant"
 	"github.com/Ehco1996/ehco/internal/lb"
-	"github.com/Ehco1996/ehco/pkg/log"
+	"go.uber.org/zap"
 )
 
 // RelayTransporter
@@ -24,7 +24,7 @@ func PickTransporter(transType string, tcpRemotes, udpRemotes lb.RoundRobin) Rel
 		TCPRemotes:     tcpRemotes,
 		UDPRemotes:     udpRemotes,
 		UDPBufferChMap: make(map[string]*BufferCh),
-		L:              log.Logger.Named(transType),
+		L:              zap.S().Named(transType),
 	}
 	switch transType {
 	case constant.Transport_RAW:

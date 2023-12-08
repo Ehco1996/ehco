@@ -12,6 +12,7 @@ import (
 	"github.com/Ehco1996/ehco/internal/relay"
 	"github.com/Ehco1996/ehco/internal/tls"
 	"github.com/Ehco1996/ehco/pkg/log"
+	"go.uber.org/zap"
 )
 
 const (
@@ -116,6 +117,8 @@ func init() {
 		},
 	}
 
+	logger, _ := zap.NewDevelopment()
+
 	for _, c := range cfg.RelayConfigs {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
@@ -123,9 +126,9 @@ func init() {
 		go func(ctx context.Context, c *config.RelayConfig) {
 			r, err := relay.NewRelay(c)
 			if err != nil {
-				log.Logger.Fatal(err)
+				logger.Sugar().Fatal(err)
 			}
-			log.Logger.Fatal(r.ListenAndServe())
+			logger.Sugar().Fatal(r.ListenAndServe())
 		}(ctx, c)
 	}
 
@@ -151,14 +154,15 @@ func TestRelayOverRaw(t *testing.T) {
 }
 
 func TestRelayWithDeadline(t *testing.T) {
+	logger, _ := zap.NewDevelopment()
 	msg := []byte("hello")
 	conn, err := net.Dial("tcp", RAW_LISTEN)
 	if err != nil {
-		log.Logger.Fatal(err)
+		logger.Sugar().Fatal(err)
 	}
 	defer conn.Close()
 	if _, err := conn.Write(msg); err != nil {
-		log.Logger.Fatal(err)
+		logger.Sugar().Fatal(err)
 	}
 
 	buf := make([]byte, len(msg))
@@ -166,7 +170,7 @@ func TestRelayWithDeadline(t *testing.T) {
 	time.Sleep(constant.IdleTimeOut)
 	_, err = conn.Read(buf)
 	if err != nil {
-		log.Logger.Fatal("need error here")
+		logger.Sugar().Fatal("need error here")
 	}
 }
 

@@ -10,7 +10,6 @@ import (
 	"github.com/Ehco1996/ehco/internal/lb"
 	"github.com/Ehco1996/ehco/internal/transporter"
 	"github.com/Ehco1996/ehco/internal/web"
-	"github.com/Ehco1996/ehco/pkg/log"
 	"go.uber.org/zap"
 )
 
@@ -69,7 +68,7 @@ func NewRelay(cfg *config.RelayConfig) (*Relay, error) {
 			lb.NewRoundRobin(tcpNodeList),
 			lb.NewRoundRobin(udpNodeList),
 		),
-		L: log.Logger.Named("relay"),
+		L: zap.S().Named("relay"),
 	}
 	r.Name = fmt.Sprintf("<At=%s Over=%s TCP-To=%s UDP-To=%s Through=%s>",
 		r.LocalTCPAddr, r.ListenType, r.cfg.TCPRemotes, r.cfg.UDPRemotes, r.TransportType)

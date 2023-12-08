@@ -8,7 +8,6 @@ import (
 
 	"github.com/Ehco1996/ehco/internal/config"
 	"github.com/Ehco1996/ehco/internal/constant"
-	"github.com/Ehco1996/ehco/pkg/log"
 	"github.com/alecthomas/kingpin/v2"
 	"github.com/gorilla/mux"
 	"github.com/prometheus/client_golang/prometheus"
@@ -106,7 +105,7 @@ func simpleTokenAuthMiddleware(token string, h http.Handler) http.Handler {
 
 func StartWebServer(cfg *config.Config) error {
 	// todo make this only doing once
-	l = log.Logger.Named("web")
+	l = zap.S().Named("web")
 	// end todo
 
 	addr := fmt.Sprintf("0.0.0.0:%d", cfg.WebPort)

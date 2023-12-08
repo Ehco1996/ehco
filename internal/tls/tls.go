@@ -12,7 +12,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/Ehco1996/ehco/pkg/log"
+	"go.uber.org/zap"
 )
 
 // pre built in tls cert
@@ -88,30 +88,30 @@ func generateKeyPair() (rawCert, rawKey []byte, err error) {
 		certOut, err := os.Create(CertFileName)
 		if err != nil {
 			// todo fix logger
-			log.Logger.Fatalf("failed to open cert.pem for writing: %s", err)
+			zap.S().Fatalf("failed to open cert.pem for writing: %s", err)
 		}
 		if err = pem.Encode(certOut, &pem.Block{Type: "CERTIFICATE", Bytes: derBytes}); err != nil {
-			log.Logger.Info("failed to pem encode:", err)
+			zap.S().Info("failed to pem encode:", err)
 		}
 		if err := certOut.Close(); err != nil {
-			log.Logger.Error("error closing cert.pem:", err)
+			zap.S().Error("error closing cert.pem:", err)
 			return nil, nil, err
 		}
-		log.Logger.Infof("write cert to %s", CertFileName)
+		zap.S().Infof("write cert to %s", CertFileName)
 	}
 	if KeyFileName != "" {
 		keyOut, err := os.OpenFile(KeyFileName, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
 		if err != nil {
-			log.Logger.Info("failed to open key.pem for writing:", err)
+			zap.S().Info("failed to open key.pem for writing:", err)
 		}
 		if err = pem.Encode(keyOut, mustPemBlockForKey(priv)); err != nil {
-			log.Logger.Info("failed to pem encode:", err)
+			zap.S().Info("failed to pem encode:", err)
 		}
 		if err := keyOut.Close(); err != nil {
-			log.Logger.Error("error closing key.pem:", err)
+			zap.S().Error("error closing key.pem:", err)
 			return nil, nil, err
 		}
-		log.Logger.Infof("write key to %s", KeyFileName)
+		zap.S().Infof("write key to %s", KeyFileName)
 	}
 	return
 }
@@ -123,7 +123,7 @@ func mustPemBlockForKey(priv interface{}) *pem.Block {
 	case *ecdsa.PrivateKey:
 		b, err := x509.MarshalECPrivateKey(k)
 		if err != nil {
-			log.Logger.Errorf("Unable to marshal ECDSA private key: %v", err)
+			zap.S().Errorf("Unable to marshal ECDSA private key: %v", err)
 		}
 		return &pem.Block{Type: "EC PRIVATE KEY", Bytes: b}
 	default:

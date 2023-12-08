@@ -80,7 +80,7 @@ type Config struct {
 }
 
 func NewConfig(path string) *Config {
-	return &Config{PATH: path, RelayConfigs: []*RelayConfig{}, L: zap.L().Sugar().Named("cfg")}
+	return &Config{PATH: path, RelayConfigs: []*RelayConfig{}, L: zap.S().Named("cfg")}
 }
 
 func (c *Config) NeedSyncUserFromServer() bool {

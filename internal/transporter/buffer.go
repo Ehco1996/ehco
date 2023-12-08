@@ -9,10 +9,10 @@ import (
 	"time"
 
 	"go.uber.org/atomic"
+	"go.uber.org/zap"
 
 	"github.com/Ehco1996/ehco/internal/constant"
 	"github.com/Ehco1996/ehco/internal/web"
-	"github.com/Ehco1996/ehco/pkg/log"
 	"github.com/xtaci/smux"
 )
 
@@ -110,7 +110,7 @@ func transport(conn1, conn2 net.Conn, remote string) error {
 	// conn2 to conn1
 	_, err := io.Copy(WriteOnlyMetricsWriter{Writer: conn2, remoteLabel: remote}, ReadOnlyMetricsReader{Reader: conn1, remoteLabel: remote})
 	if err2 := MuteErr(err); err2 != nil {
-		log.Logger.Errorf("from:%s to:%s meet error:%s", conn2.LocalAddr(), conn1.RemoteAddr(), err2.Error())
+		zap.S().Errorf("from:%s to:%s meet error:%s", conn2.LocalAddr(), conn1.RemoteAddr(), err2.Error())
 	}
 	_ = conn2.SetReadDeadline(time.Now().Add(constant.IdleTimeOut)) // unblock read on conn2
 	return MuteErr(<-errCH)

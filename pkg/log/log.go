@@ -8,15 +8,12 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
-var (
-	Logger *zap.SugaredLogger
-	doOnce sync.Once
-)
+var doOnce sync.Once
 
-func initLogger(logLevel string) (*zap.SugaredLogger, error) {
+func initLogger(logLevel string) error {
 	level := zapcore.InfoLevel
 	if err := level.UnmarshalText([]byte(logLevel)); err != nil {
-		return nil, err
+		return err
 	}
 	writers := []zapcore.WriteSyncer{zapcore.AddSync(os.Stdout)}
 	encoder := zapcore.EncoderConfig{
@@ -35,21 +32,13 @@ func initLogger(logLevel string) (*zap.SugaredLogger, error) {
 	)
 	l := zap.New(core)
 	zap.ReplaceGlobals(l)
-	return l.Sugar(), nil
+	return nil
 }
 
 func InitGlobalLogger(logLevel string) error {
 	var err error
 	doOnce.Do(func() {
-		Logger, err = initLogger(logLevel)
+		err = initLogger(logLevel)
 	})
 	return err
-}
-
-func MustNewInfoLogger(name string) *zap.SugaredLogger {
-	l, err := initLogger("info")
-	if err != nil {
-		panic(err)
-	}
-	return l.Named(name)
 }

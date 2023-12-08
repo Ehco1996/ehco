@@ -376,7 +376,7 @@ func initLogger(cfg *config.Config) error {
 }
 
 func start(ctx *cli.Context) error {
-	cmdLogger = log.MustNewInfoLogger("cmd")
+	cmdLogger = zap.NewExample().Sugar().Named("cmd")
 
 	cfg, err := loadConfig()
 	if err != nil {
