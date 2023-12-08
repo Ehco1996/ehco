@@ -376,8 +376,6 @@ func initLogger(cfg *config.Config) error {
 }
 
 func start(ctx *cli.Context) error {
-	cmdLogger = zap.NewExample().Sugar().Named("cmd")
-
 	cfg, err := loadConfig()
 	if err != nil {
 		return err
@@ -431,6 +429,13 @@ func main() {
 			sentry.Flush(time.Second * 5)
 		}
 	}()
+
+	l, err := log.NewLogger("info")
+	if err != nil {
+		println("init logger failed,err=", err)
+		os.Exit(2)
+	}
+	cmdLogger = l.Sugar()
 
 	app := createCliAPP()
 	// register start command

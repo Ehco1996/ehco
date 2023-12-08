@@ -10,10 +10,10 @@ import (
 
 var doOnce sync.Once
 
-func initLogger(logLevel string) error {
+func initLogger(logLevel string, replaceGlobal bool) (*zap.Logger, error) {
 	level := zapcore.InfoLevel
 	if err := level.UnmarshalText([]byte(logLevel)); err != nil {
-		return err
+		return nil, err
 	}
 	writers := []zapcore.WriteSyncer{zapcore.AddSync(os.Stdout)}
 	encoder := zapcore.EncoderConfig{
@@ -32,13 +32,17 @@ func initLogger(logLevel string) error {
 	)
 	l := zap.New(core)
 	zap.ReplaceGlobals(l)
-	return nil
+	return l, nil
 }
 
 func InitGlobalLogger(logLevel string) error {
 	var err error
 	doOnce.Do(func() {
-		err = initLogger(logLevel)
+		_, err = initLogger(logLevel, true)
 	})
 	return err
+}
+
+func NewLogger(logLevel string) (*zap.Logger, error) {
+	return initLogger(logLevel, false)
 }
