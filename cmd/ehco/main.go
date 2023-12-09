@@ -271,7 +271,7 @@ func startRelayServers(ctx context.Context, cfg *config.Config) error {
 }
 
 func watchAndReloadRelayConfig(ctx context.Context, curCfg *config.Config, relayM *sync.Map, errCh chan error) {
-	cmdLogger.Infof("Start to watch config file: %s ", ConfigPath)
+	cmdLogger.Infof("Start to watch relay config %s ", ConfigPath)
 	reladRelay := func() error {
 		newCfg, err := loadConfig()
 		if err != nil {
@@ -340,7 +340,6 @@ func watchAndReloadRelayConfig(ctx context.Context, curCfg *config.Config, relay
 				case <-ctx.Done():
 					return
 				case <-ticker.C:
-					cmdLogger.Info("Now Reloading Relay Conf By Ticker! ")
 					reloadCH <- struct{}{}
 				}
 			}
@@ -402,18 +401,18 @@ func start(ctx *cli.Context) error {
 	}
 
 	if cfg.XRayConfig != nil {
-		xrayS, err := xray.NewXrayServer(cfg)
-		if err != nil {
-			return err
+		xrayS := xray.NewXrayServer(cfg)
+		if err := xrayS.Setup(); err != nil {
+			cmdLogger.Fatalf("Setup XrayServer meet err=%v", err)
 		}
 		if err := xrayS.Start(mainCtx); err != nil {
-			cmdLogger.Fatalf("StartXrayServer meet err=%v", err)
+			cmdLogger.Fatalf("Start XrayServer meet err=%v", err)
 		}
 	}
 
 	if len(cfg.RelayConfigs) > 0 {
 		go func() {
-			cmdLogger.Fatalf("StartRelayServers meet err=%v", startRelayServers(mainCtx, cfg))
+			cmdLogger.Fatalf("Start RelayServers meet err=%v", startRelayServers(mainCtx, cfg))
 		}()
 	}
 

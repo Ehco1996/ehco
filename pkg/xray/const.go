@@ -9,6 +9,9 @@ const (
 	XraySSRProxyTag    = "ssr_proxy"
 
 	SyncTime = 60
+
+	ProtocolSS     = "ss"
+	ProtocolTrojan = "trojan"
 )
 
 func InProxyTags(tag string) bool {

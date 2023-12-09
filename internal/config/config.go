@@ -105,7 +105,7 @@ func (c *Config) readFromFile() error {
 	if err != nil {
 		return err
 	}
-	c.L.Infof("Load Config From file: %s", c.PATH)
+	c.L.Infof("Load Config From File: %s", c.PATH)
 	if err != nil {
 		return err
 	}

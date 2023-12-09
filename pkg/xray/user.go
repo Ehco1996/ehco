@@ -93,15 +93,17 @@ func (u *User) Equal(new *User) bool {
 func (u *User) ToXrayUser() *protocol.User {
 	var account *serial.TypedMessage
 	switch u.Protocol {
-	case "trojan":
+	case ProtocolTrojan:
 		account = serial.ToTypedMessage(&trojan.Account{Password: u.Password})
-	default:
+	case ProtocolSS:
 		account = serial.ToTypedMessage(&shadowsocks.Account{CipherType: mappingCipher(u.Method), Password: u.Password})
+	default:
+		zap.S().DPanicf("unknown protocol %s", u.Protocol)
+		return nil
 	}
 	return &protocol.User{Level: uint32(u.Level), Email: u.GetEmail(), Account: account}
 }
 
-// UserPool user pool
 type UserPool struct {
 	l *zap.Logger
 	sync.RWMutex

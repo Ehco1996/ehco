@@ -47,21 +47,26 @@ type XrayServer struct {
 	up       *UserPool
 	fallBack *http.Server
 	instance *core.Instance
+
+	mainCtx context.Context
 }
 
-func NewXrayServer(cfg *config.Config) (*XrayServer, error) {
-	xs := &XrayServer{l: zap.L().Named("xray"), cfg: cfg}
-	coreCfg, err := buildXrayInstanceCfg(cfg.XRayConfig)
+func NewXrayServer(cfg *config.Config) *XrayServer {
+	return &XrayServer{l: zap.L().Named("xray"), cfg: cfg}
+}
+
+func (xs *XrayServer) Setup() error {
+	coreCfg, err := buildXrayInstanceCfg(xs.cfg.XRayConfig)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	for _, inbound := range coreCfg.Inbound {
 		if inbound.Tag == XrayTrojanProxyTag {
 			ins, err := inbound.ProxySettings.GetInstance()
 			if err != nil {
-				return nil, err
+				return err
 			}
-			// // add fake fallback http server
+			// add fake fallback http server
 			s := ins.(*trojan.ServerConfig)
 			if len(s.Fallbacks) > 0 {
 				dest := s.Fallbacks[0].Dest
@@ -74,7 +79,7 @@ func NewXrayServer(cfg *config.Config) (*XrayServer, error) {
 	}
 	instance, err := core.New(coreCfg)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	xs.instance = instance
 
@@ -91,39 +96,42 @@ func NewXrayServer(cfg *config.Config) (*XrayServer, error) {
 			}
 		}
 		if grpcEndPoint == "" {
-			return nil, errors.New("can't find api port in config")
+			return errors.New("can't find api port in config")
 		}
 		if len(proxyTags) == 0 {
-			return nil, errors.New("can't find proxy tag in config")
+			return errors.New("can't find proxy tag in config")
 		}
 		xs.up = NewUserPool(grpcEndPoint, xs.cfg.SyncTrafficEndPoint, xs.cfg.GetMetricURL(), proxyTags)
 	}
-	return xs, nil
+	return nil
 }
 
-//nolint:errcheck
 func (xs *XrayServer) Stop() {
-	if xs.up != nil {
-		xs.up.Stop()
-	}
+	xs.l.Warn("Stop Xray Server now...")
 	if xs.instance != nil {
-		xs.instance.Close()
+		if err := xs.instance.Close(); err != nil {
+			xs.l.Error("stop instance meet error", zap.Error(err))
+		}
 	}
 	if xs.fallBack != nil {
-		xs.fallBack.Close()
+		if err := xs.fallBack.Close(); err != nil {
+			xs.l.Error("stop fallback server meet error", zap.Error(err))
+		}
+	}
+	if xs.up != nil {
+		xs.up.Stop()
 	}
 }
 
 func (xs *XrayServer) Start(ctx context.Context) error {
+	xs.l.Info("Start Xray Server now...")
 	if err := xs.instance.Start(); err != nil {
 		return err
 	}
-	xs.l.Info("Start Xray Server")
 	if xs.up != nil {
 		if err := xs.up.Start(ctx); err != nil {
 			return err
 		}
-		xs.l.Info("Start Xray User Pool")
 	}
 
 	if xs.cfg.ReloadInterval > 0 {
@@ -135,48 +143,71 @@ func (xs *XrayServer) Start(ctx context.Context) error {
 				case <-ctx.Done():
 					return
 				case <-ticker.C:
-					if err := xs.ReloadProxyInbound(); err != nil {
+					newCfg := config.NewConfig(xs.cfg.PATH)
+					if err := newCfg.LoadConfig(); err != nil {
 						xs.l.Error("Reload Config meet error", zap.Error(err))
+					}
+					if needReload, err := xs.needReload(newCfg); err != nil {
+						xs.l.Error("check need reload meet error", zap.Error(err))
+					} else {
+						if needReload {
+							xs.cfg = newCfg
+							if err := xs.Reload(); err != nil {
+								xs.l.Error("Reload Xray Server meet error", zap.Error(err))
+							}
+							xs.l.Warn("Reload Xray Server success exit watcher ...")
+							return
+						}
 					}
 				}
 			}
 		}()
 	}
+	if xs.mainCtx == nil {
+		xs.mainCtx = ctx
+	}
 	return nil
 }
 
-func (xs *XrayServer) ReloadProxyInbound() error {
-	// todo: implement reload proxy inbound
-	// 1. close old proxy inbound when not in new config
-	// 2. add new proxy inbound when not in old config
-	// 3. update proxy inbound when port changed
-	oldCfgM := make(map[string]*conf.InboundDetourConfig)
+func (xs *XrayServer) needReload(newCfg *config.Config) (bool, error) {
+	oldCfgM := make(map[string]conf.InboundDetourConfig)
 	for _, inbound := range xs.cfg.XRayConfig.InboundConfigs {
 		if InProxyTags(inbound.Tag) {
-			oldCfgM[inbound.Tag] = &inbound
+			oldCfgM[inbound.Tag] = inbound
 		}
 	}
+	for _, newInbound := range newCfg.XRayConfig.InboundConfigs {
+		if !InProxyTags(newInbound.Tag) {
+			continue
+		}
+		oldInbound, ok := oldCfgM[newInbound.Tag]
+		if !ok {
+			xs.l.Info("find new inbound config, need restart instance", zap.String("tag", newInbound.Tag))
+			return true, nil
+		}
+		oldListen := fmt.Sprintf("%s,%s", oldInbound.ListenOn.Address.String(), oldInbound.PortList.Build().String())
+		newListen := fmt.Sprintf("%s,%s", newInbound.ListenOn.Address.String(), newInbound.PortList.Build().String())
+		xs.l.Debug("check listen port",
+			zap.String("old", oldListen), zap.String("new", newListen), zap.String("tag", newInbound.Tag))
+		if oldListen != newListen {
+			xs.l.Warn("find listener changed reload inbound now...",
+				zap.String("old", oldListen),
+				zap.String("new", newListen),
+				zap.String("tag", newInbound.Tag))
+			return true, nil
+		}
+	}
+	return false, nil
+}
 
-	newCfg := config.NewConfig(xs.cfg.PATH)
-	if err := newCfg.LoadConfig(); err != nil {
-		xs.l.Error("Reload Config meet error", zap.Error(err))
+func (xs *XrayServer) Reload() error {
+	xs.l.Warn("Reload Xray Server now...")
+	xs.Stop()
+	if err := xs.Setup(); err != nil {
 		return err
 	}
-	for _, inbound := range newCfg.XRayConfig.InboundConfigs {
-		if !InProxyTags(inbound.Tag) {
-			continue
-		}
-		oldCfg, ok := oldCfgM[inbound.Tag]
-		if !ok {
-			xs.l.Info("find new inbound config", zap.String("tag", inbound.Tag))
-			continue
-		}
-		if oldCfg.PortList.Build().String() != inbound.PortList.Build().String() {
-			xs.l.Warn("find listen port changed, need restart xray server",
-				zap.String("old", oldCfg.PortList.Build().String()),
-				zap.String("new", inbound.PortList.Build().String()),
-				zap.String("tag", inbound.Tag))
-		}
+	if err := xs.Start(xs.mainCtx); err != nil {
+		return err
 	}
 	return nil
 }
