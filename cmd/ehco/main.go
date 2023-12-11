@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/http"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -229,7 +230,9 @@ func inArray(ele string, array []string) bool {
 
 func startOneRelay(r *relay.Relay, relayM *sync.Map, errCh chan error) {
 	relayM.Store(r.Name, r)
-	if err := r.ListenAndServe(); err != nil && !errors.Is(err, net.ErrClosed) { // mute use closed network error
+	// mute closed network error for tcp server and mute http.ErrServerClosed for http server when config reload
+	if err := r.ListenAndServe(); err != nil &&
+		!errors.Is(err, net.ErrClosed) && !errors.Is(err, http.ErrServerClosed) {
 		errCh <- err
 	}
 }
@@ -297,7 +300,7 @@ func watchAndReloadRelayConfig(ctx context.Context, curCfg *config.Config, relay
 				continue // no need to reload
 			}
 			// start bread new relay that not in old relayM
-			cmdLogger.Infof("starr new relay name=%s", r.Name)
+			cmdLogger.Infof("start new relay name=%s", r.Name)
 			go startOneRelay(r, relayM, errCh)
 		}
 		// closed relay not in new config
