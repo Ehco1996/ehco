@@ -128,6 +128,14 @@ func (xs *XrayServer) Start(ctx context.Context) error {
 	if err := xs.instance.Start(); err != nil {
 		return err
 	}
+	if xs.fallBack != nil {
+		go func() {
+			if err := xs.fallBack.ListenAndServe(); err != nil {
+				xs.l.Error("fallback server meet error", zap.Error(err))
+			}
+		}()
+	}
+
 	if xs.up != nil {
 		if err := xs.up.Start(ctx); err != nil {
 			return err

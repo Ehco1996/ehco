@@ -1,4 +1,5 @@
 {
+    "reload_interval": 1,
     "xray_config": {
         "stats": {},
         "api": {
@@ -27,6 +28,7 @@
         },
         "inbounds": [
             {
+                "listen": "127.0.0.1",
                 "port": 4443,
                 "protocol": "trojan",
                 "tag": "trojan_proxy",

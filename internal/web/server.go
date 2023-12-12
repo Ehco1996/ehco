@@ -18,11 +18,9 @@ import (
 	"go.uber.org/zap"
 )
 
-var l *zap.SugaredLogger
-
 func MakeIndexF() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		l.Infof("index call from %s", r.RemoteAddr)
+		zap.S().Named("web").Infof("index call from %s", r.RemoteAddr)
 		fmt.Fprintf(w, "access from %s \n", r.RemoteAddr)
 	}
 }
@@ -89,7 +87,7 @@ func simpleTokenAuthMiddleware(token string, h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if t := r.URL.Query().Get("token"); t != token {
 			msg := fmt.Sprintf("un auth request from %s", r.RemoteAddr)
-			l.Error(msg)
+			zap.S().Named("web").Error(msg)
 			hj, ok := w.(http.Hijacker)
 			if ok {
 				conn, _, _ := hj.Hijack()
@@ -104,12 +102,8 @@ func simpleTokenAuthMiddleware(token string, h http.Handler) http.Handler {
 }
 
 func StartWebServer(cfg *config.Config) error {
-	// todo make this only doing once
-	l = zap.S().Named("web")
-	// end todo
-
 	addr := fmt.Sprintf("0.0.0.0:%d", cfg.WebPort)
-	l.Infof("Start Web Server at http://%s/", addr)
+	zap.S().Named("web").Infof("Start Web Server at http://%s/", addr)
 
 	r := mux.NewRouter()
 	AttachProfiler(r)

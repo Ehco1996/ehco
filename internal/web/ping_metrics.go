@@ -9,6 +9,7 @@ import (
 	"github.com/Ehco1996/ehco/internal/config"
 	"github.com/go-ping/ping"
 	"github.com/prometheus/client_golang/prometheus"
+	"go.uber.org/zap"
 )
 
 var (
@@ -43,10 +44,10 @@ type PingGroup struct {
 func initPinger(host string) *ping.Pinger {
 	pinger := ping.New(host)
 	if err := pinger.Resolve(); err != nil {
-		l.Errorf("failed to resolve pinger host:%s err:%s\n", host, err.Error())
+		zap.S().Named("web").Errorf("failed to resolve pinger host:%s err:%s\n", host, err.Error())
 		return nil
 	}
-	l.Infof("Resolved %s as %s", host, pinger.IPAddr())
+	zap.S().Named("web").Infof("Resolved %s as %s", host, pinger.IPAddr())
 	pinger.Interval = pingInterval
 	pinger.Timeout = time.Duration(math.MaxInt64)
 	pinger.RecordRtts = false
@@ -84,11 +85,11 @@ func NewPingGroup(cfg *config.Config) *PingGroup {
 		pinger.OnRecv = func(pkt *ping.Packet) {
 			PingResponseDurationSeconds.WithLabelValues(
 				pkt.IPAddr.String(), pkt.Addr, labelMap[pkt.Addr]).Observe(pkt.Rtt.Seconds())
-			l.Infof("%d bytes from %s: icmp_seq=%d time=%v ttl=%v",
+			zap.S().Named("web").Infof("%d bytes from %s: icmp_seq=%d time=%v ttl=%v",
 				pkt.Nbytes, pkt.Addr, pkt.Seq, pkt.Rtt, pkt.Ttl)
 		}
 		pinger.OnDuplicateRecv = func(pkt *ping.Packet) {
-			l.Infof("%d bytes from %s: icmp_seq=%d time=%v ttl=%v (DUP!)",
+			zap.S().Named("web").Infof("%d bytes from %s: icmp_seq=%d time=%v ttl=%v (DUP!)",
 				pkt.Nbytes, pkt.IPAddr, pkt.Seq, pkt.Rtt, pkt.Ttl)
 		}
 		pingers[i] = pinger
@@ -123,14 +124,14 @@ func (pg *PingGroup) Run() {
 		return
 	}
 	splay := time.Duration(pingInterval.Nanoseconds() / int64(len(pg.Pingers)))
-	l.Infof("Waiting %s between starting pingers", splay)
+	zap.S().Named("web").Infof("Waiting %s between starting pingers", splay)
 	for idx := range pg.Pingers {
 		go func() {
 			pinger := pg.Pingers[idx]
 			if err := pinger.Run(); err != nil {
-				l.Infof("Starting prober err: %s", err)
+				zap.S().Named("web").Infof("Starting prober err: %s", err)
 			}
-			l.Infof("Starting prober for %s", pinger.Addr())
+			zap.S().Named("web").Infof("Starting prober for %s", pinger.Addr())
 		}()
 		time.Sleep(splay)
 	}
