@@ -120,7 +120,6 @@ func (raw *Raw) dialRemote(remote *lb.Node) (net.Conn, error) {
 	d := net.Dialer{Timeout: constant.DialTimeOut}
 	rc, err := d.Dial("tcp", remote.Address)
 	if err != nil {
-		raw.L.Errorf("dial error: %s", err)
 		return nil, err
 	}
 	return rc, nil
@@ -133,10 +132,10 @@ func (raw *Raw) HandleTCPConn(c net.Conn, remote *lb.Node) error {
 	defer c.Close()
 	t1 := time.Now()
 	rc, err := raw.dialRemote(remote)
-	web.HandShakeDuration.WithLabelValues(remote.Label).Observe(float64(time.Since(t1).Milliseconds()))
 	if err != nil {
 		return err
 	}
+	web.HandShakeDuration.WithLabelValues(remote.Label).Observe(float64(time.Since(t1).Milliseconds()))
 	raw.L.Infof("HandleTCPConn from %s to %s", c.RemoteAddr(), remote.Address)
 	defer rc.Close()
 	return transport(rc, c, remote.Label)

@@ -105,7 +105,7 @@ func (c *Config) readFromFile() error {
 	if err != nil {
 		return err
 	}
-	c.L.Infof("Load Config From File: %s", c.PATH)
+	c.L.Debugf("Load Config From File: %s", c.PATH)
 	if err != nil {
 		return err
 	}
@@ -119,7 +119,7 @@ func (c *Config) readFromHttp() error {
 		return err
 	}
 	defer r.Body.Close()
-	c.L.Infof("Load Config From HTTP: %s", c.PATH)
+	c.L.Debugf("Load Config From HTTP: %s", c.PATH)
 	return json.NewDecoder(r.Body).Decode(&c)
 }
 

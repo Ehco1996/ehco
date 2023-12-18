@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/Ehco1996/ehco/internal/constant"
 	"github.com/Ehco1996/ehco/internal/lb"
 	"github.com/Ehco1996/ehco/internal/web"
 	"github.com/gobwas/ws"
@@ -17,10 +18,18 @@ type Ws struct {
 	*Raw
 }
 
+func (s *Ws) dialRemote(remote *lb.Node) (net.Conn, error) {
+	d := ws.Dialer{Timeout: constant.DialTimeOut}
+	wsc, _, _, err := d.Dial(context.TODO(), remote.Address+"/ws/")
+	if err != nil {
+		return nil, err
+	}
+	return wsc, nil
+}
+
 func (s *Ws) HandleTCPConn(c net.Conn, remote *lb.Node) error {
 	defer c.Close()
-
-	wsc, _, _, err := ws.Dial(context.TODO(), remote.Address+"/ws/")
+	wsc, err := s.dialRemote(remote)
 	if err != nil {
 		return err
 	}
