@@ -61,6 +61,20 @@ func (bp *BytePool) Put(b []byte) {
 	}
 }
 
+type BufferCh struct {
+	Ch      chan []byte
+	Handled atomic.Bool
+	UDPAddr *net.UDPAddr
+}
+
+func newudpBufferCh(clientUDPAddr *net.UDPAddr) *BufferCh {
+	return &BufferCh{
+		Ch:      make(chan []byte, 100),
+		Handled: atomic.Bool{},
+		UDPAddr: clientUDPAddr,
+	}
+}
+
 type ReadOnlyMetricsReader struct {
 	io.Reader
 	remoteLabel string
@@ -88,7 +102,7 @@ func (w WriteOnlyMetricsWriter) Write(p []byte) (n int, err error) {
 }
 
 // mute broken pipe connection reset timeout err.
-func MuteErr(err error) error {
+func muteTransportErr(err error) error {
 	if errors.Is(err, syscall.ECONNRESET) ||
 		errors.Is(err, syscall.EPIPE) ||
 		errors.Is(err, smux.ErrTimeout) ||
@@ -102,30 +116,20 @@ func transport(conn1, conn2 net.Conn, remote string) error {
 	errCH := make(chan error, 1)
 	// conn1 to conn2
 	go func() {
-		_, err := io.Copy(WriteOnlyMetricsWriter{Writer: conn1, remoteLabel: remote}, ReadOnlyMetricsReader{Reader: conn2, remoteLabel: remote})
-		_ = conn1.SetReadDeadline(time.Now().Add(constant.IdleTimeOut)) // unblock read on conn1
+		_ = conn2.SetReadDeadline(time.Now().Add(constant.IdleTimeOut))
+		_, err := io.Copy(
+			WriteOnlyMetricsWriter{Writer: conn1, remoteLabel: remote},
+			ReadOnlyMetricsReader{Reader: conn2, remoteLabel: remote})
 		errCH <- err
 	}()
 
 	// conn2 to conn1
-	_, err := io.Copy(WriteOnlyMetricsWriter{Writer: conn2, remoteLabel: remote}, ReadOnlyMetricsReader{Reader: conn1, remoteLabel: remote})
-	if err2 := MuteErr(err); err2 != nil {
+	_ = conn1.SetReadDeadline(time.Now().Add(constant.IdleTimeOut))
+	_, err := io.Copy(
+		WriteOnlyMetricsWriter{Writer: conn2, remoteLabel: remote},
+		ReadOnlyMetricsReader{Reader: conn1, remoteLabel: remote})
+	if err2 := muteTransportErr(err); err2 != nil {
 		zap.S().Errorf("from:%s to:%s meet error:%s", conn2.LocalAddr(), conn1.RemoteAddr(), err2.Error())
 	}
-	_ = conn2.SetReadDeadline(time.Now().Add(constant.IdleTimeOut)) // unblock read on conn2
-	return MuteErr(<-errCH)
-}
-
-type BufferCh struct {
-	Ch      chan []byte
-	Handled atomic.Bool
-	UDPAddr *net.UDPAddr
-}
-
-func newudpBufferCh(clientUDPAddr *net.UDPAddr) *BufferCh {
-	return &BufferCh{
-		Ch:      make(chan []byte, 100),
-		Handled: atomic.Bool{},
-		UDPAddr: clientUDPAddr,
-	}
+	return muteTransportErr(<-errCH)
 }

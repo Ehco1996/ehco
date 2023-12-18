@@ -136,7 +136,7 @@ func (raw *Raw) HandleTCPConn(c net.Conn, remote *lb.Node) error {
 		return err
 	}
 	web.HandShakeDuration.WithLabelValues(remote.Label).Observe(float64(time.Since(t1).Milliseconds()))
-	raw.L.Infof("HandleTCPConn from %s to %s", c.RemoteAddr(), remote.Address)
+	raw.L.Infof("HandleTCPConn from %s to %s", c.LocalAddr(), remote.Address)
 	defer rc.Close()
-	return transport(rc, c, remote.Label)
+	return transport(c, rc, remote.Label)
 }
