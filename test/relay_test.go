@@ -12,6 +12,7 @@ import (
 	"github.com/Ehco1996/ehco/internal/relay"
 	"github.com/Ehco1996/ehco/internal/tls"
 	"github.com/Ehco1996/ehco/pkg/log"
+	"github.com/Ehco1996/ehco/test/echo"
 	"go.uber.org/zap"
 )
 
@@ -40,9 +41,9 @@ const (
 )
 
 func init() {
-	_ = log.InitGlobalLogger("info")
+	_ = log.InitGlobalLogger("debug")
 	// Start the new echo server.
-	go RunEchoServer(ECHO_HOST, ECHO_PORT)
+	go echo.RunEchoServer(ECHO_HOST, ECHO_PORT)
 
 	// init tls,make linter happy
 	_ = tls.InitTlsCfg()
@@ -116,8 +117,7 @@ func init() {
 			},
 		},
 	}
-
-	logger, _ := zap.NewDevelopment()
+	logger := zap.S()
 
 	for _, c := range cfg.RelayConfigs {
 		ctx, cancel := context.WithCancel(context.Background())
@@ -126,9 +126,9 @@ func init() {
 		go func(ctx context.Context, c *config.RelayConfig) {
 			r, err := relay.NewRelay(c)
 			if err != nil {
-				logger.Sugar().Fatal(err)
+				logger.Fatal(err)
 			}
-			logger.Sugar().Fatal(r.ListenAndServe())
+			logger.Fatal(r.ListenAndServe())
 		}(ctx, c)
 	}
 
@@ -139,14 +139,14 @@ func init() {
 func TestRelayOverRaw(t *testing.T) {
 	msg := []byte("hello")
 	// test tcp
-	res := SendTcpMsg(msg, RAW_LISTEN)
+	res := echo.SendTcpMsg(msg, RAW_LISTEN)
 	if string(res) != string(msg) {
 		t.Fatal(res)
 	}
 	t.Log("test tcp done!")
 
 	// test udp
-	res = SendUdpMsg(msg, RAW_LISTEN)
+	res = echo.SendUdpMsg(msg, RAW_LISTEN)
 	if string(res) != string(msg) {
 		t.Fatal(res)
 	}
@@ -177,7 +177,7 @@ func TestRelayWithDeadline(t *testing.T) {
 func TestRelayOverWs(t *testing.T) {
 	msg := []byte("hello")
 	// test tcp
-	res := SendTcpMsg(msg, WS_LISTEN)
+	res := echo.SendTcpMsg(msg, WS_LISTEN)
 	if string(res) != string(msg) {
 		t.Fatal(res)
 	}
@@ -187,7 +187,7 @@ func TestRelayOverWs(t *testing.T) {
 func TestRelayOverWss(t *testing.T) {
 	msg := []byte("hello")
 	// test tcp
-	res := SendTcpMsg(msg, WSS_LISTEN)
+	res := echo.SendTcpMsg(msg, WSS_LISTEN)
 	if string(res) != string(msg) {
 		t.Fatal(res)
 	}
@@ -202,7 +202,7 @@ func TestRelayOverMwss(t *testing.T) {
 	for i := 0; i < testCnt; i++ {
 		go func(i int) {
 			t.Logf("run no: %d test.", i)
-			res := SendTcpMsg(msg, MWSS_LISTEN)
+			res := echo.SendTcpMsg(msg, MWSS_LISTEN)
 			wg.Done()
 			if string(res) != string(msg) {
 				t.Log(res)
@@ -223,7 +223,7 @@ func TestRelayOverMTCP(t *testing.T) {
 	for i := 0; i < testCnt; i++ {
 		go func(i int) {
 			t.Logf("run no: %d test.", i)
-			res := SendTcpMsg(msg, MTCP_LISTEN)
+			res := echo.SendTcpMsg(msg, MTCP_LISTEN)
 			wg.Done()
 			if string(res) != string(msg) {
 				t.Log(res)
@@ -238,7 +238,7 @@ func TestRelayOverMTCP(t *testing.T) {
 func BenchmarkTcpRelay(b *testing.B) {
 	msg := []byte("hello")
 	for i := 0; i <= b.N; i++ {
-		res := SendTcpMsg(msg, RAW_LISTEN)
+		res := echo.SendTcpMsg(msg, RAW_LISTEN)
 		if string(res) != string(msg) {
 			b.Fatal(res)
 		}

@@ -1,4 +1,4 @@
-package test
+package echo
 
 import (
 	"fmt"
@@ -10,24 +10,24 @@ import (
 	"time"
 )
 
-// TODO support random timeouts
 func echo(conn net.Conn) {
 	defer conn.Close()
 	defer fmt.Println("conn closed", conn.RemoteAddr().String())
-
+	buf := make([]byte, 10)
 	for {
-		buf := make([]byte, 512)
 		i, err := conn.Read(buf)
 		if err == io.EOF {
+			fmt.Println("read eof")
 			return
 		}
 		if err != nil {
-			fmt.Println(err)
-			continue
+			fmt.Println(err.Error())
+			return
 		}
 		_, err = conn.Write(buf[:i])
 		if err != nil {
-			continue
+			fmt.Println(err.Error())
+			return
 		}
 	}
 }
@@ -36,6 +36,7 @@ func ServeTcp(l net.Listener) {
 	for {
 		conn, err := l.Accept()
 		if err != nil {
+			fmt.Println("accept err", err.Error())
 			continue
 		}
 		go echo(conn)
@@ -98,13 +99,18 @@ func SendTcpMsg(msg []byte, address string) []byte {
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer conn.Close()
+	println("conn start", conn.RemoteAddr().String(), conn.LocalAddr().String())
 	if _, err := conn.Write(msg); err != nil {
 		log.Fatal(err)
 	}
-	buf := make([]byte, len(msg))
 	time.Sleep(time.Second * 1)
-	n, _ := conn.Read(buf)
+	buf := make([]byte, len(msg))
+	n, err := conn.Read(buf)
+	if err != nil {
+		log.Fatal(err)
+	}
+	conn.Close()
+	println("conn closed", conn.RemoteAddr().String())
 	return buf[:n]
 }
 
