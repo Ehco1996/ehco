@@ -15,6 +15,7 @@ type RelayTransporter interface {
 	HandleUDPConn(uaddr *net.UDPAddr, local *net.UDPConn)
 
 	// TCP相关
+	dialRemote(remote *lb.Node) (net.Conn, error)
 	HandleTCPConn(c net.Conn, remote *lb.Node) error
 	GetRemote() *lb.Node
 }

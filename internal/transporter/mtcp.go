@@ -6,6 +6,7 @@ import (
 	"net"
 	"time"
 
+	"github.com/Ehco1996/ehco/internal/constant"
 	"github.com/Ehco1996/ehco/internal/lb"
 	"github.com/Ehco1996/ehco/internal/web"
 	"github.com/xtaci/smux"
@@ -17,17 +18,24 @@ type MTCP struct {
 	mtp *smuxTransporter
 }
 
+func (s *MTCP) dialRemote(remote *lb.Node) (net.Conn, error) {
+	t1 := time.Now()
+	mtcpc, err := s.mtp.Dial(context.TODO(), remote.Address)
+	if err != nil {
+		return nil, err
+	}
+	web.HandShakeDuration.WithLabelValues(remote.Label).Observe(float64(time.Since(t1).Milliseconds()))
+	return mtcpc, nil
+}
+
 func (s *MTCP) HandleTCPConn(c net.Conn, remote *lb.Node) error {
 	defer c.Close()
-	t1 := time.Now()
-	mwsc, err := s.mtp.Dial(context.TODO(), remote.Address)
-	web.HandShakeDuration.WithLabelValues(remote.Label).Observe(float64(time.Since(t1).Milliseconds()))
+	mctpc, err := s.dialRemote(remote)
 	if err != nil {
 		return err
 	}
-	defer mwsc.Close()
 	s.L.Infof("HandleTCPConn from:%s to:%s", c.LocalAddr(), remote.Address)
-	return transport(c, mwsc, remote.Label)
+	return transport(c, mctpc, remote.Label)
 }
 
 type MTCPServer struct {
@@ -126,15 +134,16 @@ func (s *MTCPServer) Close() error {
 }
 
 type MTCPClient struct {
-	l *zap.SugaredLogger
+	l      *zap.SugaredLogger
+	dialer *net.Dialer
 }
 
 func NewMTCPClient(l *zap.SugaredLogger) *MTCPClient {
-	return &MTCPClient{l: l}
+	return &MTCPClient{l: l, dialer: &net.Dialer{Timeout: constant.DialTimeOut}}
 }
 
 func (c *MTCPClient) InitNewSession(ctx context.Context, addr string) (*smux.Session, error) {
-	rc, err := net.Dial("tcp", addr)
+	rc, err := c.dialer.Dial("tcp", addr)
 	if err != nil {
 		return nil, err
 	}

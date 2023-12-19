@@ -117,11 +117,13 @@ func (raw *Raw) GetRemote() *lb.Node {
 }
 
 func (raw *Raw) dialRemote(remote *lb.Node) (net.Conn, error) {
+	t1 := time.Now()
 	d := net.Dialer{Timeout: constant.DialTimeOut}
 	rc, err := d.Dial("tcp", remote.Address)
 	if err != nil {
 		return nil, err
 	}
+	web.HandShakeDuration.WithLabelValues(remote.Label).Observe(float64(time.Since(t1).Milliseconds()))
 	return rc, nil
 }
 
@@ -130,12 +132,10 @@ func (raw *Raw) HandleTCPConn(c net.Conn, remote *lb.Node) error {
 	defer web.CurConnectionCount.WithLabelValues(remote.Label, web.METRIC_CONN_TYPE_TCP).Dec()
 
 	defer c.Close()
-	t1 := time.Now()
 	rc, err := raw.dialRemote(remote)
 	if err != nil {
 		return err
 	}
-	web.HandShakeDuration.WithLabelValues(remote.Label).Observe(float64(time.Since(t1).Milliseconds()))
 	raw.L.Infof("HandleTCPConn from %s to %s", c.LocalAddr(), remote.Address)
 	defer rc.Close()
 	return transport(c, rc, remote.Label)

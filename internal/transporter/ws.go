@@ -19,11 +19,13 @@ type Ws struct {
 }
 
 func (s *Ws) dialRemote(remote *lb.Node) (net.Conn, error) {
+	t1 := time.Now()
 	d := ws.Dialer{Timeout: constant.DialTimeOut}
 	wsc, _, _, err := d.Dial(context.TODO(), remote.Address+"/ws/")
 	if err != nil {
 		return nil, err
 	}
+	web.HandShakeDuration.WithLabelValues(remote.Label).Observe(float64(time.Since(t1).Milliseconds()))
 	return wsc, nil
 }
 

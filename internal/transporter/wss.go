@@ -20,17 +20,23 @@ type Wss struct {
 	*Raw
 }
 
+func (s *Wss) dialRemote(remote *lb.Node) (net.Conn, error) {
+	t1 := time.Now()
+	d := ws.Dialer{TLSConfig: mytls.DefaultTLSConfig}
+	wsc, _, _, err := d.Dial(context.TODO(), remote.Address+"/wss/")
+	if err != nil {
+		return nil, err
+	}
+	web.HandShakeDuration.WithLabelValues(remote.Label).Observe(float64(time.Since(t1).Milliseconds()))
+	return wsc, nil
+}
+
 func (s *Wss) HandleTCPConn(c net.Conn, remote *lb.Node) error {
 	defer c.Close()
-
-	d := ws.Dialer{TLSConfig: mytls.DefaultTLSConfig}
-	t1 := time.Now()
-	wsc, _, _, err := d.Dial(context.TODO(), remote.Address+"/wss/")
-	web.HandShakeDuration.WithLabelValues(remote.Label).Observe(float64(time.Since(t1).Milliseconds()))
+	wsc, err := s.dialRemote(remote)
 	if err != nil {
 		return err
 	}
-	defer wsc.Close()
 	s.L.Infof("HandleTCPConn from %s to %s", c.RemoteAddr(), remote.Address)
 	return transport(c, wsc, remote.Label)
 }

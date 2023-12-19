@@ -23,11 +23,19 @@ type Mwss struct {
 	mtp *smuxTransporter
 }
 
-func (s *Mwss) HandleTCPConn(c net.Conn, remote *lb.Node) error {
-	defer c.Close()
+func (s *Mwss) dialRemote(remote *lb.Node) (net.Conn, error) {
 	t1 := time.Now()
 	mwsc, err := s.mtp.Dial(context.TODO(), remote.Address+"/mwss/")
+	if err != nil {
+		return nil, err
+	}
 	web.HandShakeDuration.WithLabelValues(remote.Label).Observe(float64(time.Since(t1).Milliseconds()))
+	return mwsc, nil
+}
+
+func (s *Mwss) HandleTCPConn(c net.Conn, remote *lb.Node) error {
+	defer c.Close()
+	mwsc, err := s.dialRemote(remote)
 	if err != nil {
 		return err
 	}
@@ -146,11 +154,7 @@ type MWSSClient struct {
 }
 
 func NewMWSSClient(l *zap.SugaredLogger) *MWSSClient {
-	dialer := &ws.Dialer{
-		TLSConfig: mytls.DefaultTLSConfig,
-		Timeout:   constant.DialTimeOut,
-	}
-
+	dialer := &ws.Dialer{TLSConfig: mytls.DefaultTLSConfig, Timeout: constant.DialTimeOut}
 	return &MWSSClient{
 		dialer: dialer,
 		l:      l,
