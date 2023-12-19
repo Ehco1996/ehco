@@ -26,7 +26,7 @@ func (s *MTCP) HandleTCPConn(c net.Conn, remote *lb.Node) error {
 		return err
 	}
 	defer mwsc.Close()
-	s.L.Infof("HandleTCPConn from:%s to:%s", c.RemoteAddr(), remote.Address)
+	s.L.Infof("HandleTCPConn from:%s to:%s", c.LocalAddr(), remote.Address)
 	return transport(c, mwsc, remote.Label)
 }
 

@@ -22,7 +22,7 @@ func initLogger(logLevel string, replaceGlobal bool) (*zap.Logger, error) {
 		MessageKey:  "msg",
 		NameKey:     "name",
 		EncodeLevel: zapcore.LowercaseColorLevelEncoder,
-		EncodeTime:  zapcore.ISO8601TimeEncoder,
+		EncodeTime:  zapcore.RFC3339TimeEncoder,
 		EncodeName:  zapcore.FullNameEncoder,
 	}
 	core := zapcore.NewCore(
