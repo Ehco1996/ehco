@@ -119,10 +119,29 @@ func (raw *Raw) GetRemote() *lb.Node {
 func (raw *Raw) dialRemote(remote *lb.Node) (net.Conn, error) {
 	t1 := time.Now()
 	d := net.Dialer{Timeout: constant.DialTimeOut}
+	d.SetMultipathTCP(true)
+
+	if d.MultipathTCP() {
+		raw.L.Infof("Multipath TCP is supported")
+	} else {
+		raw.L.Infof("Multipath TCP is not supported")
+	}
+
 	rc, err := d.Dial("tcp", remote.Address)
 	if err != nil {
 		return nil, err
 	}
+
+	tcp, ok := rc.(*net.TCPConn)
+	if !ok {
+		panic("struct is not a TCPConn")
+	}
+	mptcp, err := tcp.MultipathTCP() //Does the connection established really support mptcp
+	if err != nil {
+		panic(err)
+	}
+	raw.L.Infof("Is multipath TCP connection: %v", mptcp)
+
 	web.HandShakeDuration.WithLabelValues(remote.Label).Observe(float64(time.Since(t1).Milliseconds()))
 	return rc, nil
 }

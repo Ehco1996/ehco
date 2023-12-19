@@ -1,6 +1,7 @@
 package relay
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"sync"
@@ -132,7 +133,14 @@ func (r *Relay) Close() {
 }
 
 func (r *Relay) RunLocalTCPServer() error {
-	lis, err := net.ListenTCP("tcp", r.LocalTCPAddr)
+	lc := net.ListenConfig{}
+	lc.SetMultipathTCP(true)
+	if lc.MultipathTCP() {
+		r.L.Infof("Multipath TCP is supported")
+	} else {
+		r.L.Infof("Multipath TCP is not supported")
+	}
+	lis, err := lc.Listen(context.TODO(), "tcp", r.LocalTCPAddr.String())
 	if err != nil {
 		return err
 	}
@@ -142,10 +150,15 @@ func (r *Relay) RunLocalTCPServer() error {
 	}
 	r.L.Infof("Start TCP relay Server %s", r.Name)
 	for {
-		c, err := lis.AcceptTCP()
+		c, err := lis.Accept()
 		if err != nil {
 			return err
 		}
+		isMultipathTCP, err := c.(*net.TCPConn).MultipathTCP()
+		if err != nil {
+			r.L.Errorf("MultipathTCP error:%s", err)
+		}
+		r.L.Infof("isMultipathTCP:%v", isMultipathTCP)
 
 		go func(c net.Conn) {
 			remote := r.TP.GetRemote()
