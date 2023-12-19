@@ -36,8 +36,7 @@ func NewBytePool(maxSize int, size int) (bp *BytePool) {
 	}
 }
 
-// Get gets a []byte from the BytePool, or creates a new one if none are
-// available in the pool.
+// Get gets a []byte from the BytePool, or creates a new one if none are available in the pool.
 func (bp *BytePool) Get() (b []byte) {
 	select {
 	case b = <-bp.c:
@@ -105,22 +104,23 @@ func shortHashSHA256(input string) string {
 	hash := hasher.Sum(nil)
 	return hex.EncodeToString(hash)[:7]
 }
+
 func connectionName(conn net.Conn) string {
 	return fmt.Sprintf("l:<%s> r:<%s>", conn.LocalAddr(), conn.RemoteAddr())
 }
 
-// 注意此代码假设 conn1 是和客户端的连接，conn2 是和远程服务器的连接。
-// 在每个 io.Copy 完成后，我们通过判断连接是否是 *net.TCPConn 类型，
-// 使用 CloseWrite 来关闭写方向的连接以发送 EOF。
-// 接下来我们从错误通道 errCH 中接收另一个方向的错误，关闭剩余的读方向连接，并返回适当的错误信息。
+// Note that this code assumes that conn1 is the connection to the client and conn2 is the connection to the remote server.
+// leave some optimization chance for future
+// * use io.CopyBuffer
+// * use go routine pool
 func transport(conn1, conn2 net.Conn, remote string) error {
 	name := fmt.Sprintf("c1:[%s] c2:[%s]", connectionName(conn1), connectionName(conn2))
 	l := zap.S().Named(shortHashSHA256(name))
 	l.Debugf("transport for:%s start", name)
 	defer l.Debugf("transport for:%s end", name)
-
 	errCH := make(chan error, 1)
-	// conn1 to conn2
+
+	// copy conn1 to conn2,read from conn1 and write to conn2
 	go func() {
 		l.Debug("copy conn1 to conn2 start")
 		_, err := io.Copy(
@@ -129,12 +129,12 @@ func transport(conn1, conn2 net.Conn, remote string) error {
 		)
 		l.Debug("copy conn1 to conn2 end", err)
 		if tcpConn, ok := conn2.(*net.TCPConn); ok {
-			tcpConn.CloseWrite() // 立即发送EOF
+			_ = tcpConn.CloseWrite() // all data is written to conn2 now, so close the write side of conn2 to send eof
 		}
 		errCH <- err
 	}()
 
-	// conn2 to conn1
+	// reverse copy conn2 to conn1,read from conn2 and write to conn1
 	l.Debug("copy conn2 to conn1 start")
 	_, err := io.Copy(
 		WriteOnlyMetricsWriter{Writer: conn1, remoteLabel: remote},
@@ -142,25 +142,22 @@ func transport(conn1, conn2 net.Conn, remote string) error {
 	)
 	l.Debug("copy conn2 to conn1 end", err)
 	if tcpConn, ok := conn1.(*net.TCPConn); ok {
-		tcpConn.CloseWrite() // 立即发送EOF
+		_ = tcpConn.CloseWrite()
 	}
 
-	// 等待 conn1 到 conn2 goroutine 的错误
 	err2 := <-errCH
-
-	// 如果两个连接都是TCP连接，关闭读端
+	// due to closeWrite, the other side will get EOF, so close the read side of conn1 and conn2
 	if tcpConn, ok := conn1.(*net.TCPConn); ok {
-		tcpConn.CloseRead()
+		_ = tcpConn.CloseRead()
 	}
 	if tcpConn, ok := conn2.(*net.TCPConn); ok {
-		tcpConn.CloseRead()
+		_ = tcpConn.CloseRead()
 	}
 
-	// 此外，在处理错误时，我们也需要同时考虑两个方向的错误。
-	// 如果两个方向都有错误，我们可以把两个错误都返回。
-	// 如果只有一个方向有错误，我们只返回那个错误。如果两个方向都没有错误
+	// handle errors, need to combine errors from both directions
 	if err != nil && err2 != nil {
-		return fmt.Errorf("errors in both directions: %v, %v", err, err2)
+		err := fmt.Errorf("errors in both directions: %v, %v", err, err2)
+		l.Error(err)
 	}
 	if err != nil {
 		return err
