@@ -356,7 +356,6 @@ func watchAndReloadRelayConfig(ctx context.Context, curCfg *config.Config, relay
 		case <-reloadCH:
 			if err := reladRelay(); err != nil {
 				cmdLogger.Errorf("Reloading Relay Conf meet error: %s ", err)
-				errCh <- err
 			}
 		}
 	}
