@@ -95,7 +95,7 @@ jobs:
         platform: [amd64, arm64]
     steps:
       - name: Download binaries
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: binaries
           path: /tmp/ehco
@@ -144,7 +144,7 @@ jobs:
       - build-image
     steps:
       - name: Download digests
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: digests
           path: /tmp/digests
