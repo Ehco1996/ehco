@@ -434,7 +434,7 @@ func main() {
 
 	l, err := log.NewLogger("info")
 	if err != nil {
-		println("init logger failed,err=", err)
+		println("new info logger failed,err=", err)
 		os.Exit(2)
 	}
 	cmdLogger = l.Sugar()

@@ -21,7 +21,7 @@ import (
 func MakeIndexF() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		zap.S().Named("web").Infof("index call from %s", r.RemoteAddr)
-		fmt.Fprintf(w, "access from %s \n", r.RemoteAddr)
+		fmt.Fprintf(w, "access from remote ip: %s \n", r.RemoteAddr)
 	}
 }
 
@@ -62,7 +62,8 @@ func registerMetrics(cfg *config.Config) {
 
 func registerNodeExporterMetrics(cfg *config.Config) error {
 	level := &promlog.AllowedLevel{}
-	if err := level.Set(cfg.LogLeveL); err != nil {
+	// mute node_exporter logger
+	if err := level.Set("error"); err != nil {
 		return err
 	}
 	promlogConfig := &promlog.Config{Level: level}
