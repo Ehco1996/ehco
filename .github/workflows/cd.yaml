@@ -77,7 +77,7 @@ jobs:
           cp ./build/Dockerfile /tmp/ehco/Dockerfile
 
       - name: Upload binaries
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         with:
           name: binaries
           path: /tmp/ehco
@@ -131,7 +131,7 @@ jobs:
           digest="${{ steps.build.outputs.digest }}"
           touch "/tmp/digests/${digest#sha256:}"
       - name: Upload digest
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         with:
           name: digests
           path: /tmp/digests/*
