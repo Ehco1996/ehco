@@ -254,7 +254,6 @@ func startRelayServers(ctx context.Context, cfg *config.Config) error {
 		}
 		go startOneRelay(r, relayM, errCH)
 	}
-	// start watch config file TODO support reload from http , refine the ConfigPath global var
 	if ConfigPath != "" {
 		go watchAndReloadRelayConfig(ctx, cfg, relayM, errCH)
 	}
@@ -275,7 +274,7 @@ func startRelayServers(ctx context.Context, cfg *config.Config) error {
 
 func watchAndReloadRelayConfig(ctx context.Context, curCfg *config.Config, relayM *sync.Map, errCh chan error) {
 	cmdLogger.Infof("Start to watch relay config %s ", ConfigPath)
-	reladRelay := func() error {
+	reladRelayF := func() error {
 		newCfg, err := loadConfig()
 		if err != nil {
 			cmdLogger.Errorf("Reloading Realy Conf meet error: %s ", err)
@@ -354,9 +353,8 @@ func watchAndReloadRelayConfig(ctx context.Context, curCfg *config.Config, relay
 		case <-ctx.Done():
 			return
 		case <-reloadCH:
-			if err := reladRelay(); err != nil {
+			if err := reladRelayF(); err != nil {
 				cmdLogger.Errorf("Reloading Relay Conf meet error: %s ", err)
-				errCh <- err
 			}
 		}
 	}
