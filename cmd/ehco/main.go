@@ -254,7 +254,8 @@ func startRelayServers(ctx context.Context, cfg *config.Config) error {
 		}
 		go startOneRelay(r, relayM, errCH)
 	}
-	if ConfigPath != "" {
+	if cfg.PATH != "" && cfg.ReloadInterval > 0 {
+		cmdLogger.Infof("Start to watch relay config %s ", ConfigPath)
 		go watchAndReloadRelayConfig(ctx, cfg, relayM, errCH)
 	}
 
@@ -272,17 +273,16 @@ func startRelayServers(ctx context.Context, cfg *config.Config) error {
 	}
 }
 
-func watchAndReloadRelayConfig(ctx context.Context, curCfg *config.Config, relayM *sync.Map, errCh chan error) {
-	cmdLogger.Infof("Start to watch relay config %s ", ConfigPath)
+func watchAndReloadRelayConfig(ctx context.Context, cfg *config.Config, relayM *sync.Map, errCh chan error) {
 	reladRelayF := func() error {
-		newCfg, err := loadConfig()
-		if err != nil {
+		// load new config
+		if err := cfg.LoadConfig(); err != nil {
 			cmdLogger.Errorf("Reloading Realy Conf meet error: %s ", err)
 			return err
 		}
 		var newRelayAddrList []string
-		for idx := range newCfg.RelayConfigs {
-			r, err := relay.NewRelay(newCfg.RelayConfigs[idx])
+		for idx := range cfg.RelayConfigs {
+			r, err := relay.NewRelay(cfg.RelayConfigs[idx])
 			if err != nil {
 				cmdLogger.Errorf("reload new relay failed err=%s", err.Error())
 				return err
@@ -333,20 +333,18 @@ func watchAndReloadRelayConfig(ctx context.Context, curCfg *config.Config, relay
 	}()
 
 	// ticker to reload config
-	if curCfg.ReloadInterval > 0 {
-		ticker := time.NewTicker(time.Second * time.Duration(curCfg.ReloadInterval))
-		defer ticker.Stop()
-		go func() {
-			for {
-				select {
-				case <-ctx.Done():
-					return
-				case <-ticker.C:
-					reloadCH <- struct{}{}
-				}
+	ticker := time.NewTicker(time.Second * time.Duration(cfg.ReloadInterval))
+	defer ticker.Stop()
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				reloadCH <- struct{}{}
 			}
-		}()
-	}
+		}
+	}()
 
 	for {
 		select {

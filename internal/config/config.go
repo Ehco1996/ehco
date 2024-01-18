@@ -77,6 +77,8 @@ type Config struct {
 	SyncTrafficEndPoint string          `json:"sync_traffic_endpoint"`
 
 	L *zap.SugaredLogger
+
+	lastLoadTime time.Time
 }
 
 func NewConfig(path string) *Config {
@@ -88,6 +90,11 @@ func (c *Config) NeedSyncUserFromServer() bool {
 }
 
 func (c *Config) LoadConfig() error {
+	if c.ReloadInterval > 0 && time.Since(c.lastLoadTime).Seconds() < float64(c.ReloadInterval) {
+		c.L.Debugf("Skip Load Config, last load time: %s", c.lastLoadTime)
+		return nil
+	}
+	c.lastLoadTime = time.Now()
 	if c.NeedSyncUserFromServer() {
 		if err := c.readFromHttp(); err != nil {
 			return err
