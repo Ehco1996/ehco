@@ -65,24 +65,24 @@ func (r *RelayConfig) Validate() error {
 type Config struct {
 	PATH string
 
-	WebPort        int    `json:"web_port,omitempty"`
-	WebToken       string `json:"web_token,omitempty"`
-	EnablePing     bool   `json:"enable_ping,omitempty"`
+	WebHost  string `json:"web_host,omitempty"`
+	WebPort  int    `json:"web_port,omitempty"`
+	WebToken string `json:"web_token,omitempty"`
+
 	LogLeveL       string `json:"log_level,omitempty"`
+	EnablePing     bool   `json:"enable_ping,omitempty"`
 	ReloadInterval int    `json:"reload_interval,omitempty"`
 
-	RelayConfigs []*RelayConfig `json:"relay_configs"`
-
+	RelayConfigs        []*RelayConfig  `json:"relay_configs"`
 	XRayConfig          *xrayCfg.Config `json:"xray_config,omitempty"`
-	SyncTrafficEndPoint string          `json:"sync_traffic_endpoint"`
-
-	L *zap.SugaredLogger
+	SyncTrafficEndPoint string          `json:"sync_traffic_endpoint,omitempty"`
 
 	lastLoadTime time.Time
+	l            *zap.SugaredLogger
 }
 
 func NewConfig(path string) *Config {
-	return &Config{PATH: path, RelayConfigs: []*RelayConfig{}, L: zap.S().Named("cfg")}
+	return &Config{PATH: path, RelayConfigs: []*RelayConfig{}, l: zap.S().Named("cfg")}
 }
 
 func (c *Config) NeedSyncUserFromServer() bool {
@@ -91,7 +91,7 @@ func (c *Config) NeedSyncUserFromServer() bool {
 
 func (c *Config) LoadConfig() error {
 	if c.ReloadInterval > 0 && time.Since(c.lastLoadTime).Seconds() < float64(c.ReloadInterval) {
-		c.L.Debugf("Skip Load Config, last load time: %s", c.lastLoadTime)
+		c.l.Debugf("Skip Load Config, last load time: %s", c.lastLoadTime)
 		return nil
 	}
 	c.lastLoadTime = time.Now()
@@ -112,7 +112,7 @@ func (c *Config) readFromFile() error {
 	if err != nil {
 		return err
 	}
-	c.L.Debugf("Load Config From File: %s", c.PATH)
+	c.l.Debugf("Load Config From File: %s", c.PATH)
 	if err != nil {
 		return err
 	}
@@ -126,7 +126,7 @@ func (c *Config) readFromHttp() error {
 		return err
 	}
 	defer r.Body.Close()
-	c.L.Debugf("Load Config From HTTP: %s", c.PATH)
+	c.l.Debugf("Load Config From HTTP: %s", c.PATH)
 	return json.NewDecoder(r.Body).Decode(&c)
 }
 
@@ -140,6 +140,9 @@ func (c *Config) Validate() error {
 	if c.LogLeveL == "" {
 		c.LogLeveL = "info"
 	}
+	if c.WebHost == "" {
+		c.WebHost = "0.0.0.0"
+	}
 	return nil
 }
 
@@ -151,7 +154,7 @@ func (c *Config) GetMetricURL() string {
 	if !c.NeedStartWebServer() {
 		return ""
 	}
-	url := fmt.Sprintf("http://0.0.0.0:%d/metrics/", c.WebPort)
+	url := fmt.Sprintf("http://%s:%d/metrics/", c.WebHost, c.WebPort)
 	if c.WebToken != "" {
 		url += fmt.Sprintf("?token=%s", c.WebToken)
 	}

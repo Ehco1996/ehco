@@ -23,3 +23,7 @@ key.pem
 monitor/data/
 main
 ehco
+
+cmd/test/
+localdev/
+

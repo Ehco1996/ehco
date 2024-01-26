@@ -1,17 +1,24 @@
 package web
 
 import (
+	"fmt"
 	"math"
+	"os"
 	"runtime"
 	"strings"
 	"time"
 
 	"github.com/Ehco1996/ehco/internal/config"
+	"github.com/alecthomas/kingpin/v2"
 	"github.com/go-ping/ping"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/common/promlog"
+	"github.com/prometheus/common/version"
+	"github.com/prometheus/node_exporter/collector"
 	"go.uber.org/zap"
 )
 
+// ping metrics
 var (
 	pingLabelNames = []string{"ip", "host", "label"}
 	pingBuckets    = prometheus.ExponentialBuckets(0.001, 2, 12) // 1ms ~ 4s
@@ -34,6 +41,46 @@ var (
 		pingLabelNames,
 		ConstLabels,
 	)
+)
+
+// traffic metrics
+var (
+	Hostname, _ = os.Hostname()
+
+	ConstLabels = map[string]string{
+		"hostname": Hostname,
+	}
+	EhcoAlive = prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace:   METRIC_NS,
+		Subsystem:   "",
+		Name:        "alive_state",
+		Help:        "ehco 存活状态",
+		ConstLabels: ConstLabels,
+	})
+
+	CurConnectionCount = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace:   METRIC_NS,
+		Subsystem:   METRIC_SUBSYSTEM_TRAFFIC,
+		Name:        "current_connection_count",
+		Help:        "当前链接数",
+		ConstLabels: ConstLabels,
+	}, []string{METRIC_LABEL_REMOTE, METRIC_LABEL_CONN_TYPE})
+
+	NetWorkTransmitBytes = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Namespace:   METRIC_NS,
+		Subsystem:   METRIC_SUBSYSTEM_TRAFFIC,
+		Name:        "network_transmit_bytes",
+		Help:        "传输流量总量bytes",
+		ConstLabels: ConstLabels,
+	}, []string{METRIC_LABEL_REMOTE, METRIC_LABEL_CONN_TYPE, METRIC_LABEL_CONN_FLOW})
+
+	HandShakeDuration = prometheus.NewHistogramVec(prometheus.HistogramOpts{
+		Subsystem:   METRIC_SUBSYSTEM_TRAFFIC,
+		Namespace:   METRIC_NS,
+		Name:        "handshake_duration",
+		Help:        "握手时间ms",
+		ConstLabels: ConstLabels,
+	}, []string{METRIC_LABEL_REMOTE})
 )
 
 type PingGroup struct {
@@ -135,4 +182,47 @@ func (pg *PingGroup) Run() {
 		}()
 		time.Sleep(splay)
 	}
+}
+
+func registerEhcoMetrics(cfg *config.Config) error {
+	// traffic
+	prometheus.MustRegister(EhcoAlive)
+	prometheus.MustRegister(CurConnectionCount)
+	prometheus.MustRegister(NetWorkTransmitBytes)
+	prometheus.MustRegister(HandShakeDuration)
+
+	EhcoAlive.Set(EhcoAliveStateInit)
+
+	// ping
+	if cfg.EnablePing {
+		pg := NewPingGroup(cfg)
+		prometheus.MustRegister(PingResponseDurationSeconds)
+		prometheus.MustRegister(pg)
+		go pg.Run()
+	}
+	return nil
+}
+
+func registerNodeExporterMetrics(cfg *config.Config) error {
+	level := &promlog.AllowedLevel{}
+	// mute node_exporter logger
+	if err := level.Set("error"); err != nil {
+		return err
+	}
+	promlogConfig := &promlog.Config{Level: level}
+	logger := promlog.New(promlogConfig)
+	// see this https://github.com/prometheus/node_exporter/pull/2463
+	if _, err := kingpin.CommandLine.Parse([]string{}); err != nil {
+		return err
+	}
+	nc, err := collector.NewNodeCollector(logger)
+	if err != nil {
+		return fmt.Errorf("couldn't create collector: %s", err)
+	}
+	// nc.Collectors = collectors
+	prometheus.MustRegister(
+		nc,
+		version.NewCollector("node_exporter"),
+	)
+	return nil
 }

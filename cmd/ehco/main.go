@@ -394,8 +394,12 @@ func start(ctx *cli.Context) error {
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
 
 	if cfg.NeedStartWebServer() {
+		webS, err := web.NewServer(cfg)
+		if err != nil {
+			cmdLogger.Fatalf("NewWebServer meet err=%s", err.Error())
+		}
 		go func() {
-			cmdLogger.Fatalf("StartWebServer meet err=%s", web.StartWebServer(cfg))
+			cmdLogger.Fatalf("StartWebServer meet err=%s", webS.Start())
 		}()
 	}
 

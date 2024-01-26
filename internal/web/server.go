@@ -2,19 +2,14 @@ package web
 
 import (
 	"fmt"
+	"net"
 	"net/http"
-	"net/http/pprof"
 	_ "net/http/pprof"
 
 	"github.com/Ehco1996/ehco/internal/config"
 	"github.com/Ehco1996/ehco/internal/constant"
-	"github.com/alecthomas/kingpin/v2"
-	"github.com/gorilla/mux"
-	"github.com/prometheus/client_golang/prometheus"
+	"github.com/labstack/echo/v4"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/prometheus/common/promlog"
-	"github.com/prometheus/common/version"
-	"github.com/prometheus/node_exporter/collector"
 	"go.uber.org/zap"
 )
 
@@ -29,95 +24,44 @@ func Welcome(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, constant.IndexHTMLTMPL)
 }
 
-func AttachProfiler(router *mux.Router) {
-	router.HandleFunc("/debug/pprof/", pprof.Index)
-	router.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
-	router.HandleFunc("/debug/pprof/profile", pprof.Profile)
-	router.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
-
-	// Manually add support for paths linked to by index page at /debug/pprof/
-	router.Handle("/debug/pprof/goroutine", pprof.Handler("goroutine"))
-	router.Handle("/debug/pprof/heap", pprof.Handler("heap"))
-	router.Handle("/debug/pprof/threadcreate", pprof.Handler("threadcreate"))
-	router.Handle("/debug/pprof/block", pprof.Handler("block"))
+type Server struct {
+	e    *echo.Echo
+	addr string
+	l    *zap.SugaredLogger
 }
 
-func registerMetrics(cfg *config.Config) {
-	// traffic
-	prometheus.MustRegister(EhcoAlive)
-	prometheus.MustRegister(CurConnectionCount)
-	prometheus.MustRegister(NetWorkTransmitBytes)
-	prometheus.MustRegister(HandShakeDuration)
+func NewServer(cfg *config.Config) (*Server, error) {
+	addr := net.JoinHostPort(cfg.WebHost, fmt.Sprintf("%d", cfg.WebPort))
+	l := zap.S().Named("web")
 
-	EhcoAlive.Set(EhcoAliveStateInit)
-
-	// ping
-	if cfg.EnablePing {
-		pg := NewPingGroup(cfg)
-		prometheus.MustRegister(PingResponseDurationSeconds)
-		prometheus.MustRegister(pg)
-		go pg.Run()
-	}
-}
-
-func registerNodeExporterMetrics(cfg *config.Config) error {
-	level := &promlog.AllowedLevel{}
-	// mute node_exporter logger
-	if err := level.Set("error"); err != nil {
-		return err
-	}
-	promlogConfig := &promlog.Config{Level: level}
-	logger := promlog.New(promlogConfig)
-	// see this https://github.com/prometheus/node_exporter/pull/2463
-	if _, err := kingpin.CommandLine.Parse([]string{}); err != nil {
-		return err
-	}
-	nc, err := collector.NewNodeCollector(logger)
-	if err != nil {
-		return fmt.Errorf("couldn't create collector: %s", err)
-	}
-	// nc.Collectors = collectors
-	prometheus.MustRegister(
-		nc,
-		version.NewCollector("node_exporter"),
-	)
-	return nil
-}
-
-func simpleTokenAuthMiddleware(token string, h http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if t := r.URL.Query().Get("token"); t != token {
-			msg := fmt.Sprintf("un auth request from %s", r.RemoteAddr)
-			zap.S().Named("web").Error(msg)
-			hj, ok := w.(http.Hijacker)
-			if ok {
-				conn, _, _ := hj.Hijack()
-				conn.Close()
-			} else {
-				panic(msg)
-			}
-			return
-		}
-		h.ServeHTTP(w, r)
-	})
-}
-
-func StartWebServer(cfg *config.Config) error {
-	addr := fmt.Sprintf("0.0.0.0:%d", cfg.WebPort)
-	zap.S().Named("web").Infof("Start Web Server at http://%s/", addr)
-
-	r := mux.NewRouter()
-	AttachProfiler(r)
-	registerMetrics(cfg)
-	if err := registerNodeExporterMetrics(cfg); err != nil {
-		return err
-	}
-	r.Handle("/", http.HandlerFunc(Welcome))
-	r.Handle("/metrics/", promhttp.Handler())
-
+	e := echo.New()
+	e.HideBanner = true
+	e.HidePort = true
+	e.Use(NginxLogMiddleware(l))
 	if cfg.WebToken != "" {
-		return http.ListenAndServe(addr, simpleTokenAuthMiddleware(cfg.WebToken, r))
-	} else {
-		return http.ListenAndServe(addr, r)
+		e.Use(SimpleTokenAuthMiddleware(cfg.WebToken, l))
 	}
+
+	if err := registerEhcoMetrics(cfg); err != nil {
+		return nil, err
+	}
+	if err := registerNodeExporterMetrics(cfg); err != nil {
+		return nil, err
+	}
+
+	// register router
+	e.GET("/", echo.WrapHandler(http.HandlerFunc(Welcome)))
+	e.GET("/metrics/", echo.WrapHandler(promhttp.Handler()))
+	e.GET("/debug/pprof/*", echo.WrapHandler(http.DefaultServeMux))
+
+	return &Server{e: e, addr: addr, l: l}, nil
+}
+
+func (s *Server) Start() error {
+	s.l.Infof("Start Web Server at http://%s", s.addr)
+	return s.e.Start(s.addr)
+}
+
+func (s *Server) Stop() error {
+	return s.e.Close()
 }
