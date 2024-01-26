@@ -6,11 +6,12 @@ import (
 	"net"
 	"time"
 
-	"github.com/Ehco1996/ehco/internal/constant"
-	"github.com/Ehco1996/ehco/internal/lb"
-	"github.com/Ehco1996/ehco/internal/web"
 	"github.com/xtaci/smux"
 	"go.uber.org/zap"
+
+	"github.com/Ehco1996/ehco/internal/constant"
+	"github.com/Ehco1996/ehco/internal/web"
+	"github.com/Ehco1996/ehco/pkg/lb"
 )
 
 type MTCP struct {

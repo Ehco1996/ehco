@@ -5,12 +5,13 @@ import (
 	"net"
 	"sync"
 
+	"go.uber.org/zap"
+
 	"github.com/Ehco1996/ehco/internal/config"
 	"github.com/Ehco1996/ehco/internal/constant"
-	"github.com/Ehco1996/ehco/internal/lb"
 	"github.com/Ehco1996/ehco/internal/transporter"
 	"github.com/Ehco1996/ehco/internal/web"
-	"go.uber.org/zap"
+	"github.com/Ehco1996/ehco/pkg/lb"
 )
 
 var doOnce sync.Once

@@ -3,9 +3,10 @@ package transporter
 import (
 	"net"
 
-	"github.com/Ehco1996/ehco/internal/constant"
-	"github.com/Ehco1996/ehco/internal/lb"
 	"go.uber.org/zap"
+
+	"github.com/Ehco1996/ehco/internal/constant"
+	"github.com/Ehco1996/ehco/pkg/lb"
 )
 
 // RelayTransporter

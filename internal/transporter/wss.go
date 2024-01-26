@@ -8,12 +8,13 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/Ehco1996/ehco/internal/lb"
-	mytls "github.com/Ehco1996/ehco/internal/tls"
-	"github.com/Ehco1996/ehco/internal/web"
 	"github.com/gobwas/ws"
 	"github.com/gorilla/mux"
 	"go.uber.org/zap"
+
+	mytls "github.com/Ehco1996/ehco/internal/tls"
+	"github.com/Ehco1996/ehco/internal/web"
+	"github.com/Ehco1996/ehco/pkg/lb"
 )
 
 type Wss struct {

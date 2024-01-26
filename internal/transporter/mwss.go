@@ -8,14 +8,15 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/Ehco1996/ehco/internal/constant"
-	"github.com/Ehco1996/ehco/internal/lb"
-	mytls "github.com/Ehco1996/ehco/internal/tls"
-	"github.com/Ehco1996/ehco/internal/web"
 	"github.com/gobwas/ws"
 	"github.com/gorilla/mux"
 	"github.com/xtaci/smux"
 	"go.uber.org/zap"
+
+	"github.com/Ehco1996/ehco/internal/constant"
+	mytls "github.com/Ehco1996/ehco/internal/tls"
+	"github.com/Ehco1996/ehco/internal/web"
+	"github.com/Ehco1996/ehco/pkg/lb"
 )
 
 type Mwss struct {
