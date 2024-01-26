@@ -3,21 +3,18 @@ package relay
 import (
 	"fmt"
 	"net"
-	"sync"
 
 	"go.uber.org/zap"
 
-	"github.com/Ehco1996/ehco/internal/config"
 	"github.com/Ehco1996/ehco/internal/constant"
+	"github.com/Ehco1996/ehco/internal/relay/conf"
 	"github.com/Ehco1996/ehco/internal/transporter"
 	"github.com/Ehco1996/ehco/internal/web"
 	"github.com/Ehco1996/ehco/pkg/lb"
 )
 
-var doOnce sync.Once
-
 type Relay struct {
-	cfg *config.RelayConfig
+	cfg *conf.Config
 
 	ListenType    string
 	TransportType string
@@ -32,7 +29,7 @@ type Relay struct {
 	L    *zap.SugaredLogger
 }
 
-func NewRelay(cfg *config.RelayConfig) (*Relay, error) {
+func NewRelay(cfg *conf.Config) (*Relay, error) {
 	localTCPAddr, err := net.ResolveTCPAddr("tcp", cfg.Listen)
 	if err != nil {
 		return nil, err
@@ -77,10 +74,6 @@ func NewRelay(cfg *config.RelayConfig) (*Relay, error) {
 }
 
 func (r *Relay) ListenAndServe() error {
-	doOnce.Do(func() {
-		web.EhcoAlive.Set(web.EhcoAliveStateRunning)
-	})
-
 	errCh := make(chan error)
 
 	if len(r.cfg.TCPRemotes) > 0 {

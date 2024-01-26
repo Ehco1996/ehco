@@ -2,65 +2,16 @@ package config
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 	"os"
 	"strings"
 	"time"
 
-	"github.com/Ehco1996/ehco/internal/constant"
-	xrayCfg "github.com/xtls/xray-core/infra/conf"
+	"github.com/Ehco1996/ehco/internal/relay/conf"
+	xConf "github.com/xtls/xray-core/infra/conf"
 	"go.uber.org/zap"
 )
-
-type RelayConfig struct {
-	Listen        string   `json:"listen"`
-	ListenType    string   `json:"listen_type"`
-	TransportType string   `json:"transport_type"`
-	TCPRemotes    []string `json:"tcp_remotes"`
-	UDPRemotes    []string `json:"udp_remotes"`
-	Label         string   `json:"label"`
-}
-
-func (r *RelayConfig) Validate() error {
-	if r.ListenType != constant.Listen_RAW &&
-		r.ListenType != constant.Listen_WS &&
-		r.ListenType != constant.Listen_WSS &&
-		r.ListenType != constant.Listen_MTCP &&
-		r.ListenType != constant.Listen_MWSS {
-		return fmt.Errorf("invalid listen type:%s", r.ListenType)
-	}
-
-	if r.TransportType != constant.Transport_RAW &&
-		r.TransportType != constant.Transport_WS &&
-		r.TransportType != constant.Transport_WSS &&
-		r.TransportType != constant.Transport_MTCP &&
-		r.TransportType != constant.Transport_MWSS {
-		return fmt.Errorf("invalid transport type:%s", r.ListenType)
-	}
-
-	if r.Listen == "" {
-		return fmt.Errorf("invalid listen:%s", r.Listen)
-	}
-
-	for _, addr := range r.TCPRemotes {
-		if addr == "" {
-			return fmt.Errorf("invalid tcp remote addr:%s", addr)
-		}
-	}
-
-	for _, addr := range r.UDPRemotes {
-		if addr == "" {
-			return fmt.Errorf("invalid udp remote addr:%s", addr)
-		}
-	}
-
-	if len(r.TCPRemotes) == 0 && len(r.UDPRemotes) == 0 {
-		return errors.New("both tcp and udp remotes are empty")
-	}
-	return nil
-}
 
 type Config struct {
 	PATH string
@@ -73,16 +24,16 @@ type Config struct {
 	EnablePing     bool   `json:"enable_ping,omitempty"`
 	ReloadInterval int    `json:"reload_interval,omitempty"`
 
-	RelayConfigs        []*RelayConfig  `json:"relay_configs"`
-	XRayConfig          *xrayCfg.Config `json:"xray_config,omitempty"`
-	SyncTrafficEndPoint string          `json:"sync_traffic_endpoint,omitempty"`
+	RelayConfigs        []*conf.Config `json:"relay_configs"`
+	XRayConfig          *xConf.Config  `json:"xray_config,omitempty"`
+	SyncTrafficEndPoint string         `json:"sync_traffic_endpoint,omitempty"`
 
 	lastLoadTime time.Time
 	l            *zap.SugaredLogger
 }
 
 func NewConfig(path string) *Config {
-	return &Config{PATH: path, RelayConfigs: []*RelayConfig{}, l: zap.S().Named("cfg")}
+	return &Config{PATH: path, l: zap.S().Named("cfg")}
 }
 
 func (c *Config) NeedSyncUserFromServer() bool {
@@ -104,7 +55,7 @@ func (c *Config) LoadConfig() error {
 			return err
 		}
 	}
-	return c.Validate()
+	return c.Adjust()
 }
 
 func (c *Config) readFromFile() error {
@@ -130,18 +81,17 @@ func (c *Config) readFromHttp() error {
 	return json.NewDecoder(r.Body).Decode(&c)
 }
 
-func (c *Config) Validate() error {
-	// validate relay configs
-	for _, r := range c.RelayConfigs {
-		if err := r.Validate(); err != nil {
-			return err
-		}
-	}
+func (c *Config) Adjust() error {
 	if c.LogLeveL == "" {
 		c.LogLeveL = "info"
 	}
 	if c.WebHost == "" {
 		c.WebHost = "0.0.0.0"
+	}
+	for _, r := range c.RelayConfigs {
+		if err := r.Validate(); err != nil {
+			return err
+		}
 	}
 	return nil
 }

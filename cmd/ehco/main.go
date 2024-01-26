@@ -20,6 +20,7 @@ import (
 	"github.com/Ehco1996/ehco/internal/config"
 	"github.com/Ehco1996/ehco/internal/constant"
 	"github.com/Ehco1996/ehco/internal/relay"
+	"github.com/Ehco1996/ehco/internal/relay/conf"
 	"github.com/Ehco1996/ehco/internal/tls"
 	"github.com/Ehco1996/ehco/internal/web"
 	"github.com/Ehco1996/ehco/pkg/log"
@@ -187,7 +188,7 @@ func loadConfig() (cfg *config.Config, err error) {
 			PATH:           ConfigPath,
 			LogLeveL:       LogLevel,
 			ReloadInterval: ConfigReloadInterval,
-			RelayConfigs: []*config.RelayConfig{
+			RelayConfigs: []*conf.Config{
 				{
 					Listen:        LocalAddr,
 					ListenType:    ListenType,
@@ -201,7 +202,7 @@ func loadConfig() (cfg *config.Config, err error) {
 		if UDPRemoteAddr != "" {
 			cfg.RelayConfigs[0].UDPRemotes = []string{UDPRemoteAddr}
 		}
-		if err := cfg.Validate(); err != nil {
+		if err := cfg.Adjust(); err != nil {
 			return nil, err
 		}
 	}
@@ -417,6 +418,7 @@ func start(ctx *cli.Context) error {
 		go func() {
 			cmdLogger.Fatalf("Start RelayServers meet err=%v", startRelayServers(mainCtx, cfg))
 		}()
+		web.EhcoAlive.Set(web.EhcoAliveStateRunning)
 	}
 
 	<-sigs

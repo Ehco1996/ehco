@@ -10,6 +10,7 @@ import (
 	"github.com/Ehco1996/ehco/internal/config"
 	"github.com/Ehco1996/ehco/internal/constant"
 	"github.com/Ehco1996/ehco/internal/relay"
+	"github.com/Ehco1996/ehco/internal/relay/conf"
 	"github.com/Ehco1996/ehco/internal/tls"
 	"github.com/Ehco1996/ehco/pkg/log"
 	"github.com/Ehco1996/ehco/test/echo"
@@ -50,7 +51,7 @@ func init() {
 
 	cfg := config.Config{
 		PATH: "",
-		RelayConfigs: []*config.RelayConfig{
+		RelayConfigs: []*conf.Config{
 			// raw cfg
 			{
 				Listen:        RAW_LISTEN,
@@ -123,7 +124,7 @@ func init() {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		go func(ctx context.Context, c *config.RelayConfig) {
+		go func(ctx context.Context, c *conf.Config) {
 			r, err := relay.NewRelay(c)
 			if err != nil {
 				logger.Fatal(err)
