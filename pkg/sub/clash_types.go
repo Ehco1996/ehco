@@ -4,7 +4,6 @@ type ClashConfig struct {
 	Proxies []Proxies `yaml:"proxies"`
 }
 
-// and omitempty for all fields
 type Proxies struct {
 	// basic fields
 	Name     string `yaml:"name"`

@@ -8,16 +8,10 @@ import (
 	"go.uber.org/zap"
 )
 
-var l *zap.Logger
+var (
+	l *zap.Logger
 
-func init() {
-	log.InitGlobalLogger("debug")
-	l = zap.L().Named("clash_test")
-}
-
-func TestNewClashConfig(t *testing.T) {
-	// todo add more proxy types
-	buf := []byte(`
+	configBuf = []byte(`
 proxies:
   - name: ss
     type: ss
@@ -33,7 +27,17 @@ proxies:
     password: password
     skip-cert-verify: true
 `)
-	cs, err := NewClashSub(buf)
+)
+
+func init() {
+	log.InitGlobalLogger("debug")
+	l = zap.L().Named("clash_test")
+}
+
+func TestNewClashConfig(t *testing.T) {
+	// todo add more proxy types
+
+	cs, err := NewClashSub(configBuf)
 	assert.NoError(t, err, "NewConfig should not return an error")
 	assert.NotNil(t, cs, "Config should not be nil")
 	expectedProxyCount := 2
@@ -43,4 +47,17 @@ proxies:
 	assert.NoError(t, err, "ToClashConfigYaml should not return an error")
 	assert.NotNil(t, yamlBuf, "yamlBuf should not be nil")
 	println(string(yamlBuf))
+}
+
+func TestToRelayConfigs(t *testing.T) {
+	cs, err := NewClashSub(configBuf)
+	assert.NoError(t, err, "NewConfig should not return an error")
+	assert.NotNil(t, cs, "Config should not be nil")
+
+	relayConfigs, err := cs.ToRelayConfigs("localhost")
+	assert.NoError(t, err, "ToRelayConfigs should not return an error")
+	assert.NotNil(t, relayConfigs, "relayConfigs should not be nil")
+	expectedRelayCount := 2
+	assert.Equal(t, expectedRelayCount, len(relayConfigs), "Relay count should match")
+	l.Info("relayConfigs", zap.Any("relayConfigs", relayConfigs))
 }
