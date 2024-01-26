@@ -2,14 +2,10 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"net"
-	"net/http"
 	"os"
 	"os/exec"
 	"os/signal"
-	"sync"
 	"syscall"
 	"time"
 
@@ -220,145 +216,6 @@ func loadConfig() (cfg *config.Config, err error) {
 	return cfg, nil
 }
 
-func inArray(ele string, array []string) bool {
-	for _, v := range array {
-		if v == ele {
-			return true
-		}
-	}
-	return false
-}
-
-func startOneRelay(r *relay.Relay, relayM *sync.Map, errCh chan error) {
-	relayM.Store(r.Name, r)
-	// mute closed network error for tcp server and mute http.ErrServerClosed for http server when config reload
-	if err := r.ListenAndServe(); err != nil &&
-		!errors.Is(err, net.ErrClosed) && !errors.Is(err, http.ErrServerClosed) {
-		errCh <- err
-	}
-}
-
-func stopOneRelay(r *relay.Relay, relayM *sync.Map) {
-	r.Close()
-	relayM.Delete(r.Name)
-}
-
-func startRelayServers(ctx context.Context, cfg *config.Config) error {
-	// relay ListenAddress -> relay
-	relayM := &sync.Map{}
-	errCH := make(chan error, 1)
-	// init and relay servers
-	for idx := range cfg.RelayConfigs {
-		r, err := relay.NewRelay(cfg.RelayConfigs[idx])
-		if err != nil {
-			return err
-		}
-		go startOneRelay(r, relayM, errCH)
-	}
-	if cfg.PATH != "" && cfg.ReloadInterval > 0 {
-		cmdLogger.Infof("Start to watch relay config %s ", ConfigPath)
-		go watchAndReloadRelayConfig(ctx, cfg, relayM, errCH)
-	}
-
-	select {
-	case err := <-errCH:
-		return err
-	case <-ctx.Done():
-		cmdLogger.Info("start to stop relay servers")
-		relayM.Range(func(key, value interface{}) bool {
-			r := value.(*relay.Relay)
-			r.Close()
-			return true
-		})
-		return nil
-	}
-}
-
-func watchAndReloadRelayConfig(ctx context.Context, cfg *config.Config, relayM *sync.Map, errCh chan error) {
-	reladRelayF := func() error {
-		// load new config
-		if err := cfg.LoadConfig(); err != nil {
-			cmdLogger.Errorf("Reloading Realy Conf meet error: %s ", err)
-			return err
-		}
-		var newRelayAddrList []string
-		for idx := range cfg.RelayConfigs {
-			r, err := relay.NewRelay(cfg.RelayConfigs[idx])
-			if err != nil {
-				cmdLogger.Errorf("reload new relay failed err=%s", err.Error())
-				return err
-			}
-			newRelayAddrList = append(newRelayAddrList, r.Name)
-			// reload relay when name change
-			if oldR, ok := relayM.Load(r.Name); ok {
-				oldR := oldR.(*relay.Relay)
-				if oldR.Name != r.Name {
-					cmdLogger.Infof("close old relay name=%s", oldR.Name)
-					stopOneRelay(oldR, relayM)
-					go startOneRelay(r, relayM, errCh)
-				}
-				continue // no need to reload
-			}
-			// start bread new relay that not in old relayM
-			cmdLogger.Infof("start new relay name=%s", r.Name)
-			go startOneRelay(r, relayM, errCh)
-		}
-		// closed relay not in new config
-		relayM.Range(func(key, value interface{}) bool {
-			oldAddr := key.(string)
-			if !inArray(oldAddr, newRelayAddrList) {
-				v, _ := relayM.Load(oldAddr)
-				oldR := v.(*relay.Relay)
-				stopOneRelay(oldR, relayM)
-			}
-			return true
-		})
-		return nil
-	}
-
-	reloadCH := make(chan struct{}, 1)
-
-	// listen syscall.SIGHUP to trigger reload
-	sigHubCH := make(chan os.Signal, 1)
-	signal.Notify(sigHubCH, syscall.SIGHUP)
-	go func() {
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-sigHubCH:
-				cmdLogger.Info("Now Reloading Relay Conf By HUP Signal! ")
-				reloadCH <- struct{}{}
-			}
-		}
-	}()
-
-	// ticker to reload config
-	ticker := time.NewTicker(time.Second * time.Duration(cfg.ReloadInterval))
-	defer ticker.Stop()
-	go func() {
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-ticker.C:
-				reloadCH <- struct{}{}
-			}
-		}
-	}()
-
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-reloadCH:
-			if err := reladRelayF(); err != nil {
-				cmdLogger.Errorf("Reloading Relay Conf meet error: %s ", err)
-			}
-		}
-	}
-}
-
 func initSentry() error {
 	if dsn := os.Getenv("SENTRY_DSN"); dsn != "" {
 		cmdLogger.Infof("init sentry with dsn", dsn)
@@ -404,7 +261,7 @@ func start(ctx *cli.Context) error {
 		}()
 	}
 
-	if cfg.XRayConfig != nil {
+	if cfg.NeedStartXrayServer() {
 		xrayS := xray.NewXrayServer(cfg)
 		if err := xrayS.Setup(); err != nil {
 			cmdLogger.Fatalf("Setup XrayServer meet err=%v", err)
@@ -414,11 +271,15 @@ func start(ctx *cli.Context) error {
 		}
 	}
 
-	if len(cfg.RelayConfigs) > 0 {
-		go func() {
-			cmdLogger.Fatalf("Start RelayServers meet err=%v", startRelayServers(mainCtx, cfg))
-		}()
+	if cfg.NeedStartRelayServer() {
 		web.EhcoAlive.Set(web.EhcoAliveStateRunning)
+		rs, err := relay.NewServer(cfg)
+		if err != nil {
+			cmdLogger.Fatalf("NewRelayServer meet err=%s", err.Error())
+		}
+		go func() {
+			cmdLogger.Fatalf("StartRelayServer meet err=%s", rs.Start(mainCtx))
+		}()
 	}
 
 	<-sigs
