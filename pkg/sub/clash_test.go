@@ -37,7 +37,7 @@ func init() {
 func TestNewClashConfig(t *testing.T) {
 	// todo add more proxy types
 
-	cs, err := NewClashSub(configBuf)
+	cs, err := NewClashSub(configBuf, "test")
 	assert.NoError(t, err, "NewConfig should not return an error")
 	assert.NotNil(t, cs, "Config should not be nil")
 	expectedProxyCount := 2
@@ -46,12 +46,12 @@ func TestNewClashConfig(t *testing.T) {
 	yamlBuf, err := cs.ToClashConfigYaml()
 	assert.NoError(t, err, "ToClashConfigYaml should not return an error")
 	assert.NotNil(t, yamlBuf, "yamlBuf should not be nil")
-	println(string(yamlBuf))
+	l.Info("yamlBuf", zap.String("yamlBuf", string(yamlBuf)))
 }
 
 func TestToRelayConfigs(t *testing.T) {
-	cs, err := NewClashSub(configBuf)
-	assert.NoError(t, err, "NewConfig should not return an error")
+	cs, err := NewClashSub(configBuf, "test")
+	assert.NoError(t, err, "NewConfig should not retur an error")
 	assert.NotNil(t, cs, "Config should not be nil")
 
 	relayConfigs, err := cs.ToRelayConfigs("localhost")

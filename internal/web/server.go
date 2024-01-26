@@ -8,6 +8,7 @@ import (
 
 	"github.com/Ehco1996/ehco/internal/config"
 	"github.com/Ehco1996/ehco/internal/constant"
+	"github.com/Ehco1996/ehco/pkg/sub"
 	"github.com/alecthomas/kingpin/v2"
 	"github.com/gorilla/mux"
 	"github.com/prometheus/client_golang/prometheus"
@@ -102,9 +103,29 @@ func simpleTokenAuthMiddleware(token string, h http.Handler) http.Handler {
 	})
 }
 
-func StartWebServer(cfg *config.Config) error {
+func StartWebServer(cfg *config.Config, clashSubList []*sub.ClashSub) error {
 	addr := fmt.Sprintf("0.0.0.0:%d", cfg.WebPort)
 	zap.S().Named("web").Infof("Start Web Server at http://%s/", addr)
+
+	clashSubHandler := func(w http.ResponseWriter, r *http.Request) {
+		subName := r.URL.Query().Get("name")
+		if subName == "" {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		for _, cs := range clashSubList {
+			if cs.Name == subName {
+				yamlBuf, err := cs.ToClashConfigYaml()
+				if err != nil {
+					w.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+				w.Write(yamlBuf)
+				return
+			}
+		}
+		w.WriteHeader(http.StatusNotFound)
+	}
 
 	r := mux.NewRouter()
 	AttachProfiler(r)
@@ -114,6 +135,7 @@ func StartWebServer(cfg *config.Config) error {
 	}
 	r.Handle("/", http.HandlerFunc(Welcome))
 	r.Handle("/metrics/", promhttp.Handler())
+	r.Handle("/sub/", http.HandlerFunc(clashSubHandler))
 
 	if cfg.WebToken != "" {
 		return http.ListenAndServe(addr, simpleTokenAuthMiddleware(cfg.WebToken, r))

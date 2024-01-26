@@ -9,7 +9,7 @@ type Proxies struct {
 	Name     string `yaml:"name"`
 	Type     string `yaml:"type"`
 	Server   string `yaml:"server"`
-	Port     int    `yaml:"port"`
+	Port     string `yaml:"port"`
 	Password string `yaml:"password,omitempty"`
 	UDP      bool   `yaml:"udp,omitempty"`
 

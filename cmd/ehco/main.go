@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"os"
@@ -23,6 +24,7 @@ import (
 	"github.com/Ehco1996/ehco/internal/tls"
 	"github.com/Ehco1996/ehco/internal/web"
 	"github.com/Ehco1996/ehco/pkg/log"
+	"github.com/Ehco1996/ehco/pkg/sub"
 	"github.com/Ehco1996/ehco/pkg/xray"
 )
 
@@ -393,9 +395,38 @@ func start(ctx *cli.Context) error {
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
 
+	// sart sub to relay config
+	clashSubList := make([]*sub.ClashSub, 0, len(cfg.SubConfigs))
+	for _, subCfg := range cfg.SubConfigs {
+		resp, err := http.Get(subCfg.URL)
+		if err != nil {
+			cmdLogger.Fatalf("http get sub config meet err=%v", err)
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			cmdLogger.Fatalf("http get sub config status code=%d", resp.StatusCode)
+		}
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			cmdLogger.Fatalf("read sub config body meet err=%v", err)
+		}
+		clashSub, err := sub.NewClashSub(body, subCfg.Name)
+		if err != nil {
+			cmdLogger.Fatalf("NewClashSub meet err=%v", err)
+		}
+		relayCfgs, err := clashSub.ToRelayConfigs(subCfg.ListenHost)
+		if err != nil {
+			cmdLogger.Fatalf("ToRelayConfigs meet err=%v", err)
+		}
+		if len(relayCfgs) > 0 {
+			cfg.RelayConfigs = append(cfg.RelayConfigs, relayCfgs...)
+		}
+		clashSubList = append(clashSubList, clashSub)
+	}
+
 	if cfg.NeedStartWebServer() {
 		go func() {
-			cmdLogger.Fatalf("StartWebServer meet err=%s", web.StartWebServer(cfg))
+			cmdLogger.Fatalf("StartWebServer meet err=%s", web.StartWebServer(cfg, clashSubList))
 		}()
 	}
 

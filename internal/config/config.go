@@ -62,27 +62,33 @@ func (r *RelayConfig) Validate() error {
 	return nil
 }
 
+type SubConfig struct {
+	Name       string `json:"name"`
+	URL        string `json:"url"`
+	ListenHost string `json:"listen_host"`
+}
+
+
 type Config struct {
-	PATH string
+	PATH         string
+	RelayConfigs []*RelayConfig `json:"relay_configs"`
 
 	WebPort        int    `json:"web_port,omitempty"`
 	WebToken       string `json:"web_token,omitempty"`
-	EnablePing     bool   `json:"enable_ping,omitempty"`
 	LogLeveL       string `json:"log_level,omitempty"`
+	EnablePing     bool   `json:"enable_ping,omitempty"`
 	ReloadInterval int    `json:"reload_interval,omitempty"`
 
-	RelayConfigs []*RelayConfig `json:"relay_configs"`
-
-	XRayConfig          *xrayCfg.Config `json:"xray_config,omitempty"`
 	SyncTrafficEndPoint string          `json:"sync_traffic_endpoint"`
-
-	L *zap.SugaredLogger
+	SubConfigs          []*SubConfig    `json:"sub_configs,omitempty"`
+	XRayConfig          *xrayCfg.Config `json:"xray_config,omitempty"`
 
 	lastLoadTime time.Time
+	l            *zap.SugaredLogger
 }
 
 func NewConfig(path string) *Config {
-	return &Config{PATH: path, RelayConfigs: []*RelayConfig{}, L: zap.S().Named("cfg")}
+	return &Config{PATH: path, RelayConfigs: []*RelayConfig{}, l: zap.S().Named("cfg")}
 }
 
 func (c *Config) NeedSyncUserFromServer() bool {
@@ -91,7 +97,7 @@ func (c *Config) NeedSyncUserFromServer() bool {
 
 func (c *Config) LoadConfig() error {
 	if c.ReloadInterval > 0 && time.Since(c.lastLoadTime).Seconds() < float64(c.ReloadInterval) {
-		c.L.Debugf("Skip Load Config, last load time: %s", c.lastLoadTime)
+		c.l.Debugf("Skip Load Config, last load time: %s", c.lastLoadTime)
 		return nil
 	}
 	c.lastLoadTime = time.Now()
@@ -112,7 +118,7 @@ func (c *Config) readFromFile() error {
 	if err != nil {
 		return err
 	}
-	c.L.Debugf("Load Config From File: %s", c.PATH)
+	c.l.Debugf("Load Config From File: %s", c.PATH)
 	if err != nil {
 		return err
 	}
@@ -126,7 +132,7 @@ func (c *Config) readFromHttp() error {
 		return err
 	}
 	defer r.Body.Close()
-	c.L.Debugf("Load Config From HTTP: %s", c.PATH)
+	c.l.Debugf("Load Config From HTTP: %s", c.PATH)
 	return json.NewDecoder(r.Body).Decode(&c)
 }
 
