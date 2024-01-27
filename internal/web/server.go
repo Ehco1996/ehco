@@ -50,7 +50,7 @@ func NewServer(cfg *config.Config, relayReloader reloader.Reloader) (*Server, er
 	}
 
 	// register handler
-	e.GET("/", echo.WrapHandler(http.HandlerFunc(welcome)))
+	e.GET("/", echo.WrapHandler(http.HandlerFunc(s.welcome)))
 	e.GET("/metrics/", echo.WrapHandler(promhttp.Handler()))
 	e.GET("/debug/pprof/*", echo.WrapHandler(http.DefaultServeMux))
 	e.GET("/clash_proxy_provider/", echo.WrapHandler(http.HandlerFunc(s.HandleClashProxyProvider)))

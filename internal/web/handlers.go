@@ -3,7 +3,9 @@ package web
 import (
 	"fmt"
 	"net/http"
+	"text/template"
 
+	"github.com/Ehco1996/ehco/internal/config"
 	"github.com/Ehco1996/ehco/internal/constant"
 	"go.uber.org/zap"
 )
@@ -15,13 +17,30 @@ func MakeIndexF() http.HandlerFunc {
 	}
 }
 
-func welcome(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintf(w, constant.WelcomeHTML)
-}
-
 func writerBadRequestMsg(w http.ResponseWriter, msg string) {
 	w.WriteHeader(http.StatusBadRequest)
 	_, _ = w.Write([]byte(msg))
+}
+
+func (s *Server) welcome(w http.ResponseWriter, r *http.Request) {
+	tmpl := template.Must(template.New("").Parse(constant.WelcomeHTML))
+	data := struct {
+		Version     string
+		GitBranch   string
+		GitRevision string
+		BuildTime   string
+		SubConfigs  []*config.SubConfig
+	}{
+		Version:     "1.0",
+		GitBranch:   "master",
+		GitRevision: "1a2b3c",
+		BuildTime:   "2022-01-01T00:00:00Z",
+		SubConfigs:  s.cfg.SubConfigs,
+	}
+	if err := tmpl.Execute(w, data); err != nil {
+		writerBadRequestMsg(w, err.Error())
+		return
+	}
 }
 
 func (s *Server) HandleClashProxyProvider(w http.ResponseWriter, r *http.Request) {
