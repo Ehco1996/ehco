@@ -2,91 +2,96 @@ package sub
 
 import (
 	"fmt"
-	"io"
-	"net"
-	"net/http"
-	"strconv"
 
-	"github.com/Ehco1996/ehco/internal/constant"
 	relay_cfg "github.com/Ehco1996/ehco/internal/relay/conf"
 	"gopkg.in/yaml.v3"
 )
 
 type ClashSub struct {
 	Name string
+	URL  string
 
-	raw   *ClashConfig
-	after *ClashConfig
-
-	relayConfigs []*relay_cfg.Config
+	cCfg *clashConfig
 }
 
-func NewClashSub(rawClashCfgBuf []byte, name string) (*ClashSub, error) {
-	var raw ClashConfig
-	err := yaml.Unmarshal(rawClashCfgBuf, &raw)
+func NewClashSub(rawClashCfgBuf []byte, name string, url string) (*ClashSub, error) {
+	var rawCfg clashConfig
+	err := yaml.Unmarshal(rawClashCfgBuf, &rawCfg)
 	if err != nil {
 		return nil, err
 	}
-	return &ClashSub{raw: &raw, Name: name}, nil
+	rawCfg.Adjust()
+	return &ClashSub{cCfg: &rawCfg, Name: name, URL: url}, nil
 }
 
 func NewClashSubByURL(url string, name string) (*ClashSub, error) {
-	resp, err := http.Get(url)
-	if err != nil {
-		msg := fmt.Sprintf("http get sub config url=%s meet err=%v", url, err)
-		return nil, fmt.Errorf(msg)
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		msg := fmt.Sprintf("http get sub config url=%s meet status code=%d", url, resp.StatusCode)
-		return nil, fmt.Errorf(msg)
-	}
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		msg := fmt.Sprintf("read body meet err=%v", err)
-		return nil, fmt.Errorf(msg)
-	}
-	return NewClashSub(body, name)
-}
-
-func (c *ClashSub) ToClashConfigYaml() ([]byte, error) {
-	return yaml.Marshal(c.after)
-}
-
-func (c *ClashSub) ToRelayConfigsWithCache(listenHost string) ([]*relay_cfg.Config, error) {
-	if len(c.relayConfigs) > 0 {
-		return c.relayConfigs, nil
-	}
-	// do a copy for raw
-	after := c.raw
-	c.after = after
-
-	freePorts, err := getFreePortInBatch(listenHost, len(c.raw.Proxies))
+	body, err := getHttpBody(url)
 	if err != nil {
 		return nil, err
 	}
-	// overwrite port and server by relay
-	for idx, proxy := range c.raw.Proxies {
-		listenPort := freePorts[idx]
-		listenAddr := net.JoinHostPort(listenHost, strconv.Itoa(listenPort))
-		remoteAddr := net.JoinHostPort(proxy.Server, proxy.Port)
-		r := &relay_cfg.Config{
-			Label:         proxy.Name,
-			ListenType:    constant.Listen_RAW,
-			TransportType: constant.Transport_RAW,
-			Listen:        listenAddr,
-			TCPRemotes:    []string{remoteAddr},
+	return NewClashSub(body, name, url)
+}
+
+func (c *ClashSub) ToClashConfigYaml() ([]byte, error) {
+	return yaml.Marshal(c.cCfg)
+}
+
+func (c *ClashSub) Refresh() error {
+	// get new clash sub by url
+	newSub, err := NewClashSubByURL(c.URL, c.Name)
+	if err != nil {
+		return err
+	}
+
+	needAdd := []*Proxies{}
+	needDeleteProxyName := map[string]struct{}{}
+
+	// check if need add/delete proxies
+	for _, newProxy := range *newSub.cCfg.Proxies {
+		oldProxy := c.cCfg.GetProxyByRawName(newProxy.rawName)
+		if oldProxy == nil {
+			println("need add", newProxy.Name)
+			needAdd = append(needAdd, newProxy)
+		} else if oldProxy.Different(newProxy) {
+			// update  so we need to delete and add again
+			needDeleteProxyName[oldProxy.rawName] = struct{}{}
+			needAdd = append(needAdd, newProxy)
+			println("need update", oldProxy.rawName)
 		}
-		if proxy.UDP {
-			r.UDPRemotes = []string{remoteAddr}
+	}
+	// check if need delete proxies
+	for _, proxy := range *c.cCfg.Proxies {
+		newProxy := newSub.cCfg.GetProxyByRawName(proxy.rawName)
+		if newProxy == nil {
+			needDeleteProxyName[proxy.rawName] = struct{}{}
+			println("need delete", proxy.rawName)
 		}
-		if err := r.Validate(); err != nil {
+	}
+
+	tmp := []*Proxies{}
+	// delete proxies from changedCfg
+	for _, p := range *c.cCfg.Proxies {
+		if _, ok := needDeleteProxyName[p.rawName]; !ok {
+			tmp = append(tmp, p)
+		}
+	}
+	// add new proxies to changedCfg
+	tmp = append(tmp, needAdd...)
+
+	// update current
+	c.cCfg.Proxies = &tmp
+	return nil
+}
+
+func (c *ClashSub) ToRelayConfigs(listenHost string) ([]*relay_cfg.Config, error) {
+	relayConfigs := []*relay_cfg.Config{}
+	for _, proxy := range *c.cCfg.Proxies {
+		newName := fmt.Sprintf("%s-%s", c.Name, proxy.Name)
+		rc, err := proxy.ToRelayConfig(listenHost, newName)
+		if err != nil {
 			return nil, err
 		}
-		c.relayConfigs = append(c.relayConfigs, r)
-		c.after.Proxies[idx].Server = listenHost
-		c.after.Proxies[idx].Port = strconv.Itoa(listenPort)
-		c.after.Proxies[idx].Name = fmt.Sprintf("%s-%s", c.Name, proxy.Name)
+		relayConfigs = append(relayConfigs, rc)
 	}
-	return c.relayConfigs, nil
+	return relayConfigs, nil
 }

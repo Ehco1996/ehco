@@ -134,11 +134,9 @@ document.getElementById("reloadButton").addEventListener("click", function() {
 	request.onreadystatechange = function() {
 		if (request.readyState === XMLHttpRequest.DONE) {
 			if (request.status === 200) {
-				// 处理请求成功的逻辑
 				msg = "Reload config success." + "response: " + request.responseText;
 				alert(msg);
 			} else {
-				// 处理请求失败的逻辑
 				msg = "Failed to reload config." + "response: " + request.responseText;
 				alert(msg);;
 			}

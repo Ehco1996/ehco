@@ -98,7 +98,10 @@ func (c *Config) Adjust() error {
 		return err
 	}
 	for _, clashSub := range clashSubList {
-		relayConfigs, err := clashSub.ToRelayConfigsWithCache(c.WebHost)
+		if err := clashSub.Refresh(); err != nil {
+			return err
+		}
+		relayConfigs, err := clashSub.ToRelayConfigs(c.WebHost)
 		if err != nil {
 			return err
 		}

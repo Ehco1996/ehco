@@ -52,11 +52,13 @@ func (s *Server) HandleClashProxyProvider(w http.ResponseWriter, r *http.Request
 		return
 	}
 	if s.relayServerReloader != nil {
-		s.relayServerReloader.TriggerReload()
+		if err := s.relayServerReloader.Reload(); err != nil {
+			writerBadRequestMsg(w, err.Error())
+			return
+		}
 	} else {
 		s.l.Debugf("relayServerReloader is nil this should not happen")
 	}
-
 	clashSubList, err := s.cfg.GetClashSubList()
 	if err != nil {
 		writerBadRequestMsg(w, err.Error())
@@ -69,7 +71,6 @@ func (s *Server) HandleClashProxyProvider(w http.ResponseWriter, r *http.Request
 				writerBadRequestMsg(w, err.Error())
 				return
 			}
-
 			_, err = w.Write(clashCfgBuf)
 			if err != nil {
 				s.l.Errorf("write response meet err=%v", err)
