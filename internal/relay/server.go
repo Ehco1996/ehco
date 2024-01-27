@@ -59,7 +59,6 @@ func (s *Server) stopOneRelay(r *Relay) {
 }
 
 func (s *Server) Start(ctx context.Context) error {
-
 	// init and relay servers
 	for idx := range s.cfg.RelayConfigs {
 		r, err := NewRelay(s.cfg.RelayConfigs[idx])

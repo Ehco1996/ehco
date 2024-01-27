@@ -43,6 +43,10 @@ func InitGlobalLogger(logLevel string) error {
 	return err
 }
 
-func NewLogger(logLevel string) (*zap.Logger, error) {
-	return initLogger(logLevel, false)
+func MustNewLogger(logLevel string) *zap.Logger {
+	l, err := initLogger(logLevel, false)
+	if err != nil {
+		panic(err)
+	}
+	return l
 }
