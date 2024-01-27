@@ -78,13 +78,11 @@ func (p *Proxies) Different(new *Proxies) bool {
 		p.UUID != new.UUID ||
 		p.AlterID != new.AlterID ||
 		p.ServerName != new.ServerName {
-		println("different in 1", p.Name)
 		return true
 	}
 	// ALPN field is a slice, should assert values successively.
 	for i, v := range p.ALPN {
 		if v != new.ALPN[i] {
-			println("different in 2", p.Name)
 			return true
 		}
 	}
@@ -93,7 +91,6 @@ func (p *Proxies) Different(new *Proxies) bool {
 	if p.rawName != new.rawName ||
 		p.rawServer != new.rawServer ||
 		p.rawPort != new.rawPort {
-		println("different in 3", p.Name)
 		return true
 	}
 

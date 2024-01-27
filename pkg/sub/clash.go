@@ -50,13 +50,11 @@ func (c *ClashSub) Refresh() error {
 	for _, newProxy := range *newSub.cCfg.Proxies {
 		oldProxy := c.cCfg.GetProxyByRawName(newProxy.rawName)
 		if oldProxy == nil {
-			println("need add", newProxy.Name)
 			needAdd = append(needAdd, newProxy)
 		} else if oldProxy.Different(newProxy) {
 			// update  so we need to delete and add again
 			needDeleteProxyName[oldProxy.rawName] = struct{}{}
 			needAdd = append(needAdd, newProxy)
-			println("need update", oldProxy.rawName)
 		}
 	}
 	// check if need delete proxies
@@ -64,7 +62,6 @@ func (c *ClashSub) Refresh() error {
 		newProxy := newSub.cCfg.GetProxyByRawName(proxy.rawName)
 		if newProxy == nil {
 			needDeleteProxyName[proxy.rawName] = struct{}{}
-			println("need delete", proxy.rawName)
 		}
 	}
 
