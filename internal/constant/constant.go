@@ -11,7 +11,7 @@ var (
 	GitRevision string
 	BuildTime   string
 
-	IndexHTMLTMPL = `<!doctype html>
+	WelcomeHTML = `<!doctype html>
 	<html>
 	<head>
 		<meta charset="UTF-8">
@@ -24,10 +24,15 @@ var (
 		<h3>GitRevision: ` + GitRevision + `</h3>
 		<h3>BuildTime: ` + BuildTime + `</h3>
 		<hr>
-		<p><a href="https://github.com/Ehco1996/ehco">More information here</a></p>
 		<p><a href="/metrics/">Metrics</a></p>
 		<p><a href="/debug/pprof/">Debug</a></p>
 		<p><a href="/clash_proxy_provider/?sub_name=<your_sub_name>">Clash Proxy Provider</a></p>
+
+		<form action="/reload/" method="post">
+			<input type="submit" value="Reload Config">
+		</form>
+		<hr>
+		<p><a href="https://github.com/Ehco1996/ehco">More information here</a></p>
 	</body>
 	</html>
 	`

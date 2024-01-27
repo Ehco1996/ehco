@@ -54,7 +54,7 @@ func TestToRelayConfigs(t *testing.T) {
 	assert.NoError(t, err, "NewConfig should not retur an error")
 	assert.NotNil(t, cs, "Config should not be nil")
 
-	relayConfigs, err := cs.ToRelayConfigs("localhost")
+	relayConfigs, err := cs.ToRelayConfigsWithCache("localhost")
 	assert.NoError(t, err, "ToRelayConfigs should not return an error")
 	assert.NotNil(t, relayConfigs, "relayConfigs should not be nil")
 	expectedRelayCount := 2

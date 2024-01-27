@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/Ehco1996/ehco/internal/relay/conf"
+	"github.com/Ehco1996/ehco/pkg/sub"
 	xConf "github.com/xtls/xray-core/infra/conf"
 	"go.uber.org/zap"
 )
@@ -31,10 +32,12 @@ type Config struct {
 
 	lastLoadTime time.Time
 	l            *zap.SugaredLogger
+
+	cachedClashSubMap map[string]*sub.ClashSub // key: clash sub name
 }
 
 func NewConfig(path string) *Config {
-	return &Config{PATH: path, l: zap.S().Named("cfg")}
+	return &Config{PATH: path, l: zap.S().Named("cfg"), cachedClashSubMap: make(map[string]*sub.ClashSub)}
 }
 
 func (c *Config) NeedSyncUserFromServer() bool {
@@ -89,6 +92,19 @@ func (c *Config) Adjust() error {
 	if c.WebHost == "" {
 		c.WebHost = "0.0.0.0"
 	}
+
+	clashSubList, err := c.GetClashSubList()
+	if err != nil {
+		return err
+	}
+	for _, clashSub := range clashSubList {
+		relayConfigs, err := clashSub.ToRelayConfigsWithCache(c.WebHost)
+		if err != nil {
+			return err
+		}
+		c.RelayConfigs = append(c.RelayConfigs, relayConfigs...)
+	}
+
 	for _, r := range c.RelayConfigs {
 		if err := r.Validate(); err != nil {
 			return err
@@ -118,6 +134,30 @@ func (c *Config) GetMetricURL() string {
 		url += fmt.Sprintf("?token=%s", c.WebToken)
 	}
 	return url
+}
+
+func (c *Config) GetClashSubList() ([]*sub.ClashSub, error) {
+	clashSubList := make([]*sub.ClashSub, 0, len(c.SubConfigs))
+	for _, subCfg := range c.SubConfigs {
+		clashSub, err := c.getOrCreateClashSub(subCfg)
+		if err != nil {
+			return nil, err
+		}
+		clashSubList = append(clashSubList, clashSub)
+	}
+	return clashSubList, nil
+}
+
+func (c *Config) getOrCreateClashSub(subCfg *SubConfig) (*sub.ClashSub, error) {
+	if clashSub, ok := c.cachedClashSubMap[subCfg.Name]; ok {
+		return clashSub, nil
+	}
+	clashSub, err := sub.NewClashSubByURL(subCfg.URL, subCfg.Name)
+	if err != nil {
+		return nil, err
+	}
+	c.cachedClashSubMap[subCfg.Name] = clashSub
+	return clashSub, nil
 }
 
 type SubConfig struct {

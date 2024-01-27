@@ -12,8 +12,11 @@ import (
 	"time"
 
 	"github.com/Ehco1996/ehco/internal/config"
+	"github.com/Ehco1996/ehco/internal/reloader"
 	"go.uber.org/zap"
 )
+
+var _ reloader.Reloader = (*Server)(nil)
 
 func inArray(ele string, array []string) bool {
 	for _, v := range array {
@@ -29,16 +32,18 @@ type Server struct {
 	cfg    *config.Config
 	l      *zap.SugaredLogger
 
-	errCH chan error // once error happen, server will exit
+	errCH    chan error    // once error happen, server will exit
+	reloadCH chan struct{} // reload config
 }
 
 func NewServer(cfg *config.Config) (*Server, error) {
 	l := zap.S().Named("relay-server")
 	s := &Server{
-		cfg:    cfg,
-		l:      l,
-		relayM: &sync.Map{},
-		errCH:  make(chan error, 1),
+		cfg:      cfg,
+		l:        l,
+		relayM:   &sync.Map{},
+		errCH:    make(chan error, 1),
+		reloadCH: make(chan struct{}, 1),
 	}
 	return s, nil
 }
@@ -68,7 +73,7 @@ func (s *Server) Start(ctx context.Context) error {
 		go s.startOneRelay(r)
 	}
 
-	if s.cfg.PATH != "" && s.cfg.ReloadInterval > 0 {
+	if s.cfg.PATH != "" && (s.cfg.ReloadInterval > 0 || len(s.cfg.SubConfigs) > 0) {
 		s.l.Infof("Start to watch relay config %s ", s.cfg.PATH)
 		go s.WatchAndReload(ctx)
 	}
@@ -89,38 +94,32 @@ func (s *Server) Start(ctx context.Context) error {
 }
 
 func (s *Server) Reload() error {
-	// load new config
+	// load config on raw
+	// NOTE: this is for reuse cached clash sub, because clash sub to relay config will change port every time when call
 	if err := s.cfg.LoadConfig(); err != nil {
-		s.l.Errorf("Reload conf meet error: %s ", err)
+		s.l.Error("load new cfg meet error", zap.Error(err))
 		return err
 	}
-	var newRelayAddrList []string
+	var allRelayAddrList []string
 	for idx := range s.cfg.RelayConfigs {
 		r, err := NewRelay(s.cfg.RelayConfigs[idx])
 		if err != nil {
 			s.l.Errorf("reload new relay failed err=%s", err.Error())
 			return err
 		}
-		newRelayAddrList = append(newRelayAddrList, r.Name)
-		// reload relay when name change
-		if oldR, ok := s.relayM.Load(r.Name); ok {
-			oldR := oldR.(*Relay)
-			if oldR.Name != r.Name {
-				s.l.Warnf("close old relay name=%s", oldR.Name)
-				s.stopOneRelay(oldR)
-				go s.startOneRelay(r)
-			}
-			continue // no need to reload
-		}
+		allRelayAddrList = append(allRelayAddrList, r.Name)
 		// start bread new relay that not in old relayM
-		s.l.Infof("start new relay name=%s", r.Name)
-		go s.startOneRelay(r)
+		if _, ok := s.relayM.Load(r.Name); !ok {
+			s.l.Infof("start new relay name=%s", r.Name)
+			go s.startOneRelay(r)
+			continue
+		}
 	}
 
-	// closed relay not in new config
+	// closed relay not in all relay list
 	s.relayM.Range(func(key, value interface{}) bool {
 		oldAddr := key.(string)
-		if !inArray(oldAddr, newRelayAddrList) {
+		if !inArray(oldAddr, allRelayAddrList) {
 			v, _ := s.relayM.Load(oldAddr)
 			oldR := v.(*Relay)
 			s.stopOneRelay(oldR)
@@ -130,46 +129,64 @@ func (s *Server) Reload() error {
 	return nil
 }
 
-func (s *Server) WatchAndReload(ctx context.Context) {
-	reloadCH := make(chan struct{}, 1)
-	// listen syscall.SIGHUP to trigger reload
-	sigHubCH := make(chan os.Signal, 1)
-	signal.Notify(sigHubCH, syscall.SIGHUP)
-	go func() {
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-sigHubCH:
-				s.l.Info("Now Reloading Relay Conf By HUP Signal! ")
-				reloadCH <- struct{}{}
-			}
-		}
-	}()
+func (s *Server) Stop() error {
+	s.l.Info("relay server stop now")
+	s.relayM.Range(func(key, value interface{}) bool {
+		r := value.(*Relay)
+		r.Close()
+		return true
+	})
+	return nil
+}
 
-	// ticker to reload config
-	ticker := time.NewTicker(time.Second * time.Duration(s.cfg.ReloadInterval))
-	defer ticker.Stop()
-	go func() {
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-ticker.C:
-				reloadCH <- struct{}{}
-			}
-		}
-	}()
+func (s *Server) TriggerReload() {
+	s.reloadCH <- struct{}{}
+}
+
+func (s *Server) WatchAndReload(ctx context.Context) {
+	go s.TriggerReloadBySignal(ctx)
+	go s.triggerReloadByTicker(ctx)
 
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case <-reloadCH:
+		case <-s.reloadCH:
 			if err := s.Reload(); err != nil {
 				s.l.Errorf("Reloading Relay Conf meet error: %s ", err)
 				s.errCH <- err
 			}
+		}
+	}
+}
+
+func (s *Server) triggerReloadByTicker(ctx context.Context) {
+	if s.cfg.ReloadInterval > 0 {
+		ticker := time.NewTicker(time.Second * time.Duration(s.cfg.ReloadInterval))
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				s.l.Info("Now Reloading Relay Conf By ticker! ")
+				s.TriggerReload()
+			}
+		}
+	}
+}
+
+func (s *Server) TriggerReloadBySignal(ctx context.Context) {
+	// listen syscall.SIGHUP to trigger reload
+	sigHubCH := make(chan os.Signal, 1)
+	signal.Notify(sigHubCH, syscall.SIGHUP)
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-sigHubCH:
+			s.l.Info("Now Reloading Relay Conf By HUP Signal! ")
+			s.TriggerReload()
 		}
 	}
 }
