@@ -6,7 +6,7 @@ var (
 	// allow change in test
 	IdleTimeOut = 10 * time.Second
 
-	Version     = "1.1.3"
+	Version     = "1.1.4-dev"
 	GitBranch   string
 	GitRevision string
 	BuildTime   string
@@ -27,6 +27,7 @@ var (
 		<p><a href="https://github.com/Ehco1996/ehco">More information here</a></p>
 		<p><a href="/metrics/">Metrics</a></p>
 		<p><a href="/debug/pprof/">Debug</a></p>
+		<p><a href="/clash_proxy_provider/?sub_name=<your_sub_name>">Clash Proxy Provider</a></p>
 	</body>
 	</html>
 	`

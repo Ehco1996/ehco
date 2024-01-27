@@ -25,6 +25,7 @@ type Config struct {
 	ReloadInterval int    `json:"reload_interval,omitempty"`
 
 	RelayConfigs        []*conf.Config `json:"relay_configs"`
+	SubConfigs          []*SubConfig   `json:"sub_configs,omitempty"`
 	XRayConfig          *xConf.Config  `json:"xray_config,omitempty"`
 	SyncTrafficEndPoint string         `json:"sync_traffic_endpoint,omitempty"`
 
@@ -117,4 +118,9 @@ func (c *Config) GetMetricURL() string {
 		url += fmt.Sprintf("?token=%s", c.WebToken)
 	}
 	return url
+}
+
+type SubConfig struct {
+	Name string `json:"name"`
+	URL  string `json:"url"`
 }

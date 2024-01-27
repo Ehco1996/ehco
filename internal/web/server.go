@@ -7,37 +7,28 @@ import (
 	_ "net/http/pprof"
 
 	"github.com/Ehco1996/ehco/internal/config"
-	"github.com/Ehco1996/ehco/internal/constant"
 	"github.com/labstack/echo/v4"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.uber.org/zap"
 )
 
-func MakeIndexF() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		zap.S().Named("web").Infof("index call from %s", r.RemoteAddr)
-		fmt.Fprintf(w, "access from remote ip: %s \n", r.RemoteAddr)
-	}
-}
-
-func Welcome(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintf(w, constant.IndexHTMLTMPL)
-}
-
 type Server struct {
 	e    *echo.Echo
 	addr string
 	l    *zap.SugaredLogger
+
+	cfg *config.Config
 }
 
 func NewServer(cfg *config.Config) (*Server, error) {
-	addr := net.JoinHostPort(cfg.WebHost, fmt.Sprintf("%d", cfg.WebPort))
 	l := zap.S().Named("web")
 
+	addr := net.JoinHostPort(cfg.WebHost, fmt.Sprintf("%d", cfg.WebPort))
 	e := echo.New()
 	e.HideBanner = true
 	e.HidePort = true
 	e.Use(NginxLogMiddleware(l))
+
 	if cfg.WebToken != "" {
 		e.Use(SimpleTokenAuthMiddleware(cfg.WebToken, l))
 	}
@@ -48,13 +39,14 @@ func NewServer(cfg *config.Config) (*Server, error) {
 	if err := registerNodeExporterMetrics(cfg); err != nil {
 		return nil, err
 	}
+	s := &Server{e: e, addr: addr, l: l, cfg: cfg}
 
-	// register router
-	e.GET("/", echo.WrapHandler(http.HandlerFunc(Welcome)))
+	// register handler
+	e.GET("/", echo.WrapHandler(http.HandlerFunc(welcome)))
 	e.GET("/metrics/", echo.WrapHandler(promhttp.Handler()))
 	e.GET("/debug/pprof/*", echo.WrapHandler(http.DefaultServeMux))
-
-	return &Server{e: e, addr: addr, l: l}, nil
+	e.GET("/clash_proxy_provider/", echo.WrapHandler(http.HandlerFunc(s.HandleClashProxyProvider)))
+	return s, nil
 }
 
 func (s *Server) Start() error {
