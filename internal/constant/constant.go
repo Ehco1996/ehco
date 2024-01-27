@@ -103,6 +103,7 @@ const WelcomeHTML = `
 			<ul>
 				<li><a href="/metrics/">Metrics</a></li>
 				<li><a href="/debug/pprof/">Debug</a></li>
+				<li><a href="/config/">Current Config</a></li>
 			</ul>
 
 			{{if .SubConfigs}}
@@ -120,7 +121,7 @@ const WelcomeHTML = `
 		</div>
 
 		<footer>
-		<a href="https://github.com/Ehco1996/ehco">More information here</a>
+		<a href="https://github.com/Ehco1996/ehco">Source code</a>
 		</footer>
 	</div>
 </body>

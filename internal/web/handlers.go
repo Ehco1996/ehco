@@ -1,6 +1,7 @@
 package web
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"text/template"
@@ -94,4 +95,16 @@ func (s *Server) HandleReload(w http.ResponseWriter, r *http.Request) {
 		writerBadRequestMsg(w, err.Error())
 		return
 	}
+}
+
+func (s *Server) CurrentConfig(w http.ResponseWriter, r *http.Request) {
+	// return json config
+	ret, err := json.Marshal(s.cfg)
+	if err != nil {
+		writerBadRequestMsg(w, err.Error())
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+	w.Header().Set("Content-Type", "application/json")
+	_, _ = w.Write(ret)
 }
