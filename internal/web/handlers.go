@@ -32,10 +32,10 @@ func (s *Server) welcome(w http.ResponseWriter, r *http.Request) {
 		BuildTime   string
 		SubConfigs  []*config.SubConfig
 	}{
-		Version:     "1.0",
-		GitBranch:   "master",
-		GitRevision: "1a2b3c",
-		BuildTime:   "2022-01-01T00:00:00Z",
+		Version:     constant.Version,
+		GitBranch:   constant.GitBranch,
+		GitRevision: constant.GitRevision,
+		BuildTime:   constant.BuildTime,
 		SubConfigs:  s.cfg.SubConfigs,
 	}
 	if err := tmpl.Execute(w, data); err != nil {
