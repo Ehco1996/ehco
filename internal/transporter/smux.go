@@ -25,14 +25,35 @@ type smuxTransporter struct {
 }
 
 type SessionWithMetrics struct {
-	session     *smux.Session
+	session *smux.Session
+
 	createdTime time.Time
+	streamList  []*smux.Stream
 }
 
-func (sm *SessionWithMetrics) CanNotServe() bool {
+func (sm *SessionWithMetrics) CanNotServeNewStream() bool {
 	return sm.session.IsClosed() ||
 		sm.session.NumStreams() >= constant.SmuxMaxStreamCnt ||
 		time.Since(sm.createdTime) > constant.SmuxMaxAliveDuration
+}
+
+func streamDead(s *smux.Stream) bool {
+	select {
+	case _, ok := <-s.GetDieCh():
+		return !ok // 如果接收到值且通道未关闭，则 Stream 未死
+	default:
+		return true // 如果通道已经关闭，则 Stream 死了
+	}
+}
+
+func (sm *SessionWithMetrics) canCloseSession(remoteAddr string, l *zap.SugaredLogger) bool {
+	for _, s := range sm.streamList {
+		if !streamDead(s) {
+			return false
+		}
+		l.Debugf("session: %s stream: %d is not dead", remoteAddr, s.ID())
+	}
+	return true
 }
 
 func NewSmuxTransporter(l *zap.SugaredLogger,
@@ -56,9 +77,10 @@ func (tr *smuxTransporter) gc() {
 			tr.L.Debugf("start doing gc for remote addr: %s total session count %d", addr, len(sl))
 			for idx := range sl {
 				sm := sl[idx]
-				if sm.session.NumStreams() == 0 {
+				if sm.CanNotServeNewStream() && sm.canCloseSession(addr, tr.L) {
+					tr.L.Debugf("close idle session:%s stream cnt %d",
+						sm.session.LocalAddr().String(), sm.session.NumStreams())
 					sm.session.Close()
-					tr.L.Debugf("close idle session:%s", sm.session.LocalAddr().String())
 				}
 			}
 			newList := []*SessionWithMetrics{}
@@ -78,27 +100,30 @@ func (tr *smuxTransporter) Dial(ctx context.Context, addr string) (conn net.Conn
 	tr.sessionMutex.Lock()
 	defer tr.sessionMutex.Unlock()
 	var session *smux.Session
+	var curSM *SessionWithMetrics
 
 	sessionList := tr.sessionM[addr]
 	for _, sm := range sessionList {
-		if sm.CanNotServe() {
+		if sm.CanNotServeNewStream() {
 			continue
 		} else {
 			tr.L.Debugf("use session: %s total stream count: %d remote addr: %s",
 				sm.session.LocalAddr().String(), sm.session.NumStreams(), addr)
 			session = sm.session
+			curSM = sm
 			break
 		}
 	}
-
 	// create new one
 	if session == nil {
 		session, err = tr.initSessionF(ctx, addr)
 		if err != nil {
 			return nil, err
 		}
-		sessionList = append(sessionList, &SessionWithMetrics{session: session, createdTime: time.Now()})
+		sm := &SessionWithMetrics{session: session, createdTime: time.Now(), streamList: []*smux.Stream{}}
+		sessionList = append(sessionList, sm)
 		tr.sessionM[addr] = sessionList
+		curSM = sm
 	}
 
 	stream, err := session.OpenStream()
@@ -107,5 +132,6 @@ func (tr *smuxTransporter) Dial(ctx context.Context, addr string) (conn net.Conn
 		session.Close()
 		return nil, err
 	}
+	curSM.streamList = append(curSM.streamList, stream)
 	return stream, nil
 }

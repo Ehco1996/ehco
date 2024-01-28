@@ -16,7 +16,7 @@ const (
 	DialTimeOut = 3 * time.Second
 
 	SmuxGCDuration       = 30 * time.Second
-	SmuxMaxAliveDuration = 1 * time.Hour
+	SmuxMaxAliveDuration = 10 * time.Minute
 	SmuxMaxStreamCnt     = 5
 
 	Listen_RAW  = "raw"
