@@ -2,7 +2,7 @@
   "__inputs": [
     {
       "name": "DS_PROMETHEUS",
-      "label": "Prometheus",
+      "label": "prometheus",
       "description": "",
       "type": "datasource",
       "pluginId": "prometheus",
@@ -21,7 +21,7 @@
       "type": "grafana",
       "id": "grafana",
       "name": "Grafana",
-      "version": "9.2.2"
+      "version": "10.3.1"
     },
     {
       "type": "panel",
@@ -95,6 +95,7 @@
                 "mode": "palette-classic"
               },
               "custom": {
+                "axisBorderShow": false,
                 "axisCenteredZero": false,
                 "axisColorMode": "text",
                 "axisLabel": "",
@@ -108,6 +109,7 @@
                   "tooltip": false,
                   "viz": false
                 },
+                "insertNulls": false,
                 "lineInterpolation": "linear",
                 "lineWidth": 1,
                 "pointSize": 5,
@@ -130,8 +132,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -139,7 +140,8 @@
                   }
                 ]
               },
-              "unit": "bps"
+              "unit": "bps",
+              "unitScale": true
             },
             "overrides": [
               {
@@ -529,8 +531,9 @@
                 "uid": "${DS_PROMETHEUS}"
               },
               "editorMode": "code",
-              "expr": "irate(node_network_receive_bytes_total{instance=\"$node\",job=\"$job\"}[$__rate_interval])*8",
+              "expr": "irate(node_network_receive_bytes_total{job=\"$job\",instance=~\"$instance\"}[$__rate_interval])*8",
               "format": "time_series",
+              "hide": false,
               "intervalFactor": 1,
               "legendFormat": "recv {{device}}",
               "range": true,
@@ -542,10 +545,13 @@
                 "type": "prometheus",
                 "uid": "${DS_PROMETHEUS}"
               },
-              "expr": "irate(node_network_transmit_bytes_total{instance=\"$node\",job=\"$job\"}[$__rate_interval])*8",
+              "editorMode": "code",
+              "expr": "irate(node_network_transmit_bytes_total{job=\"$job\",instance=~\"$instance\"}[$__rate_interval])*8",
               "format": "time_series",
+              "hide": false,
               "intervalFactor": 1,
-              "legendFormat": "trans {{device}} ",
+              "legendFormat": "trans {{device}}",
+              "range": true,
               "refId": "B",
               "step": 240
             }
@@ -565,6 +571,7 @@
                 "mode": "palette-classic"
               },
               "custom": {
+                "axisBorderShow": false,
                 "axisCenteredZero": false,
                 "axisColorMode": "text",
                 "axisLabel": "",
@@ -578,6 +585,7 @@
                   "tooltip": false,
                   "viz": false
                 },
+                "insertNulls": false,
                 "lineInterpolation": "smooth",
                 "lineWidth": 1,
                 "pointSize": 5,
@@ -601,8 +609,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -610,7 +617,8 @@
                   }
                 ]
               },
-              "unit": "percentunit"
+              "unit": "percentunit",
+              "unitScale": true
             },
             "overrides": [
               {
@@ -749,7 +757,7 @@
                 "uid": "${DS_PROMETHEUS}"
               },
               "editorMode": "code",
-              "expr": "sum by(instance) (irate(node_cpu_seconds_total{instance=\"$node\",job=\"$job\", mode=\"system\"}[$__rate_interval])) / on(instance) group_left sum by (instance)((irate(node_cpu_seconds_total{instance=\"$node\",job=\"$job\"}[$__rate_interval])))",
+              "expr": "sum by(instance) (irate(node_cpu_seconds_total{job=\"$job\",instance=~\"$instance\", mode=\"system\"}[$__rate_interval])) / on(instance) group_left sum by (instance)((irate(node_cpu_seconds_total{job=\"$job\",instance=~\"$instance\"}[$__rate_interval])))",
               "format": "time_series",
               "hide": false,
               "intervalFactor": 1,
@@ -764,7 +772,7 @@
                 "uid": "${DS_PROMETHEUS}"
               },
               "editorMode": "code",
-              "expr": "sum by(instance) (irate(node_cpu_seconds_total{instance=\"$node\",job=\"$job\", mode=\"user\"}[$__rate_interval])) / on(instance) group_left sum by (instance)((irate(node_cpu_seconds_total{instance=\"$node\",job=\"$job\"}[$__rate_interval])))",
+              "expr": "sum by(instance) (irate(node_cpu_seconds_total{job=\"$job\",instance=~\"$instance\", mode=\"user\"}[$__rate_interval])) / on(instance) group_left sum by (instance)((irate(node_cpu_seconds_total{job=\"$job\",instance=~\"$instance\"}[$__rate_interval])))",
               "format": "time_series",
               "hide": false,
               "intervalFactor": 1,
@@ -779,7 +787,7 @@
                 "uid": "${DS_PROMETHEUS}"
               },
               "editorMode": "code",
-              "expr": "sum by(instance) (irate(node_cpu_seconds_total{instance=\"$node\",job=\"$job\", mode=\"iowait\"}[$__rate_interval])) / on(instance) group_left sum by (instance)((irate(node_cpu_seconds_total{instance=\"$node\",job=\"$job\"}[$__rate_interval])))",
+              "expr": "sum by(instance) (irate(node_cpu_seconds_total{job=\"$job\",instance=~\"$instance\", mode=\"iowait\"}[$__rate_interval])) / on(instance) group_left sum by (instance)((irate(node_cpu_seconds_total{job=\"$job\",instance=~\"$instance\"}[$__rate_interval])))",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "Busy Iowait",
@@ -793,7 +801,7 @@
                 "uid": "${DS_PROMETHEUS}"
               },
               "editorMode": "code",
-              "expr": "sum by(instance) (irate(node_cpu_seconds_total{instance=\"$node\",job=\"$job\", mode=~\".*irq\"}[$__rate_interval])) / on(instance) group_left sum by (instance)((irate(node_cpu_seconds_total{instance=\"$node\",job=\"$job\"}[$__rate_interval])))",
+              "expr": "sum by(instance) (irate(node_cpu_seconds_total{job=\"$job\",instance=~\"$instance\", mode=~\".*irq\"}[$__rate_interval])) / on(instance) group_left sum by (instance)((irate(node_cpu_seconds_total{job=\"$job\",instance=~\"$instance\"}[$__rate_interval])))",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "Busy IRQs",
@@ -807,7 +815,7 @@
                 "uid": "${DS_PROMETHEUS}"
               },
               "editorMode": "code",
-              "expr": "sum by(instance) (irate(node_cpu_seconds_total{instance=\"$node\",job=\"$job\", mode!='idle',mode!='user',mode!='system',mode!='iowait',mode!='irq',mode!='softirq'}[$__rate_interval])) / on(instance) group_left sum by (instance)((irate(node_cpu_seconds_total{instance=\"$node\",job=\"$job\"}[$__rate_interval])))",
+              "expr": "sum by(instance) (irate(node_cpu_seconds_total{job=\"$job\",instance=~\"$instance\", mode!='idle',mode!='user',mode!='system',mode!='iowait',mode!='irq',mode!='softirq'}[$__rate_interval])) / on(instance) group_left sum by (instance)((irate(node_cpu_seconds_total{job=\"$job\",instance=~\"$instance\"}[$__rate_interval])))",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "Busy Other",
@@ -821,7 +829,7 @@
                 "uid": "${DS_PROMETHEUS}"
               },
               "editorMode": "code",
-              "expr": "sum by(instance) (irate(node_cpu_seconds_total{instance=\"$node\",job=\"$job\", mode=\"idle\"}[$__rate_interval])) / on(instance) group_left sum by (instance)((irate(node_cpu_seconds_total{instance=\"$node\",job=\"$job\"}[$__rate_interval])))",
+              "expr": "sum by(instance) (irate(node_cpu_seconds_total{job=\"$job\",instance=~\"$instance\", mode=\"idle\"}[$__rate_interval])) / on(instance) group_left sum by (instance)((irate(node_cpu_seconds_total{job=\"$job\",instance=~\"$instance\"}[$__rate_interval])))",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "Idle",
@@ -845,6 +853,7 @@
                 "mode": "palette-classic"
               },
               "custom": {
+                "axisBorderShow": false,
                 "axisCenteredZero": false,
                 "axisColorMode": "text",
                 "axisLabel": "",
@@ -858,6 +867,7 @@
                   "tooltip": false,
                   "viz": false
                 },
+                "insertNulls": false,
                 "lineInterpolation": "linear",
                 "lineWidth": 1,
                 "pointSize": 5,
@@ -881,8 +891,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -890,7 +899,8 @@
                   }
                 ]
               },
-              "unit": "bytes"
+              "unit": "bytes",
+              "unitScale": true
             },
             "overrides": [
               {
@@ -1290,11 +1300,13 @@
                 "type": "prometheus",
                 "uid": "${DS_PROMETHEUS}"
               },
-              "expr": "node_memory_MemTotal_bytes{instance=\"$node\",job=\"$job\"}",
+              "editorMode": "code",
+              "expr": "node_memory_MemTotal_bytes{job=\"$job\",instance=~\"$instance\"}",
               "format": "time_series",
               "hide": false,
               "intervalFactor": 1,
               "legendFormat": "RAM Total",
+              "range": true,
               "refId": "A",
               "step": 240
             },
@@ -1303,11 +1315,13 @@
                 "type": "prometheus",
                 "uid": "${DS_PROMETHEUS}"
               },
-              "expr": "node_memory_MemTotal_bytes{instance=\"$node\",job=\"$job\"} - node_memory_MemFree_bytes{instance=\"$node\",job=\"$job\"} - (node_memory_Cached_bytes{instance=\"$node\",job=\"$job\"} + node_memory_Buffers_bytes{instance=\"$node\",job=\"$job\"} + node_memory_SReclaimable_bytes{instance=\"$node\",job=\"$job\"})",
+              "editorMode": "code",
+              "expr": "node_memory_MemTotal_bytes{job=\"$job\",instance=~\"$instance\"} - node_memory_MemFree_bytes{job=\"$job\",instance=~\"$instance\"} - (node_memory_Cached_bytes{job=\"$job\",instance=~\"$instance\"} + node_memory_Buffers_bytes{job=\"$job\",instance=~\"$instance\"} + node_memory_SReclaimable_bytes{job=\"$job\",instance=~\"$instance\"})",
               "format": "time_series",
               "hide": false,
               "intervalFactor": 1,
               "legendFormat": "RAM Used",
+              "range": true,
               "refId": "B",
               "step": 240
             },
@@ -1316,10 +1330,12 @@
                 "type": "prometheus",
                 "uid": "${DS_PROMETHEUS}"
               },
-              "expr": "node_memory_Cached_bytes{instance=\"$node\",job=\"$job\"} + node_memory_Buffers_bytes{instance=\"$node\",job=\"$job\"} + node_memory_SReclaimable_bytes{instance=\"$node\",job=\"$job\"}",
+              "editorMode": "code",
+              "expr": "node_memory_Cached_bytes{job=\"$job\",instance=~\"$instance\"} + node_memory_Buffers_bytes{job=\"$job\",instance=~\"$instance\"} + node_memory_SReclaimable_bytes{job=\"$job\",instance=~\"$instance\"}",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "RAM Cache + Buffer",
+              "range": true,
               "refId": "C",
               "step": 240
             },
@@ -1328,10 +1344,12 @@
                 "type": "prometheus",
                 "uid": "${DS_PROMETHEUS}"
               },
-              "expr": "node_memory_MemFree_bytes{instance=\"$node\",job=\"$job\"}",
+              "editorMode": "code",
+              "expr": "node_memory_MemFree_bytes{job=\"$job\",instance=~\"$instance\"}",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "RAM Free",
+              "range": true,
               "refId": "D",
               "step": 240
             },
@@ -1340,10 +1358,12 @@
                 "type": "prometheus",
                 "uid": "${DS_PROMETHEUS}"
               },
-              "expr": "(node_memory_SwapTotal_bytes{instance=\"$node\",job=\"$job\"} - node_memory_SwapFree_bytes{instance=\"$node\",job=\"$job\"})",
+              "editorMode": "code",
+              "expr": "(node_memory_SwapTotal_bytes{job=\"$job\",instance=~\"$instance\"} - node_memory_SwapFree_bytes{job=\"$job\",instance=~\"$instance\"})",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "SWAP Used",
+              "range": true,
               "refId": "E",
               "step": 240
             }
@@ -1363,6 +1383,7 @@
                 "mode": "palette-classic"
               },
               "custom": {
+                "axisBorderShow": false,
                 "axisCenteredZero": false,
                 "axisColorMode": "text",
                 "axisLabel": "",
@@ -1376,6 +1397,7 @@
                   "tooltip": false,
                   "viz": false
                 },
+                "insertNulls": false,
                 "lineInterpolation": "linear",
                 "lineWidth": 1,
                 "pointSize": 5,
@@ -1400,8 +1422,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -1409,7 +1430,8 @@
                   }
                 ]
               },
-              "unit": "percent"
+              "unit": "percent",
+              "unitScale": true
             },
             "overrides": []
           },
@@ -1440,10 +1462,12 @@
                 "type": "prometheus",
                 "uid": "${DS_PROMETHEUS}"
               },
-              "expr": "100 - ((node_filesystem_avail_bytes{instance=\"$node\",job=\"$job\",device!~'rootfs'} * 100) / node_filesystem_size_bytes{instance=\"$node\",job=\"$job\",device!~'rootfs'})",
+              "editorMode": "code",
+              "expr": "100 - ((node_filesystem_avail_bytes{job=\"$job\",instance=~\"$instance\",device!~'rootfs'} * 100) / node_filesystem_size_bytes{job=\"$job\",instance=~\"$instance\",device!~'rootfs'})",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "{{mountpoint}}",
+              "range": true,
               "refId": "A",
               "step": 240
             }
@@ -1521,6 +1545,12 @@
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
       },
+      "fieldConfig": {
+        "defaults": {
+          "unitScale": true
+        },
+        "overrides": []
+      },
       "fill": 1,
       "fillGradient": 0,
       "gridPos": {
@@ -1548,7 +1578,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "9.2.2",
+      "pluginVersion": "10.3.1",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -1620,7 +1650,8 @@
       },
       "fieldConfig": {
         "defaults": {
-          "links": []
+          "links": [],
+          "unitScale": true
         },
         "overrides": []
       },
@@ -1653,7 +1684,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "9.2.2",
+      "pluginVersion": "10.3.1",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -1730,7 +1761,8 @@
       },
       "fieldConfig": {
         "defaults": {
-          "links": []
+          "links": [],
+          "unitScale": true
         },
         "overrides": []
       },
@@ -1762,7 +1794,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "9.2.2",
+      "pluginVersion": "10.3.1",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -1826,6 +1858,7 @@
             "mode": "palette-classic"
           },
           "custom": {
+            "axisBorderShow": false,
             "axisCenteredZero": false,
             "axisColorMode": "text",
             "axisLabel": "",
@@ -1839,6 +1872,7 @@
               "tooltip": false,
               "viz": false
             },
+            "insertNulls": false,
             "lineInterpolation": "linear",
             "lineWidth": 1,
             "pointSize": 5,
@@ -1869,7 +1903,8 @@
               }
             ]
           },
-          "unit": "ms"
+          "unit": "ms",
+          "unitScale": true
         },
         "overrides": []
       },
@@ -1902,11 +1937,11 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "histogram_quantile(0.90, sum(rate(ehco_traffic_handshake_duration_bucket{remote=~\"$remote\"}[$__rate_interval])) by (le,remote))",
+          "expr": "histogram_quantile(0.90, sum(rate(ehco_traffic_handshake_duration_bucket{job=\"$job\",instance=~\"$instance\"}[$__rate_interval])) by (le,instance,remote))",
           "hide": false,
           "instant": false,
           "interval": "",
-          "legendFormat": "{{remote}}",
+          "legendFormat": "{{instance}} - {{remote}}",
           "range": true,
           "refId": "A"
         }
@@ -1934,7 +1969,8 @@
               }
             ]
           },
-          "unit": "bytes"
+          "unit": "bytes",
+          "unitScale": true
         },
         "overrides": []
       },
@@ -1947,6 +1983,8 @@
       "id": 50,
       "links": [],
       "options": {
+        "minVizHeight": 75,
+        "minVizWidth": 75,
         "orientation": "auto",
         "reduceOptions": {
           "calcs": [
@@ -1957,9 +1995,10 @@
         },
         "showThresholdLabels": false,
         "showThresholdMarkers": true,
+        "sizing": "auto",
         "text": {}
       },
-      "pluginVersion": "9.2.2",
+      "pluginVersion": "10.3.1",
       "targets": [
         {
           "datasource": {
@@ -1967,11 +2006,11 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "sum(ehco_traffic_network_transmit_bytes{hostname=~\"$hostname\",remote=~\"$remote\"}) by (hostname,remote)",
+          "expr": "sum(ehco_traffic_network_transmit_bytes{job=\"$job\",instance=~\"$instance\"}) by (instance,remote)",
           "hide": false,
           "instant": false,
           "interval": "",
-          "legendFormat": "{{remote}}",
+          "legendFormat": "{{instance}} : {{remote}}",
           "refId": "A"
         }
       ],
@@ -1989,6 +2028,7 @@
             "mode": "palette-classic"
           },
           "custom": {
+            "axisBorderShow": false,
             "axisCenteredZero": false,
             "axisColorMode": "text",
             "axisLabel": "",
@@ -2002,6 +2042,7 @@
               "tooltip": false,
               "viz": false
             },
+            "insertNulls": false,
             "lineInterpolation": "linear",
             "lineWidth": 1,
             "pointSize": 5,
@@ -2032,7 +2073,8 @@
               }
             ]
           },
-          "unit": "binbps"
+          "unit": "binbps",
+          "unitScale": true
         },
         "overrides": []
       },
@@ -2065,8 +2107,8 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "irate(ehco_traffic_network_transmit_bytes{hostname=~\"$hostname\",remote=~\"$remote\",flow=\"read\"}[$__rate_interval]) * 8",
-          "legendFormat": "{{remote}}-{{type}}-read",
+          "expr": "irate(ehco_traffic_network_transmit_bytes{job=\"$job\",instance=~\"$instance\",flow=\"read\"}[$__rate_interval]) * 8",
+          "legendFormat": "{{instance}} - {{remote}}-{{type}}-read",
           "range": true,
           "refId": "A"
         },
@@ -2076,9 +2118,9 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "-irate(ehco_traffic_network_transmit_bytes{hostname=~\"$hostname\",remote=~\"$remote\",flow=\"write\"}[$__rate_interval]) * 8",
+          "expr": "-irate(ehco_traffic_network_transmit_bytes{job=\"$job\",instance=~\"$instance\",flow=\"write\"}[$__rate_interval]) * 8",
           "hide": false,
-          "legendFormat": "{{remote}}-{{type}}-write",
+          "legendFormat": "{{instance}} - {{remote}}-{{type}}-write",
           "range": true,
           "refId": "B"
         }
@@ -2097,6 +2139,7 @@
             "mode": "palette-classic"
           },
           "custom": {
+            "axisBorderShow": false,
             "axisCenteredZero": false,
             "axisColorMode": "text",
             "axisLabel": "",
@@ -2110,6 +2153,7 @@
               "tooltip": false,
               "viz": false
             },
+            "insertNulls": false,
             "lineInterpolation": "linear",
             "lineWidth": 1,
             "pointSize": 5,
@@ -2140,34 +2184,10 @@
               }
             ]
           },
-          "unit": "short"
+          "unit": "short",
+          "unitScale": true
         },
-        "overrides": [
-          {
-            "__systemRef": "hideSeriesFrom",
-            "matcher": {
-              "id": "byNames",
-              "options": {
-                "mode": "exclude",
-                "names": [
-                  "-0.0.0.0:5201-tcp"
-                ],
-                "prefix": "All except:",
-                "readOnly": true
-              }
-            },
-            "properties": [
-              {
-                "id": "custom.hideFrom",
-                "value": {
-                  "legend": false,
-                  "tooltip": false,
-                  "viz": true
-                }
-              }
-            ]
-          }
-        ]
+        "overrides": []
       },
       "gridPos": {
         "h": 9,
@@ -2198,11 +2218,11 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "sum(ehco_traffic_current_connection_count{type=\"udp\"}) by (hostname)",
-          "hide": true,
-          "legendFormat": "{{remote}}-udp",
+          "expr": "sum(ehco_traffic_current_connection_count{job=\"$job\",type=\"tcp\",instance=~\"$instance\"}) by (instance,remote)",
+          "hide": false,
+          "legendFormat": "{{instance}} - {{remote}}-tcp",
           "range": true,
-          "refId": "A"
+          "refId": "B"
         },
         {
           "datasource": {
@@ -2210,11 +2230,11 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "ehco_traffic_current_connection_count{type=\"tcp\"}",
+          "expr": "sum(ehco_traffic_current_connection_count{job=\"$job\",type=\"udp\",instance=~\"$instance\"}) by (instance,remote)",
           "hide": false,
-          "legendFormat": "{{remote}}-tcp",
+          "legendFormat": "{{instance}} - {{remote}}-udp",
           "range": true,
-          "refId": "B"
+          "refId": "C"
         }
       ],
       "title": "实时连接数",
@@ -2249,12 +2269,12 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   }
                 ]
               },
-              "unit": "short"
+              "unit": "short",
+              "unitScale": true
             },
             "overrides": []
           },
@@ -2262,11 +2282,13 @@
             "h": 6,
             "w": 24,
             "x": 0,
-            "y": 42
+            "y": 3
           },
           "id": 49,
           "links": [],
           "options": {
+            "minVizHeight": 75,
+            "minVizWidth": 75,
             "orientation": "auto",
             "reduceOptions": {
               "calcs": [
@@ -2277,9 +2299,10 @@
             },
             "showThresholdLabels": false,
             "showThresholdMarkers": true,
+            "sizing": "auto",
             "text": {}
           },
-          "pluginVersion": "9.2.2",
+          "pluginVersion": "10.3.1",
           "targets": [
             {
               "datasource": {
@@ -2287,7 +2310,7 @@
                 "uid": "${DS_PROMETHEUS}"
               },
               "editorMode": "code",
-              "expr": "sum(ehco_ping_requests_total{}) by (hostname)",
+              "expr": "sum(ehco_ping_requests_total{}) by (instance)",
               "hide": false,
               "instant": false,
               "interval": "",
@@ -2309,7 +2332,8 @@
           },
           "fieldConfig": {
             "defaults": {
-              "unit": "s"
+              "unit": "s",
+              "unitScale": true
             },
             "overrides": []
           },
@@ -2319,7 +2343,7 @@
             "h": 9,
             "w": 24,
             "x": 0,
-            "y": 48
+            "y": 9
           },
           "hiddenSeries": false,
           "id": 35,
@@ -2344,7 +2368,7 @@
             "alertThreshold": false
           },
           "percentage": false,
-          "pluginVersion": "9.2.2",
+          "pluginVersion": "10.3.1",
           "pointradius": 2,
           "points": false,
           "renderer": "flot",
@@ -2358,7 +2382,8 @@
                 "type": "prometheus",
                 "uid": "${DS_PROMETHEUS}"
               },
-              "expr": "histogram_quantile(0.9,sum(rate(ehco_ping_response_duration_seconds_bucket{hostname=\"$hostname\"}[1m])) by (label,host,le))",
+              "editorMode": "code",
+              "expr": "histogram_quantile(0.9,sum(rate(ehco_ping_response_duration_seconds_bucket{instance=~\"$instance\"}[1m])) by (label,host,le))",
               "hide": false,
               "instant": false,
               "interval": "",
@@ -2406,8 +2431,7 @@
     }
   ],
   "refresh": "5s",
-  "schemaVersion": 37,
-  "style": "dark",
+  "schemaVersion": 39,
   "tags": [
     "go",
     "golang"
@@ -2421,7 +2445,7 @@
           "uid": "${DS_PROMETHEUS}"
         },
         "definition": "label_values(go_goroutines, job)",
-        "hide": 2,
+        "hide": 0,
         "includeAll": false,
         "label": "",
         "multi": false,
@@ -2446,63 +2470,12 @@
           "type": "prometheus",
           "uid": "${DS_PROMETHEUS}"
         },
-        "definition": "label_values(go_goroutines{job=\"$job\"}, instance)",
-        "hide": 0,
-        "includeAll": true,
-        "label": "instance",
-        "multi": true,
-        "name": "instance",
-        "options": [],
-        "query": {
-          "query": "label_values(go_goroutines{job=\"$job\"}, instance)",
-          "refId": "StandardVariableQuery"
-        },
-        "refresh": 2,
-        "regex": "",
-        "skipUrlSync": false,
-        "sort": 0,
-        "tagValuesQuery": "",
-        "tagsQuery": "",
-        "type": "query",
-        "useTags": false
-      },
-      {
-        "current": {},
-        "datasource": {
-          "type": "prometheus",
-          "uid": "${DS_PROMETHEUS}"
-        },
-        "definition": "label_values(ehco_alive_state,hostname)",
-        "hide": 0,
-        "includeAll": true,
-        "multi": true,
-        "name": "hostname",
-        "options": [],
-        "query": {
-          "query": "label_values(ehco_alive_state,hostname)",
-          "refId": "StandardVariableQuery"
-        },
-        "refresh": 2,
-        "regex": "",
-        "skipUrlSync": false,
-        "sort": 0,
-        "tagValuesQuery": "",
-        "tagsQuery": "",
-        "type": "query",
-        "useTags": false
-      },
-      {
-        "current": {},
-        "datasource": {
-          "type": "prometheus",
-          "uid": "${DS_PROMETHEUS}"
-        },
         "definition": "label_values(node_uname_info{job=\"$job\"}, instance)",
         "hide": 0,
         "includeAll": false,
-        "label": "Host:",
-        "multi": false,
-        "name": "node",
+        "label": "instance",
+        "multi": true,
+        "name": "instance",
         "options": [],
         "query": {
           "query": "label_values(node_uname_info{job=\"$job\"}, instance)",
@@ -2513,30 +2486,11 @@
         "skipUrlSync": false,
         "sort": 1,
         "type": "query"
-      },
-      {
-        "current": {},
-        "definition": "label_values(ehco_traffic_network_transmit_bytes{hostname=\"$hostname\"},remote)",
-        "hide": 0,
-        "includeAll": true,
-        "label": "remote",
-        "multi": true,
-        "name": "remote",
-        "options": [],
-        "query": {
-          "query": "label_values(ehco_traffic_network_transmit_bytes{hostname=\"$hostname\"},remote)",
-          "refId": "StandardVariableQuery"
-        },
-        "refresh": 1,
-        "regex": "",
-        "skipUrlSync": false,
-        "sort": 0,
-        "type": "query"
       }
     ]
   },
   "time": {
-    "from": "now-30m",
+    "from": "now-3h",
     "to": "now"
   },
   "timepicker": {
@@ -2567,6 +2521,6 @@
   "timezone": "",
   "title": "中转节点",
   "uid": "CgCw8jKZz",
-  "version": 13,
+  "version": 14,
   "weekStart": ""
 }
