@@ -92,10 +92,23 @@ func InitConfigAndComponents() (*config.Config, error) {
 }
 
 func MustStartComponents(mainCtx context.Context, cfg *config.Config) {
-	cliLogger.Infof("Start ehco with version=%s", constant.Version)
+	cliLogger.Infof("Start ehco with version:%s", constant.Version)
+
+	var rs *relay.Server
+	if cfg.NeedStartRelayServer() {
+		web.EhcoAlive.Set(web.EhcoAliveStateRunning)
+		s, err := relay.NewServer(cfg)
+		if err != nil {
+			cliLogger.Fatalf("NewRelayServer meet err=%s", err.Error())
+		}
+		rs = s
+		go func() {
+			cliLogger.Fatalf("StartRelayServer meet err=%s", rs.Start(mainCtx))
+		}()
+	}
 
 	if cfg.NeedStartWebServer() {
-		webS, err := web.NewServer(cfg)
+		webS, err := web.NewServer(cfg, rs)
 		if err != nil {
 			cliLogger.Fatalf("NewWebServer meet err=%s", err.Error())
 		}
@@ -103,6 +116,7 @@ func MustStartComponents(mainCtx context.Context, cfg *config.Config) {
 			cliLogger.Fatalf("StartWebServer meet err=%s", webS.Start())
 		}()
 	}
+
 	if cfg.NeedStartXrayServer() {
 		xrayS := xray.NewXrayServer(cfg)
 		if err := xrayS.Setup(); err != nil {
@@ -111,15 +125,5 @@ func MustStartComponents(mainCtx context.Context, cfg *config.Config) {
 		if err := xrayS.Start(mainCtx); err != nil {
 			cliLogger.Fatalf("Start XrayServer meet err=%v", err)
 		}
-	}
-	if cfg.NeedStartRelayServer() {
-		web.EhcoAlive.Set(web.EhcoAliveStateRunning)
-		rs, err := relay.NewServer(cfg)
-		if err != nil {
-			cliLogger.Fatalf("NewRelayServer meet err=%s", err.Error())
-		}
-		go func() {
-			cliLogger.Fatalf("StartRelayServer meet err=%s", rs.Start(mainCtx))
-		}()
 	}
 }
