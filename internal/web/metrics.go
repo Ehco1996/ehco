@@ -67,8 +67,9 @@ var (
 	Hostname, _ = os.Hostname()
 
 	ConstLabels = map[string]string{
-		"hostname": Hostname,
+		"ehco_runner_hostname": Hostname,
 	}
+
 	EhcoAlive = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace:   METRIC_NS,
 		Subsystem:   "",
