@@ -156,8 +156,7 @@ func transport(conn1, conn2 net.Conn, remote string) error {
 
 	// handle errors, need to combine errors from both directions
 	if err != nil && err2 != nil {
-		err := fmt.Errorf("errors in both directions: %v, %v", err, err2)
-		l.Error(err)
+		return fmt.Errorf("errors in both directions: %v, %v", err, err2)
 	}
 	if err != nil {
 		return err

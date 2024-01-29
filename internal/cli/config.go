@@ -63,7 +63,7 @@ func loadConfig() (cfg *config.Config, err error) {
 
 func initSentry() error {
 	if dsn := os.Getenv("SENTRY_DSN"); dsn != "" {
-		cliLogger.Infof("init sentry with dsn", dsn)
+		cliLogger.Infof("init sentry with dsn:%s", dsn)
 		return sentry.Init(sentry.ClientOptions{Dsn: dsn})
 	}
 	return nil
