@@ -36,6 +36,16 @@ func (c *ClashSub) ToClashConfigYaml() ([]byte, error) {
 	return yaml.Marshal(c.cCfg)
 }
 
+func (c *ClashSub) ToGroupedClashConfigYaml() ([]byte, error) {
+	groupProxy := c.cCfg.groupByLongestCommonPrefix()
+	groupedCfg := &clashConfig{Proxies: &[]*Proxies{}}
+	for groupName, proxies := range groupProxy {
+		println("group:", groupName)
+		groupedCfg.Proxies = &proxies
+	}
+	return yaml.Marshal(groupedCfg)
+}
+
 func (c *ClashSub) Refresh() error {
 	// get new clash sub by url
 	newSub, err := NewClashSubByURL(c.URL, c.Name)

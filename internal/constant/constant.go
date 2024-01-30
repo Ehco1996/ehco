@@ -111,6 +111,7 @@ const WelcomeHTML = `
 			<ul>
 				{{range .SubConfigs}}
 					<li><a href="/clash_proxy_provider/?sub_name={{.Name}}">{{.Name}}</a></li>
+					<li><a href="/clash_proxy_provider/group-by-prefix/?sub_name={{.Name}}">{{.Name}}-grouped</a></li>
 				{{end}}
 			</ul>
 			{{end}}

@@ -31,6 +31,50 @@ func (cc *clashConfig) Adjust() {
 	}
 }
 
+func (cc *clashConfig) groupByLongestCommonPrefix() map[string][]*Proxies {
+	proxies := *cc.Proxies
+	groups := make(map[string][]*Proxies)
+
+	// 用于记录每个代理是否已分组
+	visited := make([]bool, len(proxies))
+
+	for i, currentProxy := range proxies {
+		if visited[i] {
+			continue
+		}
+		// 标记当前项为已访问
+		visited[i] = true
+		// 创建当前代理的分组，至少包含它自身
+		group := []*Proxies{currentProxy}
+		// 将当前代理的名称设为分组的键
+		prefix := currentProxy.Name
+
+		for j, otherProxy := range proxies[i+1:] {
+			if visited[i+j+1] {
+				continue
+			}
+			// 找出和当前代理名称的最长公共前缀
+			commonPrefix := commonPrefix(prefix, otherProxy.Name)
+			// 如果当前代理名称是其他代理名称的前缀，将其添加到当前分组
+			if len(commonPrefix) > 0 {
+				group = append(group, otherProxy)
+				visited[i+j+1] = true
+				// 更新前缀以更具体地反映当前分组的公共部分
+				if len(commonPrefix) < len(prefix) {
+					prefix = commonPrefix
+				}
+			}
+		}
+
+		// 处理完当前代理后，将分组添加到结果中
+		if len(prefix) > 0 {
+			groups[prefix] = group
+		}
+	}
+
+	return groups
+}
+
 type Proxies struct {
 	// basic fields
 	Name     string `yaml:"name"`

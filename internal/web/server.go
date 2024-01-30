@@ -54,6 +54,7 @@ func NewServer(cfg *config.Config, relayReloader reloader.Reloader) (*Server, er
 	e.GET("/metrics/", echo.WrapHandler(promhttp.Handler()))
 	e.GET("/debug/pprof/*", echo.WrapHandler(http.DefaultServeMux))
 	e.GET("/clash_proxy_provider/", echo.WrapHandler(http.HandlerFunc(s.HandleClashProxyProvider)))
+	e.GET("/clash_proxy_provider/group-by-prefix/", echo.WrapHandler(http.HandlerFunc(s.HandleClashProxyProviderGroupByPrefix)))
 	e.GET("/config/", echo.WrapHandler(http.HandlerFunc(s.CurrentConfig)))
 
 	e.POST("/reload/", echo.WrapHandler(http.HandlerFunc(s.HandleReload)))
