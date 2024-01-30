@@ -64,6 +64,7 @@ func (s *Server) HandleClashProxyProviderGroupByPrefix(w http.ResponseWriter, r 
 	handleClashProxyProvider(s, w, r, subName, true)
 }
 
+// todo  handle grouped by http query
 func handleClashProxyProvider(s *Server, w http.ResponseWriter, r *http.Request, subName string, grouped bool) {
 	if s.relayServerReloader != nil {
 		if err := s.relayServerReloader.Reload(); err != nil {
