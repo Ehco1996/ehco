@@ -95,3 +95,12 @@ func groupByLongestCommonPrefix(strList []string) map[string][]string {
 
 	return grouped
 }
+
+func strInArray(ele string, array []string) bool {
+	for _, v := range array {
+		if v == ele {
+			return true
+		}
+	}
+	return false
+}
