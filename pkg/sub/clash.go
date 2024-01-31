@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 	"sort"
+	"strings"
 
 	relay_cfg "github.com/Ehco1996/ehco/internal/relay/conf"
 	"gopkg.in/yaml.v3"
@@ -105,7 +106,13 @@ func (c *ClashSub) ToRelayConfigs(listenHost string) ([]*relay_cfg.Config, error
 	relayConfigs := []*relay_cfg.Config{}
 	// generate relay config for each proxy
 	for _, proxy := range *c.cCfg.Proxies {
-		newName := fmt.Sprintf("%s-%s", c.Name, proxy.Name)
+		var newName string
+		if strings.HasSuffix(proxy.Name, "-") {
+			newName = fmt.Sprintf("%s%s", proxy.Name, c.Name)
+		} else {
+			newName = fmt.Sprintf("%s-%s", proxy.Name, c.Name)
+		}
+
 		rc, err := proxy.ToRelayConfig(listenHost, newName)
 		if err != nil {
 			return nil, err
@@ -118,7 +125,12 @@ func (c *ClashSub) ToRelayConfigs(listenHost string) ([]*relay_cfg.Config, error
 	for groupName, proxies := range groupProxy {
 		// only use first proxy will be show in proxy provider, other will be merged into load balance in relay
 		groupLeader := proxies[0].getOrCreateGroupLeader()
-		newName := fmt.Sprintf("%s-lb", groupName)
+		var newName string
+		if strings.HasSuffix(groupName, "-") {
+			newName = fmt.Sprintf("%slb", groupName)
+		} else {
+			newName = fmt.Sprintf("%s-lb", groupName)
+		}
 		rc, err := groupLeader.ToRelayConfig(listenHost, newName)
 		if err != nil {
 			return nil, err
@@ -138,6 +150,5 @@ func (c *ClashSub) ToRelayConfigs(listenHost string) ([]*relay_cfg.Config, error
 		}
 		relayConfigs = append(relayConfigs, rc)
 	}
-
 	return relayConfigs, nil
 }

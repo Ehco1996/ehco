@@ -7,6 +7,11 @@ import (
 	"net/http"
 	"sort"
 	"strings"
+	"time"
+)
+
+var (
+	client = http.Client{Timeout: time.Second * 10}
 )
 
 func getFreePortInBatch(host string, count int) ([]int, error) {
@@ -28,7 +33,7 @@ func getFreePortInBatch(host string, count int) ([]int, error) {
 }
 
 func getHttpBody(url string) ([]byte, error) {
-	resp, err := http.Get(url)
+	resp, err := client.Get(url)
 	if err != nil {
 		msg := fmt.Sprintf("http get sub config url=%s meet err=%v", url, err)
 		return nil, fmt.Errorf(msg)
