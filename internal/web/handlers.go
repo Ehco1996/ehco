@@ -51,20 +51,14 @@ func (s *Server) HandleClashProxyProvider(w http.ResponseWriter, r *http.Request
 		writerBadRequestMsg(w, msg)
 		return
 	}
-	handleClashProxyProvider(s, w, r, subName, false)
-}
-
-func (s *Server) HandleClashProxyProviderGroupByPrefix(w http.ResponseWriter, r *http.Request) {
-	subName := r.URL.Query().Get("sub_name")
-	if subName == "" {
-		msg := "sub_name is empty"
-		writerBadRequestMsg(w, msg)
-		return
+	grouped := r.URL.Query().Get("grouped")
+	if grouped == "true" {
+		handleClashProxyProvider(s, w, r, subName, true)
+	} else {
+		handleClashProxyProvider(s, w, r, subName, false)
 	}
-	handleClashProxyProvider(s, w, r, subName, true)
 }
 
-// todo  handle grouped by http query
 func handleClashProxyProvider(s *Server, w http.ResponseWriter, r *http.Request, subName string, grouped bool) {
 	if s.relayServerReloader != nil {
 		if err := s.relayServerReloader.Reload(); err != nil {

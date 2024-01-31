@@ -118,7 +118,7 @@ func (c *ClashSub) ToRelayConfigs(listenHost string) ([]*relay_cfg.Config, error
 	for groupName, proxies := range groupProxy {
 		// only use first proxy will be show in proxy provider, other will be merged into load balance in relay
 		groupLeader := proxies[0].getOrCreateGroupLeader()
-		newName := fmt.Sprintf("%s-with-lb", groupName)
+		newName := fmt.Sprintf("%s-lb", groupName)
 		rc, err := groupLeader.ToRelayConfig(listenHost, newName)
 		if err != nil {
 			return nil, err
