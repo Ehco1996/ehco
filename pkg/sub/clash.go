@@ -50,8 +50,7 @@ func (c *ClashSub) ToGroupedClashConfigYaml() ([]byte, error) {
 	for _, groupName := range groupNameList {
 		proxies := groupProxy[groupName]
 		// only use first proxy will be show in proxy provider, other will be merged into load balance in relay
-		p := proxies[0].Clone()
-		p.Name = groupName + "-with-lb"
+		p := proxies[0].getOrCreateGroupLeader()
 		ps = append(ps, p)
 	}
 	groupedCfg := &clashConfig{&ps}
