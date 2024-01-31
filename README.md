@@ -22,11 +22,12 @@ e.g. 本地开发调试连接内网服务 db, db host: xxx-rds.xxx.us-east-1.rds
 
 3. 本地使用客户端连接
    `mysql -h 127.0.0.1:3306 -u root -p`
-    </details>
+      </details>
 
 <details> <summary>中转 proxy 客户端,提供负载均衡功能</summary>
 
-\*从 **v1.1.4-dev(nightly)** 开始, ehco 支持了从 clash proxy provider 读取 proxy 配置,并复写成 ehco 的 relay 配置,从而实现了 ehco 作为中转机器,提供负载均衡的功能
+从 **v1.1.4-dev(nightly)** 开始, ehco 支持了从 clash proxy provider 读取 proxy 配置并复写成 ehco 的 relay 配置
+从而实现了 ehco 作为代理客户端的前置代理,提供负载均衡,流量监控等功能
 
 e.g.
 
@@ -55,8 +56,8 @@ e.g.
 
 ehco 会将每个 clash proxy provider 转换成两个新 clash provider
 
--   会将每个单独的 proxy 转换成一个 relay, 名字: <name>
--   会将所有的 proxy 按最长前缀**分组**,并将每个分组转换成一个包含负载均衡的 relay,名字: <name>-lb
+-   会将每个的 proxy 转换成一个 relay
+-   会将 proxy 按最长前缀**分组**,并将每个分组转换成开启负载均衡的 relay
 
 举个例子
 
@@ -94,6 +95,9 @@ proxy-providers:
         type: http
         url: http://<web_host>:<web_port>/clash_proxy_provider/?sub_name=name&grouped=true
 ```
+
+你就能得到一个支持负载均衡的 clash proxy client 了,并且还能在 dashboard 上看到流量监控哟
+![](monitor/proxy-traffic.png)
 
 </details>
 
