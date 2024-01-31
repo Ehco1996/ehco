@@ -1,10 +1,8 @@
-# ehco
+# ehco is a network relay tool and a typo :)
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/Ehco1996/ehco)](https://goreportcard.com/report/github.com/Ehco1996/ehco)
 [![go.dev reference](https://img.shields.io/badge/go.dev-reference-007d9c?logo=go&logoColor=white&style=flat-square)](https://pkg.go.dev/github.com/Ehco1996/ehco)
 [![Docker Pulls](https://img.shields.io/docker/pulls/ehco1996/ehco)](https://hub.docker.com/r/ehco1996/ehco)
-
-ehco is a network relay tool and a typo :)
 
 [see Readme in English here](README_EN.md)
 
@@ -27,19 +25,11 @@ e.g. 本地开发调试连接内网服务 db, db host: xxx-rds.xxx.us-east-1.rds
 
 ## 安装
 
-### go get
+-   ehco 的可执行文件可以从项目的[release](https://github.com/Ehco1996/ehco/releases)页面下载
 
-```bash
-go get -u "github.com/Ehco1996/ehco/cmd/ehco"
-```
+-   ehco 提供 [nightly build](https://github.com/Ehco1996/ehco/releases/tag/nightly), 但可能会有较大的改动
 
-### 从 release 下载编译好的文件
-
-> ehco 的可执行文件可以从项目的[release](https://github.com/Ehco1996/ehco/releases)页面下载
-
-### docker image
-
-`docker pull ehco1996/ehco`
+-   ehco 也可以通过 docker 来运行 `docker pull ehco1996/ehco`
 
 ## 主要功能
 
@@ -52,23 +42,23 @@ go get -u "github.com/Ehco1996/ehco/cmd/ehco"
 -   热重载配置
 -   内嵌了完整版本的 [xray](https://github.com/XTLS/Xray-core) 后端
 
-## 中转使用说明
+## 中转使用介绍
 
 使用隧道需要至少两台主机, 并且在两台主机上都安装了 ehco
 
 -   中转机器 A 假设机器 A 的 IP 是 1.1.1.1
 -   落地机器 B 假设机器 B 的 IP 是 2.2.2.2 并且落地机器 B 的 5555 端口跑着一个 SS/v2ray/任意 tcp/udp 服务
 
-### 案例一 不用隧道直接通过中转机器中转用户流量
-
+<details> <summary>案例一 不用隧道直接通过中转机器中转用户流量</summary>
 直接在中转机器 A 上输入: `ehco  -l 0.0.0.0:1234 -r 2.2.2.2:5555`
 
 > 该命令表示将所有从中转机器 A 的 1234 端口进入的流量直接转发到落地机器 B 的 5555 端口
 
 用户即可通过 中转机器 A 的 1234 端口访问到落地机器 B 的 5555 端口的 SS/v2ray 服务了
 
-### 案例二 用 mwss 隧道中转用户流量
+</details>
 
+<details> <summary>案例二 用 mwss 隧道中转用户流量</summary>
 在落地机器 B 上输入: `ehco  -l 0.0.0.0:443 -lt mwss -r 127.0.0.1:5555`
 
 > 该命令表示将所有从落地机器 B 的 443 端口进入的 wss 流量解密后转发到落地机器 B 的 5555 端口
@@ -79,16 +69,18 @@ go get -u "github.com/Ehco1996/ehco/cmd/ehco"
 
 用户即可通过 中转机器 A 的 1234 端口访问到落地机器 B 的 5555 端口的 SS/v2ray 服务了
 
-## Xray 功能使用说明
+</details>
 
-### 内置 xray 后端
+## 内嵌 Xray 功能介绍
 
+<details> <summary>ehco 内的 xray 服务端</summary>
 从 `v1.1.2` 开始，ehco 内置了完整版本的 [xray](https://github.com/XTLS/Xray-core) 后端，可以通过标准的 xray 配置文件来启动内置的 xray server, 配置的 key 为 `xray_config`：
 
 -   单端口多用户的 ss [xray_ss.json](examples/xray_ss.json)
 -   单端口多用户的 trojan [xray_trojan.json](examples/xray_trojan.json)
+</details>
 
-### 用户流量同步
+<details> <summary>用户流量统计</summary>
 
 从 `v1.1.2` 开始，ehco 支持通过 api 下方用户配置和上报用户流量，配置的 key 为 `sync_traffic_endpoint`：
 
@@ -146,48 +138,20 @@ ehco 会每隔 60s 发送一次 POST 请求至 `sync_traffic_endpoint` ，上报
 
 一个完整的例子可以参考 [xray_ss.json](examples/xray_ss.json) 和 [xray_trojan.json](examples/xray_trojan.json)
 
-## 配置文件
+</details>
+
+## 配置文件格式
 
 > ehco 支持从 `配置文件` / `http接口` 里读取 `json` 格式的配置并启动
+> (更多例子可以参考项目里的 [config.json](examples/config.json) 文件):
 
-配置文件格式要求如下(更多例子可以参考项目里的 [config.json](examples/config.json) 文件):
+<details> <summary>热重载配置</summary>
 
-```json
-{
-    "web_port": 9000,
-    "web_token": "",
-    "enable_ping": false,
-    "relay_configs": [
-        {
-            "listen": "127.0.0.1:1234",
-            "listen_type": "raw",
-            "transport_type": "raw",
-            "tcp_remotes": ["0.0.0.0:5201"],
-            "udp_remotes": ["0.0.0.0:5201"]
-        }
-    ]
-}
-```
-
-### 热重载配置
-
-> 大于 1.1.0 版本的 ehco 支持热重载配置
-
-```sh
-# 使用配置文件启动 ehco
-ehco  -c config.json
-
-# 更新配置文件后可以使用 kill -HUP pid 命令来重新加载配置
-kill -HUP pid
-
-# 重载成功可以看到如下信息
-[cfg-reload] Got A HUP Signal! Now Reloading Conf ...
-Load Config From File:config.json
-[cfg-reload] start new relay name=[At=127.0.0.1:12342 Over=raw TCP-To=[0.0.0.0:5201] UDP-To=[0.0.0.0:5201] Through=raw]
-[relay] Close relay [At=127.0.0.1:1234 Over=raw TCP-To=[0.0.0.0:5201] UDP-To=[0.0.0.0:5201] Through=raw]
-[relay] Start UDP relay [At=127.0.0.1:12342 Over=raw TCP-To=[0.0.0.0:5201] UDP-To=[0.0.0.0:5201] Through=raw]
-[relay] Start TCP relay [At=127.0.0.1:12342 Over=raw TCP-To=[0.0.0.0:5201] UDP-To=[0.0.0.0:5201] Through=raw]
-```
+-   大于 1.1.0 版本的 ehco 支持热重载配置
+-   通过 `kill -HUP pid` 信号来热重载配置
+-   通过配置 `reload_interval` 来指定配置文件的路径
+-   通过访问 POST `http://web_host:web_port/reload/` 接口来热重载配置
+    </detail>
 
 ## 监控报警
 
