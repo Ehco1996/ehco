@@ -22,16 +22,82 @@ e.g. 本地开发调试连接内网服务 db, db host: xxx-rds.xxx.us-east-1.rds
 
 3. 本地使用客户端连接
    `mysql -h 127.0.0.1:3306 -u root -p`
-     </details>
+    </details>
 
-<details> <summary>中转本地 proxy 客户端,提供负载均衡功能</summary>
+<details> <summary>中转 proxy 客户端,提供负载均衡功能</summary>
 
-WIP
+\*从 **v1.1.4-dev(nightly)** 开始, ehco 支持了从 clash proxy provider 读取 proxy 配置,并复写成 ehco 的 relay 配置,从而实现了 ehco 作为中转机器,提供负载均衡的功能
+
+e.g.
+
+1. 配置 ehco 的 config.json 并启动
+
+```json
+{
+    "web_host": "12.0.0.1",
+    "web_port": 9000,
+    "sub_configs": [
+        {
+            "name": "nas",
+            "url": "your url"
+        }
+    ]
+}
+```
+
+`ehco -c config.json`
+
+2. 访问 ehco 的 web 界面 获取 ehco 的 proxy provider url
+
+`http://<web_host>:<web_port>`
+
+![](monitor/web.png)
+
+ehco 会将每个 clash proxy provider 转换成两个新 clash provider
+
+-   会将每个单独的 proxy 转换成一个 relay, 名字: <name>
+-   会将所有的 proxy 按最长前缀**分组**,并将每个分组转换成一个包含负载均衡的 relay,名字: <name>-lb
+
+举个例子
+
+```yaml
+proxies:
+    - name: us-1
+      server: s1
+      password:
+      port: 1
+    - name: us-2
+      server: s2
+      port: 2
+    - name: jb-1
+      server: s3
+      password: pass
+      port: 3
+```
+
+上面这个包含 3 个 proxy 的会被转换成 5 个 relay:
+
+-   us-1 relay to s1:1
+-   us-2 relay to s2:2
+-   jb-1 relay to s3:3
+    us-lb relay to s1:1,s2:2
+-   jb-1-lb relay to s3:3
+
+3. 将 ehco 的 proxy provider url 配置到 clash 的配置文件中
+
+```yaml
+proxy-providers:
+    ehco:
+        type: http
+        url: http://<web_host>:<web_port>/clash_proxy_provider/?sub_name=<name>
+    ehco-lb:
+        type: http
+        url: http://<web_host>:<web_port>/clash_proxy_provider/?sub_name=name&grouped=true
+```
 
 </details>
 
-<details> <summary>隧道连接到 proxy 集群</summary>
-WIP
+<details> <summary>WIP: 隧道连接到 proxy 集群</summary>
 </details>
 
 ## 安装
@@ -229,3 +295,7 @@ iperf3 -c 0.0.0.0 -p 1234 -u -b 1G --length 1024
 | ----- | -------------- | ------------- | ------------ | ------------ | -------------- | -------------- |
 | tcp   | 123 Gbits/sec  | 55 Gbits/sec  | 41 Gbits/sec | 10 Gbits/sec | 5.78 Gbits/sec | 22.2 Gbits/sec |
 | udp   | 14.5 Gbits/sec | 3.3 Gbits/sec | 直接转发     | 直接转发     | 直接转发       | 直接转发       |
+
+```
+
+```
