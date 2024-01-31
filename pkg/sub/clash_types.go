@@ -21,6 +21,15 @@ func (cc *clashConfig) GetProxyByRawName(name string) *Proxies {
 	return nil
 }
 
+func (cc *clashConfig) GetProxyByName(name string) *Proxies {
+	for _, proxy := range *cc.Proxies {
+		if proxy.Name == name {
+			return proxy
+		}
+	}
+	return nil
+}
+
 func (cc *clashConfig) Adjust() {
 	for _, proxy := range *cc.Proxies {
 		if proxy.rawName == "" {
@@ -29,6 +38,24 @@ func (cc *clashConfig) Adjust() {
 			proxy.rawServer = proxy.Server
 		}
 	}
+}
+
+func (cc *clashConfig) groupByLongestCommonPrefix() map[string][]*Proxies {
+	proxies := cc.Proxies
+
+	proxyNameList := []string{}
+	for _, proxy := range *proxies {
+		proxyNameList = append(proxyNameList, proxy.Name)
+	}
+	groupNameMap := groupByLongestCommonPrefix(proxyNameList)
+
+	proxyGroups := make(map[string][]*Proxies)
+	for groupName, proxyNames := range groupNameMap {
+		for _, proxyName := range proxyNames {
+			proxyGroups[groupName] = append(proxyGroups[groupName], cc.GetProxyByName(proxyName))
+		}
+	}
+	return proxyGroups
 }
 
 type Proxies struct {
@@ -62,6 +89,8 @@ type Proxies struct {
 	rawServer string
 	rawPort   string
 	relayCfg  *relay_cfg.Config
+
+	groupLeader *Proxies
 }
 
 func (p *Proxies) Different(new *Proxies) bool {
@@ -110,7 +139,7 @@ func (p *Proxies) ToRelayConfig(listenHost string, newName string) (*relay_cfg.C
 	listenAddr := net.JoinHostPort(listenHost, strconv.Itoa(listenPort))
 	remoteAddr := net.JoinHostPort(p.Server, p.Port)
 	r := &relay_cfg.Config{
-		Label:         p.Name,
+		Label:         newName,
 		ListenType:    constant.Listen_RAW,
 		TransportType: constant.Transport_RAW,
 		Listen:        listenAddr,
@@ -128,4 +157,46 @@ func (p *Proxies) ToRelayConfig(listenHost string, newName string) (*relay_cfg.C
 	p.Port = strconv.Itoa(listenPort)
 	p.relayCfg = r
 	return r, nil
+}
+
+func (p *Proxies) Clone() *Proxies {
+	cloned := &Proxies{
+		Name:           p.Name,
+		Type:           p.Type,
+		Server:         p.Server,
+		Port:           p.Port,
+		Password:       p.Password,
+		UDP:            p.UDP,
+		Cipher:         p.Cipher,
+		ALPN:           p.ALPN,
+		SkipCertVerify: p.SkipCertVerify,
+		SNI:            p.SNI,
+		Network:        p.Network,
+		UserName:       p.UserName,
+		TLS:            p.TLS,
+		UUID:           p.UUID,
+		AlterID:        p.AlterID,
+		ServerName:     p.ServerName,
+
+		rawName:   p.rawName,
+		rawServer: p.rawServer,
+		rawPort:   p.rawPort,
+	}
+	if p.relayCfg != nil {
+		cloned.relayCfg = p.relayCfg.Clone()
+	}
+	return cloned
+}
+
+func (p *Proxies) getOrCreateGroupLeader() *Proxies {
+	if p.groupLeader != nil {
+		return p.groupLeader
+	}
+	p.groupLeader = p.Clone()
+	// reset name,port,and server to raw
+	p.groupLeader.Name = p.rawName
+	p.groupLeader.Port = p.rawPort
+	p.groupLeader.Server = p.rawServer
+	p.groupLeader.relayCfg = nil
+	return p.groupLeader
 }

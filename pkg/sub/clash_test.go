@@ -51,13 +51,13 @@ func TestNewClashConfig(t *testing.T) {
 
 func TestToRelayConfigs(t *testing.T) {
 	cs, err := NewClashSub(configBuf, "test", "")
-	assert.NoError(t, err, "NewConfig should not retur an error")
+	assert.NoError(t, err, "NewConfig should not return an error")
 	assert.NotNil(t, cs, "Config should not be nil")
 
 	relayConfigs, err := cs.ToRelayConfigs("localhost")
 	assert.NoError(t, err, "ToRelayConfigs should not return an error")
 	assert.NotNil(t, relayConfigs, "relayConfigs should not be nil")
-	expectedRelayCount := 2
+	expectedRelayCount := 4 // 2 proxy + 2 load balance
 	assert.Equal(t, expectedRelayCount, len(relayConfigs), "Relay count should match")
 	l.Info("relayConfigs", zap.Any("relayConfigs", relayConfigs))
 }

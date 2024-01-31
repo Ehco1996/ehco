@@ -51,6 +51,15 @@ func (s *Server) HandleClashProxyProvider(w http.ResponseWriter, r *http.Request
 		writerBadRequestMsg(w, msg)
 		return
 	}
+	grouped := r.URL.Query().Get("grouped")
+	if grouped == "true" {
+		handleClashProxyProvider(s, w, r, subName, true)
+	} else {
+		handleClashProxyProvider(s, w, r, subName, false)
+	}
+}
+
+func handleClashProxyProvider(s *Server, w http.ResponseWriter, r *http.Request, subName string, grouped bool) {
 	if s.relayServerReloader != nil {
 		if err := s.relayServerReloader.Reload(); err != nil {
 			writerBadRequestMsg(w, err.Error())
@@ -66,7 +75,13 @@ func (s *Server) HandleClashProxyProvider(w http.ResponseWriter, r *http.Request
 	}
 	for _, clashSub := range clashSubList {
 		if clashSub.Name == subName {
-			clashCfgBuf, err := clashSub.ToClashConfigYaml()
+			var clashCfgBuf []byte
+			var err error
+			if grouped {
+				clashCfgBuf, err = clashSub.ToGroupedClashConfigYaml()
+			} else {
+				clashCfgBuf, err = clashSub.ToClashConfigYaml()
+			}
 			if err != nil {
 				writerBadRequestMsg(w, err.Error())
 				return

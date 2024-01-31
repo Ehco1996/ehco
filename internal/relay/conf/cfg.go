@@ -54,3 +54,14 @@ func (r *Config) Validate() error {
 	}
 	return nil
 }
+
+func (r *Config) Clone() *Config {
+	return &Config{
+		Listen:        r.Listen,
+		ListenType:    r.ListenType,
+		TransportType: r.TransportType,
+		TCPRemotes:    r.TCPRemotes,
+		UDPRemotes:    r.UDPRemotes,
+		Label:         r.Label,
+	}
+}
