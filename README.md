@@ -8,9 +8,9 @@
 
 ## 使用场景
 
-### 连接内网服务
+<details> <summary>连接内网服务</summary>
 
--   本地无法链接集群内的服务,可以通过 ehco 将本地流量转发到集群内,方便本地开发和调试
+本地无法链接集群内的服务,可以通过 ehco 将本地流量转发到集群内,方便本地开发和调试
 
 e.g. 本地开发调试连接内网服务 db, db host: xxx-rds.xxx.us-east-1.rds.amazonaws.com
 
@@ -22,25 +22,33 @@ e.g. 本地开发调试连接内网服务 db, db host: xxx-rds.xxx.us-east-1.rds
 
 3. 本地使用客户端连接
    `mysql -h 127.0.0.1:3306 -u root -p`
+     </details>
+
+<details> <summary>中转本地 proxy 客户端,提供负载均衡功能</summary>
+
+WIP
+
+</details>
+
+<details> <summary>隧道连接到 proxy 集群</summary>
+WIP
+</details>
 
 ## 安装
 
--   ehco 的可执行文件可以从项目的[release](https://github.com/Ehco1996/ehco/releases)页面下载
+-   ehco 提供预编译的的二进制 [release](https://github.com/Ehco1996/ehco/releases) 页面下载
 
--   ehco 提供 [nightly build](https://github.com/Ehco1996/ehco/releases/tag/nightly), 但可能会有较大的改动
+-   ehco 提供 [nightly build](https://github.com/Ehco1996/ehco/releases/tag/nightly)
 
--   ehco 也可以通过 docker 来运行 `docker pull ehco1996/ehco`
+-   ehco 提供 docker 镜像 `docker pull ehco1996/ehco`
 
 ## 主要功能
 
 -   tcp/udp relay
--   tcp relay over wss
--   从配置文件启动 支持多端口转发
--   从远程启动
--   benchmark
--   grafana 监控报警
--   热重载配置
--   内嵌了完整版本的 [xray](https://github.com/XTLS/Xray-core) 后端
+-   tunnel relay (ws/wss/mwss/mtcp)
+-   proxy server (内嵌了完整班版本的 xray)
+-   监控报警 (prometheus/grafana)
+-   WebAPI (http://web_host:web_port)
 
 ## 中转使用介绍
 
