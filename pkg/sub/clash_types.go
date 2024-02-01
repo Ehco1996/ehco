@@ -2,7 +2,6 @@ package sub
 
 import (
 	"net"
-	"strconv"
 
 	"github.com/Ehco1996/ehco/internal/constant"
 	relay_cfg "github.com/Ehco1996/ehco/internal/relay/conf"
@@ -89,6 +88,7 @@ type Proxies struct {
 	rawServer string
 	rawPort   string
 	relayCfg  *relay_cfg.Config
+	freePort  string
 
 	groupLeader *Proxies
 }
@@ -127,22 +127,16 @@ func (p *Proxies) Different(new *Proxies) bool {
 	return false
 }
 
-func (p *Proxies) ToRelayConfig(listenHost string, newName string) (*relay_cfg.Config, error) {
+func (p *Proxies) ToRelayConfig(listenHost string, listenPort string, newName string) (*relay_cfg.Config, error) {
 	if p.relayCfg != nil {
 		return p.relayCfg, nil
 	}
-	freePorts, err := getFreePortInBatch(listenHost, 1)
-	if err != nil {
-		return nil, err
-	}
-	listenPort := freePorts[0]
-	listenAddr := net.JoinHostPort(listenHost, strconv.Itoa(listenPort))
 	remoteAddr := net.JoinHostPort(p.Server, p.Port)
 	r := &relay_cfg.Config{
 		Label:         newName,
 		ListenType:    constant.Listen_RAW,
 		TransportType: constant.Transport_RAW,
-		Listen:        listenAddr,
+		Listen:        net.JoinHostPort(listenHost, listenPort),
 		TCPRemotes:    []string{remoteAddr},
 	}
 	if p.UDP {
@@ -154,7 +148,7 @@ func (p *Proxies) ToRelayConfig(listenHost string, newName string) (*relay_cfg.C
 	// overwrite name,port,and server by relay
 	p.Name = newName
 	p.Server = listenHost
-	p.Port = strconv.Itoa(listenPort)
+	p.Port = listenPort
 	p.relayCfg = r
 	return r, nil
 }

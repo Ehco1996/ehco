@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 	"sort"
+	"strconv"
 	"strings"
 
 	relay_cfg "github.com/Ehco1996/ehco/internal/relay/conf"
@@ -98,10 +99,43 @@ func (c *ClashSub) Refresh() error {
 
 	// update current
 	c.cCfg.Proxies = &tmp
+
+	// init group leader for each group
+	groupProxy := c.cCfg.groupByLongestCommonPrefix()
+	for _, proxies := range groupProxy {
+		// only use first proxy will be show in proxy provider, other will be merged into load balance in relay
+		proxies[0].getOrCreateGroupLeader()
+	}
 	return nil
 }
 
 func (c *ClashSub) ToRelayConfigs(listenHost string) ([]*relay_cfg.Config, error) {
+
+	// assign free port to proxies in batch
+	needAssign := 0
+	for _, proxy := range *c.cCfg.Proxies {
+		if proxy.freePort == "" {
+			needAssign++
+		}
+		if proxy.groupLeader != nil && proxy.groupLeader.freePort == "" {
+			needAssign++
+		}
+	}
+	freePortList, err := getFreePortInBatch(listenHost, needAssign)
+	if err != nil {
+		return nil, err
+	}
+	for i, p := range *c.cCfg.Proxies {
+		if p.freePort == "" {
+			(*c.cCfg.Proxies)[i].freePort = strconv.Itoa(freePortList[0])
+			freePortList = freePortList[1:]
+		}
+		if p.groupLeader != nil && p.groupLeader.freePort == "" {
+			(*c.cCfg.Proxies)[i].groupLeader.freePort = strconv.Itoa(freePortList[0])
+			freePortList = freePortList[1:]
+		}
+	}
+
 	relayConfigs := []*relay_cfg.Config{}
 	// generate relay config for each proxy
 	for _, proxy := range *c.cCfg.Proxies {
@@ -111,8 +145,7 @@ func (c *ClashSub) ToRelayConfigs(listenHost string) ([]*relay_cfg.Config, error
 		} else {
 			newName = fmt.Sprintf("%s-%s", proxy.Name, c.Name)
 		}
-
-		rc, err := proxy.ToRelayConfig(listenHost, newName)
+		rc, err := proxy.ToRelayConfig(listenHost, proxy.freePort, newName)
 		if err != nil {
 			return nil, err
 		}
@@ -130,7 +163,7 @@ func (c *ClashSub) ToRelayConfigs(listenHost string) ([]*relay_cfg.Config, error
 		} else {
 			newName = fmt.Sprintf("%s-lb", groupName)
 		}
-		rc, err := groupLeader.ToRelayConfig(listenHost, newName)
+		rc, err := groupLeader.ToRelayConfig(listenHost, groupLeader.freePort, newName)
 		if err != nil {
 			return nil, err
 		}
