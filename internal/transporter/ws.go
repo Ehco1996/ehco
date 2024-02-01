@@ -37,8 +37,8 @@ func (s *Ws) HandleTCPConn(c net.Conn, remote *lb.Node) error {
 		return err
 	}
 	defer wsc.Close()
-	s.L.Infof("HandleTCPConn from %s to %s", c.LocalAddr(), remote.Address)
-	return transport(c, wsc, remote.Label)
+	s.l.Infof("HandleTCPConn from %s to %s", c.LocalAddr(), remote.Address)
+	return transport(c, wsc, remote.Label, s.cs)
 }
 
 type WSServer struct {

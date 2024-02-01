@@ -61,7 +61,7 @@ func NewRelay(cfg *conf.Config) (*Relay, error) {
 		LocalUDPAddr:  localUDPAddr,
 		ListenType:    cfg.ListenType,
 		TransportType: cfg.TransportType,
-		TP: transporter.PickTransporter(
+		TP: transporter.NewRelayTransporter(
 			cfg.TransportType,
 			lb.NewRoundRobin(tcpNodeList),
 			lb.NewRoundRobin(udpNodeList),

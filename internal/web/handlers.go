@@ -104,7 +104,7 @@ func (s *Server) HandleReload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.relayServerReloader.TriggerReload()
+	s.relayServerReloader.Reload()
 	_, err := w.Write([]byte("reload success"))
 	if err != nil {
 		s.l.Errorf("write response meet err=%v", err)

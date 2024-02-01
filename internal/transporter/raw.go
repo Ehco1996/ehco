@@ -20,7 +20,19 @@ type Raw struct {
 	UDPRemotes     lb.RoundRobin
 	UDPBufferChMap map[string]*BufferCh
 
-	L *zap.SugaredLogger
+	l  *zap.SugaredLogger
+	cs ConnStats
+}
+
+func NewRawTransporter(transType string, tcpRemotes, udpRemotes lb.RoundRobin) *Raw {
+	r := &Raw{
+		TCPRemotes:     tcpRemotes,
+		UDPRemotes:     udpRemotes,
+		UDPBufferChMap: make(map[string]*BufferCh),
+		l:              zap.S().Named(transType),
+	}
+	r.cs = NewConnStats()
+	return r
 }
 
 func (raw *Raw) GetOrCreateBufferCh(uaddr *net.UDPAddr) *BufferCh {
@@ -45,7 +57,7 @@ func (raw *Raw) HandleUDPConn(uaddr *net.UDPAddr, local *net.UDPConn) {
 	remoteUdp, _ := net.ResolveUDPAddr("udp", remote.Address)
 	rc, err := net.DialUDP("udp", nil, remoteUdp)
 	if err != nil {
-		raw.L.Error(err)
+		raw.l.Error(err)
 		return
 	}
 	defer func() {
@@ -55,7 +67,7 @@ func (raw *Raw) HandleUDPConn(uaddr *net.UDPAddr, local *net.UDPConn) {
 		raw.udpmu.Unlock()
 	}()
 
-	raw.L.Infof("HandleUDPConn from %s to %s", local.LocalAddr().String(), remote.Label)
+	raw.l.Infof("HandleUDPConn from %s to %s", local.LocalAddr().String(), remote.Label)
 
 	buf := BufferPool.Get()
 	defer BufferPool.Put(buf)
@@ -71,7 +83,7 @@ func (raw *Raw) HandleUDPConn(uaddr *net.UDPAddr, local *net.UDPConn) {
 			_ = rc.SetDeadline(time.Now().Add(constant.IdleTimeOut))
 			i, err := rc.Read(buf)
 			if err != nil {
-				raw.L.Error(err)
+				raw.l.Error(err)
 				break
 			}
 			web.NetWorkTransmitBytes.WithLabelValues(
@@ -79,7 +91,7 @@ func (raw *Raw) HandleUDPConn(uaddr *net.UDPAddr, local *net.UDPConn) {
 			).Add(float64(i))
 
 			if _, err := local.WriteToUDP(buf[0:i], uaddr); err != nil {
-				raw.L.Error(err)
+				raw.l.Error(err)
 				break
 			}
 			web.NetWorkTransmitBytes.WithLabelValues(
@@ -102,7 +114,7 @@ func (raw *Raw) HandleUDPConn(uaddr *net.UDPAddr, local *net.UDPConn) {
 
 			_ = rc.SetDeadline(time.Now().Add(constant.IdleTimeOut))
 			if _, err := rc.Write(b); err != nil {
-				raw.L.Error(err)
+				raw.l.Error(err)
 				return
 			}
 			web.NetWorkTransmitBytes.WithLabelValues(
@@ -137,7 +149,10 @@ func (raw *Raw) HandleTCPConn(c net.Conn, remote *lb.Node) error {
 	if err != nil {
 		return err
 	}
-	raw.L.Infof("HandleTCPConn from %s to %s", c.LocalAddr(), remote.Address)
+	raw.l.Infof("HandleTCPConn from %s to %s", c.LocalAddr(), remote.Address)
 	defer rc.Close()
-	return transport(c, rc, remote.Label)
+	return transport(c, rc, remote.Label, raw.cs)
+}
+
+func (raw *Raw) RecordTraffic(down, up int64) {
 }
