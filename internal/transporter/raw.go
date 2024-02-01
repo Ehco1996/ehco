@@ -24,7 +24,7 @@ type Raw struct {
 	cs ConnStats
 }
 
-func NewRawTransporter(transType string, tcpRemotes, udpRemotes lb.RoundRobin) *Raw {
+func newRawTransporter(transType string, tcpRemotes, udpRemotes lb.RoundRobin) *Raw {
 	r := &Raw{
 		TCPRemotes:     tcpRemotes,
 		UDPRemotes:     udpRemotes,

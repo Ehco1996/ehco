@@ -28,7 +28,11 @@ func (rc *RelayConn) Transport(remoteLabel string) error {
 	cl := zap.L().Named(shortName)
 	cl.Debug("transport start", zap.String("full name", name), zap.String("stats", rc.cs.GetStats().String()))
 	defer cl.Debug("transport end", zap.String("stats", rc.cs.GetStats().String()))
-	return transport(rc.clientConn, rc.remoteConn, remoteLabel, rc.cs)
+	err := transport(rc.clientConn, rc.remoteConn, remoteLabel, rc.cs)
+	if err != nil {
+		cl.Error("transport error", zap.Error(err))
+	}
+	return err
 }
 
 func shortHashSHA256(input string) string {
@@ -116,7 +120,7 @@ func transport(conn1, conn2 net.Conn, remoteLabel string, cs ConnStats) error {
 
 	// handle errors, need to combine errors from both directions
 	if err != nil && err2 != nil {
-		err = fmt.Errorf("errors in both directions: %v, %v", err, err2)
+		err = fmt.Errorf("transport errors in both directions: %v, %v", err, err2)
 	}
 	if err != nil {
 		return err
