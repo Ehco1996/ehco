@@ -145,7 +145,6 @@ func (r *Relay) RunLocalTCPServer() error {
 			remote := r.TP.GetRemote()
 			web.CurConnectionCount.WithLabelValues(remote.Label, web.METRIC_CONN_TYPE_TCP).Inc()
 			defer web.CurConnectionCount.WithLabelValues(remote.Label, web.METRIC_CONN_TYPE_TCP).Dec()
-			defer c.Close()
 			if err := r.TP.HandleTCPConn(c, remote); err != nil {
 				r.L.Errorf("HandleTCPConn meet error tp:%s from:%s to:%s err:%s",
 					r.TransportType,

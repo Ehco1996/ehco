@@ -73,7 +73,6 @@ func (s *WSServer) HandleRequest(w http.ResponseWriter, req *http.Request) {
 	if err != nil {
 		return
 	}
-	defer wsc.Close()
 
 	remote := s.raw.GetRemote()
 	if err := s.raw.HandleTCPConn(wsc, remote); err != nil {

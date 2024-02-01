@@ -121,7 +121,6 @@ func (s *MTCPServer) ListenAndServe() error {
 			return e
 		}
 		go func(c net.Conn) {
-			defer c.Close()
 			remote := s.raw.GetRemote()
 			if err := s.raw.HandleTCPConn(c, remote); err != nil {
 				s.L.Errorf("HandleTCPConn meet error from:%s to:%s err:%s", c.RemoteAddr(), remote.Address, err)
