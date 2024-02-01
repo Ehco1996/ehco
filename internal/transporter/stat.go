@@ -1,27 +1,46 @@
 package transporter
 
+import "fmt"
+
+type Stats struct {
+	up   int64
+	down int64
+}
+
+func (s *Stats) ReSet() {
+	s.up = 0
+	s.down = 0
+}
+
+func (s *Stats) String() string {
+	return fmt.Sprintf("up: %d, down: %d", s.up, s.down)
+}
+
 type ConnStats interface {
-	// RecordTraffic records the traffic of the connection
 	RecordTraffic(down, up int64)
 
 	ReSetTraffic()
+
+	GetStats() *Stats
 }
 
 func NewConnStats() ConnStats {
-	return &connStatsImpl{}
+	return &connStatsImpl{s: &Stats{up: 0, down: 0}}
 }
 
 type connStatsImpl struct {
-	down int64
-	up   int64
+	s *Stats
 }
 
 func (c *connStatsImpl) RecordTraffic(down, up int64) {
-	c.down += down
-	c.up += up
+	c.s.down += down
+	c.s.up += up
 }
 
 func (c *connStatsImpl) ReSetTraffic() {
-	c.down = 0
-	c.up = 0
+	c.s.ReSet()
+}
+
+func (c *connStatsImpl) GetStats() *Stats {
+	return c.s
 }

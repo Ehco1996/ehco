@@ -151,7 +151,7 @@ func (raw *Raw) HandleTCPConn(c net.Conn, remote *lb.Node) error {
 	}
 	raw.l.Infof("HandleTCPConn from %s to %s", c.LocalAddr(), remote.Address)
 	defer rc.Close()
-	return transport(c, rc, remote.Label, raw.cs)
+	return NewRelayConn(c, rc, raw.cs).Transport(remote.Label)
 }
 
 func (raw *Raw) RecordTraffic(down, up int64) {

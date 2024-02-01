@@ -34,12 +34,12 @@ func (s *Wss) dialRemote(remote *lb.Node) (net.Conn, error) {
 
 func (s *Wss) HandleTCPConn(c net.Conn, remote *lb.Node) error {
 	defer c.Close()
-	wsc, err := s.dialRemote(remote)
+	wssc, err := s.dialRemote(remote)
 	if err != nil {
 		return err
 	}
 	s.l.Infof("HandleTCPConn from %s to %s", c.RemoteAddr(), remote.Address)
-	return transport(c, wsc, remote.Label, s.cs)
+	return NewRelayConn(c, wssc, s.cs).Transport(remote.Label)
 }
 
 type WSSServer struct {
