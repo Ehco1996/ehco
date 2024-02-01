@@ -3,8 +3,6 @@ package transporter
 import (
 	"net"
 
-	"go.uber.org/zap"
-
 	"github.com/Ehco1996/ehco/internal/constant"
 	"github.com/Ehco1996/ehco/pkg/lb"
 )
@@ -21,31 +19,26 @@ type RelayTransporter interface {
 	GetRemote() *lb.Node
 }
 
-func PickTransporter(transType string, tcpRemotes, udpRemotes lb.RoundRobin) RelayTransporter {
-	raw := Raw{
-		TCPRemotes:     tcpRemotes,
-		UDPRemotes:     udpRemotes,
-		UDPBufferChMap: make(map[string]*BufferCh),
-		L:              zap.S().Named(transType),
-	}
+func NewRelayTransporter(transType string, tcpRemotes, udpRemotes lb.RoundRobin) RelayTransporter {
+	raw := newRawTransporter(transType, tcpRemotes, udpRemotes)
 	switch transType {
 	case constant.Transport_RAW:
-		return &raw
+		return raw
 	case constant.Transport_WS:
-		return &Ws{Raw: &raw}
+		return &Ws{Raw: raw}
 	case constant.Transport_WSS:
-		return &Wss{Raw: &raw}
+		return &Wss{Raw: raw}
 	case constant.Transport_MWSS:
-		logger := raw.L.Named("MWSSClient")
+		logger := raw.l.Named("MWSSClient")
 		mWSSClient := NewMWSSClient(logger)
 		mwss := &Mwss{mtp: NewSmuxTransporter(logger, mWSSClient.InitNewSession)}
-		mwss.Raw = &raw
+		mwss.Raw = raw
 		return mwss
 	case constant.Transport_MTCP:
-		logger := raw.L.Named("MTCPClient")
+		logger := raw.l.Named("MTCPClient")
 		mTCPClient := NewMTCPClient(logger)
 		mtcp := &MTCP{mtp: NewSmuxTransporter(logger, mTCPClient.InitNewSession)}
-		mtcp.Raw = &raw
+		mtcp.Raw = raw
 		return mtcp
 	}
 	return nil

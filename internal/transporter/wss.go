@@ -24,22 +24,22 @@ type Wss struct {
 func (s *Wss) dialRemote(remote *lb.Node) (net.Conn, error) {
 	t1 := time.Now()
 	d := ws.Dialer{TLSConfig: mytls.DefaultTLSConfig}
-	wsc, _, _, err := d.Dial(context.TODO(), remote.Address+"/wss/")
+	wssc, _, _, err := d.Dial(context.TODO(), remote.Address+"/wss/")
 	if err != nil {
 		return nil, err
 	}
 	web.HandShakeDuration.WithLabelValues(remote.Label).Observe(float64(time.Since(t1).Milliseconds()))
-	return wsc, nil
+	return wssc, nil
 }
 
 func (s *Wss) HandleTCPConn(c net.Conn, remote *lb.Node) error {
 	defer c.Close()
-	wsc, err := s.dialRemote(remote)
+	wssc, err := s.dialRemote(remote)
 	if err != nil {
 		return err
 	}
-	s.L.Infof("HandleTCPConn from %s to %s", c.RemoteAddr(), remote.Address)
-	return transport(c, wsc, remote.Label)
+	s.l.Infof("HandleTCPConn from %s to %s", c.RemoteAddr(), remote.Address)
+	return NewRelayConn(c, wssc, s.cs).Transport(remote.Label)
 }
 
 type WSSServer struct {

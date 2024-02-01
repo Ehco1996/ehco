@@ -27,3 +27,4 @@ ehco
 cmd/test/
 localdev/
 
+.vscode/settings.json
