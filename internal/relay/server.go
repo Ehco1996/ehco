@@ -41,7 +41,6 @@ func NewServer(cfg *config.Config) (*Server, error) {
 }
 
 func (s *Server) startOneRelay(r *Relay) {
-	r.registerMgr(s.cmgr)
 	s.relayM.Store(r.Name, r)
 	// mute closed network error for tcp server and mute http.ErrServerClosed for http server when config reload
 	if err := r.ListenAndServe(); err != nil &&
@@ -59,7 +58,7 @@ func (s *Server) stopOneRelay(r *Relay) {
 func (s *Server) Start(ctx context.Context) error {
 	// init and relay servers
 	for idx := range s.cfg.RelayConfigs {
-		r, err := NewRelay(s.cfg.RelayConfigs[idx])
+		r, err := NewRelay(s.cfg.RelayConfigs[idx], s.cmgr)
 		if err != nil {
 			return err
 		}

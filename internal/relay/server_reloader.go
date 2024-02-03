@@ -43,7 +43,7 @@ func (s *Server) Reload() error {
 		// start bread new relay that not in old relayM
 		if old, ok := s.relayM.Load(newCfg.Label); !ok {
 			s.l.Infof("start new relay name=%s", newCfg.Label)
-			r, err := NewRelay(newCfg)
+			r, err := NewRelay(newCfg, s.cmgr)
 			if err != nil {
 				s.l.Error("new relay meet error", zap.Error(err))
 				continue
@@ -61,7 +61,7 @@ func (s *Server) Reload() error {
 				oldR := old.(*Relay)
 				s.l.Infof("relay config changed, stop old and start new relay name=%s", newCfg.Label)
 				s.stopOneRelay(oldR)
-				r, err := NewRelay(newCfg)
+				r, err := NewRelay(newCfg, s.cmgr)
 				if err != nil {
 					s.l.Error("new relay meet error", zap.Error(err))
 					continue

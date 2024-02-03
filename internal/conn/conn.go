@@ -15,8 +15,8 @@ type RelayConn interface {
 
 func NewRelayConn(label string, clientConn, remoteConn net.Conn) RelayConn {
 	return &relayConnImpl{
-		Label: label,
-		Stats: &Stats{},
+		RelayLabel: label,
+		Stats:      &Stats{},
 
 		clientConn: clientConn,
 		remoteConn: remoteConn,
@@ -24,9 +24,8 @@ func NewRelayConn(label string, clientConn, remoteConn net.Conn) RelayConn {
 }
 
 type relayConnImpl struct {
-	// same with relay label
-	Label string `json:"label"`
-	Stats *Stats `json:"stats"`
+	RelayLabel string `json:"relay_label"`
+	Stats      *Stats `json:"stats"`
 
 	clientConn net.Conn
 	remoteConn net.Conn

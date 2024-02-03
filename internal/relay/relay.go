@@ -1,7 +1,6 @@
 package relay
 
 import (
-	"fmt"
 	"net"
 
 	"go.uber.org/zap"
@@ -11,7 +10,6 @@ import (
 	"github.com/Ehco1996/ehco/internal/relay/conf"
 	"github.com/Ehco1996/ehco/internal/transporter"
 	"github.com/Ehco1996/ehco/internal/web"
-	"github.com/Ehco1996/ehco/pkg/lb"
 )
 
 type Relay struct {
@@ -25,13 +23,13 @@ type Relay struct {
 
 	closeTcpF func() error
 	closeUdpF func() error
-	cfg       *conf.Config
-	l         *zap.SugaredLogger
 
-	cmgr cmgr.Cmgr // register when start
+	cmgr cmgr.Cmgr
+	cfg  *conf.Config
+	l    *zap.SugaredLogger
 }
 
-func NewRelay(cfg *conf.Config) (*Relay, error) {
+func NewRelay(cfg *conf.Config, connMgr cmgr.Cmgr) (*Relay, error) {
 	localTCPAddr, err := net.ResolveTCPAddr("tcp", cfg.Listen)
 	if err != nil {
 		return nil, err
@@ -39,21 +37,6 @@ func NewRelay(cfg *conf.Config) (*Relay, error) {
 	localUDPAddr, err := net.ResolveUDPAddr("udp", cfg.Listen)
 	if err != nil {
 		return nil, err
-	}
-
-	tcpNodeList := make([]*lb.Node, len(cfg.TCPRemotes))
-	for idx, addr := range cfg.TCPRemotes {
-		tcpNodeList[idx] = &lb.Node{
-			Address: addr,
-			Label:   fmt.Sprintf("%s-%s", cfg.Label, addr),
-		}
-	}
-	udpNodeList := make([]*lb.Node, len(cfg.UDPRemotes))
-	for idx, addr := range cfg.UDPRemotes {
-		udpNodeList[idx] = &lb.Node{
-			Address: addr,
-			Label:   fmt.Sprintf("%s-%s", cfg.Label, addr),
-		}
 	}
 
 	r := &Relay{
@@ -65,18 +48,10 @@ func NewRelay(cfg *conf.Config) (*Relay, error) {
 		LocalUDPAddr:  localUDPAddr,
 		ListenType:    cfg.ListenType,
 		TransportType: cfg.TransportType,
-		TP: transporter.NewRelayTransporter(
-			cfg.TransportType,
-			lb.NewRoundRobin(tcpNodeList),
-			lb.NewRoundRobin(udpNodeList),
-		),
+		TP:            transporter.NewRelayTransporter(cfg, connMgr),
 	}
 
 	return r, nil
-}
-
-func (r *Relay) registerMgr(cmgr cmgr.Cmgr) {
-	r.cmgr = cmgr
 }
 
 func (r *Relay) ListenAndServe() error {

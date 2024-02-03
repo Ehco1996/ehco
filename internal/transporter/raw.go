@@ -17,22 +17,33 @@ import (
 )
 
 type Raw struct {
-	udpmu          sync.Mutex
-	TCPRemotes     lb.RoundRobin
-	UDPRemotes     lb.RoundRobin
-	UDPBufferChMap map[string]*BufferCh
+	relayLabel string
 
-	l    *zap.SugaredLogger
-	cmgr cmgr.Cmgr
+	// TCP
+	cmgr       cmgr.Cmgr
+	tCPRemotes lb.RoundRobin
+
+	// UDP todo refactor udp relay
+	udpmu          sync.Mutex
+	uDPRemotes     lb.RoundRobin
+	uDPBufferChMap map[string]*BufferCh
+
+	l *zap.SugaredLogger
 }
 
-func newRawTransporter(transType string, tcpRemotes, udpRemotes lb.RoundRobin, cmgr cmgr.Cmgr) *Raw {
+func newRaw(
+	relayLabel string,
+	tcpRemotes, udpRemotes lb.RoundRobin,
+	cmgr cmgr.Cmgr) *Raw {
 	r := &Raw{
-		TCPRemotes:     tcpRemotes,
-		UDPRemotes:     udpRemotes,
-		UDPBufferChMap: make(map[string]*BufferCh),
-		l:              zap.S().Named(transType),
-		cmgr:           cmgr,
+		cmgr: cmgr,
+
+		relayLabel:     relayLabel,
+		tCPRemotes:     tcpRemotes,
+		uDPRemotes:     udpRemotes,
+		uDPBufferChMap: make(map[string]*BufferCh),
+
+		l: zap.S().Named(relayLabel),
 	}
 	return r
 }
@@ -41,17 +52,17 @@ func (raw *Raw) GetOrCreateBufferCh(uaddr *net.UDPAddr) *BufferCh {
 	raw.udpmu.Lock()
 	defer raw.udpmu.Unlock()
 
-	bc, found := raw.UDPBufferChMap[uaddr.String()]
+	bc, found := raw.uDPBufferChMap[uaddr.String()]
 	if !found {
 		bc := newudpBufferCh(uaddr)
-		raw.UDPBufferChMap[uaddr.String()] = bc
+		raw.uDPBufferChMap[uaddr.String()] = bc
 		return bc
 	}
 	return bc
 }
 
 func (raw *Raw) HandleUDPConn(uaddr *net.UDPAddr, local *net.UDPConn) {
-	remote := raw.UDPRemotes.Next()
+	remote := raw.uDPRemotes.Next()
 	web.CurConnectionCount.WithLabelValues(remote.Label, web.METRIC_CONN_TYPE_UDP).Inc()
 	defer web.CurConnectionCount.WithLabelValues(remote.Label, web.METRIC_CONN_TYPE_UDP).Dec()
 
@@ -65,7 +76,7 @@ func (raw *Raw) HandleUDPConn(uaddr *net.UDPAddr, local *net.UDPConn) {
 	defer func() {
 		rc.Close()
 		raw.udpmu.Lock()
-		delete(raw.UDPBufferChMap, uaddr.String())
+		delete(raw.uDPBufferChMap, uaddr.String())
 		raw.udpmu.Unlock()
 	}()
 
@@ -128,7 +139,7 @@ func (raw *Raw) HandleUDPConn(uaddr *net.UDPAddr, local *net.UDPConn) {
 }
 
 func (raw *Raw) GetRemote() *lb.Node {
-	return raw.TCPRemotes.Next()
+	return raw.tCPRemotes.Next()
 }
 
 func (raw *Raw) dialRemote(remote *lb.Node) (net.Conn, error) {
@@ -153,5 +164,6 @@ func (raw *Raw) HandleTCPConn(c net.Conn, remote *lb.Node) error {
 	}
 	raw.l.Infof("HandleTCPConn from %s to %s", c.LocalAddr(), remote.Address)
 	defer rc.Close()
+
 	return conn.NewRelayConn("TODO", c, rc).Transport(remote.Label)
 }

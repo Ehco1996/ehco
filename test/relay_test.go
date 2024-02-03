@@ -125,7 +125,7 @@ func init() {
 		defer cancel()
 
 		go func(ctx context.Context, c *conf.Config) {
-			r, err := relay.NewRelay(c)
+			r, err := relay.NewRelay(c, nil)
 			if err != nil {
 				logger.Fatal(err)
 			}
