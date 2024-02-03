@@ -7,9 +7,9 @@ import (
 
 	"github.com/Ehco1996/ehco/internal/cmgr"
 	"github.com/Ehco1996/ehco/internal/constant"
+	"github.com/Ehco1996/ehco/internal/metrics"
 	"github.com/Ehco1996/ehco/internal/relay/conf"
 	"github.com/Ehco1996/ehco/internal/transporter"
-	"github.com/Ehco1996/ehco/internal/web"
 )
 
 type Relay struct {
@@ -123,8 +123,8 @@ func (r *Relay) RunLocalTCPServer() error {
 
 		go func(c net.Conn) {
 			remote := r.TP.GetRemote()
-			web.CurConnectionCount.WithLabelValues(remote.Label, web.METRIC_CONN_TYPE_TCP).Inc()
-			defer web.CurConnectionCount.WithLabelValues(remote.Label, web.METRIC_CONN_TYPE_TCP).Dec()
+			metrics.CurConnectionCount.WithLabelValues(remote.Label, metrics.METRIC_CONN_TYPE_TCP).Inc()
+			defer metrics.CurConnectionCount.WithLabelValues(remote.Label, metrics.METRIC_CONN_TYPE_TCP).Dec()
 			if err := r.TP.HandleTCPConn(c, remote); err != nil {
 				r.l.Errorf("HandleTCPConn meet error tp:%s from:%s to:%s err:%s",
 					r.TransportType,

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/Ehco1996/ehco/internal/web"
+	"github.com/Ehco1996/ehco/internal/metrics"
 	"github.com/Ehco1996/ehco/pkg/bytes"
 )
 
@@ -33,8 +33,8 @@ type metricsConn struct {
 func (c metricsConn) Read(p []byte) (n int, err error) {
 	n, err = c.underlyingConn.Read(p)
 	// increment the metric for the read bytes
-	web.NetWorkTransmitBytes.WithLabelValues(
-		c.remoteLabel, web.METRIC_CONN_TYPE_TCP, web.METRIC_CONN_FLOW_READ,
+	metrics.NetWorkTransmitBytes.WithLabelValues(
+		c.remoteLabel, metrics.METRIC_CONN_TYPE_TCP, metrics.METRIC_CONN_FLOW_READ,
 	).Add(float64(n))
 	// record the traffic
 	c.stats.Record(int64(n), 0)
@@ -43,8 +43,8 @@ func (c metricsConn) Read(p []byte) (n int, err error) {
 
 func (c metricsConn) Write(p []byte) (n int, err error) {
 	n, err = c.underlyingConn.Write(p)
-	web.NetWorkTransmitBytes.WithLabelValues(
-		c.remoteLabel, web.METRIC_CONN_TYPE_TCP, web.METRIC_CONN_FLOW_WRITE,
+	metrics.NetWorkTransmitBytes.WithLabelValues(
+		c.remoteLabel, metrics.METRIC_CONN_TYPE_TCP, metrics.METRIC_CONN_FLOW_WRITE,
 	).Add(float64(n))
 	c.stats.Record(0, int64(n))
 	return

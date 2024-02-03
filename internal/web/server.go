@@ -11,6 +11,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/Ehco1996/ehco/internal/config"
+	"github.com/Ehco1996/ehco/internal/metrics"
 	"github.com/Ehco1996/ehco/internal/reloader"
 )
 
@@ -21,6 +22,7 @@ type Server struct {
 	cfg  *config.Config
 
 	relayServerReloader reloader.Reloader
+	// connMgr             cmgr.Cmgr
 }
 
 func NewServer(cfg *config.Config, relayReloader reloader.Reloader) (*Server, error) {
@@ -35,10 +37,10 @@ func NewServer(cfg *config.Config, relayReloader reloader.Reloader) (*Server, er
 	if cfg.WebToken != "" {
 		e.Use(SimpleTokenAuthMiddleware(cfg.WebToken, l))
 	}
-	if err := registerEhcoMetrics(cfg); err != nil {
+	if err := metrics.RegisterEhcoMetrics(cfg); err != nil {
 		return nil, err
 	}
-	if err := registerNodeExporterMetrics(cfg); err != nil {
+	if err := metrics.RegisterNodeExporterMetrics(cfg); err != nil {
 		return nil, err
 	}
 	s := &Server{

@@ -127,3 +127,8 @@ func (s *Server) CurrentConfig(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	_, _ = w.Write(ret)
 }
+
+// func (s *Server) ListConnections(c echo.Context) error {
+// 	conns := s.cmgr.ListAllConnections()
+// 	return c.JSON(http.StatusOK, conns)
+// }
