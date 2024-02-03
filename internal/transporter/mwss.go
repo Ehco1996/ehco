@@ -43,7 +43,9 @@ func (s *Mwss) HandleTCPConn(c net.Conn, remote *lb.Node) error {
 	}
 	defer mwsc.Close()
 	s.l.Infof("HandleTCPConn from:%s to:%s", c.LocalAddr(), remote.Address)
-	return conn.NewRelayConn("TODO", c, mwsc).Transport(remote.Label)
+	relayConn := conn.NewRelayConn(s.relayLabel, c, mwsc)
+	s.cmgr.AddConnection(relayConn)
+	return relayConn.Transport(remote.Label)
 }
 
 type MWSSServer struct {

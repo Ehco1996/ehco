@@ -11,13 +11,13 @@ type Cmgr interface {
 	ListAllConnections() []conn.RelayConn
 
 	// AddConnection adds a connection to the connection manager.
-	AddConnection(relayName string, conn conn.RelayConn)
+	AddConnection(conn conn.RelayConn)
 }
 
 type cmgrImpl struct {
 	lock sync.RWMutex
 
-	// k: relay name, v: connectionList
+	// k: relay label, v: connection list
 	connectionsMap map[string][]conn.RelayConn
 }
 
@@ -38,12 +38,13 @@ func (cm *cmgrImpl) ListAllConnections() []conn.RelayConn {
 	return conns
 }
 
-func (cm *cmgrImpl) AddConnection(relayName string, c conn.RelayConn) {
+func (cm *cmgrImpl) AddConnection(c conn.RelayConn) {
 	cm.lock.Lock()
 	defer cm.lock.Unlock()
+	label := c.GetRelayLabel()
 
-	if _, ok := cm.connectionsMap[relayName]; !ok {
-		cm.connectionsMap[relayName] = []conn.RelayConn{}
+	if _, ok := cm.connectionsMap[label]; !ok {
+		cm.connectionsMap[label] = []conn.RelayConn{}
 	}
-	cm.connectionsMap[relayName] = append(cm.connectionsMap[relayName], c)
+	cm.connectionsMap[label] = append(cm.connectionsMap[label], c)
 }

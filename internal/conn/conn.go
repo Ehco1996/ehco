@@ -11,11 +11,14 @@ type RelayConn interface {
 	// Transport transports data between the client and the remote server.
 	// The remoteLabel is the label of the remote server.
 	Transport(remoteLabel string) error
+
+	// GetRelayLabel returns the label of the Relay instance.
+	GetRelayLabel() string
 }
 
-func NewRelayConn(label string, clientConn, remoteConn net.Conn) RelayConn {
+func NewRelayConn(relayName string, clientConn, remoteConn net.Conn) RelayConn {
 	return &relayConnImpl{
-		RelayLabel: label,
+		RelayLabel: relayName,
 		Stats:      &Stats{},
 
 		clientConn: clientConn,
@@ -59,4 +62,8 @@ func (rc *relayConnImpl) Transport(remoteLabel string) error {
 
 func (rc *relayConnImpl) Name() string {
 	return fmt.Sprintf("c1:[%s] c2:[%s]", connectionName(rc.clientConn), connectionName(rc.remoteConn))
+}
+
+func (rc *relayConnImpl) GetRelayLabel() string {
+	return rc.RelayLabel
 }

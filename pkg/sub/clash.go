@@ -110,7 +110,6 @@ func (c *ClashSub) Refresh() error {
 }
 
 func (c *ClashSub) ToRelayConfigs(listenHost string) ([]*relay_cfg.Config, error) {
-
 	// assign free port to proxies in batch
 	needAssign := 0
 	for _, proxy := range *c.cCfg.Proxies {

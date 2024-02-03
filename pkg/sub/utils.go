@@ -10,9 +10,7 @@ import (
 	"time"
 )
 
-var (
-	client = http.Client{Timeout: time.Second * 10}
-)
+var client = http.Client{Timeout: time.Second * 10}
 
 func getFreePortInBatch(host string, count int) ([]int, error) {
 	res := make([]int, 0, count)

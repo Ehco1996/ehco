@@ -24,9 +24,8 @@ type Relay struct {
 	closeTcpF func() error
 	closeUdpF func() error
 
-	cmgr cmgr.Cmgr
-	cfg  *conf.Config
-	l    *zap.SugaredLogger
+	cfg *conf.Config
+	l   *zap.SugaredLogger
 }
 
 func NewRelay(cfg *conf.Config, connMgr cmgr.Cmgr) (*Relay, error) {

@@ -40,7 +40,10 @@ func (s *Wss) HandleTCPConn(c net.Conn, remote *lb.Node) error {
 		return err
 	}
 	s.l.Infof("HandleTCPConn from %s to %s", c.RemoteAddr(), remote.Address)
-	return conn.NewRelayConn("TODO", c, wssc).Transport(remote.Label)
+
+	relayConn := conn.NewRelayConn(s.relayLabel, c, wssc)
+	s.cmgr.AddConnection(relayConn)
+	return relayConn.Transport(remote.Label)
 }
 
 type WSSServer struct {

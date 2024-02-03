@@ -23,7 +23,6 @@ type RelayTransporter interface {
 }
 
 func NewRelayTransporter(cfg *conf.Config, connMgr cmgr.Cmgr) RelayTransporter {
-
 	tcpNodeList := make([]*lb.Node, len(cfg.TCPRemotes))
 	for idx, addr := range cfg.TCPRemotes {
 		tcpNodeList[idx] = &lb.Node{

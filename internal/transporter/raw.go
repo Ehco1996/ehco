@@ -34,7 +34,8 @@ type Raw struct {
 func newRaw(
 	relayLabel string,
 	tcpRemotes, udpRemotes lb.RoundRobin,
-	cmgr cmgr.Cmgr) *Raw {
+	cmgr cmgr.Cmgr,
+) *Raw {
 	r := &Raw{
 		cmgr: cmgr,
 
@@ -154,6 +155,7 @@ func (raw *Raw) dialRemote(remote *lb.Node) (net.Conn, error) {
 }
 
 func (raw *Raw) HandleTCPConn(c net.Conn, remote *lb.Node) error {
+	// todo refactor metrics to server
 	web.CurConnectionCount.WithLabelValues(remote.Label, web.METRIC_CONN_TYPE_TCP).Inc()
 	defer web.CurConnectionCount.WithLabelValues(remote.Label, web.METRIC_CONN_TYPE_TCP).Dec()
 
@@ -162,8 +164,10 @@ func (raw *Raw) HandleTCPConn(c net.Conn, remote *lb.Node) error {
 	if err != nil {
 		return err
 	}
-	raw.l.Infof("HandleTCPConn from %s to %s", c.LocalAddr(), remote.Address)
 	defer rc.Close()
 
-	return conn.NewRelayConn("TODO", c, rc).Transport(remote.Label)
+	raw.l.Infof("HandleTCPConn from %s to %s", c.LocalAddr(), remote.Address)
+	relayConn := conn.NewRelayConn(raw.relayLabel, c, rc)
+	raw.cmgr.AddConnection(relayConn)
+	return relayConn.Transport(remote.Label)
 }
