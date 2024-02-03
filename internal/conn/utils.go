@@ -1,4 +1,4 @@
-package transporter
+package conn
 
 import (
 	"crypto/sha256"

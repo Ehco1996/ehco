@@ -6,6 +6,7 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/Ehco1996/ehco/internal/cmgr"
 	"github.com/Ehco1996/ehco/internal/constant"
 	"github.com/Ehco1996/ehco/internal/relay/conf"
 	"github.com/Ehco1996/ehco/internal/transporter"
@@ -26,6 +27,8 @@ type Relay struct {
 	closeUdpF func() error
 	cfg       *conf.Config
 	l         *zap.SugaredLogger
+
+	cmgr cmgr.Cmgr // register when start
 }
 
 func NewRelay(cfg *conf.Config) (*Relay, error) {
@@ -70,6 +73,10 @@ func NewRelay(cfg *conf.Config) (*Relay, error) {
 	}
 
 	return r, nil
+}
+
+func (r *Relay) registerMgr(cmgr cmgr.Cmgr) {
+	r.cmgr = cmgr
 }
 
 func (r *Relay) ListenAndServe() error {

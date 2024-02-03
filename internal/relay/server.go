@@ -11,18 +11,10 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/Ehco1996/ehco/internal/cmgr"
 	"github.com/Ehco1996/ehco/internal/config"
 	"go.uber.org/zap"
 )
-
-func inArray(ele string, array []string) bool {
-	for _, v := range array {
-		if v == ele {
-			return true
-		}
-	}
-	return false
-}
 
 type Server struct {
 	relayM *sync.Map
@@ -31,6 +23,8 @@ type Server struct {
 
 	errCH    chan error    // once error happen, server will exit
 	reloadCH chan struct{} // reload config
+
+	cmgr cmgr.Cmgr
 }
 
 func NewServer(cfg *config.Config) (*Server, error) {
@@ -41,11 +35,13 @@ func NewServer(cfg *config.Config) (*Server, error) {
 		relayM:   &sync.Map{},
 		errCH:    make(chan error, 1),
 		reloadCH: make(chan struct{}, 1),
+		cmgr:     cmgr.NewCmgr(),
 	}
 	return s, nil
 }
 
 func (s *Server) startOneRelay(r *Relay) {
+	r.registerMgr(s.cmgr)
 	s.relayM.Store(r.Name, r)
 	// mute closed network error for tcp server and mute http.ErrServerClosed for http server when config reload
 	if err := r.ListenAndServe(); err != nil &&

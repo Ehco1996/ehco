@@ -20,7 +20,7 @@ type RelayTransporter interface {
 }
 
 func NewRelayTransporter(transType string, tcpRemotes, udpRemotes lb.RoundRobin) RelayTransporter {
-	raw := newRawTransporter(transType, tcpRemotes, udpRemotes)
+	raw := newRawTransporter(transType, tcpRemotes, udpRemotes, nil)
 	switch transType {
 	case constant.Transport_RAW:
 		return raw

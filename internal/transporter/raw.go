@@ -9,6 +9,7 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/Ehco1996/ehco/internal/cmgr"
 	"github.com/Ehco1996/ehco/internal/constant"
 	"github.com/Ehco1996/ehco/internal/web"
 	"github.com/Ehco1996/ehco/pkg/lb"
@@ -20,15 +21,17 @@ type Raw struct {
 	UDPRemotes     lb.RoundRobin
 	UDPBufferChMap map[string]*BufferCh
 
-	l *zap.SugaredLogger
+	l    *zap.SugaredLogger
+	cmgr cmgr.Cmgr
 }
 
-func newRawTransporter(transType string, tcpRemotes, udpRemotes lb.RoundRobin) *Raw {
+func newRawTransporter(transType string, tcpRemotes, udpRemotes lb.RoundRobin, cmgr cmgr.Cmgr) *Raw {
 	r := &Raw{
 		TCPRemotes:     tcpRemotes,
 		UDPRemotes:     udpRemotes,
 		UDPBufferChMap: make(map[string]*BufferCh),
 		l:              zap.S().Named(transType),
+		cmgr:           cmgr,
 	}
 	return r
 }
