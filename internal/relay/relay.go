@@ -14,19 +14,18 @@ import (
 )
 
 type Relay struct {
-	cfg *conf.Config
-
-	ListenType    string
+	Name          string // unique name for all relay\
 	TransportType string
-	LocalTCPAddr  *net.TCPAddr
-	LocalUDPAddr  *net.UDPAddr
+	ListenType    string
 	TP            transporter.RelayTransporter
+
+	LocalTCPAddr *net.TCPAddr
+	LocalUDPAddr *net.UDPAddr
 
 	closeTcpF func() error
 	closeUdpF func() error
-
-	Name string             // unique name for all relay
-	L    *zap.SugaredLogger // todo rename to l;
+	cfg       *conf.Config
+	l         *zap.SugaredLogger
 }
 
 func NewRelay(cfg *conf.Config) (*Relay, error) {
@@ -56,7 +55,7 @@ func NewRelay(cfg *conf.Config) (*Relay, error) {
 
 	r := &Relay{
 		cfg: cfg,
-		L:   zap.S().Named("relay"),
+		l:   zap.S().Named("relay"),
 
 		Name:          cfg.Label,
 		LocalTCPAddr:  localTCPAddr,
@@ -110,17 +109,17 @@ func (r *Relay) ListenAndServe() error {
 }
 
 func (r *Relay) Close() {
-	r.L.Infof("Close relay label: %s", r.Name)
+	r.l.Infof("Close relay label: %s", r.Name)
 	if r.closeUdpF != nil {
 		err := r.closeUdpF()
 		if err != nil {
-			r.L.Errorf(err.Error())
+			r.l.Errorf(err.Error())
 		}
 	}
 	if r.closeTcpF != nil {
 		err := r.closeTcpF()
 		if err != nil {
-			r.L.Errorf(err.Error())
+			r.l.Errorf(err.Error())
 		}
 	}
 }
@@ -134,7 +133,7 @@ func (r *Relay) RunLocalTCPServer() error {
 	r.closeTcpF = func() error {
 		return lis.Close()
 	}
-	r.L.Infof("Start TCP relay Server: %s", r.Name)
+	r.l.Infof("Start TCP relay Server: %s", r.Name)
 	for {
 		c, err := lis.AcceptTCP()
 		if err != nil {
@@ -146,7 +145,7 @@ func (r *Relay) RunLocalTCPServer() error {
 			web.CurConnectionCount.WithLabelValues(remote.Label, web.METRIC_CONN_TYPE_TCP).Inc()
 			defer web.CurConnectionCount.WithLabelValues(remote.Label, web.METRIC_CONN_TYPE_TCP).Dec()
 			if err := r.TP.HandleTCPConn(c, remote); err != nil {
-				r.L.Errorf("HandleTCPConn meet error tp:%s from:%s to:%s err:%s",
+				r.l.Errorf("HandleTCPConn meet error tp:%s from:%s to:%s err:%s",
 					r.TransportType,
 					c.RemoteAddr(), remote.Address, err)
 			}
@@ -163,7 +162,7 @@ func (r *Relay) RunLocalUDPServer() error {
 	r.closeUdpF = func() error {
 		return lis.Close()
 	}
-	r.L.Infof("Start UDP relay Server: %s", r.Name)
+	r.l.Infof("Start UDP relay Server: %s", r.Name)
 
 	buf := transporter.BufferPool.Get()
 	defer transporter.BufferPool.Put(buf)
@@ -183,40 +182,40 @@ func (r *Relay) RunLocalUDPServer() error {
 
 func (r *Relay) RunLocalMTCPServer() error {
 	tp := r.TP.(*transporter.Raw)
-	mTCPServer := transporter.NewMTCPServer(r.LocalTCPAddr.String(), tp, r.L.Named("MTCPServer"))
+	mTCPServer := transporter.NewMTCPServer(r.LocalTCPAddr.String(), tp, r.l.Named("MTCPServer"))
 	r.closeTcpF = func() error {
 		return mTCPServer.Close()
 	}
-	r.L.Infof("Start MTCP relay Server: %s", r.Name)
+	r.l.Infof("Start MTCP relay Server: %s", r.Name)
 	return mTCPServer.ListenAndServe()
 }
 
 func (r *Relay) RunLocalWSServer() error {
 	tp := r.TP.(*transporter.Raw)
-	wsServer := transporter.NewWSServer(r.LocalTCPAddr.String(), tp, r.L.Named("WSServer"))
+	wsServer := transporter.NewWSServer(r.LocalTCPAddr.String(), tp, r.l.Named("WSServer"))
 	r.closeTcpF = func() error {
 		return wsServer.Close()
 	}
-	r.L.Infof("Start WS relay Server: %s", r.Name)
+	r.l.Infof("Start WS relay Server: %s", r.Name)
 	return wsServer.ListenAndServe()
 }
 
 func (r *Relay) RunLocalWSSServer() error {
 	tp := r.TP.(*transporter.Raw)
-	wssServer := transporter.NewWSSServer(r.LocalTCPAddr.String(), tp, r.L.Named("NewWSSServer"))
+	wssServer := transporter.NewWSSServer(r.LocalTCPAddr.String(), tp, r.l.Named("NewWSSServer"))
 	r.closeTcpF = func() error {
 		return wssServer.Close()
 	}
-	r.L.Infof("Start WSS relay Server: %s", r.Name)
+	r.l.Infof("Start WSS relay Server: %s", r.Name)
 	return wssServer.ListenAndServe()
 }
 
 func (r *Relay) RunLocalMWSSServer() error {
 	tp := r.TP.(*transporter.Raw)
-	mwssServer := transporter.NewMWSSServer(r.LocalTCPAddr.String(), tp, r.L.Named("MWSSServer"))
+	mwssServer := transporter.NewMWSSServer(r.LocalTCPAddr.String(), tp, r.l.Named("MWSSServer"))
 	r.closeTcpF = func() error {
 		return mwssServer.Close()
 	}
-	r.L.Infof("Start MWSS relay Server: %s", r.Name)
+	r.l.Infof("Start MWSS relay Server: %s", r.Name)
 	return mwssServer.ListenAndServe()
 }

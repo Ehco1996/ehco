@@ -16,7 +16,7 @@ type smuxTransporter struct {
 	sessionMutex sync.Mutex
 
 	gcTicker *time.Ticker
-	L        *zap.SugaredLogger
+	l        *zap.SugaredLogger
 
 	// remote addr -> SessionWithMetrics
 	sessionM map[string][]*SessionWithMetrics
@@ -60,7 +60,7 @@ func NewSmuxTransporter(l *zap.SugaredLogger,
 	initSessionF func(ctx context.Context, addr string) (*smux.Session, error),
 ) *smuxTransporter {
 	tr := &smuxTransporter{
-		L:            l,
+		l:            l,
 		initSessionF: initSessionF,
 		sessionM:     make(map[string][]*SessionWithMetrics),
 		gcTicker:     time.NewTicker(constant.SmuxGCDuration),
@@ -74,11 +74,11 @@ func (tr *smuxTransporter) gc() {
 	for range tr.gcTicker.C {
 		tr.sessionMutex.Lock()
 		for addr, sl := range tr.sessionM {
-			tr.L.Debugf("start doing gc for remote addr: %s total session count %d", addr, len(sl))
+			tr.l.Debugf("start doing gc for remote addr: %s total session count %d", addr, len(sl))
 			for idx := range sl {
 				sm := sl[idx]
-				if sm.CanNotServeNewStream() && sm.canCloseSession(addr, tr.L) {
-					tr.L.Debugf("close idle session:%s stream cnt %d",
+				if sm.CanNotServeNewStream() && sm.canCloseSession(addr, tr.l) {
+					tr.l.Debugf("close idle session:%s stream cnt %d",
 						sm.session.LocalAddr().String(), sm.session.NumStreams())
 					sm.session.Close()
 				}
@@ -90,7 +90,7 @@ func (tr *smuxTransporter) gc() {
 				}
 			}
 			tr.sessionM[addr] = newList
-			tr.L.Debugf("finish gc for remote addr: %s total session count %d", addr, len(sl))
+			tr.l.Debugf("finish gc for remote addr: %s total session count %d", addr, len(sl))
 		}
 		tr.sessionMutex.Unlock()
 	}
@@ -107,7 +107,7 @@ func (tr *smuxTransporter) Dial(ctx context.Context, addr string) (conn net.Conn
 		if sm.CanNotServeNewStream() {
 			continue
 		} else {
-			tr.L.Debugf("use session: %s total stream count: %d remote addr: %s",
+			tr.l.Debugf("use session: %s total stream count: %d remote addr: %s",
 				sm.session.LocalAddr().String(), sm.session.NumStreams(), addr)
 			session = sm.session
 			curSM = sm
@@ -128,7 +128,7 @@ func (tr *smuxTransporter) Dial(ctx context.Context, addr string) (conn net.Conn
 
 	stream, err := session.OpenStream()
 	if err != nil {
-		tr.L.Errorf("open stream meet error:%s", err)
+		tr.l.Errorf("open stream meet error:%s", err)
 		session.Close()
 		return nil, err
 	}

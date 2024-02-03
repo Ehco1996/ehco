@@ -44,12 +44,12 @@ func (s *Wss) HandleTCPConn(c net.Conn, remote *lb.Node) error {
 
 type WSSServer struct {
 	raw        *Raw
-	L          *zap.SugaredLogger
+	l          *zap.SugaredLogger
 	httpServer *http.Server
 }
 
 func NewWSSServer(listenAddr string, raw *Raw, l *zap.SugaredLogger) *WSSServer {
-	s := &WSSServer{raw: raw, L: l}
+	s := &WSSServer{raw: raw, l: l}
 	mux := mux.NewRouter()
 	mux.HandleFunc("/", web.MakeIndexF())
 	mux.HandleFunc("/wss/", s.HandleRequest)
@@ -84,6 +84,6 @@ func (s *WSSServer) HandleRequest(w http.ResponseWriter, req *http.Request) {
 
 	remote := s.raw.GetRemote()
 	if err := s.raw.HandleTCPConn(wsc, remote); err != nil {
-		s.L.Errorf("HandleTCPConn meet error from:%s to:%s err:%s", wsc.RemoteAddr(), remote.Address, err)
+		s.l.Errorf("HandleTCPConn meet error from:%s to:%s err:%s", wsc.RemoteAddr(), remote.Address, err)
 	}
 }
