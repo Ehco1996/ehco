@@ -12,6 +12,7 @@ import (
 	"github.com/gorilla/mux"
 	"go.uber.org/zap"
 
+	"github.com/Ehco1996/ehco/internal/conn"
 	mytls "github.com/Ehco1996/ehco/internal/tls"
 	"github.com/Ehco1996/ehco/internal/web"
 	"github.com/Ehco1996/ehco/pkg/lb"
@@ -39,7 +40,7 @@ func (s *Wss) HandleTCPConn(c net.Conn, remote *lb.Node) error {
 		return err
 	}
 	s.l.Infof("HandleTCPConn from %s to %s", c.RemoteAddr(), remote.Address)
-	return NewRelayConn("TODO", c, wssc).Transport(remote.Label)
+	return conn.NewRelayConn("TODO", c, wssc).Transport(remote.Label)
 }
 
 type WSSServer struct {

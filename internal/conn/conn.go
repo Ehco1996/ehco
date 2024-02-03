@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/Ehco1996/ehco/internal/transporter"
 	"go.uber.org/zap"
 )
 
@@ -39,21 +38,19 @@ func (rc *relayConnImpl) Transport(remoteLabel string) error {
 	cl := zap.L().Named(shortName)
 	cl.Debug("transport start", zap.String("full name", name), zap.String("stats", rc.Stats.String()))
 
-	mc := &metricsConn{
-		Reader:      rc.remoteConn,
-		Writer:      rc.clientConn,
-		remoteLabel: remoteLabel,
-		stats:       rc.Stats,
+	c1 := &metricsConn{
+		stats:          rc.Stats,
+		remoteLabel:    remoteLabel,
+		underlyingConn: rc.clientConn,
 	}
 
-	sc := &metricsConn{
-		Reader:      rc.remoteConn,
-		Writer:      rc.clientConn,
-		remoteLabel: remoteLabel,
-		stats:       rc.Stats,
+	c2 := &metricsConn{
+		stats:          rc.Stats,
+		remoteLabel:    remoteLabel,
+		underlyingConn: rc.remoteConn,
 	}
 
-	err := transporter.CopyConn(mc, sc)
+	err := CopyConn(c1, c2)
 	if err != nil {
 		cl.Error("transport error", zap.Error(err))
 	}

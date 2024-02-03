@@ -10,6 +10,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/Ehco1996/ehco/internal/cmgr"
+	"github.com/Ehco1996/ehco/internal/conn"
 	"github.com/Ehco1996/ehco/internal/constant"
 	"github.com/Ehco1996/ehco/internal/web"
 	"github.com/Ehco1996/ehco/pkg/lb"
@@ -152,5 +153,5 @@ func (raw *Raw) HandleTCPConn(c net.Conn, remote *lb.Node) error {
 	}
 	raw.l.Infof("HandleTCPConn from %s to %s", c.LocalAddr(), remote.Address)
 	defer rc.Close()
-	return NewRelayConn("TODO", c, rc).Transport(remote.Label)
+	return conn.NewRelayConn("TODO", c, rc).Transport(remote.Label)
 }

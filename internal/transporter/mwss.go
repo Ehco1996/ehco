@@ -13,6 +13,7 @@ import (
 	"github.com/xtaci/smux"
 	"go.uber.org/zap"
 
+	"github.com/Ehco1996/ehco/internal/conn"
 	"github.com/Ehco1996/ehco/internal/constant"
 	mytls "github.com/Ehco1996/ehco/internal/tls"
 	"github.com/Ehco1996/ehco/internal/web"
@@ -42,7 +43,7 @@ func (s *Mwss) HandleTCPConn(c net.Conn, remote *lb.Node) error {
 	}
 	defer mwsc.Close()
 	s.l.Infof("HandleTCPConn from:%s to:%s", c.LocalAddr(), remote.Address)
-	return NewRelayConn("TODO", c, mwsc).Transport(remote.Label)
+	return conn.NewRelayConn("TODO", c, mwsc).Transport(remote.Label)
 }
 
 type MWSSServer struct {

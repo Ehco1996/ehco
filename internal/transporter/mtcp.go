@@ -9,6 +9,7 @@ import (
 	"github.com/xtaci/smux"
 	"go.uber.org/zap"
 
+	"github.com/Ehco1996/ehco/internal/conn"
 	"github.com/Ehco1996/ehco/internal/constant"
 	"github.com/Ehco1996/ehco/internal/web"
 	"github.com/Ehco1996/ehco/pkg/lb"
@@ -36,7 +37,7 @@ func (s *MTCP) HandleTCPConn(c net.Conn, remote *lb.Node) error {
 		return err
 	}
 	s.l.Infof("HandleTCPConn from:%s to:%s", c.LocalAddr(), remote.Address)
-	return NewRelayConn("TODO", c, mtcpc).Transport(remote.Label)
+	return conn.NewRelayConn("TODO", c, mtcpc).Transport(remote.Label)
 }
 
 type MTCPServer struct {

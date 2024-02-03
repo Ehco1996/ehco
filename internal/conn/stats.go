@@ -2,7 +2,6 @@ package conn
 
 import (
 	"fmt"
-	"io"
 	"net"
 
 	"github.com/Ehco1996/ehco/internal/web"
@@ -25,15 +24,14 @@ func (s *Stats) Record(up, down int64) {
 
 type metricsConn struct {
 	net.Conn
-	io.Reader
-	io.Writer
 
-	remoteLabel string
-	stats       *Stats
+	underlyingConn net.Conn
+	remoteLabel    string
+	stats          *Stats
 }
 
 func (c metricsConn) Read(p []byte) (n int, err error) {
-	n, err = c.Reader.Read(p)
+	n, err = c.underlyingConn.Read(p)
 	// increment the metric for the read bytes
 	web.NetWorkTransmitBytes.WithLabelValues(
 		c.remoteLabel, web.METRIC_CONN_TYPE_TCP, web.METRIC_CONN_FLOW_READ,
@@ -44,7 +42,7 @@ func (c metricsConn) Read(p []byte) (n int, err error) {
 }
 
 func (c metricsConn) Write(p []byte) (n int, err error) {
-	n, err = c.Writer.Write(p)
+	n, err = c.underlyingConn.Write(p)
 	web.NetWorkTransmitBytes.WithLabelValues(
 		c.remoteLabel, web.METRIC_CONN_TYPE_TCP, web.METRIC_CONN_FLOW_WRITE,
 	).Add(float64(n))

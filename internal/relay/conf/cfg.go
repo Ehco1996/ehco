@@ -109,8 +109,8 @@ func (r *Config) defaultLabel() string {
 
 func (r *Config) Adjust() error {
 	if r.Label == "" {
-		zap.S().Warnf("label is empty, set default label:%s", r.Label)
 		r.Label = r.defaultLabel()
+		zap.S().Warnf("label is empty, set default label:%s", r.Label)
 	}
 	return nil
 }
