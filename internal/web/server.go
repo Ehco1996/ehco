@@ -69,17 +69,17 @@ func NewServer(cfg *config.Config, relayReloader reloader.Reloader, connMgr cmgr
 	}
 
 	// register handler
-	e.GET("/", echo.WrapHandler(http.HandlerFunc(s.welcome)))
 	e.GET("/metrics/", echo.WrapHandler(promhttp.Handler()))
 	e.GET("/debug/pprof/*", echo.WrapHandler(http.DefaultServeMux))
-	e.GET("/clash_proxy_provider/", echo.WrapHandler(http.HandlerFunc(s.HandleClashProxyProvider)))
-	e.GET("/config/", echo.WrapHandler(http.HandlerFunc(s.CurrentConfig)))
 
-	e.POST("/reload/", echo.WrapHandler(http.HandlerFunc(s.HandleReload)))
+	e.GET("/", s.index)
+	e.GET("/connections/", s.ListConnections)
+	e.GET("/clash_proxy_provider/", s.HandleClashProxyProvider)
 
 	// api group
 	api := e.Group("/api/v1")
-	api.GET("/connections/", s.ListConnections)
+	api.GET("/config/", s.CurrentConfig)
+	api.POST("/config/reload/", s.HandleReload)
 
 	return s, nil
 }

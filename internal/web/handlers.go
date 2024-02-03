@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
-	"text/template"
 
 	"github.com/Ehco1996/ehco/internal/config"
 	"github.com/Ehco1996/ehco/internal/constant"
@@ -22,13 +21,7 @@ func MakeIndexF() http.HandlerFunc {
 	}
 }
 
-func writerBadRequestMsg(w http.ResponseWriter, msg string) {
-	w.WriteHeader(http.StatusBadRequest)
-	_, _ = w.Write([]byte(msg))
-}
-
-func (s *Server) welcome(w http.ResponseWriter, r *http.Request) {
-	tmpl := template.Must(template.New("").Parse(welcomeHTML))
+func (s *Server) index(c echo.Context) error {
 	data := struct {
 		Version     string
 		GitBranch   string
@@ -42,94 +35,73 @@ func (s *Server) welcome(w http.ResponseWriter, r *http.Request) {
 		BuildTime:   constant.BuildTime,
 		SubConfigs:  s.cfg.SubConfigs,
 	}
-	if err := tmpl.Execute(w, data); err != nil {
-		writerBadRequestMsg(w, err.Error())
-		return
-	}
+	return c.Render(http.StatusOK, "index.html", data)
 }
 
-func (s *Server) HandleClashProxyProvider(w http.ResponseWriter, r *http.Request) {
-	subName := r.URL.Query().Get("sub_name")
+func (s *Server) HandleClashProxyProvider(c echo.Context) error {
+	subName := c.QueryParam("sub_name")
 	if subName == "" {
-		msg := "sub_name is empty"
-		writerBadRequestMsg(w, msg)
-		return
+		return c.String(http.StatusBadRequest, "sub_name is empty")
 	}
-	grouped := r.URL.Query().Get("grouped")
-	if grouped == "true" {
-		handleClashProxyProvider(s, w, r, subName, true)
-	} else {
-		handleClashProxyProvider(s, w, r, subName, false)
-	}
+	grouped, _ := strconv.ParseBool(c.QueryParam("grouped")) // defaults to false if parameter is missing or invalid
+
+	return s.handleClashProxyProvider(c, subName, grouped)
 }
 
-func handleClashProxyProvider(s *Server, w http.ResponseWriter, r *http.Request, subName string, grouped bool) {
+func (s *Server) handleClashProxyProvider(c echo.Context, subName string, grouped bool) error {
 	if s.relayServerReloader != nil {
 		if err := s.relayServerReloader.Reload(); err != nil {
-			writerBadRequestMsg(w, err.Error())
-			return
+			return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 		}
 	} else {
 		s.l.Debugf("relayServerReloader is nil this should not happen")
 	}
 	clashSubList, err := s.cfg.GetClashSubList()
 	if err != nil {
-		writerBadRequestMsg(w, err.Error())
-		return
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
 	for _, clashSub := range clashSubList {
 		if clashSub.Name == subName {
 			var clashCfgBuf []byte
-			var err error
 			if grouped {
 				clashCfgBuf, err = clashSub.ToGroupedClashConfigYaml()
 			} else {
 				clashCfgBuf, err = clashSub.ToClashConfigYaml()
 			}
 			if err != nil {
-				writerBadRequestMsg(w, err.Error())
-				return
+				return c.JSON(http.StatusBadRequest, map[string]string{"message": err.Error()})
 			}
-			_, err = w.Write(clashCfgBuf)
-			if err != nil {
-				s.l.Errorf("write response meet err=%v", err)
-				return
-			}
-			return
+			return c.Blob(http.StatusOK, "application/octate-stream", clashCfgBuf)
 		}
 	}
 	msg := fmt.Sprintf("sub_name=%s not found", subName)
-	writerBadRequestMsg(w, msg)
+	return c.JSON(http.StatusBadRequest, map[string]string{"message": msg})
 }
 
-func (s *Server) HandleReload(w http.ResponseWriter, r *http.Request) {
+func (s *Server) HandleReload(c echo.Context) error {
 	if s.relayServerReloader == nil {
-		writerBadRequestMsg(w, "reload not support")
-		return
+		return echo.NewHTTPError(http.StatusBadRequest, "reload not support")
 	}
 
-	if err := s.relayServerReloader.Reload(); err != nil {
-		writerBadRequestMsg(w, err.Error())
-		return
-	}
-	_, err := w.Write([]byte("reload success"))
+	err := s.relayServerReloader.Reload()
 	if err != nil {
-		s.l.Errorf("write response meet err=%v", err)
-		writerBadRequestMsg(w, err.Error())
-		return
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
+
+	if _, err := c.Response().Write([]byte("reload success")); err != nil {
+		s.l.Errorf("write response meet err=%v", err)
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
+	return nil
 }
 
-func (s *Server) CurrentConfig(w http.ResponseWriter, r *http.Request) {
-	// return json config
+func (s *Server) CurrentConfig(c echo.Context) error {
 	ret, err := json.Marshal(s.cfg)
 	if err != nil {
-		writerBadRequestMsg(w, err.Error())
-		return
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
-	w.WriteHeader(http.StatusOK)
-	w.Header().Set("Content-Type", "application/json")
-	_, _ = w.Write(ret)
+
+	return c.JSONBlob(http.StatusOK, ret)
 }
 
 func (s *Server) ListConnections(c echo.Context) error {
