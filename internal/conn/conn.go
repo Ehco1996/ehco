@@ -28,6 +28,7 @@ func NewRelayConn(relayName string, clientConn, remoteConn net.Conn) RelayConn {
 
 type relayConnImpl struct {
 	RelayLabel string `json:"relay_label"`
+	Closed     bool   `json:"closed"`
 	Stats      *Stats `json:"stats"`
 
 	clientConn net.Conn
@@ -57,6 +58,7 @@ func (rc *relayConnImpl) Transport(remoteLabel string) error {
 		cl.Error("transport error", zap.Error(err))
 	}
 	cl.Debug("transport end", zap.String("stats", rc.Stats.String()))
+	rc.Closed = true
 	return err
 }
 

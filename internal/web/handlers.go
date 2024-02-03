@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 	"text/template"
 
 	"github.com/Ehco1996/ehco/internal/config"
@@ -11,6 +12,8 @@ import (
 	"github.com/labstack/echo/v4"
 	"go.uber.org/zap"
 )
+
+const defaultPageSize = 10
 
 func MakeIndexF() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -25,7 +28,7 @@ func writerBadRequestMsg(w http.ResponseWriter, msg string) {
 }
 
 func (s *Server) welcome(w http.ResponseWriter, r *http.Request) {
-	tmpl := template.Must(template.New("").Parse(constant.WelcomeHTML))
+	tmpl := template.Must(template.New("").Parse(welcomeHTML))
 	data := struct {
 		Version     string
 		GitBranch   string
@@ -130,6 +133,35 @@ func (s *Server) CurrentConfig(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) ListConnections(c echo.Context) error {
-	conns := s.connMgr.ListAllConnections()
-	return c.JSON(http.StatusOK, conns)
+	pageStr := c.QueryParam("page")
+	page, err := strconv.Atoi(pageStr)
+	if err != nil || page < 1 {
+		page = 1
+	}
+
+	pageSizeStr := c.QueryParam("page_size")
+	pageSize, err := strconv.Atoi(pageSizeStr)
+	if err != nil || pageSize < 1 {
+		pageSize = defaultPageSize
+	}
+
+	total := s.connMgr.CountConnection()
+
+	perv := 1
+	if page > 1 {
+		perv = page - 1
+	}
+	next := page
+	if page*pageSize < total {
+		next = page + 1
+	}
+
+	println("page:", page, "pageSize:", pageSize, "total:", total, "perv:", perv, "next:", next)
+
+	return c.Render(http.StatusOK, "connection.html", map[string]interface{}{
+		"Data":  s.connMgr.ListConnections(page, pageSize),
+		"Prev":  perv,
+		"Next":  next,
+		"Count": total,
+	})
 }

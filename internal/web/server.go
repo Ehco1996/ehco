@@ -2,6 +2,8 @@ package web
 
 import (
 	"fmt"
+	"html/template"
+	"io"
 	"net"
 	"net/http"
 	_ "net/http/pprof"
@@ -26,14 +28,27 @@ type Server struct {
 	connMgr             cmgr.Cmgr
 }
 
+type echoTemplate struct {
+	templates *template.Template
+}
+
+func (t *echoTemplate) Render(w io.Writer, name string, data interface{}, c echo.Context) error {
+	return t.templates.ExecuteTemplate(w, name, data)
+}
+
 func NewServer(cfg *config.Config, relayReloader reloader.Reloader, connMgr cmgr.Cmgr) (*Server, error) {
 	l := zap.S().Named("web")
 
-	addr := net.JoinHostPort(cfg.WebHost, fmt.Sprintf("%d", cfg.WebPort))
+	templates := template.Must(template.ParseGlob("internal/web/templates/*.html"))
+	for _, temp := range templates.Templates() {
+		l.Debug("template name: ", temp.Name())
+	}
 	e := echo.New()
-	e.HideBanner = true
+	e.Debug = true
 	e.HidePort = true
+	e.HideBanner = true
 	e.Use(NginxLogMiddleware(l))
+	e.Renderer = &echoTemplate{templates: templates}
 
 	if cfg.WebToken != "" {
 		e.Use(SimpleTokenAuthMiddleware(cfg.WebToken, l))
@@ -46,11 +61,11 @@ func NewServer(cfg *config.Config, relayReloader reloader.Reloader, connMgr cmgr
 	}
 	s := &Server{
 		e:                   e,
-		addr:                addr,
 		l:                   l,
 		cfg:                 cfg,
-		relayServerReloader: relayReloader,
 		connMgr:             connMgr,
+		relayServerReloader: relayReloader,
+		addr:                net.JoinHostPort(cfg.WebHost, fmt.Sprintf("%d", cfg.WebPort)),
 	}
 
 	// register handler
