@@ -1,6 +1,7 @@
 package relay
 
 import (
+	"github.com/Ehco1996/ehco/internal/relay/conf"
 	"github.com/Ehco1996/ehco/internal/reloader"
 	"go.uber.org/zap"
 )
@@ -9,37 +10,66 @@ import (
 var _ reloader.Reloader = (*Server)(nil)
 
 func (s *Server) Reload() error {
-	// load config on raw
+	// k:name v: *Config
+	oldRelayCfgM := make(map[string]*conf.Config)
+	for _, v := range s.cfg.RelayConfigs {
+		oldRelayCfgM[v.Label] = v.Clone()
+	}
+	allRelayLabelList := make([]string, 0)
+
 	// NOTE: this is for reuse cached clash sub, because clash sub to relay config will change port every time when call
 	if err := s.cfg.LoadConfig(); err != nil {
 		s.l.Error("load new cfg meet error", zap.Error(err))
 		return err
 	}
-	var allRelayAddrList []string
-	for idx := range s.cfg.RelayConfigs {
-		r, err := NewRelay(s.cfg.RelayConfigs[idx])
-		if err != nil {
-			s.l.Errorf("reload new relay failed err=%s", err.Error())
-			return err
-		}
-		allRelayAddrList = append(allRelayAddrList, r.Name)
-		// start bread new relay that not in old relayM
-		if _, ok := s.relayM.Load(r.Name); !ok {
-			s.l.Infof("start new relay name=%s", r.Name)
-			go s.startOneRelay(r)
-			continue
-		}
-	}
 
+	// find all new relay label
+	for _, newCfg := range s.cfg.RelayConfigs {
+		// start bread new relay that not in old relayM
+		allRelayLabelList = append(allRelayLabelList, newCfg.Label)
+	}
 	// closed relay not in all relay list
 	s.relayM.Range(func(key, value interface{}) bool {
-		oldAddr := key.(string)
-		if !inArray(oldAddr, allRelayAddrList) {
-			v, _ := s.relayM.Load(oldAddr)
+		oldLabel := key.(string)
+		if !inArray(oldLabel, allRelayLabelList) {
+			v, _ := s.relayM.Load(oldLabel)
 			oldR := v.(*Relay)
 			s.stopOneRelay(oldR)
 		}
 		return true
 	})
+
+	for _, newCfg := range s.cfg.RelayConfigs {
+		// start bread new relay that not in old relayM
+		if old, ok := s.relayM.Load(newCfg.Label); !ok {
+			s.l.Infof("start new relay name=%s", newCfg.Label)
+			r, err := NewRelay(newCfg)
+			if err != nil {
+				s.l.Error("new relay meet error", zap.Error(err))
+				continue
+			}
+			go s.startOneRelay(r)
+		} else {
+			// when label not change, check if config changed
+			oldCfg, ok := oldRelayCfgM[newCfg.Label]
+			if !ok {
+				continue
+				/// should not happen
+			}
+			// stop old and start new relay when config changed
+			if oldCfg.Different(newCfg) {
+				oldR := old.(*Relay)
+				s.l.Infof("relay config changed, stop old and start new relay name=%s", newCfg.Label)
+				s.stopOneRelay(oldR)
+				r, err := NewRelay(newCfg)
+				if err != nil {
+					s.l.Error("new relay meet error", zap.Error(err))
+					continue
+				}
+				go s.startOneRelay(r)
+			}
+		}
+	}
+
 	return nil
 }

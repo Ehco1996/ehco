@@ -130,7 +130,7 @@ func (s *Server) triggerReloadByTicker(ctx context.Context) {
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
-				s.l.Info("Now Reloading Relay Conf By ticker! ")
+				s.l.Warn("Trigger Reloading Relay Conf By ticker! ")
 				s.TriggerReload()
 			}
 		}
@@ -146,7 +146,7 @@ func (s *Server) TriggerReloadBySignal(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-sigHubCH:
-			s.l.Info("Now Reloading Relay Conf By HUP Signal! ")
+			s.l.Warn("Trigger Reloading Relay Conf By HUP Signal! ")
 			s.TriggerReload()
 		}
 	}

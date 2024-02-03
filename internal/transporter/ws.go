@@ -38,7 +38,7 @@ func (s *Ws) HandleTCPConn(c net.Conn, remote *lb.Node) error {
 	}
 	defer wsc.Close()
 	s.l.Infof("HandleTCPConn from %s to %s", c.LocalAddr(), remote.Address)
-	return NewRelayConn(c, wsc, s.cs).Transport(remote.Label)
+	return NewRelayConn("TODO", c, wsc).Transport(remote.Label)
 }
 
 type WSServer struct {

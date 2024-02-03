@@ -40,7 +40,7 @@ func NewConfig(path string) *Config {
 	return &Config{PATH: path, l: zap.S().Named("cfg"), cachedClashSubMap: make(map[string]*sub.ClashSub)}
 }
 
-func (c *Config) NeedSyncUserFromServer() bool {
+func (c *Config) NeedSyncFromServer() bool {
 	return strings.Contains(c.PATH, "http")
 }
 
@@ -50,7 +50,7 @@ func (c *Config) LoadConfig() error {
 		return nil
 	}
 	c.lastLoadTime = time.Now()
-	if c.NeedSyncUserFromServer() {
+	if c.NeedSyncFromServer() {
 		if err := c.readFromHttp(); err != nil {
 			return err
 		}
@@ -112,6 +112,15 @@ func (c *Config) Adjust() error {
 		if err := r.Validate(); err != nil {
 			return err
 		}
+	}
+
+	// check relay config label is unique
+	labelMap := make(map[string]struct{})
+	for _, r := range c.RelayConfigs {
+		if _, ok := labelMap[r.Label]; ok {
+			return fmt.Errorf("relay label %s is not unique", r.Label)
+		}
+		labelMap[r.Label] = struct{}{}
 	}
 	return nil
 }

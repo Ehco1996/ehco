@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/Ehco1996/ehco/internal/constant"
+	"go.uber.org/zap"
 )
 
 type Config struct {
@@ -18,6 +19,9 @@ type Config struct {
 }
 
 func (r *Config) Validate() error {
+	if r.Adjust() != nil {
+		return errors.New("adjust config failed")
+	}
 	if r.ListenType != constant.Listen_RAW &&
 		r.ListenType != constant.Listen_WS &&
 		r.ListenType != constant.Listen_WSS &&
@@ -57,12 +61,56 @@ func (r *Config) Validate() error {
 }
 
 func (r *Config) Clone() *Config {
-	return &Config{
+	new := &Config{
 		Listen:        r.Listen,
 		ListenType:    r.ListenType,
 		TransportType: r.TransportType,
-		TCPRemotes:    r.TCPRemotes,
-		UDPRemotes:    r.UDPRemotes,
 		Label:         r.Label,
 	}
+	new.TCPRemotes = make([]string, len(r.TCPRemotes))
+	copy(new.TCPRemotes, r.TCPRemotes)
+	new.UDPRemotes = make([]string, len(r.UDPRemotes))
+	copy(new.UDPRemotes, r.UDPRemotes)
+	return new
+}
+
+func (r *Config) Different(new *Config) bool {
+	if r.Listen != new.Listen ||
+		r.ListenType != new.ListenType ||
+		r.TransportType != new.TransportType ||
+		r.Label != new.Label {
+		return true
+	}
+	if len(r.TCPRemotes) != len(new.TCPRemotes) {
+		return true
+	}
+
+	for i, addr := range r.TCPRemotes {
+		if addr != new.TCPRemotes[i] {
+			return true
+		}
+	}
+	if len(r.UDPRemotes) != len(new.UDPRemotes) {
+		return true
+	}
+	for i, addr := range r.UDPRemotes {
+		if addr != new.UDPRemotes[i] {
+			return true
+		}
+	}
+	return false
+}
+
+func (r *Config) defaultLabel() string {
+	defaultLabel := fmt.Sprintf("<At=%s Over=%s TCP-To=%s UDP-To=%s Through=%s>",
+		r.Listen, r.ListenType, r.TCPRemotes, r.UDPRemotes, r.TransportType)
+	return defaultLabel
+}
+
+func (r *Config) Adjust() error {
+	if r.Label == "" {
+		zap.S().Warnf("label is empty, set default label:%s", r.Label)
+		r.Label = r.defaultLabel()
+	}
+	return nil
 }

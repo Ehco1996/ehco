@@ -15,11 +15,12 @@ type RelayConn struct {
 	clientConn net.Conn
 	remoteConn net.Conn
 
-	cs ConnStats
+	cs    ConnStats
+	Label string // same load with relay label
 }
 
-func NewRelayConn(clientConn, remoteConn net.Conn, cs ConnStats) *RelayConn {
-	return &RelayConn{clientConn: clientConn, remoteConn: remoteConn, cs: cs}
+func NewRelayConn(label string, clientConn, remoteConn net.Conn) *RelayConn {
+	return &RelayConn{clientConn: clientConn, remoteConn: remoteConn, cs: NewConnStats()}
 }
 
 func (rc *RelayConn) Transport(remoteLabel string) error {

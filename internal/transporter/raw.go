@@ -20,8 +20,7 @@ type Raw struct {
 	UDPRemotes     lb.RoundRobin
 	UDPBufferChMap map[string]*BufferCh
 
-	l  *zap.SugaredLogger
-	cs ConnStats
+	l *zap.SugaredLogger
 }
 
 func newRawTransporter(transType string, tcpRemotes, udpRemotes lb.RoundRobin) *Raw {
@@ -31,7 +30,6 @@ func newRawTransporter(transType string, tcpRemotes, udpRemotes lb.RoundRobin) *
 		UDPBufferChMap: make(map[string]*BufferCh),
 		l:              zap.S().Named(transType),
 	}
-	r.cs = NewConnStats()
 	return r
 }
 
@@ -151,5 +149,5 @@ func (raw *Raw) HandleTCPConn(c net.Conn, remote *lb.Node) error {
 	}
 	raw.l.Infof("HandleTCPConn from %s to %s", c.LocalAddr(), remote.Address)
 	defer rc.Close()
-	return NewRelayConn(c, rc, raw.cs).Transport(remote.Label)
+	return NewRelayConn("TODO", c, rc).Transport(remote.Label)
 }
