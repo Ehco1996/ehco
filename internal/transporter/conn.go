@@ -1,8 +1,6 @@
 package transporter
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
 	"io"
 	"net"
@@ -11,50 +9,56 @@ import (
 	"go.uber.org/zap"
 )
 
-type RelayConn struct {
+type RelayConn interface {
+	// Transport transports data between the client and the remote server.
+	// The remoteLabel is the label of the remote server.
+	Transport(remoteLabel string) error
+
+	// ToJSON returns the JSON representation of the connection.
+	// ToJSON() string
+}
+
+func NewRelayConn(label string, clientConn, remoteConn net.Conn) RelayConn {
+	return &relayConnImpl{
+		Label: label,
+		Stats: &Stats{},
+
+		clientConn: clientConn,
+		remoteConn: remoteConn,
+	}
+}
+
+type relayConnImpl struct {
+	// same with relay label
+	Label string `json:"label"`
+	Stats *Stats `json:"stats"`
+
 	clientConn net.Conn
 	remoteConn net.Conn
-
-	cs    ConnStats
-	Label string // same load with relay label
 }
 
-func NewRelayConn(label string, clientConn, remoteConn net.Conn) *RelayConn {
-	return &RelayConn{clientConn: clientConn, remoteConn: remoteConn, cs: NewConnStats()}
-}
-
-func (rc *RelayConn) Transport(remoteLabel string) error {
+func (rc *relayConnImpl) Transport(remoteLabel string) error {
 	name := rc.Name()
 	shortName := shortHashSHA256(name)
 	cl := zap.L().Named(shortName)
-	cl.Debug("transport start", zap.String("full name", name), zap.String("stats", rc.cs.GetStats().String()))
-	defer cl.Debug("transport end", zap.String("stats", rc.cs.GetStats().String()))
-	err := transport(rc.clientConn, rc.remoteConn, remoteLabel, rc.cs)
+	cl.Debug("transport start", zap.String("full name", name), zap.String("stats", rc.Stats.String()))
+
+	err := transport(rc.clientConn, rc.remoteConn, remoteLabel, rc.Stats)
 	if err != nil {
 		cl.Error("transport error", zap.Error(err))
 	}
+	cl.Debug("transport end", zap.String("stats", rc.Stats.String()))
 	return err
 }
 
-func shortHashSHA256(input string) string {
-	hasher := sha256.New()
-	hasher.Write([]byte(input))
-	hash := hasher.Sum(nil)
-	return hex.EncodeToString(hash)[:7]
-}
-
-func connectionName(conn net.Conn) string {
-	return fmt.Sprintf("l:<%s> r:<%s>", conn.LocalAddr(), conn.RemoteAddr())
-}
-
-func (rc *RelayConn) Name() string {
+func (rc *relayConnImpl) Name() string {
 	return fmt.Sprintf("c1:[%s] c2:[%s]", connectionName(rc.clientConn), connectionName(rc.remoteConn))
 }
 
 type readOnlyConn struct {
 	io.Reader
 	remoteLabel string
-	cs          ConnStats
+	stats       *Stats
 }
 
 func (r readOnlyConn) Read(p []byte) (n int, err error) {
@@ -64,14 +68,14 @@ func (r readOnlyConn) Read(p []byte) (n int, err error) {
 		r.remoteLabel, web.METRIC_CONN_TYPE_TCP, web.METRIC_CONN_FLOW_READ,
 	).Add(float64(n))
 	// record the traffic
-	r.cs.RecordTraffic(int64(n), 0)
+	r.stats.Record(int64(n), 0)
 	return
 }
 
 type writeOnlyConn struct {
 	io.Writer
 	remoteLabel string
-	cs          ConnStats
+	stats       *Stats
 }
 
 func (w writeOnlyConn) Write(p []byte) (n int, err error) {
@@ -79,7 +83,7 @@ func (w writeOnlyConn) Write(p []byte) (n int, err error) {
 	web.NetWorkTransmitBytes.WithLabelValues(
 		w.remoteLabel, web.METRIC_CONN_TYPE_TCP, web.METRIC_CONN_FLOW_WRITE,
 	).Add(float64(n))
-	w.cs.RecordTraffic(0, int64(n))
+	w.stats.Record(0, int64(n))
 	return
 }
 
@@ -87,13 +91,13 @@ func (w writeOnlyConn) Write(p []byte) (n int, err error) {
 // leave some optimization chance for future
 // * use io.CopyBuffer
 // * use go routine pool
-func transport(conn1, conn2 net.Conn, remoteLabel string, cs ConnStats) error {
+func transport(conn1, conn2 net.Conn, remoteLabel string, stats *Stats) error {
 	errCH := make(chan error, 1)
 	// copy conn1 to conn2,read from conn1 and write to conn2
 	go func() {
 		_, err := io.Copy(
-			writeOnlyConn{Writer: conn2, cs: cs, remoteLabel: remoteLabel},
-			readOnlyConn{Reader: conn1, cs: cs, remoteLabel: remoteLabel},
+			writeOnlyConn{Writer: conn2, stats: stats, remoteLabel: remoteLabel},
+			readOnlyConn{Reader: conn1, stats: stats, remoteLabel: remoteLabel},
 		)
 		if tcpConn, ok := conn2.(*net.TCPConn); ok {
 			_ = tcpConn.CloseWrite() // all data is written to conn2 now, so close the write side of conn2 to send eof
@@ -103,8 +107,8 @@ func transport(conn1, conn2 net.Conn, remoteLabel string, cs ConnStats) error {
 
 	// reverse copy conn2 to conn1,read from conn2 and write to conn1
 	_, err := io.Copy(
-		writeOnlyConn{Writer: conn1, cs: cs, remoteLabel: remoteLabel},
-		readOnlyConn{Reader: conn2, cs: cs, remoteLabel: remoteLabel},
+		writeOnlyConn{Writer: conn1, stats: stats, remoteLabel: remoteLabel},
+		readOnlyConn{Reader: conn2, stats: stats, remoteLabel: remoteLabel},
 	)
 	if tcpConn, ok := conn1.(*net.TCPConn); ok {
 		_ = tcpConn.CloseWrite()

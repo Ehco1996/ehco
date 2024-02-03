@@ -1,4 +1,4 @@
-package web
+package web // todo move to another package
 
 import (
 	"fmt"
