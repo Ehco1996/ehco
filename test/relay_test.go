@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Ehco1996/ehco/internal/cmgr"
 	"github.com/Ehco1996/ehco/internal/config"
 	"github.com/Ehco1996/ehco/internal/constant"
 	"github.com/Ehco1996/ehco/internal/relay"
@@ -125,7 +126,7 @@ func init() {
 		defer cancel()
 
 		go func(ctx context.Context, c *conf.Config) {
-			r, err := relay.NewRelay(c)
+			r, err := relay.NewRelay(c, cmgr.NewCmgr())
 			if err != nil {
 				logger.Fatal(err)
 			}

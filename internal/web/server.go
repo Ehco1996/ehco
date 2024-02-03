@@ -2,6 +2,8 @@ package web
 
 import (
 	"fmt"
+	"html/template"
+	"io"
 	"net"
 	"net/http"
 	_ "net/http/pprof"
@@ -10,7 +12,9 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.uber.org/zap"
 
+	"github.com/Ehco1996/ehco/internal/cmgr"
 	"github.com/Ehco1996/ehco/internal/config"
+	"github.com/Ehco1996/ehco/internal/metrics"
 	"github.com/Ehco1996/ehco/internal/reloader"
 )
 
@@ -21,42 +25,62 @@ type Server struct {
 	cfg  *config.Config
 
 	relayServerReloader reloader.Reloader
+	connMgr             cmgr.Cmgr
 }
 
-func NewServer(cfg *config.Config, relayReloader reloader.Reloader) (*Server, error) {
+type echoTemplate struct {
+	templates *template.Template
+}
+
+func (t *echoTemplate) Render(w io.Writer, name string, data interface{}, c echo.Context) error {
+	return t.templates.ExecuteTemplate(w, name, data)
+}
+
+func NewServer(cfg *config.Config, relayReloader reloader.Reloader, connMgr cmgr.Cmgr) (*Server, error) {
 	l := zap.S().Named("web")
 
-	addr := net.JoinHostPort(cfg.WebHost, fmt.Sprintf("%d", cfg.WebPort))
+	templates := template.Must(template.ParseGlob("internal/web/templates/*.html"))
+	for _, temp := range templates.Templates() {
+		l.Debug("template name: ", temp.Name())
+	}
 	e := echo.New()
-	e.HideBanner = true
+	e.Debug = true
 	e.HidePort = true
+	e.HideBanner = true
 	e.Use(NginxLogMiddleware(l))
+	e.Renderer = &echoTemplate{templates: templates}
 
 	if cfg.WebToken != "" {
 		e.Use(SimpleTokenAuthMiddleware(cfg.WebToken, l))
 	}
-	if err := registerEhcoMetrics(cfg); err != nil {
+	if err := metrics.RegisterEhcoMetrics(cfg); err != nil {
 		return nil, err
 	}
-	if err := registerNodeExporterMetrics(cfg); err != nil {
+	if err := metrics.RegisterNodeExporterMetrics(cfg); err != nil {
 		return nil, err
 	}
 	s := &Server{
 		e:                   e,
-		addr:                addr,
 		l:                   l,
 		cfg:                 cfg,
+		connMgr:             connMgr,
 		relayServerReloader: relayReloader,
+		addr:                net.JoinHostPort(cfg.WebHost, fmt.Sprintf("%d", cfg.WebPort)),
 	}
 
 	// register handler
-	e.GET("/", echo.WrapHandler(http.HandlerFunc(s.welcome)))
 	e.GET("/metrics/", echo.WrapHandler(promhttp.Handler()))
 	e.GET("/debug/pprof/*", echo.WrapHandler(http.DefaultServeMux))
-	e.GET("/clash_proxy_provider/", echo.WrapHandler(http.HandlerFunc(s.HandleClashProxyProvider)))
-	e.GET("/config/", echo.WrapHandler(http.HandlerFunc(s.CurrentConfig)))
 
-	e.POST("/reload/", echo.WrapHandler(http.HandlerFunc(s.HandleReload)))
+	e.GET("/", s.index)
+	e.GET("/connections/", s.ListConnections)
+	e.GET("/clash_proxy_provider/", s.HandleClashProxyProvider)
+
+	// api group
+	api := e.Group("/api/v1")
+	api.GET("/config/", s.CurrentConfig)
+	api.POST("/config/reload/", s.HandleReload)
+
 	return s, nil
 }
 

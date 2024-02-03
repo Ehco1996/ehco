@@ -1,4 +1,4 @@
-package web // todo move to another package
+package metrics
 
 import (
 	"fmt"
@@ -204,7 +204,7 @@ func (pg *PingGroup) Run() {
 	}
 }
 
-func registerEhcoMetrics(cfg *config.Config) error {
+func RegisterEhcoMetrics(cfg *config.Config) error {
 	// traffic
 	prometheus.MustRegister(EhcoAlive)
 	prometheus.MustRegister(CurConnectionCount)
@@ -223,7 +223,7 @@ func registerEhcoMetrics(cfg *config.Config) error {
 	return nil
 }
 
-func registerNodeExporterMetrics(cfg *config.Config) error {
+func RegisterNodeExporterMetrics(cfg *config.Config) error {
 	level := &promlog.AllowedLevel{}
 	// mute node_exporter logger
 	if err := level.Set("error"); err != nil {

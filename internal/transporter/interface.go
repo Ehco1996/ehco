@@ -1,9 +1,12 @@
 package transporter
 
 import (
+	"fmt"
 	"net"
 
+	"github.com/Ehco1996/ehco/internal/cmgr"
 	"github.com/Ehco1996/ehco/internal/constant"
+	"github.com/Ehco1996/ehco/internal/relay/conf"
 	"github.com/Ehco1996/ehco/pkg/lb"
 )
 
@@ -19,9 +22,24 @@ type RelayTransporter interface {
 	GetRemote() *lb.Node
 }
 
-func NewRelayTransporter(transType string, tcpRemotes, udpRemotes lb.RoundRobin) RelayTransporter {
-	raw := newRawTransporter(transType, tcpRemotes, udpRemotes)
-	switch transType {
+func NewRelayTransporter(cfg *conf.Config, connMgr cmgr.Cmgr) RelayTransporter {
+	tcpNodeList := make([]*lb.Node, len(cfg.TCPRemotes))
+	for idx, addr := range cfg.TCPRemotes {
+		tcpNodeList[idx] = &lb.Node{
+			Address: addr,
+			Label:   fmt.Sprintf("%s-%s", cfg.Label, addr),
+		}
+	}
+	udpNodeList := make([]*lb.Node, len(cfg.UDPRemotes))
+	for idx, addr := range cfg.UDPRemotes {
+		udpNodeList[idx] = &lb.Node{
+			Address: addr,
+			Label:   fmt.Sprintf("%s-%s", cfg.Label, addr),
+		}
+	}
+	raw := newRaw(cfg.Label, lb.NewRoundRobin(tcpNodeList), lb.NewRoundRobin(udpNodeList), connMgr)
+
+	switch cfg.TransportType {
 	case constant.Transport_RAW:
 		return raw
 	case constant.Transport_WS:

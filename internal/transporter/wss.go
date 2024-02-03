@@ -12,6 +12,8 @@ import (
 	"github.com/gorilla/mux"
 	"go.uber.org/zap"
 
+	"github.com/Ehco1996/ehco/internal/conn"
+	"github.com/Ehco1996/ehco/internal/metrics"
 	mytls "github.com/Ehco1996/ehco/internal/tls"
 	"github.com/Ehco1996/ehco/internal/web"
 	"github.com/Ehco1996/ehco/pkg/lb"
@@ -28,7 +30,7 @@ func (s *Wss) dialRemote(remote *lb.Node) (net.Conn, error) {
 	if err != nil {
 		return nil, err
 	}
-	web.HandShakeDuration.WithLabelValues(remote.Label).Observe(float64(time.Since(t1).Milliseconds()))
+	metrics.HandShakeDuration.WithLabelValues(remote.Label).Observe(float64(time.Since(t1).Milliseconds()))
 	return wssc, nil
 }
 
@@ -39,7 +41,10 @@ func (s *Wss) HandleTCPConn(c net.Conn, remote *lb.Node) error {
 		return err
 	}
 	s.l.Infof("HandleTCPConn from %s to %s", c.RemoteAddr(), remote.Address)
-	return NewRelayConn("TODO", c, wssc).Transport(remote.Label)
+
+	relayConn := conn.NewRelayConn(s.relayLabel, c, wssc)
+	s.cmgr.AddConnection(relayConn)
+	return relayConn.Transport(remote.Label)
 }
 
 type WSSServer struct {

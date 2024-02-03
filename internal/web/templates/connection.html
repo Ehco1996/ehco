@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Connections</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bulma/0.9.4/css/bulma.min.css">
+</head>
+<body>
+    <section class="section">
+        <div class="container">
+            <h1 class="title">All Connections ({{.Count}})</h1>
+            <div class="content">
+                <ul>
+                    {{range .Data}}
+                    <li>ID: {{.GetRelayLabel}}, Closed: {{.Closed}}</li>
+                    {{end}}
+                </ul>
+            </div>
+            <div class="buttons are-small">
+                {{if gt .Prev 0}}
+                <a class="button is-link" href="?page={{.Prev}}">Previous</a>
+                {{end}}
+                {{if lt .Next .Count}}
+                <a class="button is-link" href="?page={{.Next}}">Next</a>
+                {{end}}
+            </div>
+        </div>
+    </section>
+</body>
+</html>

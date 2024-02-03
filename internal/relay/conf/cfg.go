@@ -101,6 +101,7 @@ func (r *Config) Different(new *Config) bool {
 	return false
 }
 
+// todo make this shorter and more readable
 func (r *Config) defaultLabel() string {
 	defaultLabel := fmt.Sprintf("<At=%s Over=%s TCP-To=%s UDP-To=%s Through=%s>",
 		r.Listen, r.ListenType, r.TCPRemotes, r.UDPRemotes, r.TransportType)
@@ -109,8 +110,8 @@ func (r *Config) defaultLabel() string {
 
 func (r *Config) Adjust() error {
 	if r.Label == "" {
-		zap.S().Warnf("label is empty, set default label:%s", r.Label)
 		r.Label = r.defaultLabel()
+		zap.S().Warnf("label is empty, set default label:%s", r.Label)
 	}
 	return nil
 }

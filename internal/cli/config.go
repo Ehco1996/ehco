@@ -6,6 +6,7 @@ import (
 
 	"github.com/Ehco1996/ehco/internal/config"
 	"github.com/Ehco1996/ehco/internal/constant"
+	"github.com/Ehco1996/ehco/internal/metrics"
 	"github.com/Ehco1996/ehco/internal/relay"
 	"github.com/Ehco1996/ehco/internal/relay/conf"
 	"github.com/Ehco1996/ehco/internal/tls"
@@ -96,7 +97,7 @@ func MustStartComponents(mainCtx context.Context, cfg *config.Config) {
 
 	var rs *relay.Server
 	if cfg.NeedStartRelayServer() {
-		web.EhcoAlive.Set(web.EhcoAliveStateRunning)
+		metrics.EhcoAlive.Set(metrics.EhcoAliveStateRunning)
 		s, err := relay.NewServer(cfg)
 		if err != nil {
 			cliLogger.Fatalf("NewRelayServer meet err=%s", err.Error())
@@ -108,7 +109,7 @@ func MustStartComponents(mainCtx context.Context, cfg *config.Config) {
 	}
 
 	if cfg.NeedStartWebServer() {
-		webS, err := web.NewServer(cfg, rs)
+		webS, err := web.NewServer(cfg, rs, rs.Cmgr)
 		if err != nil {
 			cliLogger.Fatalf("NewWebServer meet err=%s", err.Error())
 		}
