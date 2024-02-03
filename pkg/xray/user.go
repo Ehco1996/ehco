@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Ehco1996/ehco/pkg/bytes"
 	proxy "github.com/xtls/xray-core/app/proxyman/command"
 	stats "github.com/xtls/xray-core/app/stats/command"
 	"github.com/xtls/xray-core/common/protocol"
@@ -235,11 +236,11 @@ func (up *UserPool) syncTrafficToServer(ctx context.Context, proxyTag string) er
 		db := up.br.GetDownloadBandwidth()
 		req.DownloadBandwidth = int64(db)
 		up.l.Sugar().Debug(
-			"Upload Bandwidth :", PrettyByteSize(ub),
-			"Download Bandwidth :", PrettyByteSize(db),
-			"Total Bandwidth :", PrettyByteSize(ub+db),
-			"Total Increment By BR", PrettyByteSize(uploadIncr+downloadIncr),
-			"Total Increment By Xray :", PrettyByteSize(float64(req.GetTotalTraffic())),
+			"Upload Bandwidth :", bytes.PrettyByteSize(ub),
+			"Download Bandwidth :", bytes.PrettyByteSize(db),
+			"Total Bandwidth :", bytes.PrettyByteSize(ub+db),
+			"Total Increment By BR", bytes.PrettyByteSize(uploadIncr+downloadIncr),
+			"Total Increment By Xray :", bytes.PrettyByteSize(float64(req.GetTotalTraffic())),
 		)
 	}
 	if err := postJson(up.httpClient, up.remoteConfigURL, req); err != nil {

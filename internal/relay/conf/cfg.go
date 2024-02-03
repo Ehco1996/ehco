@@ -13,7 +13,8 @@ type Config struct {
 	TransportType string   `json:"transport_type"`
 	TCPRemotes    []string `json:"tcp_remotes"`
 	UDPRemotes    []string `json:"udp_remotes"`
-	Label         string   `json:"label"`
+
+	Label string `json:"label,omitempty"`
 }
 
 func (r *Config) Validate() error {

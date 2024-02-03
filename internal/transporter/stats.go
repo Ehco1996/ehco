@@ -2,18 +2,9 @@ package transporter
 
 import (
 	"fmt"
-	"math"
-)
 
-func PrettyByteSize(bf float64) string {
-	for _, unit := range []string{"", "Ki", "Mi", "Gi", "Ti", "Pi", "Ei", "Zi"} {
-		if math.Abs(bf) < 1024.0 {
-			return fmt.Sprintf(" %3.1f%sB ", bf, unit)
-		}
-		bf /= 1024.0
-	}
-	return fmt.Sprintf(" %.1fYiB ", bf)
-}
+	"github.com/Ehco1996/ehco/pkg/bytes"
+)
 
 type Stats struct {
 	up   int64
@@ -26,7 +17,7 @@ func (s *Stats) ReSet() {
 }
 
 func (s *Stats) String() string {
-	return fmt.Sprintf("up: %s, down: %s", PrettyByteSize(float64(s.up)), PrettyByteSize(float64(s.down)))
+	return fmt.Sprintf("up: %s, down: %s", bytes.PrettyByteSize(float64(s.up)), bytes.PrettyByteSize(float64(s.down)))
 }
 
 type ConnStats interface {

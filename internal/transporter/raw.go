@@ -153,6 +153,3 @@ func (raw *Raw) HandleTCPConn(c net.Conn, remote *lb.Node) error {
 	defer rc.Close()
 	return NewRelayConn(c, rc, raw.cs).Transport(remote.Label)
 }
-
-func (raw *Raw) RecordTraffic(down, up int64) {
-}
