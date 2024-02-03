@@ -24,7 +24,7 @@ type Server struct {
 	errCH    chan error    // once error happen, server will exit
 	reloadCH chan struct{} // reload config
 
-	cmgr cmgr.Cmgr
+	Cmgr cmgr.Cmgr
 }
 
 func NewServer(cfg *config.Config) (*Server, error) {
@@ -35,7 +35,7 @@ func NewServer(cfg *config.Config) (*Server, error) {
 		relayM:   &sync.Map{},
 		errCH:    make(chan error, 1),
 		reloadCH: make(chan struct{}, 1),
-		cmgr:     cmgr.NewCmgr(),
+		Cmgr:     cmgr.NewCmgr(),
 	}
 	return s, nil
 }
@@ -58,7 +58,7 @@ func (s *Server) stopOneRelay(r *Relay) {
 func (s *Server) Start(ctx context.Context) error {
 	// init and relay servers
 	for idx := range s.cfg.RelayConfigs {
-		r, err := NewRelay(s.cfg.RelayConfigs[idx], s.cmgr)
+		r, err := NewRelay(s.cfg.RelayConfigs[idx], s.Cmgr)
 		if err != nil {
 			return err
 		}

@@ -9,17 +9,17 @@ import (
 )
 
 type Stats struct {
-	up   int64
-	down int64
+	Up   int64 `json:"up"`
+	Down int64 `json:"down"`
 }
 
 func (s *Stats) String() string {
-	return fmt.Sprintf("up: %s, down: %s", bytes.PrettyByteSize(float64(s.up)), bytes.PrettyByteSize(float64(s.down)))
+	return fmt.Sprintf("up: %s, down: %s", bytes.PrettyByteSize(float64(s.Up)), bytes.PrettyByteSize(float64(s.Down)))
 }
 
 func (s *Stats) Record(up, down int64) {
-	s.up += up
-	s.down += down
+	s.Up += up
+	s.Down += down
 }
 
 type metricsConn struct {

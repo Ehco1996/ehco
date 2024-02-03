@@ -8,6 +8,7 @@ import (
 
 	"github.com/Ehco1996/ehco/internal/config"
 	"github.com/Ehco1996/ehco/internal/constant"
+	"github.com/labstack/echo/v4"
 	"go.uber.org/zap"
 )
 
@@ -128,7 +129,7 @@ func (s *Server) CurrentConfig(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write(ret)
 }
 
-// func (s *Server) ListConnections(c echo.Context) error {
-// 	conns := s.cmgr.ListAllConnections()
-// 	return c.JSON(http.StatusOK, conns)
-// }
+func (s *Server) ListConnections(c echo.Context) error {
+	conns := s.connMgr.ListAllConnections()
+	return c.JSON(http.StatusOK, conns)
+}

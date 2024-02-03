@@ -10,6 +10,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.uber.org/zap"
 
+	"github.com/Ehco1996/ehco/internal/cmgr"
 	"github.com/Ehco1996/ehco/internal/config"
 	"github.com/Ehco1996/ehco/internal/metrics"
 	"github.com/Ehco1996/ehco/internal/reloader"
@@ -22,10 +23,10 @@ type Server struct {
 	cfg  *config.Config
 
 	relayServerReloader reloader.Reloader
-	// connMgr             cmgr.Cmgr
+	connMgr             cmgr.Cmgr
 }
 
-func NewServer(cfg *config.Config, relayReloader reloader.Reloader) (*Server, error) {
+func NewServer(cfg *config.Config, relayReloader reloader.Reloader, connMgr cmgr.Cmgr) (*Server, error) {
 	l := zap.S().Named("web")
 
 	addr := net.JoinHostPort(cfg.WebHost, fmt.Sprintf("%d", cfg.WebPort))
@@ -49,6 +50,7 @@ func NewServer(cfg *config.Config, relayReloader reloader.Reloader) (*Server, er
 		l:                   l,
 		cfg:                 cfg,
 		relayServerReloader: relayReloader,
+		connMgr:             connMgr,
 	}
 
 	// register handler
@@ -59,6 +61,11 @@ func NewServer(cfg *config.Config, relayReloader reloader.Reloader) (*Server, er
 	e.GET("/config/", echo.WrapHandler(http.HandlerFunc(s.CurrentConfig)))
 
 	e.POST("/reload/", echo.WrapHandler(http.HandlerFunc(s.HandleReload)))
+
+	// api group
+	api := e.Group("/api/v1")
+	api.GET("/connections/", s.ListConnections)
+
 	return s, nil
 }
 
