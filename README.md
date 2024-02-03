@@ -22,7 +22,7 @@ e.g. 本地开发调试连接内网服务 db, db host: xxx-rds.xxx.us-east-1.rds
 
 3. 本地使用客户端连接
    `mysql -h 127.0.0.1:3306 -u root -p`
-      </details>
+       </details>
 
 <details> <summary>中转 proxy 客户端,提供负载均衡功能</summary>
 
@@ -229,7 +229,7 @@ ehco 会每隔 60s 发送一次 POST 请求至 `sync_traffic_endpoint` ，上报
 -   通过 `kill -HUP pid` 信号来热重载配置
 -   通过配置 `reload_interval` 来指定配置文件的路径
 -   通过访问 POST `http://web_host:web_port/reload/` 接口来热重载配置
-    </detail>
+</details>
 
 ## 监控报警
 
@@ -292,14 +292,12 @@ iperf3 -c 0.0.0.0 -p 1235
 
 # benchmark upd
 iperf3 -c 0.0.0.0 -p 1234 -u -b 1G --length 1024
-
 ```
 
+```
 | iperf | raw            | relay(raw)    | relay(ws)    | relay(wss)   | relay(mwss)    | relay(mtcp)    |
 | ----- | -------------- | ------------- | ------------ | ------------ | -------------- | -------------- |
 | tcp   | 123 Gbits/sec  | 55 Gbits/sec  | 41 Gbits/sec | 10 Gbits/sec | 5.78 Gbits/sec | 22.2 Gbits/sec |
 | udp   | 14.5 Gbits/sec | 3.3 Gbits/sec | 直接转发     | 直接转发     | 直接转发       | 直接转发       |
-
-```
 
 ```
