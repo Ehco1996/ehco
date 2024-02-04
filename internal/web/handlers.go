@@ -119,18 +119,20 @@ func (s *Server) ListConnections(c echo.Context) error {
 
 	total := s.connMgr.CountConnection()
 
-	perv := 1
+	perv := 0
 	if page > 1 {
 		perv = page - 1
 	}
-	next := page
-	if page*pageSize < total {
+	next := 0
+	if page*pageSize < total && page*pageSize > 0 {
 		next = page + 1
 	}
+
 	return c.Render(http.StatusOK, "connection.html", map[string]interface{}{
-		"Data":  s.connMgr.ListConnections(page, pageSize),
-		"Prev":  perv,
-		"Next":  next,
-		"Count": total,
+		"Data":        s.connMgr.ListConnections(page, pageSize),
+		"CurrentPage": page,
+		"Prev":        perv,
+		"Next":        next,
+		"Count":       total,
 	})
 }
