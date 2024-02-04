@@ -126,7 +126,7 @@ func init() {
 		defer cancel()
 
 		go func(ctx context.Context, c *conf.Config) {
-			r, err := relay.NewRelay(c, cmgr.NewCmgr())
+			r, err := relay.NewRelay(c, cmgr.NewCmgr(cmgr.DummyConfig))
 			if err != nil {
 				logger.Fatal(err)
 			}

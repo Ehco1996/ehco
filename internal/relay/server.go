@@ -35,7 +35,10 @@ func NewServer(cfg *config.Config) (*Server, error) {
 		relayM:   &sync.Map{},
 		errCH:    make(chan error, 1),
 		reloadCH: make(chan struct{}, 1),
-		Cmgr:     cmgr.NewCmgr(),
+		Cmgr: cmgr.NewCmgr(&cmgr.Config{
+			SyncURL:      cfg.RelayTrafficSyncURL,
+			SyncDuration: cfg.RelayTrafficSyncDuration,
+		}),
 	}
 	return s, nil
 }
@@ -69,6 +72,9 @@ func (s *Server) Start(ctx context.Context) error {
 		s.l.Infof("Start to watch relay config %s ", s.cfg.PATH)
 		go s.WatchAndReload(ctx)
 	}
+
+	// start Cmgr
+	go s.Cmgr.Start(ctx, s.errCH)
 
 	select {
 	case err := <-s.errCH:
