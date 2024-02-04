@@ -12,6 +12,7 @@ import (
 
 var client = http.Client{Timeout: time.Second * 10}
 
+// todo: fix this use sync way to ensure the port is free
 func getFreePortInBatch(host string, count int) ([]int, error) {
 	res := make([]int, 0, count)
 	listenerList := make([]net.Listener, 0, count)
