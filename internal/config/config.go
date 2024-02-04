@@ -46,9 +46,11 @@ func (c *Config) NeedSyncFromServer() bool {
 
 func (c *Config) LoadConfig() error {
 	if c.ReloadInterval > 0 && time.Since(c.lastLoadTime).Seconds() < float64(c.ReloadInterval) {
-		c.l.Debugf("Skip Load Config, last load time: %s", c.lastLoadTime)
+		c.l.Warnf("Skip Load Config, last load time: %s", c.lastLoadTime)
 		return nil
 	}
+	// reset
+	c.RelayConfigs = nil
 	c.lastLoadTime = time.Now()
 	if c.NeedSyncFromServer() {
 		if err := c.readFromHttp(); err != nil {
@@ -67,7 +69,7 @@ func (c *Config) readFromFile() error {
 	if err != nil {
 		return err
 	}
-	c.l.Debugf("Load Config From File: %s", c.PATH)
+	c.l.Infof("Load Config From File: %s", c.PATH)
 	if err != nil {
 		return err
 	}
@@ -81,7 +83,7 @@ func (c *Config) readFromHttp() error {
 		return err
 	}
 	defer r.Body.Close()
-	c.l.Debugf("Load Config From HTTP: %s", c.PATH)
+	c.l.Infof("Load Config From HTTP: %s", c.PATH)
 	return json.NewDecoder(r.Body).Decode(&c)
 }
 

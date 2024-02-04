@@ -71,7 +71,7 @@ func (s *Server) handleClashProxyProvider(c echo.Context, subName string, groupe
 			if err != nil {
 				return c.JSON(http.StatusBadRequest, map[string]string{"message": err.Error()})
 			}
-			return c.Blob(http.StatusOK, "application/octate-stream", clashCfgBuf)
+			return c.String(http.StatusOK, string(clashCfgBuf))
 		}
 	}
 	msg := fmt.Sprintf("sub_name=%s not found", subName)
@@ -127,9 +127,6 @@ func (s *Server) ListConnections(c echo.Context) error {
 	if page*pageSize < total {
 		next = page + 1
 	}
-
-	println("page:", page, "pageSize:", pageSize, "total:", total, "perv:", perv, "next:", next)
-
 	return c.Render(http.StatusOK, "connection.html", map[string]interface{}{
 		"Data":  s.connMgr.ListConnections(page, pageSize),
 		"Prev":  perv,

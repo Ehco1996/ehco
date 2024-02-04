@@ -1,6 +1,7 @@
 package cmgr
 
 import (
+	"sort"
 	"sync"
 
 	"github.com/Ehco1996/ehco/internal/conn"
@@ -44,9 +45,16 @@ func (cm *cmgrImpl) ListConnections(page, pageSize int) []conn.RelayConn {
 		end = total
 	}
 
+	relayLabelList := make([]string, 0, len(cm.connectionsMap))
+	for k := range cm.connectionsMap {
+		relayLabelList = append(relayLabelList, k)
+	}
+	// Sort the relay label list to make the result more predictable
+	sort.Strings(relayLabelList)
+
 	var conns []conn.RelayConn
-	for _, v := range cm.connectionsMap {
-		conns = append(conns, v...)
+	for _, label := range relayLabelList {
+		conns = append(conns, cm.connectionsMap[label]...)
 	}
 	if end > len(conns) {
 		end = len(conns) // Don't let the end index be more than slice length

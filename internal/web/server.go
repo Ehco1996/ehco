@@ -1,6 +1,7 @@
 package web
 
 import (
+	"embed"
 	"fmt"
 	"html/template"
 	"io"
@@ -17,6 +18,9 @@ import (
 	"github.com/Ehco1996/ehco/internal/metrics"
 	"github.com/Ehco1996/ehco/internal/reloader"
 )
+
+//go:embed templates/*.html
+var templatesFS embed.FS
 
 type Server struct {
 	e    *echo.Echo
@@ -39,7 +43,7 @@ func (t *echoTemplate) Render(w io.Writer, name string, data interface{}, c echo
 func NewServer(cfg *config.Config, relayReloader reloader.Reloader, connMgr cmgr.Cmgr) (*Server, error) {
 	l := zap.S().Named("web")
 
-	templates := template.Must(template.ParseGlob("internal/web/templates/*.html"))
+	templates := template.Must(template.ParseFS(templatesFS, "templates/*.html"))
 	for _, temp := range templates.Templates() {
 		l.Debug("template name: ", temp.Name())
 	}
