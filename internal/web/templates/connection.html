@@ -1,28 +1,78 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Connections</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bulma/0.9.4/css/bulma.min.css">
+    <title>Connections</title>
 </head>
 <body>
     <section class="section">
         <div class="container">
-            <h1 class="title">All Connections ({{.Count}})</h1>
-            <div class="content">
+            <!-- Title with Total Count -->
+            <h1 class="title">ALl Connections: {{.AllCount}}</h1>
+
+            <!-- Tabs for Active/Closed Connections -->
+            <div class="tabs is-boxed is-centered">
                 <ul>
-                    {{range .Data}}
-                    <li>ID: {{.GetRelayLabel}}, Closed: {{.Closed}}</li>
-                    {{end}}
+                    <li class="{{if eq .ConnType "active"}}is-active{{end}}">
+                        <a href="?conn_type=active&page=1&page_size={{.PageSize}}">Active({{.ActiveCount}})</a>
+                    </li>
+                    <li class="{{if eq .ConnType "closed"}}is-active{{end}}">
+                        <a href="?conn_type=closed&page=1&page_size={{.PageSize}}">Closed({{.ClosedCount}})</a>
+                    </li>
                 </ul>
             </div>
-            <div class="buttons are-small">
-                {{if gt .Prev 0}}
-                <a class="button is-link" href="?page={{.Prev}}">Previous</a>
+
+            <!-- Check if we have connections to display -->
+            {{if gt (len .ConnectionList) 0}}
+
+                <!-- Connections Table -->
+                <table class="table is-striped is-hoverable is-fullwidth">
+                    <thead>
+                        <tr>
+                            <th>Relay Label</th>
+                            <th>Flow</th>
+                            <th>Stats</th>
+                            <th>Time</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {{range .ConnectionList}}
+                        <tr>
+                            <td>{{.RelayLabel}}</td>
+                            <td>{{.Flow}}</td>
+                            <td>{{.Stats}}</td>
+                            <td>{{.GetTime}}</td>
+                        </tr>
+                        {{end}}
+                    </tbody>
+                </table>
+            {{else}}
+                <!-- Message when no connections are present -->
+                <div class="notification is-info">
+                    <p>No connections available.</p>
+                </div>
+            {{end}}
+
+            <!-- Pagination -->
+            <nav class="pagination is-centered" role="navigation" aria-label="pagination" style="margin-top: 20px;">
+                <a class="pagination-previous" {{if eq .Prev 0}}disabled{{end}}
+                   href="?conn_type={{.ConnType}}&page={{.Prev}}&page_size={{.PageSize}}">Previous</a>
+                <a class="pagination-next" {{if eq .Next 0}}disabled{{end}}
+                   href="?conn_type={{.ConnType}}&page={{.Next}}&page_size={{.PageSize}}">Next page</a>
+                <ul class="pagination-list">
+                    {{if gt .CurrentPage 1}}
+                        <li><a class="pagination-link" href="?conn_type={{.ConnType}}&page=1&page_size={{.PageSize}}">1</a></li>
+                    {{end}}
+                    <li><span class="pagination-ellipsis">&hellip;</span></li>
+                    <li><a class="pagination-link is-current" aria-label="Page {{.CurrentPage}}" aria-current="page">{{.CurrentPage}}</a></li>
+                    <li><span class="pagination-ellipsis">&hellip;</span></li>
+                    {{if lt .CurrentPage .TotalPage}}
+                    <li><a class="pagination-link" href="?conn_type={{.ConnType}}&page={{.TotalPage}}&page_size={{.PageSize}}">{{.TotalPage}}</a></li>
                 {{end}}
-                {{if lt .Next .Count}}
-                <a class="button is-link" href="?page={{.Next}}">Next</a>
-                {{end}}
-            </div>
+                </ul>
+            </nav>
         </div>
     </section>
 </body>

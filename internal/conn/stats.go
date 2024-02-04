@@ -13,13 +13,13 @@ type Stats struct {
 	Down int64 `json:"down"`
 }
 
-func (s *Stats) String() string {
-	return fmt.Sprintf("up: %s, down: %s", bytes.PrettyByteSize(float64(s.Up)), bytes.PrettyByteSize(float64(s.Down)))
-}
-
 func (s *Stats) Record(up, down int64) {
 	s.Up += up
 	s.Down += down
+}
+
+func (s *Stats) String() string {
+	return fmt.Sprintf("up: %s, down: %s", bytes.PrettyByteSize(float64(s.Up)), bytes.PrettyByteSize(float64(s.Down)))
 }
 
 type metricsConn struct {

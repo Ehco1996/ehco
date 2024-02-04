@@ -110,27 +110,36 @@ func (s *Server) ListConnections(c echo.Context) error {
 	if err != nil || page < 1 {
 		page = 1
 	}
-
 	pageSizeStr := c.QueryParam("page_size")
 	pageSize, err := strconv.Atoi(pageSizeStr)
 	if err != nil || pageSize < 1 {
 		pageSize = defaultPageSize
 	}
-
-	total := s.connMgr.CountConnection()
-
-	perv := 1
+	connType := c.QueryParam("conn_type")
+	total := s.connMgr.CountConnection(connType)
+	perv := 0
 	if page > 1 {
 		perv = page - 1
 	}
-	next := page
-	if page*pageSize < total {
+	next := 0
+	if page*pageSize < total && page*pageSize > 0 {
 		next = page + 1
 	}
+
+	activeCount := s.connMgr.CountConnection("active")
+	closedCount := s.connMgr.CountConnection("closed")
+
 	return c.Render(http.StatusOK, "connection.html", map[string]interface{}{
-		"Data":  s.connMgr.ListConnections(page, pageSize),
-		"Prev":  perv,
-		"Next":  next,
-		"Count": total,
+		"ConnType":       connType,
+		"ConnectionList": s.connMgr.ListConnections(connType, page, pageSize),
+		"CurrentPage":    page,
+		"TotalPage":      total / pageSize,
+		"PageSize":       pageSize,
+		"Prev":           perv,
+		"Next":           next,
+		"Count":          total,
+		"ActiveCount":    activeCount,
+		"ClosedCount":    closedCount,
+		"AllCount":       s.connMgr.CountConnection("active") + s.connMgr.CountConnection("closed"),
 	})
 }

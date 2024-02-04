@@ -3,6 +3,7 @@ package conn
 import (
 	"fmt"
 	"net"
+	"time"
 
 	"go.uber.org/zap"
 )
@@ -19,7 +20,7 @@ type RelayConn interface {
 func NewRelayConn(relayName string, clientConn, remoteConn net.Conn) RelayConn {
 	return &relayConnImpl{
 		RelayLabel: relayName,
-		Stats:      &Stats{},
+		Stats:      &Stats{Up: 0, Down: 0},
 
 		clientConn: clientConn,
 		remoteConn: remoteConn,
@@ -29,7 +30,11 @@ func NewRelayConn(relayName string, clientConn, remoteConn net.Conn) RelayConn {
 type relayConnImpl struct {
 	RelayLabel string `json:"relay_label"`
 	Closed     bool   `json:"closed"`
-	Stats      *Stats `json:"stats"`
+
+	StartTime time.Time `json:"start_time"`
+	EndTime   time.Time `json:"end_time,omitempty"`
+
+	Stats *Stats `json:"stats"`
 
 	clientConn net.Conn
 	remoteConn net.Conn
@@ -52,20 +57,31 @@ func (rc *relayConnImpl) Transport(remoteLabel string) error {
 		remoteLabel:    remoteLabel,
 		underlyingConn: rc.remoteConn,
 	}
-
+	rc.StartTime = time.Now()
 	err := CopyConn(c1, c2)
 	if err != nil {
 		cl.Error("transport error", zap.Error(err))
 	}
 	cl.Debug("transport end", zap.String("stats", rc.Stats.String()))
 	rc.Closed = true
+	rc.EndTime = time.Now()
 	return err
+}
+
+func (rc *relayConnImpl) GetTime() string {
+	if rc.EndTime.IsZero() {
+		return fmt.Sprintf("%s - N/A", rc.StartTime.Format(time.Stamp))
+	}
+	return fmt.Sprintf("%s - %s", rc.StartTime.Format(time.Stamp), rc.EndTime.Format(time.Stamp))
 }
 
 func (rc *relayConnImpl) Name() string {
 	return fmt.Sprintf("c1:[%s] c2:[%s]", connectionName(rc.clientConn), connectionName(rc.remoteConn))
 }
 
+func (rc *relayConnImpl) Flow() string {
+	return fmt.Sprintf("%s <-> %s", rc.clientConn.LocalAddr(), rc.remoteConn.RemoteAddr())
+}
 func (rc *relayConnImpl) GetRelayLabel() string {
 	return rc.RelayLabel
 }

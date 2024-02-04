@@ -169,5 +169,6 @@ func (raw *Raw) HandleTCPConn(c net.Conn, remote *lb.Node) error {
 	raw.l.Infof("HandleTCPConn from %s to %s", c.LocalAddr(), remote.Address)
 	relayConn := conn.NewRelayConn(raw.relayLabel, c, rc)
 	raw.cmgr.AddConnection(relayConn)
+	defer raw.cmgr.RemoveConnection(relayConn)
 	return relayConn.Transport(remote.Label)
 }

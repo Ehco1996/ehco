@@ -22,36 +22,52 @@
 
                     <!-- Build Info Box -->
                     <div class="columns is-centered">
-                        <div class="column is-12">
-                            <div class="box has-text-centered">
-                                <h2 class="subtitle">Build Info:</h2>
-                                <h3>Version: {{.Version}}</h3>
-                                <h3>GitBranch: {{.GitBranch}}</h3>
-                                <h3>GitRevision: {{.GitRevision}}</h3>
-                                <h3>BuildTime: {{.BuildTime}}</h3>
+                        <div class="column">
+                            <div class="box">
+                                <h3 class="subtitle has-text-centered">
+                                    Build Info
+                                </h3>
+                                <div
+                                    class="content is-flex is-justify-content-center"
+                                >
+                                    <ul style="text-align: left">
+                                        <li>Version: {{.Version}}</li>
+                                        <li>GitBranch: {{.GitBranch}}</li>
+                                        <li>GitRevision: {{.GitRevision}}</li>
+                                        <li>BuildTime: {{.BuildTime}}</li>
+                                    </ul>
+                                </div>
                             </div>
                         </div>
                     </div>
 
                     <!-- Links Box -->
                     <div class="columns is-centered">
-                        <div class="column is-12">
-                            <div class="box has-text-centered">
-                                <h3 class="subtitle">Links:</h3>
-                                <ul>
-                                    <li><a href="/metrics/">Metrics</a></li>
-                                    <li><a href="/debug/pprof/">Debug</a></li>
-                                    <li>
-                                        <a href="/connections/"
-                                            >Current Connections</a
-                                        >
-                                    </li>
-                                    <li>
-                                        <a href="/api/v1/config/"
-                                            >Current Config</a
-                                        >
-                                    </li>
-                                </ul>
+                        <div class="column">
+                            <div class="box">
+                                <h3 class="subtitle has-text-centered">
+                                    Links
+                                </h3>
+                                <div
+                                    class="content is-flex is-justify-content-center"
+                                >
+                                    <ul style="text-align: left">
+                                        <li><a href="/metrics/">Metrics</a></li>
+                                        <li>
+                                            <a href="/debug/pprof/">Debug</a>
+                                        </li>
+                                        <li>
+                                            <a href="/connections/"
+                                                >Current Connections</a
+                                            >
+                                        </li>
+                                        <li>
+                                            <a href="/api/v1/config/"
+                                                >Current Config</a
+                                            >
+                                        </li>
+                                    </ul>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -59,25 +75,31 @@
                     <!-- Clash Providers Box -->
                     {{if .SubConfigs}}
                     <div class="columns is-centered">
-                        <div class="column is-12">
-                            <div class="box has-text-centered">
-                                <h3 class="subtitle">Clash Providers:</h3>
-                                <ul>
-                                    {{range .SubConfigs}}
-                                    <li>
-                                        <a
-                                            href="/clash_proxy_provider/?sub_name={{.Name}}"
-                                            >{{.Name}}</a
-                                        >
-                                    </li>
-                                    <li>
-                                        <a
-                                            href="/clash_proxy_provider/?sub_name={{.Name}}&grouped=true"
-                                            >{{.Name}}-lb</a
-                                        >
-                                    </li>
-                                    {{end}}
-                                </ul>
+                        <div class="column">
+                            <div class="box">
+                                <h3 class="subtitle has-text-centered">
+                                    Clash Providers
+                                </h3>
+                                <div
+                                    class="content is-flex is-justify-content-center"
+                                >
+                                    <ul style="text-align: left">
+                                        {{range .SubConfigs}}
+                                        <li>
+                                            <a
+                                                href="/clash_proxy_provider/?sub_name={{.Name}}"
+                                                >{{.Name}}</a
+                                            >
+                                        </li>
+                                        <li>
+                                            <a
+                                                href="/clash_proxy_provider/?sub_name={{.Name}}&grouped=true"
+                                                >{{.Name}}-lb</a
+                                            >
+                                        </li>
+                                        {{end}}
+                                    </ul>
+                                </div>
                             </div>
                         </div>
                     </div>
