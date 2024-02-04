@@ -7,6 +7,11 @@ import (
 	"github.com/Ehco1996/ehco/internal/conn"
 )
 
+const (
+	ConnectionTypeActive = "active"
+	ConnectionTypeClosed = "closed"
+)
+
 // connection manager interface
 type Cmgr interface {
 	ListConnections(connType string, page, pageSize int) []conn.RelayConn
@@ -43,7 +48,7 @@ func (cm *cmgrImpl) ListConnections(connType string, page, pageSize int) []conn.
 	var total int
 	var m map[string][]conn.RelayConn
 
-	if connType == "active" {
+	if connType == ConnectionTypeActive {
 		total = cm.countActiveConnection()
 		m = cm.activeConnectionsMap
 	} else {
@@ -110,7 +115,7 @@ func (cm *cmgrImpl) RemoveConnection(c conn.RelayConn) {
 }
 
 func (cm *cmgrImpl) CountConnection(connType string) int {
-	if connType == "active" {
+	if connType == ConnectionTypeActive {
 		return cm.countActiveConnection()
 	} else {
 		return cm.countClosedConnection()
