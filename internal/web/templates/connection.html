@@ -1,141 +1,79 @@
 <!DOCTYPE html>
-<html>
-    <head>
-        <title>Connections</title>
-        <link
-            rel="stylesheet"
-            href="https://cdnjs.cloudflare.com/ajax/libs/bulma/0.9.4/css/bulma.min.css"
-        />
-        <script
-            defer
-            src="https://use.fontawesome.com/releases/v5.14.0/js/all.js"
-        ></script>
-    </head>
-    <body>
-        <section class="section">
-            <div class="container">
-                <h1 class="title">Active Connections: ({{.Count}})</h1>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bulma/0.9.3/css/bulma.min.css">
+    <title>Connections</title>
+</head>
+<body>
+    <section class="section">
+        <div class="container">
+            <!-- Title with Total Count -->
+            <h1 class="title">Total Connections: {{.AllCount}}</h1>
 
-                {{if gt .Count 0}}
-                <div class="box">
-                    <table class="table is-hoverable is-fullwidth">
-                        <thead>
-                            <tr>
-                                <th>Relay Label</th>
-                                <th>Flow</th>
-                                <th>Stats</th>
-                                <th>Time</th>
-                                <th>Closed</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {{range .Data}}
-                            <tr>
-                                <td>{{.GetRelayLabel}}</td>
-                                <td>{{ .Flow }}</td>
-                                <td>{{ .Stats }}</td>
-                                <td>{{.GetTime}}</td>
-                                <td>{{if .Closed}}Yes{{else}}No{{end}}</td>
-                            </tr>
-                            {{end}}
-                        </tbody>
-                    </table>
-                </div>
-                {{end}}
-                <!-- 分页 -->
-                <div class="columns is-vcentered is-mobile">
-                    <div class="column">
-                        <div class="field is-horizontal">
-                            <div class="field-label is-small">
-                                <label class="label">每页数量:</label>
-                            </div>
-                            <div class="field-body">
-                                <div class="field">
-                                    <div class="control is-expanded">
-                                        <div class="select is-small">
-                                            <select id="pageSizeSelect">
-                                                <option
-                                                    {{if
-                                                    eq
-                                                    .PageSize
-                                                    10}}selected{{end}}
-                                                    value="10"
-                                                >
-                                                    10
-                                                </option>
-                                                <option
-                                                    {{if
-                                                    eq
-                                                    .PageSize
-                                                    20}}selected{{end}}
-                                                    value="20"
-                                                >
-                                                    20
-                                                </option>
-                                                <option
-                                                    {{if
-                                                    eq
-                                                    .PageSize
-                                                    50}}selected{{end}}
-                                                    value="50"
-                                                >
-                                                    50
-                                                </option>
-                                                <option
-                                                    {{if
-                                                    eq
-                                                    .PageSize
-                                                    100}}selected{{end}}
-                                                    value="100"
-                                                >
-                                                    100
-                                                </option>
-                                            </select>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="column">
-                        <nav
-                            class="pagination is-small"
-                            role="navigation"
-                            aria-label="pagination"
-                        >
-                            {{if gt .Prev 0}}
-                            <a
-                                class="pagination-previous"
-                                href="?page={{.Prev}}&page_size={{.PageSize}}"
-                                >Previous</a
-                            >
-                            {{end}} {{if .Next}}
-                            <a
-                                class="pagination-next"
-                                href="?page={{.Next}}&page_size={{.PageSize}}"
-                                >Next</a
-                            >
-                            {{end}}
-                            <ul class="pagination-list">
-                                <li>
-                                    <a class="pagination-info">
-                                        <label class="label is-small"
-                                            >当前页:{{.CurrentPage}}</label
-                                        >
-                                    </a>
-                                </li>
-                            </ul>
-                        </nav>
-                    </div>
-                </div>
+            <!-- Tabs for Active/Closed Connections -->
+            <div class="tabs is-boxed is-centered">
+                <ul>
+                    <li class="{{if eq .ConnType "active"}}is-active{{end}}">
+                        <a href="?conn_type=active&page=1&page_size={{.PageSize}}">Active({{.ActiveCount}})</a>
+                    </li>
+                    <li class="{{if eq .ConnType "closed"}}is-active{{end}}">
+                        <a href="?conn_type=closed&page=1&page_size={{.PageSize}}">Closed({{.ClosedCount}})</a>
+                    </li>
+                </ul>
             </div>
-        </section>
 
-        <script>
-            document.getElementById('pageSizeSelect').addEventListener('change', function() {
-                window.location.href = '?page=' + {{.CurrentPage}} + '&page_size=' + this.value;
-            });
-        </script>
-    </body>
+            <!-- Check if we have connections to display -->
+            {{if gt (len .ConnectionList) 0}}
+
+                <!-- Connections Table -->
+                <table class="table is-striped is-hoverable is-fullwidth">
+                    <thead>
+                        <tr>
+                            <th>Relay Label</th>
+                            <th>Flow</th>
+                            <th>Stats</th>
+                            <th>Time</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {{range .ConnectionList}}
+                        <tr>
+                            <td>{{.RelayLabel}}</td>
+                            <td>{{.Flow}}</td>
+                            <td>{{.Stats}}</td>
+                            <td>{{.GetTime}}</td>
+                        </tr>
+                        {{end}}
+                    </tbody>
+                </table>
+            {{else}}
+                <!-- Message when no connections are present -->
+                <div class="notification is-info">
+                    <p>No connections available.</p>
+                </div>
+            {{end}}
+
+            <!-- Pagination -->
+            <nav class="pagination is-centered" role="navigation" aria-label="pagination" style="margin-top: 20px;">
+                <a class="pagination-previous" {{if eq .Prev 0}}disabled{{end}}
+                   href="?conn_type={{.ConnType}}&page={{.Prev}}&page_size={{.PageSize}}">Previous</a>
+                <a class="pagination-next" {{if eq .Next 0}}disabled{{end}}
+                   href="?conn_type={{.ConnType}}&page={{.Next}}&page_size={{.PageSize}}">Next page</a>
+                <ul class="pagination-list">
+                    {{if gt .CurrentPage 1}}
+                        <li><a class="pagination-link" href="?conn_type={{.ConnType}}&page=1&page_size={{.PageSize}}">1</a></li>
+                    {{end}}
+                    <li><span class="pagination-ellipsis">&hellip;</span></li>
+                    <li><a class="pagination-link is-current" aria-label="Page {{.CurrentPage}}" aria-current="page">{{.CurrentPage}}</a></li>
+                    <li><span class="pagination-ellipsis">&hellip;</span></li>
+                    {{if lt .CurrentPage .TotalPage}}
+                    <li><a class="pagination-link" href="?conn_type={{.ConnType}}&page={{.TotalPage}}&page_size={{.PageSize}}">{{.TotalPage}}</a></li>
+                {{end}}
+                </ul>
+            </nav>
+        </div>
+    </section>
+</body>
 </html>

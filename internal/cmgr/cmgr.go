@@ -9,7 +9,7 @@ import (
 
 // connection manager interface
 type Cmgr interface {
-	ListConnections(page, pageSize int) []conn.RelayConn
+	ListConnections(connType string, page, pageSize int) []conn.RelayConn
 
 	// AddConnection adds a connection to the connection manager.
 	AddConnection(conn conn.RelayConn)
@@ -18,7 +18,7 @@ type Cmgr interface {
 	RemoveConnection(conn conn.RelayConn)
 
 	// CountConnection returns the number of active connections.
-	CountConnection() int
+	CountConnection(connType string) int
 }
 
 type cmgrImpl struct {
@@ -36,11 +36,21 @@ func NewCmgr() Cmgr {
 	}
 }
 
-func (cm *cmgrImpl) ListConnections(page, pageSize int) []conn.RelayConn {
+func (cm *cmgrImpl) ListConnections(connType string, page, pageSize int) []conn.RelayConn {
 	cm.lock.RLock()
 	defer cm.lock.RUnlock()
 
-	total := cm.CountConnection()
+	var total int
+	var m map[string][]conn.RelayConn
+
+	if connType == "active" {
+		total = cm.countActiveConnection()
+		m = cm.activeConnectionsMap
+	} else {
+		total = cm.countClosedConnection()
+		m = cm.closedConnectionsMap
+
+	}
 
 	start := (page - 1) * pageSize
 	if start > total {
@@ -50,8 +60,8 @@ func (cm *cmgrImpl) ListConnections(page, pageSize int) []conn.RelayConn {
 	if end > total {
 		end = total
 	}
-	relayLabelList := make([]string, 0, len(cm.activeConnectionsMap))
-	for k := range cm.activeConnectionsMap {
+	relayLabelList := make([]string, 0, len(m))
+	for k := range m {
 		relayLabelList = append(relayLabelList, k)
 	}
 	// Sort the relay label list to make the result more predictable
@@ -59,15 +69,11 @@ func (cm *cmgrImpl) ListConnections(page, pageSize int) []conn.RelayConn {
 
 	var conns []conn.RelayConn
 	for _, label := range relayLabelList {
-		conns = append(conns, cm.activeConnectionsMap[label]...)
+		conns = append(conns, m[label]...)
 	}
 	if end > len(conns) {
 		end = len(conns) // Don't let the end index be more than slice length
 	}
-	// group by status
-	sort.Slice(conns, func(i, j int) bool {
-		return conns[i].GetRelayLabel() < conns[j].GetRelayLabel()
-	})
 	return conns[start:end]
 }
 
@@ -103,11 +109,29 @@ func (cm *cmgrImpl) RemoveConnection(c conn.RelayConn) {
 	cm.closedConnectionsMap[label] = append(cm.closedConnectionsMap[label], c)
 }
 
-func (cm *cmgrImpl) CountConnection() int {
+func (cm *cmgrImpl) CountConnection(connType string) int {
+	if connType == "active" {
+		return cm.countActiveConnection()
+	} else {
+		return cm.countClosedConnection()
+	}
+}
+
+func (cm *cmgrImpl) countActiveConnection() int {
 	cm.lock.RLock()
 	defer cm.lock.RUnlock()
 	cnt := 0
 	for _, v := range cm.activeConnectionsMap {
+		cnt += len(v)
+	}
+	return cnt
+}
+
+func (cm *cmgrImpl) countClosedConnection() int {
+	cm.lock.RLock()
+	defer cm.lock.RUnlock()
+	cnt := 0
+	for _, v := range cm.closedConnectionsMap {
 		cnt += len(v)
 	}
 	return cnt
