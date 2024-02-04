@@ -46,6 +46,7 @@ func (s *Mwss) HandleTCPConn(c net.Conn, remote *lb.Node) error {
 	s.l.Infof("HandleTCPConn from:%s to:%s", c.LocalAddr(), remote.Address)
 	relayConn := conn.NewRelayConn(s.relayLabel, c, mwsc)
 	s.cmgr.AddConnection(relayConn)
+	defer s.cmgr.RemoveConnection(relayConn)
 	return relayConn.Transport(remote.Label)
 }
 

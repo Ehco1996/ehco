@@ -44,6 +44,7 @@ func (s *Wss) HandleTCPConn(c net.Conn, remote *lb.Node) error {
 
 	relayConn := conn.NewRelayConn(s.relayLabel, c, wssc)
 	s.cmgr.AddConnection(relayConn)
+	defer s.cmgr.RemoveConnection(relayConn)
 	return relayConn.Transport(remote.Label)
 }
 

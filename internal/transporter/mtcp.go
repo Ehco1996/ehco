@@ -39,6 +39,7 @@ func (s *MTCP) HandleTCPConn(c net.Conn, remote *lb.Node) error {
 	s.l.Infof("HandleTCPConn from:%s to:%s", c.LocalAddr(), remote.Address)
 	relayConn := conn.NewRelayConn(s.relayLabel, c, mtcpc)
 	s.cmgr.AddConnection(relayConn)
+	defer s.cmgr.RemoveConnection(relayConn)
 	return relayConn.Transport(remote.Label)
 }
 
