@@ -18,17 +18,31 @@
 
                 {{if gt .Count 0}}
                 <div class="box">
-                    <ul class="list is-hoverable">
-                        {{range .Data}}
-                        <li class="list-item">
-                            ID: {{.GetRelayLabel}}, Closed: {{if
-                            .Closed}}Yes{{else}}No{{end}}
-                        </li>
-                        {{end}}
-                    </ul>
+                    <table class="table is-hoverable is-fullwidth">
+                        <thead>
+                            <tr>
+                                <th>Relay Label</th>
+                                <th>Flow</th>
+                                <th>Stats</th>
+                                <th>Time</th>
+                                <th>Closed</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {{range .Data}}
+                            <tr>
+                                <td>{{.GetRelayLabel}}</td>
+                                <td>{{ .Flow }}</td>
+                                <td>{{ .Stats }}</td>
+                                <td>{{.GetTime}}</td>
+                                <td>{{if .Closed}}Yes{{else}}No{{end}}</td>
+                            </tr>
+                            {{end}}
+                        </tbody>
+                    </table>
                 </div>
                 {{end}}
-
+                <!-- 分页 -->
                 <div class="columns is-vcentered is-mobile">
                     <div class="column">
                         <div class="field is-horizontal">
