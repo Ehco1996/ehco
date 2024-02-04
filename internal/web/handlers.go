@@ -131,6 +131,7 @@ func (s *Server) ListConnections(c echo.Context) error {
 	return c.Render(http.StatusOK, "connection.html", map[string]interface{}{
 		"Data":        s.connMgr.ListConnections(page, pageSize),
 		"CurrentPage": page,
+		"PageSize":    pageSize,
 		"Prev":        perv,
 		"Next":        next,
 		"Count":       total,
