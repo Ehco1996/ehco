@@ -15,6 +15,8 @@ type RelayConn interface {
 
 	// GetRelayLabel returns the label of the Relay instance.
 	GetRelayLabel() string
+
+	GetStats() *Stats
 }
 
 func NewRelayConn(relayName string, clientConn, remoteConn net.Conn) RelayConn {
@@ -84,4 +86,8 @@ func (rc *relayConnImpl) Flow() string {
 }
 func (rc *relayConnImpl) GetRelayLabel() string {
 	return rc.RelayLabel
+}
+
+func (rc *relayConnImpl) GetStats() *Stats {
+	return rc.Stats
 }

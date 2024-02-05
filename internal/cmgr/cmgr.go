@@ -1,10 +1,15 @@
 package cmgr
 
 import (
+	"context"
+	"net/http"
 	"sort"
 	"sync"
+	"time"
 
 	"github.com/Ehco1996/ehco/internal/conn"
+	myhttp "github.com/Ehco1996/ehco/pkg/http"
+	"go.uber.org/zap"
 )
 
 const (
@@ -24,18 +29,25 @@ type Cmgr interface {
 
 	// CountConnection returns the number of active connections.
 	CountConnection(connType string) int
+
+	// Start starts the connection manager.
+	Start(ctx context.Context, errCH chan error)
 }
 
 type cmgrImpl struct {
 	lock sync.RWMutex
+	cfg  *Config
+	l    *zap.SugaredLogger
 
 	// k: relay label, v: connection list
 	activeConnectionsMap map[string][]conn.RelayConn
 	closedConnectionsMap map[string][]conn.RelayConn
 }
 
-func NewCmgr() Cmgr {
+func NewCmgr(cfg *Config) Cmgr {
 	return &cmgrImpl{
+		cfg:                  cfg,
+		l:                    zap.S().Named("cmgr"),
 		activeConnectionsMap: make(map[string][]conn.RelayConn),
 		closedConnectionsMap: make(map[string][]conn.RelayConn),
 	}
@@ -140,4 +152,54 @@ func (cm *cmgrImpl) countClosedConnection() int {
 		cnt += len(v)
 	}
 	return cnt
+}
+
+func (cm *cmgrImpl) Start(ctx context.Context, errCH chan error) {
+	if !cm.cfg.NeedSync() {
+		cm.l.Info("do not need sync return...")
+		return
+	}
+	cm.l.Info("start with sync")
+	ticker := time.NewTicker(time.Second * time.Duration(cm.cfg.SyncDuration))
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			cm.l.Info("sync stop")
+			return
+		case <-ticker.C:
+			if err := cm.syncOnce(); err != nil {
+				cm.l.Errorf("sync once meet error: %s", err)
+				if !myhttp.ShouldRetry(err) {
+					cm.l.Error("sync once meet non-retryable error, exit now")
+					errCH <- err
+				}
+			}
+		}
+	}
+}
+
+type syncReq struct {
+	RelayLabel string     `json:"relay_label"`
+	Stats      conn.Stats `json:"stats"`
+}
+
+func (cm *cmgrImpl) syncOnce() error {
+	cm.l.Infof("sync once total closed connections: %d", cm.countClosedConnection())
+	// todo: opt lock
+	cm.lock.Lock()
+
+	reqs := []syncReq{}
+	for label, conns := range cm.closedConnectionsMap {
+		for _, c := range conns {
+			reqs = append(reqs, syncReq{
+				RelayLabel: label,
+				Stats:      *c.GetStats(),
+			})
+		}
+	}
+	cm.closedConnectionsMap = make(map[string][]conn.RelayConn)
+	cm.lock.Unlock()
+	return myhttp.PostJson(http.DefaultClient, cm.cfg.SyncURL, &reqs)
 }
