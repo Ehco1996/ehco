@@ -10,5 +10,11 @@ type Config struct {
 }
 
 func (c *Config) NeedSync() bool {
-	return c.SyncURL != "" && c.SyncDuration > 0
+	return c.SyncURL != ""
+}
+
+func (c *Config) Adjust() {
+	if c.SyncDuration <= 0 {
+		c.SyncDuration = 60
+	}
 }

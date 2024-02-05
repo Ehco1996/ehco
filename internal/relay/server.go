@@ -29,16 +29,18 @@ type Server struct {
 
 func NewServer(cfg *config.Config) (*Server, error) {
 	l := zap.S().Named("relay-server")
+	cmgrCfg := &cmgr.Config{
+		SyncURL:      cfg.RelaySyncURL,
+		SyncDuration: cfg.RelaySyncDuration,
+	}
+	cmgrCfg.Adjust()
 	s := &Server{
 		cfg:      cfg,
 		l:        l,
 		relayM:   &sync.Map{},
 		errCH:    make(chan error, 1),
 		reloadCH: make(chan struct{}, 1),
-		Cmgr: cmgr.NewCmgr(&cmgr.Config{
-			SyncURL:      cfg.RelaySyncURL,
-			SyncDuration: cfg.RelaySyncDuration,
-		}),
+		Cmgr:     cmgr.NewCmgr(cmgrCfg),
 	}
 	return s, nil
 }

@@ -155,11 +155,7 @@ func (cm *cmgrImpl) countClosedConnection() int {
 }
 
 func (cm *cmgrImpl) Start(ctx context.Context, errCH chan error) {
-	if !cm.cfg.NeedSync() {
-		cm.l.Info("do not need sync return...")
-		return
-	}
-	cm.l.Info("start with sync")
+	cm.l.Info("start")
 	ticker := time.NewTicker(time.Second * time.Duration(cm.cfg.SyncDuration))
 	defer ticker.Stop()
 
@@ -201,5 +197,10 @@ func (cm *cmgrImpl) syncOnce() error {
 	}
 	cm.closedConnectionsMap = make(map[string][]conn.RelayConn)
 	cm.lock.Unlock()
-	return myhttp.PostJson(http.DefaultClient, cm.cfg.SyncURL, &reqs)
+	if cm.cfg.NeedSync() {
+		return myhttp.PostJson(http.DefaultClient, cm.cfg.SyncURL, &reqs)
+	} else {
+		cm.l.Debugf("remove %d closed connections", len(reqs))
+	}
+	return nil
 }
