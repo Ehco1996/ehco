@@ -17,7 +17,7 @@ var cliLogger = log.MustNewLogger("info").Sugar().Named("cli-app")
 func startAction(ctx *cli.Context) error {
 	cfg, err := InitConfigAndComponents()
 	if err != nil {
-		cliLogger.Fatalf("InitConfigAndCompoents meet err=%s", err.Error())
+		cliLogger.Fatalf("InitConfigAndComponents meet err=%s", err.Error())
 	}
 
 	mainCtx, cancel := context.WithCancel(ctx.Context)
