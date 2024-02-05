@@ -25,9 +25,9 @@ type Config struct {
 	EnablePing     bool   `json:"enable_ping,omitempty"`
 	ReloadInterval int    `json:"reload_interval,omitempty"`
 
-	RelayConfigs             []*conf.Config `json:"relay_configs"`
-	RelayTrafficSyncURL      string         `json:"relay_traffic_sync_url,omitempty"`
-	RelayTrafficSyncDuration int            `json:"relay_traffic_sync_duration,omitempty"`
+	RelayConfigs      []*conf.Config `json:"relay_configs"`
+	RelaySyncURL      string         `json:"relay_sync_url,omitempty"`
+	RelaySyncDuration int            `json:"relay_sync_duration,omitempty"`
 
 	SubConfigs          []*SubConfig  `json:"sub_configs,omitempty"`
 	XRayConfig          *xConf.Config `json:"xray_config,omitempty"`

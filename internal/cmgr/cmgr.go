@@ -2,12 +2,13 @@ package cmgr
 
 import (
 	"context"
+	"net/http"
 	"sort"
 	"sync"
 	"time"
 
 	"github.com/Ehco1996/ehco/internal/conn"
-	"github.com/Ehco1996/ehco/pkg/http"
+	myhttp "github.com/Ehco1996/ehco/pkg/http"
 	"go.uber.org/zap"
 )
 
@@ -170,7 +171,7 @@ func (cm *cmgrImpl) Start(ctx context.Context, errCH chan error) {
 		case <-ticker.C:
 			if err := cm.syncOnce(); err != nil {
 				cm.l.Errorf("sync once meet error: %s", err)
-				if !http.ShouldRetry(err) {
+				if !myhttp.ShouldRetry(err) {
 					cm.l.Error("sync once meet non-retryable error, exit now")
 					errCH <- err
 				}
@@ -179,7 +180,27 @@ func (cm *cmgrImpl) Start(ctx context.Context, errCH chan error) {
 	}
 }
 
+type syncReq struct {
+	RelayLabel string     `json:"relay_label"`
+	Stats      conn.Stats `json:"stats"`
+}
+
 func (cm *cmgrImpl) syncOnce() error {
-	cm.l.Info("sync once")
-	return nil
+	cm.l.Infof("sync once total closed connections: %d", cm.countClosedConnection())
+	// todo: opt lock
+	cm.lock.Lock()
+
+	var reqs []syncReq
+	for label, conns := range cm.closedConnectionsMap {
+		for _, c := range conns {
+			reqs = append(reqs, syncReq{
+				RelayLabel: label,
+				Stats:      *c.GetStats(),
+			})
+		}
+	}
+	cm.closedConnectionsMap = make(map[string][]conn.RelayConn)
+	cm.lock.Unlock()
+	println("reqs", reqs)
+	return myhttp.PostJson(http.DefaultClient, cm.cfg.SyncURL, reqs)
 }

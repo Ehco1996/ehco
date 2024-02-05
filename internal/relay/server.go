@@ -36,8 +36,8 @@ func NewServer(cfg *config.Config) (*Server, error) {
 		errCH:    make(chan error, 1),
 		reloadCH: make(chan struct{}, 1),
 		Cmgr: cmgr.NewCmgr(&cmgr.Config{
-			SyncURL:      cfg.RelayTrafficSyncURL,
-			SyncDuration: cfg.RelayTrafficSyncDuration,
+			SyncURL:      cfg.RelaySyncURL,
+			SyncDuration: cfg.RelaySyncDuration,
 		}),
 	}
 	return s, nil
