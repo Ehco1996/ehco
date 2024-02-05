@@ -190,7 +190,7 @@ func (cm *cmgrImpl) syncOnce() error {
 	// todo: opt lock
 	cm.lock.Lock()
 
-	var reqs []syncReq
+	reqs := []syncReq{}
 	for label, conns := range cm.closedConnectionsMap {
 		for _, c := range conns {
 			reqs = append(reqs, syncReq{
@@ -201,6 +201,5 @@ func (cm *cmgrImpl) syncOnce() error {
 	}
 	cm.closedConnectionsMap = make(map[string][]conn.RelayConn)
 	cm.lock.Unlock()
-	println("reqs", reqs)
-	return myhttp.PostJson(http.DefaultClient, cm.cfg.SyncURL, reqs)
+	return myhttp.PostJson(http.DefaultClient, cm.cfg.SyncURL, &reqs)
 }
