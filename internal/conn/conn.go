@@ -82,7 +82,7 @@ func (rc *relayConnImpl) Name() string {
 }
 
 func (rc *relayConnImpl) Flow() string {
-	return fmt.Sprintf("%s <-> %s", rc.clientConn.LocalAddr(), rc.remoteConn.RemoteAddr())
+	return fmt.Sprintf("%s <-> %s", rc.clientConn.RemoteAddr(), rc.remoteConn.RemoteAddr())
 }
 
 func (rc *relayConnImpl) GetRelayLabel() string {
