@@ -44,7 +44,7 @@ type relayConnImpl struct {
 
 func (rc *relayConnImpl) Transport(remoteLabel string) error {
 	name := rc.Name()
-	shortName := shortHashSHA256(name)
+	shortName := fmt.Sprintf("%s-%s", rc.RelayLabel, shortHashSHA256(name))
 	cl := zap.L().Named(shortName)
 	cl.Debug("transport start", zap.String("full name", name), zap.String("stats", rc.Stats.String()))
 
@@ -59,14 +59,14 @@ func (rc *relayConnImpl) Transport(remoteLabel string) error {
 		remoteLabel:    remoteLabel,
 		underlyingConn: rc.remoteConn,
 	}
-	rc.StartTime = time.Now()
+	rc.StartTime = time.Now().Local()
 	err := CopyConn(c1, c2)
 	if err != nil {
 		cl.Error("transport error", zap.Error(err))
 	}
 	cl.Debug("transport end", zap.String("stats", rc.Stats.String()))
 	rc.Closed = true
-	rc.EndTime = time.Now()
+	rc.EndTime = time.Now().Local()
 	return err
 }
 

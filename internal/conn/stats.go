@@ -49,3 +49,7 @@ func (c metricsConn) Write(p []byte) (n int, err error) {
 	c.stats.Record(0, int64(n))
 	return
 }
+
+func (c metricsConn) Close() error {
+	return c.underlyingConn.Close()
+}
