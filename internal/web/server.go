@@ -1,6 +1,7 @@
 package web
 
 import (
+	"crypto/subtle"
 	"embed"
 	"fmt"
 	"html/template"
@@ -10,6 +11,7 @@ import (
 	_ "net/http/pprof"
 
 	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v4/middleware"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.uber.org/zap"
 
@@ -53,10 +55,26 @@ func NewServer(cfg *config.Config, relayReloader reloader.Reloader, connMgr cmgr
 	e.HideBanner = true
 	e.Use(NginxLogMiddleware(l))
 	e.Renderer = &echoTemplate{templates: templates}
-
 	if cfg.WebToken != "" {
-		e.Use(SimpleTokenAuthMiddleware(cfg.WebToken, l))
+		e.Use(middleware.KeyAuthWithConfig(middleware.KeyAuthConfig{
+			KeyLookup: "query:token",
+			Validator: func(key string, c echo.Context) (bool, error) {
+				return key == cfg.WebToken, nil
+			},
+		}))
 	}
+
+	if cfg.WebAuthUser != "" && cfg.WebAuthPass != "" {
+		e.Use(middleware.BasicAuth(func(username, password string, c echo.Context) (bool, error) {
+			// Be careful to use constant time comparison to prevent timing attacks
+			if subtle.ConstantTimeCompare([]byte(username), []byte(cfg.WebAuthUser)) == 1 &&
+				subtle.ConstantTimeCompare([]byte(password), []byte(cfg.WebAuthPass)) == 1 {
+				return true, nil
+			}
+			return false, nil
+		}))
+	}
+
 	if err := metrics.RegisterEhcoMetrics(cfg); err != nil {
 		return nil, err
 	}

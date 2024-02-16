@@ -1,8 +1,6 @@
 package cmgr
 
-var (
-	DummyConfig = &Config{}
-)
+var DummyConfig = &Config{}
 
 type Config struct {
 	SyncURL      string `json:"sync_url,omitempty"`

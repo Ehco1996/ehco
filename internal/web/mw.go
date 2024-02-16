@@ -1,7 +1,6 @@
 package web
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/labstack/echo/v4"
@@ -31,21 +30,6 @@ func NginxLogMiddleware(logger *zap.SugaredLogger) echo.MiddlewareFunc {
 			)
 
 			return err
-		}
-	}
-}
-
-func SimpleTokenAuthMiddleware(token string, logger *zap.SugaredLogger) echo.MiddlewareFunc {
-	return func(next echo.HandlerFunc) echo.HandlerFunc {
-		return func(c echo.Context) error {
-			req := c.Request()
-
-			if t := req.URL.Query().Get("token"); t != token {
-				msg := fmt.Sprintf("invalid request from %s", req.RemoteAddr)
-				logger.Error(msg)
-				return echo.ErrUnauthorized
-			}
-			return next(c)
 		}
 	}
 }

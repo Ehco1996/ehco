@@ -17,9 +17,11 @@ import (
 type Config struct {
 	PATH string
 
-	WebHost  string `json:"web_host,omitempty"`
-	WebPort  int    `json:"web_port,omitempty"`
-	WebToken string `json:"web_token,omitempty"`
+	WebHost     string `json:"web_host,omitempty"`
+	WebPort     int    `json:"web_port,omitempty"`
+	WebToken    string `json:"web_token,omitempty"`
+	WebAuthUser string `json:"web_auth_user,omitempty"`
+	WebAuthPass string `json:"web_auth_pass,omitempty"`
 
 	LogLeveL       string `json:"log_level,omitempty"`
 	EnablePing     bool   `json:"enable_ping,omitempty"`
