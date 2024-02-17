@@ -37,12 +37,10 @@ func (s *Mwss) dialRemote(remote *lb.Node) (net.Conn, error) {
 }
 
 func (s *Mwss) HandleTCPConn(c net.Conn, remote *lb.Node) error {
-	defer c.Close()
 	mwsc, err := s.dialRemote(remote)
 	if err != nil {
 		return err
 	}
-	defer mwsc.Close()
 	s.l.Infof("HandleTCPConn from:%s to:%s", c.LocalAddr(), remote.Address)
 	relayConn := conn.NewRelayConn(s.relayLabel, c, mwsc)
 	s.cmgr.AddConnection(relayConn)

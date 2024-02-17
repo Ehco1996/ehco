@@ -35,7 +35,6 @@ func (s *Wss) dialRemote(remote *lb.Node) (net.Conn, error) {
 }
 
 func (s *Wss) HandleTCPConn(c net.Conn, remote *lb.Node) error {
-	defer c.Close()
 	wssc, err := s.dialRemote(remote)
 	if err != nil {
 		return err

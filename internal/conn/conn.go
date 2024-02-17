@@ -78,6 +78,8 @@ type RelayConn interface {
 	GetRelayLabel() string
 
 	GetStats() *Stats
+
+	Close() error
 }
 
 func NewRelayConn(relayName string, clientConn, remoteConn net.Conn) RelayConn {
@@ -104,6 +106,7 @@ type relayConnImpl struct {
 }
 
 func (rc *relayConnImpl) Transport(remoteLabel string) error {
+	defer rc.Close()
 	name := rc.Name()
 	shortName := fmt.Sprintf("%s-%s", rc.RelayLabel, shortHashSHA256(name))
 	cl := zap.L().Named(shortName)
@@ -124,7 +127,6 @@ func (rc *relayConnImpl) Transport(remoteLabel string) error {
 		cl.Error("transport error", zap.Error(err))
 	}
 	cl.Debug("transport end", zap.String("stats", rc.Stats.String()))
-	rc.Closed = true
 	rc.EndTime = time.Now().Local()
 	return err
 }
@@ -150,4 +152,21 @@ func (rc *relayConnImpl) GetRelayLabel() string {
 
 func (rc *relayConnImpl) GetStats() *Stats {
 	return rc.Stats
+}
+
+func (rc *relayConnImpl) Close() error {
+	err1 := rc.clientConn.Close()
+	err2 := rc.remoteConn.Close()
+	rc.Closed = true
+	return combineErrors(err1, err2)
+}
+
+func combineErrors(err1, err2 error) error {
+	if err1 != nil && err2 != nil {
+		return fmt.Errorf("combineErrors: %v, %v", err1, err2)
+	}
+	if err1 != nil {
+		return err1
+	}
+	return err2
 }

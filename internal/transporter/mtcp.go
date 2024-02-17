@@ -31,7 +31,6 @@ func (s *MTCP) dialRemote(remote *lb.Node) (net.Conn, error) {
 }
 
 func (s *MTCP) HandleTCPConn(c net.Conn, remote *lb.Node) error {
-	defer c.Close()
 	mtcpc, err := s.dialRemote(remote)
 	if err != nil {
 		return err
