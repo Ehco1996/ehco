@@ -5,8 +5,69 @@ import (
 	"net"
 	"time"
 
+	"github.com/Ehco1996/ehco/internal/metrics"
+	"github.com/Ehco1996/ehco/pkg/bytes"
 	"go.uber.org/zap"
 )
+
+type Stats struct {
+	Up   int64 `json:"up"`
+	Down int64 `json:"down"`
+}
+
+func (s *Stats) Record(up, down int64) {
+	s.Up += up
+	s.Down += down
+}
+
+func (s *Stats) String() string {
+	return fmt.Sprintf("up: %s, down: %s", bytes.PrettyByteSize(float64(s.Up)), bytes.PrettyByteSize(float64(s.Down)))
+}
+
+type innerConn struct {
+	net.Conn
+
+	remoteLabel string
+	stats       *Stats
+}
+
+func (c innerConn) Read(p []byte) (n int, err error) {
+	n, err = c.Conn.Read(p)
+	// increment the metric for the read bytes
+	metrics.NetWorkTransmitBytes.WithLabelValues(
+		c.remoteLabel, metrics.METRIC_CONN_TYPE_TCP, metrics.METRIC_CONN_FLOW_READ,
+	).Add(float64(n))
+	// record the traffic
+	c.stats.Record(int64(n), 0)
+	return
+}
+
+func (c innerConn) Write(p []byte) (n int, err error) {
+	n, err = c.Conn.Write(p)
+	metrics.NetWorkTransmitBytes.WithLabelValues(
+		c.remoteLabel, metrics.METRIC_CONN_TYPE_TCP, metrics.METRIC_CONN_FLOW_WRITE,
+	).Add(float64(n))
+	c.stats.Record(0, int64(n))
+	return
+}
+
+func (c innerConn) Close() error {
+	return c.Conn.Close()
+}
+
+func (c innerConn) CloseWrite() error {
+	if tcpConn, ok := c.Conn.(*net.TCPConn); ok {
+		return tcpConn.CloseWrite()
+	}
+	return nil
+}
+
+func (c innerConn) CloseRead() error {
+	if tcpConn, ok := c.Conn.(*net.TCPConn); ok {
+		return tcpConn.CloseRead()
+	}
+	return nil
+}
 
 type RelayConn interface {
 	// Transport transports data between the client and the remote server.
@@ -47,20 +108,18 @@ func (rc *relayConnImpl) Transport(remoteLabel string) error {
 	shortName := fmt.Sprintf("%s-%s", rc.RelayLabel, shortHashSHA256(name))
 	cl := zap.L().Named(shortName)
 	cl.Debug("transport start", zap.String("full name", name), zap.String("stats", rc.Stats.String()))
-
-	c1 := &metricsConn{
-		stats:          rc.Stats,
-		remoteLabel:    remoteLabel,
-		underlyingConn: rc.clientConn,
+	c1 := &innerConn{
+		stats:       rc.Stats,
+		remoteLabel: remoteLabel,
+		Conn:        rc.clientConn,
 	}
-
-	c2 := &metricsConn{
-		stats:          rc.Stats,
-		remoteLabel:    remoteLabel,
-		underlyingConn: rc.remoteConn,
+	c2 := &innerConn{
+		stats:       rc.Stats,
+		remoteLabel: remoteLabel,
+		Conn:        rc.remoteConn,
 	}
 	rc.StartTime = time.Now().Local()
-	err := CopyConn(c1, c2)
+	err := copyConn(c1, c2)
 	if err != nil {
 		cl.Error("transport error", zap.Error(err))
 	}

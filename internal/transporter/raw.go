@@ -159,13 +159,10 @@ func (raw *Raw) HandleTCPConn(c net.Conn, remote *lb.Node) error {
 	metrics.CurConnectionCount.WithLabelValues(remote.Label, metrics.METRIC_CONN_TYPE_TCP).Inc()
 	defer metrics.CurConnectionCount.WithLabelValues(remote.Label, metrics.METRIC_CONN_TYPE_TCP).Dec()
 
-	defer c.Close()
 	rc, err := raw.dialRemote(remote)
 	if err != nil {
 		return err
 	}
-	defer rc.Close()
-
 	raw.l.Infof("HandleTCPConn from %s to %s", c.LocalAddr(), remote.Address)
 	relayConn := conn.NewRelayConn(raw.relayLabel, c, rc)
 	raw.cmgr.AddConnection(relayConn)
