@@ -59,14 +59,14 @@ func (c innerConn) CloseWrite() error {
 	if tcpConn, ok := c.Conn.(*net.TCPConn); ok {
 		return tcpConn.CloseWrite()
 	}
-	return nil
+	return c.Conn.Close()
 }
 
 func (c innerConn) CloseRead() error {
 	if tcpConn, ok := c.Conn.(*net.TCPConn); ok {
 		return tcpConn.CloseRead()
 	}
-	return nil
+	return c.Conn.Close()
 }
 
 type RelayConn interface {
