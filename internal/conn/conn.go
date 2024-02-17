@@ -55,12 +55,12 @@ func (c *innerConn) recordStats(n int, isRead bool) {
 		metrics.NetWorkTransmitBytes.WithLabelValues(
 			c.remoteLabel, metrics.METRIC_CONN_TYPE_TCP, metrics.METRIC_CONN_FLOW_READ,
 		).Add(float64(n))
-		c.stats.Record(int64(n), 0)
+		c.stats.Record(0, int64(n))
 	} else {
 		metrics.NetWorkTransmitBytes.WithLabelValues(
 			c.remoteLabel, metrics.METRIC_CONN_TYPE_TCP, metrics.METRIC_CONN_FLOW_WRITE,
 		).Add(float64(n))
-		c.stats.Record(0, int64(n))
+		c.stats.Record(int64(n), 0)
 	}
 }
 
