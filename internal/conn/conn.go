@@ -10,6 +10,10 @@ import (
 	"go.uber.org/zap"
 )
 
+var (
+	idleTimeout = 30 * time.Second
+)
+
 type Stats struct {
 	Up   int64 `json:"up"`
 	Down int64 `json:"down"`
@@ -31,23 +35,47 @@ type innerConn struct {
 	stats       *Stats
 }
 
-func (c innerConn) Read(p []byte) (n int, err error) {
+func (c *innerConn) setDeadline(isRead bool) {
+	// set the read deadline to avoid hanging read for non-TCP connections
+	// because tcp connections have closeWrite/closeRead so no need to set read deadline
+	if _, ok := c.Conn.(*net.TCPConn); !ok {
+		var deadline time.Time
+		if isRead {
+			deadline = time.Now().Add(idleTimeout)
+			_ = c.Conn.SetReadDeadline(deadline)
+		} else {
+			deadline = time.Now().Add(idleTimeout)
+			_ = c.Conn.SetWriteDeadline(deadline)
+		}
+	}
+}
+
+func (c *innerConn) recordStats(n int, isRead bool) {
+	if isRead {
+		metrics.NetWorkTransmitBytes.WithLabelValues(
+			c.remoteLabel, metrics.METRIC_CONN_TYPE_TCP, metrics.METRIC_CONN_FLOW_READ,
+		).Add(float64(n))
+		c.stats.Record(int64(n), 0)
+	} else {
+		metrics.NetWorkTransmitBytes.WithLabelValues(
+			c.remoteLabel, metrics.METRIC_CONN_TYPE_TCP, metrics.METRIC_CONN_FLOW_WRITE,
+		).Add(float64(n))
+		c.stats.Record(0, int64(n))
+	}
+}
+
+// 修改Read和Write方法以使用recordStats
+func (c *innerConn) Read(p []byte) (n int, err error) {
+	c.setDeadline(true)
 	n, err = c.Conn.Read(p)
-	// increment the metric for the read bytes
-	metrics.NetWorkTransmitBytes.WithLabelValues(
-		c.remoteLabel, metrics.METRIC_CONN_TYPE_TCP, metrics.METRIC_CONN_FLOW_READ,
-	).Add(float64(n))
-	// record the traffic
-	c.stats.Record(int64(n), 0)
+	c.recordStats(n, true) // true for read operation
 	return
 }
 
-func (c innerConn) Write(p []byte) (n int, err error) {
+func (c *innerConn) Write(p []byte) (n int, err error) {
+	c.setDeadline(false)
 	n, err = c.Conn.Write(p)
-	metrics.NetWorkTransmitBytes.WithLabelValues(
-		c.remoteLabel, metrics.METRIC_CONN_TYPE_TCP, metrics.METRIC_CONN_FLOW_WRITE,
-	).Add(float64(n))
-	c.stats.Record(0, int64(n))
+	c.recordStats(n, false) // false for write operation
 	return
 }
 
@@ -59,14 +87,14 @@ func (c innerConn) CloseWrite() error {
 	if tcpConn, ok := c.Conn.(*net.TCPConn); ok {
 		return tcpConn.CloseWrite()
 	}
-	return c.Conn.Close()
+	return nil
 }
 
 func (c innerConn) CloseRead() error {
 	if tcpConn, ok := c.Conn.(*net.TCPConn); ok {
 		return tcpConn.CloseRead()
 	}
-	return c.Conn.Close()
+	return nil
 }
 
 type RelayConn interface {
@@ -106,7 +134,7 @@ type relayConnImpl struct {
 }
 
 func (rc *relayConnImpl) Transport(remoteLabel string) error {
-	defer rc.Close()
+	defer rc.Close() // nolint: errcheck
 	name := rc.Name()
 	shortName := fmt.Sprintf("%s-%s", rc.RelayLabel, shortHashSHA256(name))
 	cl := zap.L().Named(shortName)
