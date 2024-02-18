@@ -42,12 +42,10 @@ func (c *innerConn) setDeadline(isRead bool) {
 	// set the read deadline to avoid hanging read for non-TCP connections
 	// because tcp connections have closeWrite/closeRead so no need to set read deadline
 	if _, ok := c.Conn.(*net.TCPConn); !ok {
-		var deadline time.Time
+		deadline := time.Now().Add(idleTimeout)
 		if isRead {
-			deadline = time.Now().Add(idleTimeout)
 			_ = c.Conn.SetReadDeadline(deadline)
 		} else {
-			deadline = time.Now().Add(idleTimeout)
 			_ = c.Conn.SetWriteDeadline(deadline)
 		}
 	}
