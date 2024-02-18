@@ -27,12 +27,14 @@ func (s *Server) index(c echo.Context) error {
 		GitBranch   string
 		GitRevision string
 		BuildTime   string
+		StartTime   string
 		SubConfigs  []*config.SubConfig
 	}{
 		Version:     constant.Version,
 		GitBranch:   constant.GitBranch,
 		GitRevision: constant.GitRevision,
 		BuildTime:   constant.BuildTime,
+		StartTime:   constant.StartTime.Format("2006-01-02 15:04:05"),
 		SubConfigs:  s.cfg.SubConfigs,
 	}
 	return c.Render(http.StatusOK, "index.html", data)

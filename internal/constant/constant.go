@@ -10,6 +10,7 @@ var (
 	GitBranch   string
 	GitRevision string
 	BuildTime   string
+	StartTime   = time.Now().Local()
 )
 
 const (
