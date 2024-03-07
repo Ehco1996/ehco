@@ -4,7 +4,7 @@ var DummyConfig = &Config{}
 
 type Config struct {
 	SyncURL      string `json:"sync_url,omitempty"`
-	SyncDuration int    `json:"sync_duration"` // in seconds
+	SyncInterval int    `json:"sync_interval,omitempty"` // in seconds
 }
 
 func (c *Config) NeedSync() bool {
@@ -12,7 +12,7 @@ func (c *Config) NeedSync() bool {
 }
 
 func (c *Config) Adjust() {
-	if c.SyncDuration <= 0 {
-		c.SyncDuration = 60
+	if c.SyncInterval <= 0 {
+		c.SyncInterval = 60
 	}
 }

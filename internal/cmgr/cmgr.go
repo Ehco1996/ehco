@@ -155,8 +155,8 @@ func (cm *cmgrImpl) countClosedConnection() int {
 }
 
 func (cm *cmgrImpl) Start(ctx context.Context, errCH chan error) {
-	cm.l.Info("start")
-	ticker := time.NewTicker(time.Second * time.Duration(cm.cfg.SyncDuration))
+	cm.l.Infof("start sync interval=%d", cm.cfg.SyncInterval)
+	ticker := time.NewTicker(time.Second * time.Duration(cm.cfg.SyncInterval))
 	defer ticker.Stop()
 
 	for {

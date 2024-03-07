@@ -31,7 +31,7 @@ func NewServer(cfg *config.Config) (*Server, error) {
 	l := zap.S().Named("relay-server")
 	cmgrCfg := &cmgr.Config{
 		SyncURL:      cfg.RelaySyncURL,
-		SyncDuration: cfg.RelaySyncDuration,
+		SyncInterval: cfg.RelaySyncInterval,
 	}
 	cmgrCfg.Adjust()
 	s := &Server{
