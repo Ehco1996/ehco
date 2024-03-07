@@ -1,12 +1,24 @@
 package lb
 
 import (
+	"time"
+
 	"go.uber.org/atomic"
 )
 
+// todo: move to internal/lb
 type Node struct {
-	Address string
-	Label   string
+	Address           string
+	Label             string
+	HandShakeDuration time.Duration
+}
+
+func (n *Node) Clone() *Node {
+	return &Node{
+		Address:           n.Address,
+		Label:             n.Label,
+		HandShakeDuration: n.HandShakeDuration,
+	}
 }
 
 // RoundRobin is an interface for representing round-robin balancing.

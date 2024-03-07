@@ -18,8 +18,9 @@ var (
 )
 
 type Stats struct {
-	Up   int64 `json:"up"`
-	Down int64 `json:"down"`
+	Up               int64
+	Down             int64
+	HandShakeLatency time.Duration
 }
 
 func (s *Stats) Record(up, down int64) {
@@ -136,6 +137,8 @@ func copyConn(conn1, conn2 *innerConn) error {
 	return err2
 }
 
+type RelayConnOption func(*relayConnImpl)
+
 type RelayConn interface {
 	// Transport transports data between the client and the remote server.
 	// The remoteLabel is the label of the remote server.
@@ -149,14 +152,18 @@ type RelayConn interface {
 	Close() error
 }
 
-func NewRelayConn(relayName string, clientConn, remoteConn net.Conn) RelayConn {
-	return &relayConnImpl{
+func NewRelayConn(relayName string, clientConn, remoteConn net.Conn, opts ...RelayConnOption) RelayConn {
+	rci := &relayConnImpl{
 		RelayLabel: relayName,
-		Stats:      &Stats{Up: 0, Down: 0},
-
 		clientConn: clientConn,
 		remoteConn: remoteConn,
 	}
+	for _, opt := range opts {
+		opt(rci)
+	}
+	s := &Stats{Up: 0, Down: 0, HandShakeLatency: rci.HandshakeDuration}
+	rci.Stats = s
+	return rci
 }
 
 type relayConnImpl struct {
@@ -166,10 +173,17 @@ type relayConnImpl struct {
 	StartTime time.Time `json:"start_time"`
 	EndTime   time.Time `json:"end_time,omitempty"`
 
-	Stats *Stats `json:"stats"`
+	Stats             *Stats `json:"stats"`
+	HandshakeDuration time.Duration
 
 	clientConn net.Conn
 	remoteConn net.Conn
+}
+
+func WithHandshakeDuration(duration time.Duration) RelayConnOption {
+	return func(rci *relayConnImpl) {
+		rci.HandshakeDuration = duration
+	}
 }
 
 func (rc *relayConnImpl) Transport(remoteLabel string) error {

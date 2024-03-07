@@ -150,7 +150,9 @@ func (raw *Raw) dialRemote(remote *lb.Node) (net.Conn, error) {
 	if err != nil {
 		return nil, err
 	}
-	metrics.HandShakeDuration.WithLabelValues(remote.Label).Observe(float64(time.Since(t1).Milliseconds()))
+	latency := time.Since(t1)
+	metrics.HandShakeDuration.WithLabelValues(remote.Label).Observe(float64(latency.Milliseconds()))
+	remote.HandShakeDuration = latency
 	return rc, nil
 }
 
@@ -159,12 +161,13 @@ func (raw *Raw) HandleTCPConn(c net.Conn, remote *lb.Node) error {
 	metrics.CurConnectionCount.WithLabelValues(remote.Label, metrics.METRIC_CONN_TYPE_TCP).Inc()
 	defer metrics.CurConnectionCount.WithLabelValues(remote.Label, metrics.METRIC_CONN_TYPE_TCP).Dec()
 
-	rc, err := raw.dialRemote(remote)
+	clonedRemote := remote.Clone()
+	rc, err := raw.dialRemote(clonedRemote)
 	if err != nil {
 		return err
 	}
 	raw.l.Infof("HandleTCPConn from %s to %s", c.LocalAddr(), remote.Address)
-	relayConn := conn.NewRelayConn(raw.relayLabel, c, rc)
+	relayConn := conn.NewRelayConn(raw.relayLabel, c, rc, conn.WithHandshakeDuration(clonedRemote.HandShakeDuration))
 	raw.cmgr.AddConnection(relayConn)
 	defer raw.cmgr.RemoveConnection(relayConn)
 	return relayConn.Transport(remote.Label)

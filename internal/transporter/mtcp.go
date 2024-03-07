@@ -26,17 +26,20 @@ func (s *MTCP) dialRemote(remote *lb.Node) (net.Conn, error) {
 	if err != nil {
 		return nil, err
 	}
-	metrics.HandShakeDuration.WithLabelValues(remote.Label).Observe(float64(time.Since(t1).Milliseconds()))
+	latency := time.Since(t1)
+	metrics.HandShakeDuration.WithLabelValues(remote.Label).Observe(float64(latency.Milliseconds()))
+	remote.HandShakeDuration = latency
 	return mtcpc, nil
 }
 
 func (s *MTCP) HandleTCPConn(c net.Conn, remote *lb.Node) error {
-	mtcpc, err := s.dialRemote(remote)
+	clonedRemote := remote.Clone()
+	mtcpc, err := s.dialRemote(clonedRemote)
 	if err != nil {
 		return err
 	}
 	s.l.Infof("HandleTCPConn from:%s to:%s", c.LocalAddr(), remote.Address)
-	relayConn := conn.NewRelayConn(s.relayLabel, c, mtcpc)
+	relayConn := conn.NewRelayConn(s.relayLabel, c, mtcpc, conn.WithHandshakeDuration(clonedRemote.HandShakeDuration))
 	s.cmgr.AddConnection(relayConn)
 	defer s.cmgr.RemoveConnection(relayConn)
 	return relayConn.Transport(remote.Label)
