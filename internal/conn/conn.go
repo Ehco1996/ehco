@@ -29,7 +29,11 @@ func (s *Stats) Record(up, down int64) {
 }
 
 func (s *Stats) String() string {
-	return fmt.Sprintf("up: %s, down: %s", bytes.PrettyByteSize(float64(s.Up)), bytes.PrettyByteSize(float64(s.Down)))
+	return fmt.Sprintf("up: %s, down: %s, handshake latency: %s",
+		bytes.PrettyByteSize(float64(s.Up)),
+		bytes.PrettyByteSize(float64(s.Down)),
+		s.HandShakeLatency.String(),
+	)
 }
 
 type innerConn struct {
