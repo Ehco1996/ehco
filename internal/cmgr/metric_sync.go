@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/Ehco1996/ehco/internal/conn"
+	"github.com/Ehco1996/ehco/internal/constant"
 	myhttp "github.com/Ehco1996/ehco/pkg/http"
 )
 
@@ -16,8 +17,14 @@ type StatsPerRule struct {
 	HandShakeLatency int64 `json:"latency_in_ms"`
 }
 
+type VersionInfo struct {
+	Version     string `json:"version"`
+	ShortCommit string `json:"short_commit"`
+}
+
 type syncReq struct {
-	Stats []StatsPerRule `json:"stats"`
+	Version VersionInfo    `json:"version"`
+	Stats   []StatsPerRule `json:"stats"`
 }
 
 func (cm *cmgrImpl) syncOnce() error {
@@ -25,7 +32,14 @@ func (cm *cmgrImpl) syncOnce() error {
 	// todo: opt lock
 	cm.lock.Lock()
 
-	req := syncReq{Stats: []StatsPerRule{}}
+	shorCommit := ""
+	if len(constant.GitRevision) > 7 {
+		shorCommit = constant.GitRevision[:7]
+	}
+	req := syncReq{
+		Stats:   []StatsPerRule{},
+		Version: VersionInfo{Version: constant.Version, ShortCommit: shorCommit},
+	}
 	for label, conns := range cm.closedConnectionsMap {
 		s := StatsPerRule{
 			RelayLabel: label,
