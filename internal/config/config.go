@@ -75,9 +75,6 @@ func (c *Config) readFromFile() error {
 		return err
 	}
 	c.l.Infof("Load Config From File: %s", c.PATH)
-	if err != nil {
-		return err
-	}
 	return json.Unmarshal([]byte(file), &c)
 }
 
