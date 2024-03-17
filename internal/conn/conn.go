@@ -13,9 +13,7 @@ import (
 	"go.uber.org/zap"
 )
 
-var (
-	idleTimeout = 30 * time.Second
-)
+var idleTimeout = 30 * time.Second
 
 type Stats struct {
 	Up               int64

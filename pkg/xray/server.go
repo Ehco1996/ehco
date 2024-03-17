@@ -153,7 +153,8 @@ func (xs *XrayServer) Start(ctx context.Context) error {
 				case <-ticker.C:
 					newCfg := config.NewConfig(xs.cfg.PATH)
 					if err := newCfg.LoadConfig(); err != nil {
-						xs.l.Error("Reload Config meet error", zap.Error(err))
+						// TODO refine
+						xs.l.Error("Reload Config meet error will retry in next loop", zap.Error(err))
 						continue
 					}
 					if needReload, err := xs.needReload(newCfg); err != nil {
