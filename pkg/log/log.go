@@ -31,7 +31,9 @@ func initLogger(logLevel string, replaceGlobal bool) (*zap.Logger, error) {
 		level,
 	)
 	l := zap.New(core)
-	zap.ReplaceGlobals(l)
+	if replaceGlobal {
+		zap.ReplaceGlobals(l)
+	}
 	return l, nil
 }
 
