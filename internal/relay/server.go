@@ -80,7 +80,7 @@ func (s *Server) Start(ctx context.Context) error {
 
 	select {
 	case err := <-s.errCH:
-		s.l.Errorf("relay server meet error: %s exit now.", err)
+		s.l.Errorf("meet error: %s exit now.", err)
 		return err
 	case <-ctx.Done():
 		s.l.Info("ctx cancelled start to stop all relay servers")
@@ -117,8 +117,7 @@ func (s *Server) WatchAndReload(ctx context.Context) {
 			return
 		case <-s.reloadCH:
 			if err := s.Reload(); err != nil {
-				s.l.Errorf("Reloading Relay Conf meet error: %s ", err)
-				s.errCH <- err
+				s.l.Errorf("auto reloading relay conf meet error: %s will retry in next loop", err)
 			}
 		}
 	}

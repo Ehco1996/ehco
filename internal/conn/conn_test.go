@@ -115,7 +115,7 @@ func TestCopyConn(t *testing.T) {
 	_, err = clientConn.Read(buffer)
 	assert.NoError(t, err)
 	assert.Equal(t, msg, string(buffer))
-	//close the connection
+	// close the connection
 	_ = clientConn.Close()
 	_ = remoteConn.Close()
 	// wait for the copyConn to finish

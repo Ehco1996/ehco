@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/Ehco1996/ehco/internal/conn"
-	myhttp "github.com/Ehco1996/ehco/pkg/http"
 	"go.uber.org/zap"
 )
 
@@ -165,11 +164,8 @@ func (cm *cmgrImpl) Start(ctx context.Context, errCH chan error) {
 			return
 		case <-ticker.C:
 			if err := cm.syncOnce(); err != nil {
-				cm.l.Errorf("sync once meet error: %s", err)
-				if !myhttp.ShouldRetry(err) {
-					cm.l.Error("sync once meet non-retryable error, exit now")
-					errCH <- err
-				}
+				cm.l.Errorf("meet non retry error: %s ,exit now", err)
+				errCH <- err
 			}
 		}
 	}
