@@ -1,9 +1,7 @@
 package cli
 
 import (
-	"context"
 	"fmt"
-	"os"
 	"os/signal"
 	"syscall"
 
@@ -20,19 +18,14 @@ func startAction(ctx *cli.Context) error {
 		cliLogger.Fatalf("InitConfigAndComponents meet err=%s", err.Error())
 	}
 
-	mainCtx, cancel := context.WithCancel(ctx.Context)
-	defer cancel()
-
-	exitSigs := make(chan os.Signal, 1)
-	signal.Notify(exitSigs, syscall.SIGINT, syscall.SIGTERM)
+	mainCtx, stop := signal.NotifyContext(ctx.Context, syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
 
 	MustStartComponents(mainCtx, cfg)
-	// wait for exit
-	select {
-	case <-mainCtx.Done():
-	case <-exitSigs:
-	}
-	cliLogger.Infof("ehco exit now...")
+
+	<-mainCtx.Done()
+
+	cliLogger.Info("ehco exit now...")
 	return nil
 }
 
