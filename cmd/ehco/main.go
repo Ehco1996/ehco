@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/Ehco1996/ehco/internal/cli"
-	"github.com/getsentry/sentry-go"
+	sentry "github.com/getsentry/sentry-go"
 )
 
 func main() {
