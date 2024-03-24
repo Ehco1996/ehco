@@ -102,7 +102,10 @@ func MustStartComponents(mainCtx context.Context, cfg *config.Config) {
 	}
 	go func() {
 		metrics.EhcoAlive.Set(metrics.EhcoAliveStateRunning)
-		cliLogger.Fatalf("StartRelayServer meet err=%s", rs.Start(mainCtx))
+		sErr := rs.Start(mainCtx)
+		if sErr != nil {
+			cliLogger.Fatalf("StartRelayServer meet err=%s", sErr.Error())
+		}
 	}()
 
 	if cfg.NeedStartWebServer() {
