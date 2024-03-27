@@ -2,122 +2,126 @@
 <html>
     <head>
         <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <link
             rel="stylesheet"
-            href="https://cdnjs.cloudflare.com/ajax/libs/bulma/0.9.4/css/bulma.min.css"
+            href="https://cdnjs.cloudflare.com/ajax/libs/bulma/1.0.0/css/bulma.min.css"
         />
+        <title>Ehco</title>
+        <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
     </head>
     <body>
-        <section class="hero is-fullheight">
+        <section class="hero is-fullheight is-light">
             <div class="hero-body">
                 <div class="container">
                     <!-- Title -->
-                    <div class="columns is-centered">
-                        <div class="column is-12">
-                            <h1 class="title has-text-centered">
-                                ehco is a network relay tool and a typo :)
-                            </h1>
-                        </div>
-                    </div>
+                    <h1 class="title has-text-centered">
+                        ehco is a network relay tool and a typo :)
+                    </h1>
 
-                    <!-- Build Info Box -->
-                    <div class="columns is-centered">
-                        <div class="column">
-                            <div class="box">
-                                <h3 class="subtitle has-text-centered">
-                                    Build Info
-                                </h3>
-                                <div
-                                    class="content is-flex is-justify-content-center"
-                                >
-                                    <ul style="text-align: left">
-                                        <li>Version: {{.Version}}</li>
-                                        <li>GitBranch: {{.GitBranch}}</li>
-                                        <li>GitRevision: {{.GitRevision}}</li>
-                                        <li>BuildTime: {{.BuildTime}}</li>
-                                        <li>StartTime: {{.StartTime}}</li>
-                                    </ul>
-                                </div>
+                    <!-- Build Info Card -->
+                    <div class="card">
+                        <header class="card-header">
+                            <p class="card-header-title has-text-centered">
+                                Build Info
+                            </p>
+                        </header>
+                        <div class="card-content">
+                            <div class="content">
+                                <ul>
+                                    <li>Version: {{.Version}}</li>
+                                    <li>GitBranch: {{.GitBranch}}</li>
+                                    <li>GitRevision: {{.GitRevision}}</li>
+                                    <li>BuildTime: {{.BuildTime}}</li>
+                                    <li>StartTime: {{.StartTime}}</li>
+                                </ul>
                             </div>
                         </div>
                     </div>
 
-                    <!-- Links Box -->
-                    <div class="columns is-centered">
-                        <div class="column">
-                            <div class="box">
-                                <h3 class="subtitle has-text-centered">
-                                    Links
-                                </h3>
-                                <div
-                                    class="content is-flex is-justify-content-center"
-                                >
-                                    <ul style="text-align: left">
-                                        <li><a href="/metrics/">Metrics</a></li>
-                                        <li>
-                                            <a href="/debug/pprof/">Debug</a>
-                                        </li>
-                                        <li>
-                                            <a href="/connections/?conn_type=active"
-                                                >Current Connections</a
-                                            >
-                                        </li>
-                                        <li>
-                                            <a href="/api/v1/config/"
-                                                >Current Config</a
-                                            >
-                                        </li>
-                                    </ul>
-                                </div>
+                    <!-- Stylish Links Card -->
+                    <div class="card">
+                        <header class="card-header">
+                            <p class="card-header-title has-text-centered">
+                                Quick Links
+                            </p>
+                        </header>
+                        <div class="card-content">
+                            <div class="content">
+                                <ul>
+                                    <li>
+                                        <a
+                                            href="/metrics/"
+                                            class="button is-info is-light"
+                                            >Metrics</a
+                                        >
+                                    </li>
+                                    <li>
+                                        <a
+                                            href="/debug/pprof/"
+                                            class="button is-info is-light"
+                                            >Debug</a
+                                        >
+                                    </li>
+                                    <li>
+                                        <a
+                                            href="/connections/?conn_type=active"
+                                            class="button is-info is-light"
+                                            >Connections</a
+                                        >
+                                    </li>
+                                    <li>
+                                        <a
+                                            href="/api/v1/config/"
+                                            class="button is-info is-light"
+                                            >Config</a
+                                        >
+                                    </li>
+                                </ul>
                             </div>
                         </div>
                     </div>
-
-                    <!-- Clash Providers Box -->
+                    <!-- Clash Providers card -->
                     {{if .SubConfigs}}
-                    <div class="columns is-centered">
-                        <div class="column">
-                            <div class="box">
-                                <h3 class="subtitle has-text-centered">
-                                    Clash Providers
-                                </h3>
-                                <div
-                                    class="content is-flex is-justify-content-center"
-                                >
-                                    <ul style="text-align: left">
-                                        {{range .SubConfigs}}
-                                        <li>
-                                            <a
-                                                href="/clash_proxy_provider/?sub_name={{.Name}}"
-                                                >{{.Name}}</a
-                                            >
-                                        </li>
-                                        <li>
-                                            <a
-                                                href="/clash_proxy_provider/?sub_name={{.Name}}&grouped=true"
-                                                >{{.Name}}-lb</a
-                                            >
-                                        </li>
-                                        {{end}}
-                                    </ul>
-                                </div>
+                    <div class="card">
+                        <header class="card-header">
+                            <p class="card-header-title has-text-centered">
+                                Clash Providers
+                            </p>
+                        </header>
+                        <div class="card-content">
+                            <div class="content">
+                                <ul>
+                                    {{range .SubConfigs}}
+                                    <li>
+                                        <a
+                                            class="button is-info is-light"
+                                            href="/clash_proxy_provider/?sub_name={{.Name}}"
+                                            >{{.Name}}</a
+                                        >
+                                    </li>
+                                    <li>
+                                        <a
+                                            class="button is-info is-light"
+                                            href="/clash_proxy_provider/?sub_name={{.Name}}&grouped=true"
+                                            >{{.Name}}-lb</a
+                                        >
+                                    </li>
+                                </ul>
+                                {{end}}
                             </div>
                         </div>
                     </div>
                     {{end}}
 
                     <!-- Reload Config Button -->
-                    <div class="columns is-centered">
-                        <div class="column is-12">
-                            <p class="has-text-centered">
-                                <button
-                                    class="button is-primary"
-                                    id="reloadButton"
-                                >
-                                    Reload Config
-                                </button>
-                            </p>
-                        </div>
+                    <div class="has-text-centered">
+                        <button
+                            class="button is-danger is-outlined"
+                            id="reloadButton"
+                        >
+                            Reload Config
+                        </button>
                     </div>
                 </div>
             </div>
@@ -135,30 +139,25 @@
         </section>
 
         <script>
-            document
-                .getElementById("reloadButton")
-                .addEventListener("click", function () {
-                    var request = new XMLHttpRequest();
-                    request.open("POST", "/api/v1/config/reload/");
-                    request.onreadystatechange = function () {
-                        if (request.readyState === XMLHttpRequest.DONE) {
-                            var msg;
-                            if (request.status === 200) {
-                                msg =
-                                    "Reload config success." +
-                                    " Response: " +
-                                    request.responseText;
-                            } else {
-                                msg =
-                                    "Failed to reload config." +
-                                    " Response: " +
-                                    request.responseText;
-                            }
-                            alert(msg);
-                        }
-                    };
-                    request.send();
+            $(document).ready(function () {
+                $("#reloadButton").click(function () {
+                    $.ajax({
+                        type: "POST",
+                        url: "/api/v1/config/reload/",
+                        success: function (response) {
+                            alert(
+                                "Reload config success. Response: " + response
+                            );
+                        },
+                        error: function (response) {
+                            alert(
+                                "Failed to reload config. Response: " +
+                                    response.responseText
+                            );
+                        },
+                    });
                 });
+            });
         </script>
     </body>
 </html>

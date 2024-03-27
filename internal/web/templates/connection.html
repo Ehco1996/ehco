@@ -3,16 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bulma/0.9.4/css/bulma.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bulma/1.0.0/css/bulma.min.css">
     <title>Connections</title>
 </head>
 <body>
     <section class="section">
         <div class="container">
-            <!-- Title with Total Count -->
             <h1 class="title">ALL Connections: {{.AllCount}}</h1>
-
-            <!-- Tabs for Active/Closed Connections -->
             <div class="tabs is-boxed is-centered">
                 <ul>
                     <li class="{{if eq .ConnType "active"}}is-active{{end}}">
@@ -23,39 +20,34 @@
                     </li>
                 </ul>
             </div>
-
-            <!-- Check if we have connections to display -->
             {{if gt (len .ConnectionList) 0}}
-
-                <!-- Connections Table -->
-                <table class="table is-striped is-hoverable is-fullwidth">
-                    <thead>
-                        <tr>
-                            <th>Relay Label</th>
-                            <th>Flow</th>
-                            <th>Stats</th>
-                            <th>Time</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {{range .ConnectionList}}
-                        <tr>
-                            <td>{{.RelayLabel}}</td>
-                            <td>{{.Flow}}</td>
-                            <td>{{.Stats}}</td>
-                            <td>{{.GetTime}}</td>
-                        </tr>
-                        {{end}}
-                    </tbody>
-                </table>
+                <div class="table-container">
+                    <table class="table is-striped is-hoverable is-fullwidth">
+                        <thead>
+                            <tr>
+                                <th>Relay Label</th>
+                                <th>Flow</th>
+                                <th>Stats</th>
+                                <th>Time</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {{range .ConnectionList}}
+                            <tr>
+                                <td>{{.RelayLabel}}</td>
+                                <td>{{.Flow}}</td>
+                                <td>{{.Stats}}</td>
+                                <td>{{.GetTime}}</td>
+                            </tr>
+                            {{end}}
+                        </tbody>
+                    </table>
+                </div>
             {{else}}
-                <!-- Message when no connections are present -->
                 <div class="notification is-info">
                     <p>No connections available.</p>
                 </div>
             {{end}}
-
-            <!-- Pagination -->
             <nav class="pagination is-centered" role="navigation" aria-label="pagination" style="margin-top: 20px;">
                 <a class="pagination-previous" {{if eq .Prev 0}}disabled{{end}}
                    href="?conn_type={{.ConnType}}&page={{.Prev}}&page_size={{.PageSize}}">Previous</a>
@@ -70,7 +62,7 @@
                     <li><span class="pagination-ellipsis">&hellip;</span></li>
                     {{if lt .CurrentPage .TotalPage}}
                     <li><a class="pagination-link" href="?conn_type={{.ConnType}}&page={{.TotalPage}}&page_size={{.PageSize}}">{{.TotalPage}}</a></li>
-                {{end}}
+                    {{end}}
                 </ul>
             </nav>
         </div>
