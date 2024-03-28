@@ -89,9 +89,6 @@ function parse_arguments() {
         -u | --check-update)
             OPERATION="check_update"
             ;;
-        -h | --help)
-            OPERATION="help"
-            ;;
         *)
             print_error_msg "Unknown argument: $1"
             ;;
@@ -103,22 +100,63 @@ function parse_arguments() {
     fi
 }
 
+function get_latest_version() {
+    local _version
+    if _version=$(curl "${CURL_FLAGS[@]}" -sSL "https://api.github.com/repos/Ehco1996/Ehco/releases/latest" | grep -o '"tag_name": ".*"' | sed 's/"tag_name": "//;s/"//'); then
+        echo "$_version"
+    else
+        print_error_msg "Failed to get latest version."
+        exit 1
+    fi
+}
+
+function perform_install() {
+    local _version=$VERSION
+    # if version is not specified, set it to latest
+    if [[ -z "$_version" ]]; then
+        echo "not specified version, will install latest version"
+        _version=$(get_latest_version)
+    fi
+    echo "Installing Ehco version: $_version"
+
+    # Check if the Ehco is already installed
+    if [[ -x "$EXECUTABLE_INSTALL_PATH" ]]; then
+        print_error_msg "Ehco is already installed."
+        exit 1
+    fi
+
+    # Download the Ehco binary url is get from github release page
+    local _url=
+}
+
+function get_release_assets_urls() {
+    local _version="$1"
+    local api_url="https://api.github.com/repos/Ehco1996/Ehco/releases/tags/${_version}"
+    echo "$api_url"
+
+    # 解析 JSON 响应以获取 assets 的下载 URL
+    # 这里使用了 jq 工具来解析 JSON，确保你的系统已经安装了 jq
+    curl -sSL "$api_url" | jq -r '.assets[] | .browser_download_url'
+
+}
+
+###
+# Entrypoint
+###
 main() {
     parse_arguments "$@"
+    get_release_assets_urls $VERSION
+    exit 1
 
     case "$OPERATION" in
     "install")
-        # perform_install
-        echo "Installation completed." "$OPERATION"
+        perform_install
         ;;
     "remove")
         # perform_remove
         ;;
     "check_update")
         # perform_check_update
-        ;;
-    "help")
-        print_help
         ;;
     *)
         print_error_msg "Unknown operation: '$OPERATION'."
