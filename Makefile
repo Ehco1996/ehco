@@ -43,15 +43,8 @@ build:
 build-arm:
 	GOARCH=arm GOOS=linux ${GOBUILD} -o $(BINDIR)/$(NAME) cmd/ehco/main.go
 
-build-nightly:
-	${GOBUILD} -o $(NAME)  cmd/ehco/main.go
-
 build-linux-amd64:
 	GOARCH=amd64 GOOS=linux ${GOBUILD} -o $(BINDIR)/$(NAME)_amd64 cmd/ehco/main.go
 
 tidy:
 	go mod tidy
-
-release:
-	goreleaser build --skip-validate --rm-dist
-

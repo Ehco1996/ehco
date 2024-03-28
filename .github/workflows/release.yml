@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-tag-image:
+  build-image:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@master
@@ -38,7 +38,7 @@ jobs:
           file: build/Dockerfile
           platforms: linux/amd64,linux/arm64
 
-  go-build:
+  build-go-bin:
     runs-on: ubuntu-latest
     steps:
       - name: Set up Go
@@ -57,6 +57,6 @@ jobs:
         uses: goreleaser/goreleaser-action@v5
         with:
           version: latest
-          args: release
+          args: release --rm-dist
         env:
           GITHUB_TOKEN: ${{ secrets.GORELEASER_GITHUB_TOKEN }}
