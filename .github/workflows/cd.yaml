@@ -156,14 +156,26 @@ jobs:
           name: digests-arm64
           path: /tmp/digests/arm64
 
+      - name: List digests directory
+        run: |
+          ls -R /tmp/digests
+
       - name: Create manifest list and push
         run: |
           PLATFORMS=(${{ join(fromJson(needs.prepare-matrix.outputs.matrix).platform, ' ') }})
           DIGESTS=()
           for PLATFORM in "${PLATFORMS[@]}"; do
-            find /tmp/digests/$PLATFORM -type f | while read FILE; do
+            echo "Processing platform: $PLATFORM"
+            while IFS= read -r FILE; do
+              echo "Found file: $FILE"
               DIGEST=$(cat "$FILE")
+              echo "Found digest: $DIGEST"
               DIGESTS+=("${{ env.REGISTRY_IMAGE }}@${DIGEST}")
-            done
+            done < <(find /tmp/digests/$PLATFORM -type f)
           done
-          docker buildx imagetools create "${DIGESTS[@]}"
+          echo "DIGESTS array contents: ${DIGESTS[@]}"
+          if [ ${#DIGESTS[@]} -eq 0 ]; then
+            echo "No digests found, skipping docker buildx imagetools create."
+          else
+            docker buildx imagetools create "${DIGESTS[@]}"
+          fi
