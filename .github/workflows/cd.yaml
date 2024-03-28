@@ -16,35 +16,14 @@ env:
   REGISTRY_IMAGE: ehco1996/ehco
 
 jobs:
-  test:
+  prepare-matrix:
     runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: "1.21"
-        id: go
-
-      - uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cache/go-build
-            ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
-
-      - name: Check out code into the Go module directory
-        uses: actions/checkout@v4
-
-      - name: tidy
-        run: make tidy
-
-      - name: lint
-        run: make lint
-
-      - name: test
-        run: make test
+      - id: set-matrix
+        run: |
+          echo '::set-output name=matrix::{"platform":["amd64","arm64"]}'
 
   build-bin:
     runs-on: ubuntu-latest
@@ -125,6 +104,7 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           outputs: type=image,name=${{ env.REGISTRY_IMAGE }},push-by-digest=true,name-canonical=true,push=true
+
       - name: Export digest
         run: |
           mkdir -p /tmp/digests
@@ -138,15 +118,6 @@ jobs:
           path: /tmp/digests/*
           if-no-files-found: error
           retention-days: 1
-
-  prepare-matrix:
-    runs-on: ubuntu-latest
-    outputs:
-      matrix: ${{ steps.set-matrix.outputs.matrix }}
-    steps:
-      - id: set-matrix
-        run: |
-          echo '::set-output name=matrix::{"platform":["amd64","arm64"]}'
 
   merge:
     runs-on: ubuntu-latest
@@ -186,8 +157,7 @@ jobs:
           PLATFORMS=(${{ join(fromJson(needs.prepare-matrix.outputs.matrix).platform, ' ') }})
           DIGESTS=()
           for PLATFORM in "${PLATFORMS[@]}"; do
-            DIGEST_FILES="/tmp/digests/$PLATFORM/*"
-            for FILE in $DIGEST_FILES; do
+            find /tmp/digests/$PLATFORM -type f | while read FILE; do
               DIGEST=$(cat "$FILE")
               DIGESTS+=("${{ env.REGISTRY_IMAGE }}@${DIGEST}")
             done
