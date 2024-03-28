@@ -108,7 +108,7 @@ proxy-providers:
 
 -   ehco 提供预编译的的二进制 [release](https://github.com/Ehco1996/ehco/releases) 页面下载
 
--   ehco 提供 [nightly build](https://github.com/Ehco1996/ehco/releases/tag/nightly)
+-   ehco 提供 [nightly build](https://github.com/Ehco1996/ehco/releases/tag/v0.0.0-nightly)
 
 -   ehco 提供 docker 镜像 `docker pull ehco1996/ehco`
 
