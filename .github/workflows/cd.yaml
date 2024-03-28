@@ -23,7 +23,7 @@ jobs:
     steps:
       - id: set-matrix
         run: |
-          echo '::set-output name=matrix::{"platform":["amd64","arm64"]}'
+          echo '{"platform":["amd64","arm64"]}' > $GITHUB_OUTPUT
 
   build-bin:
     runs-on: ubuntu-latest
@@ -39,7 +39,7 @@ jobs:
           path: |
             ~/.cache/go-build
             ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('go.sum') }}
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-go-
 
@@ -159,11 +159,6 @@ jobs:
       - name: Create manifest list and push
         working-directory: /tmp/digests
         run: |
-          echo "Listing amd64 directory:"
-          ls -l amd64/
-          echo "Listing arm64 directory:"
-          ls -l arm64/
-
           echo "Creating manifest list..."
           AMD64_DIGEST=$(ls amd64/)
           ARM64_DIGEST=$(ls arm64/)
