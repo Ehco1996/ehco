@@ -161,21 +161,11 @@ jobs:
           ls -R /tmp/digests
 
       - name: Create manifest list and push
+        working-directory: /tmp/digests
         run: |
-          PLATFORMS=(${{ join(fromJson(needs.prepare-matrix.outputs.matrix).platform, ' ') }})
-          DIGESTS=()
-          for PLATFORM in "${PLATFORMS[@]}"; do
-            echo "Processing platform: $PLATFORM"
-            while IFS= read -r FILE; do
-              echo "Found file: $FILE"
-              DIGEST=$(cat "$FILE")
-              echo "Found digest: $DIGEST"
-              DIGESTS+=("${{ env.REGISTRY_IMAGE }}@${DIGEST}")
-            done < <(find /tmp/digests/$PLATFORM -type f)
-          done
-          echo "DIGESTS array contents: ${DIGESTS[@]}"
-          if [ ${#DIGESTS[@]} -eq 0 ]; then
-            echo "No digests found, skipping docker buildx imagetools create."
-          else
-            docker buildx imagetools create "${DIGESTS[@]}"
-          fi
+          docker buildx imagetools create $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
+            $(printf '${{ env.REGISTRY_IMAGE }}@sha256:%s ' *)
+
+      - name: Inspect image
+        run: |
+          docker buildx imagetools inspect ${{ env.REGISTRY_IMAGE }}:${{ steps.meta.outputs.version }}
