@@ -20,6 +20,7 @@ builds:
       - 7
     goos:
       - linux
+    binary: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}"
 archives:
   - format: binary
 changelog:
