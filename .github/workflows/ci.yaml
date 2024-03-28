@@ -15,7 +15,7 @@ on:
       - "cmd/**"
       - "internal/**"
       - "pkg/**"
-      - go.mod
+      - "go.mod"
 jobs:
   test:
     runs-on: ubuntu-latest

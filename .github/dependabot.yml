@@ -17,6 +17,8 @@ updates:
         # dependency name)
         patterns:
           - "*" # A wildcard that matches all dependencies in the package
+        ignore:
+          - dependency-name: "github.com/xtaci/smux"
 
   - package-ecosystem: "github-actions"
     directory: "/"
