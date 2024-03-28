@@ -9,6 +9,8 @@ updates:
     directory: "/" # Location of package manifests
     schedule:
       interval: "weekly"
+    ignore:
+      - dependency-name: "github.com/xtaci/smux"
     groups:
       # Specify a name for the group, which will be used in pull request titles
       # and branch names
@@ -17,8 +19,6 @@ updates:
         # dependency name)
         patterns:
           - "*" # A wildcard that matches all dependencies in the package
-        ignore:
-          - dependency-name: "github.com/xtaci/smux"
 
   - package-ecosystem: "github-actions"
     directory: "/"
