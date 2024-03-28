@@ -1,4 +1,4 @@
-name: sync-nightly-tag-to-latest
+name: nightly-release
 
 on:
   schedule:
@@ -31,9 +31,6 @@ jobs:
           git tag v0.0.0-nightly
           git push origin refs/tags/v0.0.0-nightly
 
-  build-go-bin:
-    runs-on: ubuntu-latest
-    steps:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
@@ -42,6 +39,8 @@ jobs:
 
       - name: Check out code into the Go module directory
         uses: actions/checkout@v4
+        with:
+          ref: v0.0.0-nightly
 
       - name: Get dependencies
         run: go mod download
