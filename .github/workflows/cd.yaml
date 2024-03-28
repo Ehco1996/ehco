@@ -156,13 +156,14 @@ jobs:
           name: digests-arm64
           path: /tmp/digests/arm64
 
-      - name: List digests directory
-        run: |
-          ls -R /tmp/digests
-
       - name: Create manifest list and push
         working-directory: /tmp/digests
         run: |
+          echo "Digests for amd64: $(cat amd64/*)"
+          echo "Digests for arm64: $(cat arm64/*)"
+          echo "Formatted command:"
+          printf '${{ env.REGISTRY_IMAGE }}@sha256:%s ' $(cat amd64/*) $(cat arm64/*)
+          echo "start create manifest list and push"
           docker buildx imagetools create $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
             $(printf '${{ env.REGISTRY_IMAGE }}@sha256:%s ' $(cat amd64/*) $(cat arm64/*))
 
