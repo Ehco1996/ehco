@@ -23,7 +23,8 @@ jobs:
     steps:
       - id: set-matrix
         run: |
-          echo '{"platform":["amd64","arm64"]}' > $GITHUB_OUTPUT
+          MATRIX_JSON='{"platform":["amd64","arm64"]}'
+          echo "matrix=$MATRIX_JSON" >> $GITHUB_ENV
 
   build-bin:
     runs-on: ubuntu-latest
