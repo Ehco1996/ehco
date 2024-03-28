@@ -30,7 +30,7 @@ jobs:
           path: |
             ~/.cache/go-build
             ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          key: ${{ runner.os }}-go-${{ hashFiles('go.sum') }}
           restore-keys: |
             ${{ runner.os }}-go-
 
@@ -60,7 +60,7 @@ jobs:
           path: |
             ~/.cache/go-build
             ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          key: ${{ runner.os }}-go-${{ hashFiles('go.sum') }}
           restore-keys: |
             ${{ runner.os }}-go-
 
@@ -130,26 +130,41 @@ jobs:
           mkdir -p /tmp/digests
           digest="${{ steps.build.outputs.digest }}"
           touch "/tmp/digests/${digest#sha256:}"
+
       - name: Upload digest
         uses: actions/upload-artifact@v4
         with:
-          name: digests
+          name: digests-${{ matrix.platform }}
           path: /tmp/digests/*
           if-no-files-found: error
           retention-days: 1
+
+  prepare-matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - id: set-matrix
+        run: |
+          echo '::set-output name=matrix::{"platform":["amd64","arm64"]}'
 
   merge:
     runs-on: ubuntu-latest
     needs:
       - build-image
+      - prepare-matrix
+    strategy:
+      matrix: ${{fromJson(needs.prepare-matrix.outputs.matrix)}}
     steps:
-      - name: Download digests
+      - name: Download digests for ${{ matrix.platform }}
         uses: actions/download-artifact@v4
         with:
-          name: digests
-          path: /tmp/digests
+          name: digests-${{ matrix.platform }}
+          path: /tmp/digests/${{ matrix.platform }}
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
+
       - name: Docker meta
         id: meta
         uses: docker/metadata-action@v5
@@ -159,16 +174,22 @@ jobs:
             type=sha
             type=raw,value=latest
             type=ref,event=tag
+
       - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
+
       - name: Create manifest list and push
-        working-directory: /tmp/digests
         run: |
-          docker buildx imagetools create $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
-            $(printf '${{ env.REGISTRY_IMAGE }}@sha256:%s ' *)
-      - name: Inspect image
-        run: |
-          docker buildx imagetools inspect ${{ env.REGISTRY_IMAGE }}:${{ steps.meta.outputs.version }}
+          PLATFORMS=(${{ join(fromJson(needs.prepare-matrix.outputs.matrix).platform, ' ') }})
+          DIGESTS=()
+          for PLATFORM in "${PLATFORMS[@]}"; do
+            DIGEST_FILES="/tmp/digests/$PLATFORM/*"
+            for FILE in $DIGEST_FILES; do
+              DIGEST=$(cat "$FILE")
+              DIGESTS+=("${{ env.REGISTRY_IMAGE }}@${DIGEST}")
+            done
+          done
+          docker buildx imagetools create "${DIGESTS[@]}"
