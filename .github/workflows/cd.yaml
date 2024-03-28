@@ -23,8 +23,7 @@ jobs:
     steps:
       - id: set-matrix
         run: |
-          MATRIX_JSON='{"platform":["amd64","arm64"]}'
-          echo "matrix=$MATRIX_JSON" >> $GITHUB_ENV
+          echo '::set-output name=matrix::{"platform":["amd64","arm64"]}'
 
   build-bin:
     runs-on: ubuntu-latest
@@ -35,17 +34,18 @@ jobs:
           go-version: "1.21"
         id: go
 
+      - name: Check out code into the Go module directory
+        uses: actions/checkout@v4
+
+      # cache golang build
       - uses: actions/cache@v4
         with:
           path: |
             ~/.cache/go-build
             ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          key: ${{ runner.os }}-go-${{ hashFiles('go.sum') }}
           restore-keys: |
-            ${{ runner.os }}-go-
-
-      - name: Check out code into the Go module directory
-        uses: actions/checkout@v4
+            ${{ runner.os }}-go-${{ hashFiles('go.sum') }}
 
       - name: build
         run: |
