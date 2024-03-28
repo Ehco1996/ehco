@@ -26,7 +26,7 @@ jobs:
         run: |
           # 删除本地和远程的 'v0.0.0-nightly' 标签（如果存在）
           git tag -d v0.0.0-nightly || true
-          git push origin :refs/tags/nightly || true
+          git push origin :refs/tags/v0.0.0-nightly || true
           # 创建新的 'v0.0.0-nightly' 标签并推送
           git tag v0.0.0-nightly
           git push origin refs/tags/v0.0.0-nightly
