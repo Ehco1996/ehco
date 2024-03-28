@@ -26,7 +26,6 @@ jobs:
         uses: goreleaser/goreleaser-action@v5
         with:
           version: latest
-          # support nightly tag (non-semVer)
-          args: release --clean --snapshot
+          args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GORELEASER_GITHUB_TOKEN }}

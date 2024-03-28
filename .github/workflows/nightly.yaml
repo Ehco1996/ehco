@@ -20,13 +20,36 @@ jobs:
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
 
-      - name: Update 'nightly' tag
+      - name: Update 'v0.0.0-nightly' tag
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # 删除本地和远程的 'nightly' 标签（如果存在）
-          git tag -d nightly || true
+          # 删除本地和远程的 'v0.0.0-nightly' 标签（如果存在）
+          git tag -d v0.0.0-nightly || true
           git push origin :refs/tags/nightly || true
-          # 创建新的 'nightly' 标签并推送
-          git tag nightly
-          git push origin refs/tags/nightly
+          # 创建新的 'v0.0.0-nightly' 标签并推送
+          git tag v0.0.0-nightly
+          git push origin refs/tags/v0.0.0-nightly
+
+  build-go-bin:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.21"
+        id: go
+
+      - name: Check out code into the Go module directory
+        uses: actions/checkout@v4
+
+      - name: Get dependencies
+        run: go mod download
+
+      - name: GoReleaser Action
+        uses: goreleaser/goreleaser-action@v5
+        with:
+          version: latest
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GORELEASER_GITHUB_TOKEN }}
