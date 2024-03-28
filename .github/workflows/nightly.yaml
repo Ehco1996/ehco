@@ -1,4 +1,4 @@
-name: release-go-bin-nightly
+name: sync-nightly-tag-to-latest
 
 on:
   schedule:
@@ -7,24 +7,26 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-go-bin:
+  create-nightly-release:
     runs-on: ubuntu-latest
     steps:
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: "1.21"
-
-      - name: Check out code into the Go module directory
+      - name: Check out code
         uses: actions/checkout@v4
-
-      - name: Get dependencies
-        run: go mod download
-
-      - name: GoReleaser Action for Nightly Build
-        uses: goreleaser/goreleaser-action@v5
         with:
-          version: nightly
-          args: release --clean --snapshot
+          fetch-depth: 0 # 确保获取所有历史和标签
+
+      - name: Configure Git
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+
+      - name: Update 'nightly' tag
         env:
-          GITHUB_TOKEN: ${{ secrets.GORELEASER_GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # 删除本地和远程的 'nightly' 标签（如果存在）
+          git tag -d nightly || true
+          git push origin :refs/tags/nightly || true
+          # 创建新的 'nightly' 标签并推送
+          git tag nightly
+          git push origin refs/tags/nightly
