@@ -67,7 +67,6 @@ jobs:
     runs-on: ubuntu-latest
     needs:
       - build-bin
-      - test
     strategy:
       fail-fast: true
       matrix:
