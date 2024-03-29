@@ -23,7 +23,6 @@ var RootFlags = []cli.Flag{
 		Usage:       "监听地址，例如 0.0.0.0:1234",
 		EnvVars:     []string{"EHCO_LOCAL_ADDR"},
 		Destination: &LocalAddr,
-		Required:    true,
 	},
 	&cli.StringFlag{
 		Name:        "lt,listen_type",
@@ -51,7 +50,6 @@ var RootFlags = []cli.Flag{
 		Usage:       "传输类型，可选选有 raw,ws,wss,mwss",
 		EnvVars:     []string{"EHCO_TRANSPORT_TYPE"},
 		Destination: &TransportType,
-		Required:    false,
 	},
 	&cli.StringFlag{
 		Name:        "c,config",

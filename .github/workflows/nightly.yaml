@@ -31,6 +31,13 @@ jobs:
           git tag v0.0.0-nightly
           git push origin refs/tags/v0.0.0-nightly
 
+      - name: Delete previous nightly release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE: ${{ github.event.issue.html_url }}
+        run: |
+          gh release delete v0.0.0-nightly
+
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
