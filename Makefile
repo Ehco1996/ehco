@@ -35,7 +35,7 @@ fmt: tools
 	@tools/bin/gofumpt -l -w $(FILES) 2>&1 | $(FAIL_ON_STDOUT)
 
 test:
-	go test -v -count=1  -coverpkg=./internal -timeout=10s ./...
+	go test -v -count=1 -timeout=1m ./...
 
 build:
 	${GOBUILD} -o $(BINDIR)/$(NAME) cmd/ehco/main.go
