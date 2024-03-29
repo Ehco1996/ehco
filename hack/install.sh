@@ -39,7 +39,44 @@ TARGET_ARCH=
 # HELPER FUNCTIONS
 ###
 
-detect_arch() {
+function gen_ehco_systemd_service {
+    cat <<EOF
+[Unit]
+Description=Ehco Service
+After=network.target
+
+[Service]
+Type=simple
+LimitNOFILE=65535
+ExecStart=$EXECUTABLE_INSTALL_PATH server -c "$API_OR_CONFIG_PATH"
+WorkingDirectory=~
+NoNewPrivileges=true
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+EOF
+}
+
+function _check_required() {
+    if [[ -z "$API_OR_CONFIG_PATH" ]]; then
+        _print_error_msg "Flag for config is required. please use --config to specify the configuration file path or api endpoint."
+        exit 1
+    fi
+
+    # check jq and curl
+    if ! command -v jq &>/dev/null; then
+        _print_error_msg "jq is required to parse JSON data."
+        exit 1
+    fi
+
+    if ! command -v curl &>/dev/null; then
+        _print_error_msg "curl is required to download files."
+        exit 1
+    fi
+}
+
+function _detect_arch() {
     # 检查操作系统
     local os=$(uname -s)
     if [ "$os" != "Linux" ]; then
@@ -64,69 +101,26 @@ detect_arch() {
     esac
 }
 
-function print_error_msg() {
+function _print_error_msg() {
     local _msg="$1"
     echo -e "\033[31m$_msg\033[0m"
 }
 
-function print_warning_msg() {
+function _print_warning_msg() {
     local _msg="$1"
     echo -e "\033[33m$_msg\033[0m"
 }
 
-function print_help() {
-    echo "Usage: $SCRIPT_NAME [options]"
-    echo
-    echo "Options:"
-    echo "  -h, --help          Show this help message and exit."
-    echo "  -v, --version       Specify the version to install."
-    echo "  -i, --install       Install the Ehco."
-    echo "  -r, --remove        Remove the Ehco."
-    echo "  -u, --check-update  Check if an update is available."
-}
-
-function set_default_version() {
+function _set_default_version() {
     # if version is not specified, set it to latest
     if [[ -z "$VERSION" ]]; then
-        print_warning_msg "Version not specified. Using **nightly** as the default version."
+        _print_warning_msg "Version not specified. Using **nightly** as the default version."
         VERSION="v0.0.0-nightly"
     fi
 }
 
-function parse_arguments() {
-    while [[ "$#" -gt 0 ]]; do
-        case "$1" in
-        -h | --help)
-            print_help
-            exit 0
-            ;;
-        -v | --version)
-            VERSION="$2"
-            shift
-            ;;
-        -i | --install)
-            OPERATION="install"
-            ;;
-        -r | --remove)
-            OPERATION="remove"
-            ;;
-        -u | --check-update)
-            OPERATION="check_update"
-            ;;
-        *)
-            print_error_msg "Unknown argument: $1"
-            ;;
-        esac
-        shift
-    done
-    if [[ -z "$OPERATION" ]]; then
-        print_error_msg "Operation not specified."
-    fi
-    set_default_version
-}
-
 # TODO check the checksum and current bin file, if the same, skip download
-function download_bin() {
+function _download_bin() {
     local api_url="https://api.github.com/repos/Ehco1996/ehco/releases/tags/$VERSION"
     local _assets_json
     _assets_json=$(curl -s "${CURL_FLAGS[@]}" "$api_url")
@@ -143,13 +137,74 @@ function download_bin() {
     chmod +x "$EXECUTABLE_INSTALL_PATH"
 }
 
-function install_systemd_service() {
+function _install_systemd_service() {
     local _service_name="ehco.service"
     local _service_path="$SYSTEMD_SERVICES_DIR/$_service_name"
+    gen_ehco_systemd_service >"$_service_path"
+    systemctl daemon-reload
+    systemctl enable "$_service_name"
+    systemctl start "$_service_name"
+}
+
+function print_help() {
+    echo "Usage: $SCRIPT_NAME [options]"
+    echo
+    echo "Options:"
+    echo "  -h, --help          Show this help message and exit."
+    echo "  -v, --version       Specify the version to install."
+    echo "  -i, --install       Install the Ehco."
+    echo "  -c, --config        Specify the configuration file path or api endpoint."
+    # echo "  -r, --remove        Remove the Ehco."
+    # echo "  -u, --check-update  Check if an update is available."
+}
+
+function parse_arguments() {
+    while [[ "$#" -gt 0 ]]; do
+        case "$1" in
+        -h | --help)
+            print_help
+            exit 0
+            ;;
+        -v | --version)
+            VERSION="$2"
+            shift
+            ;;
+        -i | --install)
+            OPERATION="install"
+            ;;
+        -c | --config)
+            API_OR_CONFIG_PATH="$2"
+            shift
+            ;;
+        # -r | --remove)
+        #     OPERATION="remove"
+        #     ;;
+        # -u | --check-update)
+        #     OPERATION="check_update"
+        #     ;;
+        *)
+            _print_error_msg "Unknown argument: $1"
+            exit 1
+            ;;
+        esac
+        shift
+    done
+    if [[ -z "$OPERATION" ]]; then
+        _print_error_msg "Operation not specified."
+    fi
+
+    # check required
+    _check_required
+
+    # set default version
+    _set_default_version
+    # detect arch
+    _detect_arch
 }
 
 function perform_install() {
-    download_bin
+    _download_bin
+    _install_systemd_service
 }
 
 ###
@@ -168,7 +223,7 @@ function main() {
         # perform_check_update
         ;;
     *)
-        print_error_msg "Unknown operation: '$OPERATION'."
+        _print_error_msg "Unknown operation: '$OPERATION'."
         ;;
     esac
 }
@@ -176,5 +231,4 @@ function main() {
 # main "$@"
 
 parse_arguments "$@"
-detect_arch
-perform_install
+_install_systemd_service
