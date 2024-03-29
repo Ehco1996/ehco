@@ -8,8 +8,7 @@ set -e
 # Basename of this script
 SCRIPT_NAME="$(basename "$0")"
 
-# Command line arguments of this script
-SCRIPT_ARGS=("$@")
+CURL_FLAGS=(-L -f -q --retry 5 --retry-delay 10 --retry-max-time 60)
 
 # Path for installing executable
 EXECUTABLE_INSTALL_PATH="/usr/local/bin/ehco"
@@ -17,26 +16,10 @@ EXECUTABLE_INSTALL_PATH="/usr/local/bin/ehco"
 # Paths to install systemd files
 SYSTEMD_SERVICES_DIR="/etc/systemd/system"
 
-# URLs of GitHub
-REPO_URL="https://github.com/Ehco1996/Ehco"
-
 # curl command line flags.
 # To using a proxy, please specify ALL_PROXY in the environ variable, such like:
 # export ALL_PROXY=socks5h://192.0.2.1:1080
 CURL_FLAGS=(-L -f -q --retry 5 --retry-delay 10 --retry-max-time 60)
-
-###
-# AUTO DETECTED GLOBAL VARIABLE
-###
-
-# Package manager
-PACKAGE_MANAGEMENT_INSTALL="${PACKAGE_MANAGEMENT_INSTALL:-}"
-
-# Operating System of current machine, supported: linux
-OPERATING_SYSTEM="${OPERATING_SYSTEM:-}"
-
-# Architecture of current machine, supported: 386, amd64, arm, arm64, mipsle, s390x
-ARCHITECTURE="${ARCHITECTURE:-}"
 
 ###
 # ARGUMENTS
@@ -51,11 +34,44 @@ VERSION=
 # support file path for configuration or API endpoint
 API_OR_CONFIG_PATH=
 
-# help function
+# auto detect target arch
+TARGET_ARCH=
+
+###
+# HELPER FUNCTIONS
+###
+
+detect_arch() {
+    # 检查操作系统
+    local os=$(uname -s)
+    if [ "$os" != "Linux" ]; then
+        echo "This script only supports Linux for now."
+        exit 1
+    fi
+
+    # 检查架构并设置 target_arch
+    local arch=$(uname -m)
+    case $arch in
+    x86_64)
+        echo "linux_amd64"
+        ;;
+    aarch64)
+        echo "linux_arm64"
+        ;;
+    *)
+        echo "Unsupported architecture: $arch" >&2
+        ;;
+    esac
+}
 
 function print_error_msg() {
     local _msg="$1"
     echo -e "\033[31m$_msg\033[0m"
+}
+
+function print_warning_msg() {
+    local _msg="$1"
+    echo -e "\033[33m$_msg\033[0m"
 }
 
 function print_help() {
@@ -67,6 +83,14 @@ function print_help() {
     echo "  -i, --install       Install the Ehco."
     echo "  -r, --remove        Remove the Ehco."
     echo "  -u, --check-update  Check if an update is available."
+}
+
+function set_default_version() {
+    # if version is not specified, set it to latest
+    if [[ -z "$VERSION" ]]; then
+        print_warning_msg "Version not specified. Using **nightly** as the default version."
+        VERSION="v0.0.0-nightly"
+    fi
 }
 
 function parse_arguments() {
@@ -98,54 +122,37 @@ function parse_arguments() {
     if [[ -z "$OPERATION" ]]; then
         print_error_msg "Operation not specified."
     fi
+    set_default_version
 }
 
-function get_release_assets_urls() {
-    local _version="$1"
-    local api_url="https://api.github.com/repos/Ehco1996/Ehco/releases/tags/${_version}"
-    echo "$api_url"
-    curl -sSL "$api_url" | jq -r '.assets[] | .browser_download_url'
-}
-
-function download_release_asset() {
-    local _assets_json=\$1
-
-    # Detect host architecture
-    arch=$(uname -m)
-    case $arch in
-    x86_64)
-        target_arch="amd64"
-        ;;
-    aarch64)
-        target_arch="arm64"
-        ;;
-    *)
-        echo "Unsupported architecture: $arch"
-        return 1
-        ;;
-    esac
+# TODO check the checksum and current bin file, if the same, skip download
+function download_bin() {
+    local api_url="https://api.github.com/repos/Ehco1996/ehco/releases/tags/$VERSION"
+    echo "Fetching release json from $api_url..."
+    local _assets_json
+    _assets_json=$(curl -s "${CURL_FLAGS[@]}" "$api_url")
 
     # Extract the download URL for the target architecture using jq
-    download_url=$(echo "$_assets_json" | jq -r --arg target_arch "$target_arch" \
+    download_url=$(echo "$_assets_json" | jq -r --arg target_arch "$TARGET_ARCH" \
         '.assets[] | select(.name | contains("linux_" + $target_arch)) | .browser_download_url')
-    echo "Download URL for architecture $target_arch: $download_url"
+    echo "Download URL for architecture $TARGET_ARCH: $download_url"
 
     if [ -z "$download_url" ]; then
-        echo "Download URL for architecture $target_arch not found."
+        echo "Download URL for architecture $TARGET_ARCH not found."
         return 1
     fi
     # Download the file
     echo "Downloading $download_url..."
-    curl -L "$download_url" -o "release_$target_arch"
+    curl -L "$download_url" -o "$EXECUTABLE_INSTALL_PATH"
+}
+
+function install_systemd_service() {
+    local _service_name="ehco.service"
+    local _service_path="$SYSTEMD_SERVICES_DIR/$_service_name"
 }
 
 function perform_install() {
-    local _version=$VERSION
-    # if version is not specified, set it to latest
-    if [[ -z "$_version" ]]; then
-        echo "not specified version, will install nightly version"
-        _version="v0.0.0-nightly"
-    fi
+    download_bin
 }
 
 ###
@@ -171,4 +178,6 @@ function main() {
 
 # main "$@"
 
+parse_arguments "$@"
+detect_arch
 perform_install
