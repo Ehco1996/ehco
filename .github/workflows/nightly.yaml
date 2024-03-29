@@ -36,7 +36,11 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ISSUE: ${{ github.event.issue.html_url }}
         run: |
-          gh release delete v0.0.0-nightly
+          if gh release view v0.0.0-nightly; then
+            gh release delete v0.0.0-nightly -y
+          else
+            echo "Release v0.0.0-nightly not found, skipping delete."
+          fi
 
       - name: Set up Go
         uses: actions/setup-go@v5
