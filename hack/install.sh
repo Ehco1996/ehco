@@ -54,8 +54,8 @@ API_OR_CONFIG_PATH=
 # help function
 
 function print_error_msg() {
-    local msg="$1"
-    echo -e "\033[31m$1\033[0m"
+    local _msg="$1"
+    echo -e "\033[31m$_msg\033[0m"
 }
 
 function print_help() {
@@ -100,54 +100,59 @@ function parse_arguments() {
     fi
 }
 
-function get_latest_version() {
-    local _version
-    if _version=$(curl "${CURL_FLAGS[@]}" -sSL "https://api.github.com/repos/Ehco1996/Ehco/releases/latest" | grep -o '"tag_name": ".*"' | sed 's/"tag_name": "//;s/"//'); then
-        echo "$_version"
-    else
-        print_error_msg "Failed to get latest version."
-        exit 1
+function get_release_assets_urls() {
+    local _version="$1"
+    local api_url="https://api.github.com/repos/Ehco1996/Ehco/releases/tags/${_version}"
+    echo "$api_url"
+    curl -sSL "$api_url" | jq -r '.assets[] | .browser_download_url'
+}
+
+function download_release_asset() {
+    local _assets_json=\$1
+
+    # Detect host architecture
+    arch=$(uname -m)
+    case $arch in
+    x86_64)
+        target_arch="amd64"
+        ;;
+    aarch64)
+        target_arch="arm64"
+        ;;
+    *)
+        echo "Unsupported architecture: $arch"
+        return 1
+        ;;
+    esac
+
+    # Extract the download URL for the target architecture using jq
+    download_url=$(echo "$_assets_json" | jq -r --arg target_arch "$target_arch" \
+        '.assets[] | select(.name | contains("linux_" + $target_arch)) | .browser_download_url')
+    echo "Download URL for architecture $target_arch: $download_url"
+
+    if [ -z "$download_url" ]; then
+        echo "Download URL for architecture $target_arch not found."
+        return 1
     fi
+    # Download the file
+    echo "Downloading $download_url..."
+    curl -L "$download_url" -o "release_$target_arch"
 }
 
 function perform_install() {
     local _version=$VERSION
     # if version is not specified, set it to latest
     if [[ -z "$_version" ]]; then
-        echo "not specified version, will install latest version"
-        _version=$(get_latest_version)
+        echo "not specified version, will install nightly version"
+        _version="v0.0.0-nightly"
     fi
-    echo "Installing Ehco version: $_version"
-
-    # Check if the Ehco is already installed
-    if [[ -x "$EXECUTABLE_INSTALL_PATH" ]]; then
-        print_error_msg "Ehco is already installed."
-        exit 1
-    fi
-
-    # Download the Ehco binary url is get from github release page
-    local _url=
-}
-
-function get_release_assets_urls() {
-    local _version="$1"
-    local api_url="https://api.github.com/repos/Ehco1996/Ehco/releases/tags/${_version}"
-    echo "$api_url"
-
-    # 解析 JSON 响应以获取 assets 的下载 URL
-    # 这里使用了 jq 工具来解析 JSON，确保你的系统已经安装了 jq
-    curl -sSL "$api_url" | jq -r '.assets[] | .browser_download_url'
-
 }
 
 ###
 # Entrypoint
 ###
-main() {
+function main() {
     parse_arguments "$@"
-    get_release_assets_urls $VERSION
-    exit 1
-
     case "$OPERATION" in
     "install")
         perform_install
@@ -164,4 +169,6 @@ main() {
     esac
 }
 
-main "$@"
+# main "$@"
+
+perform_install
