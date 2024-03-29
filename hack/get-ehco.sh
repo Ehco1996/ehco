@@ -48,9 +48,9 @@ After=network.target
 [Service]
 Type=simple
 LimitNOFILE=65535
-ExecStart=$EXECUTABLE_INSTALL_PATH server -c "$API_OR_CONFIG_PATH"
+ExecStart=$EXECUTABLE_INSTALL_PATH -c "$API_OR_CONFIG_PATH"
 WorkingDirectory=~
-NoNewPrivileges=true
+NoNewPrivileges=trues
 Restart=always
 
 [Install]
@@ -58,7 +58,7 @@ WantedBy=multi-user.target
 EOF
 }
 
-function _check_required() {
+function _check_install_required() {
     if [[ -z "$API_OR_CONFIG_PATH" ]]; then
         _print_error_msg "Flag for config is required. please use --config to specify the configuration file path or api endpoint."
         exit 1
@@ -88,11 +88,9 @@ function _detect_arch() {
     local arch=$(uname -m)
     case $arch in
     x86_64)
-        echo "Current arch is linux_amd64"
         TARGET_ARCH="linux_amd64"
         ;;
     aarch64)
-        echo "Current arch is linux_arm64"
         TARGET_ARCH="linux_arm64"
         ;;
     *)
@@ -146,6 +144,17 @@ function _install_systemd_service() {
     systemctl start "$_service_name"
 }
 
+function _remove_systemd_service_and_delete_bin() {
+    local _service_name="ehco.service"
+    local _service_path="$SYSTEMD_SERVICES_DIR/$_service_name"
+    systemctl stop "$_service_name"
+    systemctl disable "$_service_name"
+    systemctl daemon-reload
+
+    rm -f "$_service_path"
+    rm -f "$EXECUTABLE_INSTALL_PATH"
+}
+
 function print_help() {
     echo "Usage: $SCRIPT_NAME [options]"
     echo
@@ -154,7 +163,7 @@ function print_help() {
     echo "  -v, --version       Specify the version to install."
     echo "  -i, --install       Install the Ehco."
     echo "  -c, --config        Specify the configuration file path or api endpoint."
-    # echo "  -r, --remove        Remove the Ehco."
+    echo "  -r, --remove        Remove the Ehco."
     # echo "  -u, --check-update  Check if an update is available."
 }
 
@@ -176,9 +185,9 @@ function parse_arguments() {
             API_OR_CONFIG_PATH="$2"
             shift
             ;;
-        # -r | --remove)
-        #     OPERATION="remove"
-        #     ;;
+        -r | --remove)
+            OPERATION="remove"
+            ;;
         # -u | --check-update)
         #     OPERATION="check_update"
         #     ;;
@@ -191,20 +200,24 @@ function parse_arguments() {
     done
     if [[ -z "$OPERATION" ]]; then
         _print_error_msg "Operation not specified."
+        print_help
+        exit 1
     fi
-
-    # check required
-    _check_required
-
-    # set default version
-    _set_default_version
-    # detect arch
-    _detect_arch
 }
 
 function perform_install() {
+    _check_install_required
+    _set_default_version
+    _detect_arch
+
     _download_bin
     _install_systemd_service
+    _print_warning_msg "Ehco has been installed."
+}
+
+function perform_remove() {
+    _remove_systemd_service_and_delete_bin
+    _print_warning_msg "Ehco has been removed."
 }
 
 ###
@@ -217,7 +230,7 @@ function main() {
         perform_install
         ;;
     "remove")
-        # perform_remove
+        perform_remove
         ;;
     "check_update")
         # perform_check_update
@@ -228,7 +241,4 @@ function main() {
     esac
 }
 
-# main "$@"
-
-parse_arguments "$@"
-_install_systemd_service
+main "$@"
