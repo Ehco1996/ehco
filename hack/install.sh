@@ -8,8 +8,6 @@ set -e
 # Basename of this script
 SCRIPT_NAME="$(basename "$0")"
 
-CURL_FLAGS=(-L -f -q --retry 5 --retry-delay 10 --retry-max-time 60)
-
 # Path for installing executable
 EXECUTABLE_INSTALL_PATH="/usr/local/bin/ehco"
 
@@ -53,10 +51,12 @@ detect_arch() {
     local arch=$(uname -m)
     case $arch in
     x86_64)
-        echo "linux_amd64"
+        echo "Current arch is linux_amd64"
+        TARGET_ARCH="linux_amd64"
         ;;
     aarch64)
-        echo "linux_arm64"
+        echo "Current arch is linux_arm64"
+        TARGET_ARCH="linux_arm64"
         ;;
     *)
         echo "Unsupported architecture: $arch" >&2
@@ -128,22 +128,19 @@ function parse_arguments() {
 # TODO check the checksum and current bin file, if the same, skip download
 function download_bin() {
     local api_url="https://api.github.com/repos/Ehco1996/ehco/releases/tags/$VERSION"
-    echo "Fetching release json from $api_url..."
     local _assets_json
     _assets_json=$(curl -s "${CURL_FLAGS[@]}" "$api_url")
 
     # Extract the download URL for the target architecture using jq
-    download_url=$(echo "$_assets_json" | jq -r --arg target_arch "$TARGET_ARCH" \
-        '.assets[] | select(.name | contains("linux_" + $target_arch)) | .browser_download_url')
-    echo "Download URL for architecture $TARGET_ARCH: $download_url"
-
+    download_url=$(echo "$_assets_json" | jq -r --arg TARGET_ARCH "$TARGET_ARCH" '.assets[] | select(.name | contains("ehco_" + $TARGET_ARCH)) | .browser_download_url')
     if [ -z "$download_url" ]; then
         echo "Download URL for architecture $TARGET_ARCH not found."
         return 1
     fi
     # Download the file
-    echo "Downloading $download_url..."
-    curl -L "$download_url" -o "$EXECUTABLE_INSTALL_PATH"
+    curl "${CURL_FLAGS[@]}" -o "$EXECUTABLE_INSTALL_PATH" "$download_url"
+    echo "Downloaded and Install **ehco** to $EXECUTABLE_INSTALL_PATH"
+    chmod +x "$EXECUTABLE_INSTALL_PATH"
 }
 
 function install_systemd_service() {
