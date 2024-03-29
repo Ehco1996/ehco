@@ -2,7 +2,6 @@
 before:
   hooks:
     - go mod download
-    # - sudo apt-get install -y upx
 builds:
   - id: ehco
     main: ./cmd/ehco/main.go
@@ -20,9 +19,10 @@ builds:
       - 7
     goos:
       - linux
-    binary: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}"
+    binary: "ehco_{{ .Os }}_{{ .Arch }}"
 archives:
   - format: binary
+    name_template: "{{ .Binary }}"
 changelog:
   sort: asc
   filters:
