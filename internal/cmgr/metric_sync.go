@@ -32,7 +32,7 @@ func (cm *cmgrImpl) syncOnce() error {
 	// todo: opt lock
 	cm.lock.Lock()
 
-	shorCommit := ""
+	shorCommit := constant.GitRevision
 	if len(constant.GitRevision) > 7 {
 		shorCommit = constant.GitRevision[:7]
 	}
