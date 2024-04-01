@@ -6,6 +6,22 @@
 
 [see Readme in English here](README_EN.md)
 
+## Ehco Relay - 让流量转发更简单
+
+我们很高兴地宣布，ehco 现在提供 SaaS（软件即服务）版本！这是一个全托管的解决方案，旨在为那些希望在不搭建和管理自己的服务器的情况下享受 ehco 强大流量转发能力的用户提供服务。
+
+-   [Ehco Relay 官方网站](https://ehco-relay.cc)
+-   [Ehco Relay 文档](https://docs.ehco-relay.cc/)
+
+### 为什么选择 Ehco Relay?
+
+-   **即刻启动**：无需复杂的配置或服务器管理，立即获得高性能的流量转发服务。
+-   **全面托管**：我们的团队会处理所有后端事务，包括维护、更新和故障排除，让您可以专注于您的主要业务。
+-   **灵活的计划**：无论您是个人开发者还是大型企业，我们都提供多种计划来满足您的需求。
+-   **安全可靠**：利用最先进的加密技术，确保您的数据传输安全无忧。
+
+欢迎访问官网来了解更多信息，并开始您的免费试用。只需几个简单的步骤，您就可以轻松地设置并运行 ehco，享受无缝的流量转发服务。
+
 ## 使用场景
 
 <details> <summary>连接内网服务</summary>
@@ -22,7 +38,7 @@ e.g. 本地开发调试连接内网服务 db, db host: xxx-rds.xxx.us-east-1.rds
 
 3. 本地使用客户端连接
    `mysql -h 127.0.0.1:3306 -u root -p`
-       </details>
+    </details>
 
 <details> <summary>中转 proxy 客户端,提供负载均衡功能</summary>
 
