@@ -81,7 +81,7 @@ var RootFlags = []cli.Flag{
 		Name:        "log_level",
 		Usage:       "log level",
 		EnvVars:     []string{"EHCO_LOG_LEVEL"},
-		Destination: &WebToken,
+		Destination: &LogLevel,
 		DefaultText: "info",
 	},
 	&cli.IntFlag{
