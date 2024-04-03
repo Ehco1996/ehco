@@ -251,7 +251,7 @@ ehco 会每隔 60s 发送一次 POST 请求至 `sync_traffic_endpoint` ，上报
 
 -   dashboard 和 prometheus 规则可以从`monitor`文件夹下找到，可以自行导入
 
--   类似 Smokeing Ping 的延迟监控
+-   类似 Smoking Ping 的延迟监控
 
 ![](monitor/ping.png)
 
