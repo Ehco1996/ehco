@@ -32,3 +32,6 @@ changelog:
 upx:
   - enabled: true
     compress: 9
+
+release:
+  prerelease: auto
