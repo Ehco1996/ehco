@@ -88,7 +88,6 @@ type Proxies struct {
 	rawServer string
 	rawPort   string
 	relayCfg  *relay_cfg.Config
-	freePort  string
 
 	groupLeader *Proxies
 }

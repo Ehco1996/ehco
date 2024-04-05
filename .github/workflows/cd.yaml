@@ -1,6 +1,9 @@
 name: build-image
 
 on:
+  schedule:
+    # 每天 UTC 时间 00:00 自动触发构建
+    - cron: "0 0 * * *"
   push:
     tags:
       - "*"
