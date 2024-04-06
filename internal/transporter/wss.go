@@ -4,11 +4,9 @@ package transporter
 import (
 	"context"
 	"net"
-	"net/http"
 	"time"
 
 	"github.com/gobwas/ws"
-	"github.com/labstack/echo/v4"
 	"go.uber.org/zap"
 
 	"github.com/Ehco1996/ehco/internal/conn"
@@ -17,15 +15,20 @@ import (
 	"github.com/Ehco1996/ehco/pkg/lb"
 )
 
-type Wss struct {
-	*Raw
+type WSSClient struct {
+	WsClient
 }
 
-func (s *Wss) dialRemote(remote *lb.Node) (net.Conn, error) {
+func newWSSClient(raw *Raw) *WSSClient {
+	return &WSSClient{*newWsClient(raw)}
+}
+
+func (s *WSSClient) dialRemote(remote *lb.Node) (net.Conn, error) {
 	t1 := time.Now()
 	d := ws.Dialer{TLSConfig: mytls.DefaultTLSConfig}
-	wssc, _, _, err := d.Dial(context.TODO(), remote.Address+"/wss/")
+	wssc, _, _, err := d.Dial(context.TODO(), remote.Address+"/handshake/")
 	if err != nil {
+		println("wss called", err.Error())
 		return nil, err
 	}
 	latency := time.Since(t1)
@@ -34,7 +37,7 @@ func (s *Wss) dialRemote(remote *lb.Node) (net.Conn, error) {
 	return wssc, nil
 }
 
-func (s *Wss) HandleTCPConn(c net.Conn, remote *lb.Node) error {
+func (s *WSSClient) HandleTCPConn(c net.Conn, remote *lb.Node) error {
 	clonedRemote := remote.Clone()
 	wssc, err := s.dialRemote(clonedRemote)
 	if err != nil {
@@ -52,7 +55,6 @@ type WSSServer struct{ WSServer }
 
 func NewWSSServer(listenAddr string, raw *Raw, l *zap.SugaredLogger) *WSSServer {
 	wsServer := NewWSServer(listenAddr, raw, l)
-	wsServer.e.GET("/wss/", echo.WrapHandler(http.HandlerFunc(wsServer.HandleRequest)))
 	return &WSSServer{WSServer: *wsServer}
 }
 

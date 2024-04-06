@@ -183,7 +183,7 @@ func (r *Relay) RunLocalWSServer() error {
 
 func (r *Relay) RunLocalWSSServer() error {
 	tp := r.TP.(*transporter.Raw)
-	wssServer := transporter.NewWSSServer(r.LocalTCPAddr.String(), tp, r.l.Named("NewWSSServer"))
+	wssServer := transporter.NewWSSServer(r.LocalTCPAddr.String(), tp, r.l.Named("WSSServer"))
 	r.closeTcpF = func() error {
 		return wssServer.Close()
 	}

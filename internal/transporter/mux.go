@@ -56,7 +56,8 @@ func (sm *SessionWithMetrics) canCloseSession(remoteAddr string, l *zap.SugaredL
 	return true
 }
 
-func NewSmuxTransporter(l *zap.SugaredLogger,
+func NewSmuxTransporter(
+	l *zap.SugaredLogger,
 	initSessionF func(ctx context.Context, addr string) (*smux.Session, error),
 ) *smuxTransporter {
 	tr := &smuxTransporter{

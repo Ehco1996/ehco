@@ -17,14 +17,18 @@ import (
 	"github.com/Ehco1996/ehco/pkg/lb"
 )
 
-type Ws struct {
+type WsClient struct {
 	*Raw
 }
 
-func (s *Ws) dialRemote(remote *lb.Node) (net.Conn, error) {
+func newWsClient(raw *Raw) *WsClient {
+	return &WsClient{Raw: raw}
+}
+
+func (s *WsClient) dialRemote(remote *lb.Node) (net.Conn, error) {
 	t1 := time.Now()
 	d := ws.Dialer{Timeout: constant.DialTimeOut}
-	wsc, _, _, err := d.Dial(context.TODO(), remote.Address+"/ws/")
+	wsc, _, _, err := d.Dial(context.TODO(), remote.Address+"/handshake/")
 	if err != nil {
 		return nil, err
 	}
@@ -34,7 +38,7 @@ func (s *Ws) dialRemote(remote *lb.Node) (net.Conn, error) {
 	return wsc, nil
 }
 
-func (s *Ws) HandleTCPConn(c net.Conn, remote *lb.Node) error {
+func (s *WsClient) HandleTCPConn(c net.Conn, remote *lb.Node) error {
 	clonedRemote := remote.Clone()
 	wsc, err := s.dialRemote(clonedRemote)
 	if err != nil {
@@ -64,7 +68,7 @@ func NewWSServer(listenAddr string, raw *Raw, l *zap.SugaredLogger) *WSServer {
 	}
 	e := web.NewEchoServer()
 	e.GET("/", echo.WrapHandler(web.MakeIndexF()))
-	e.GET("/ws/", echo.WrapHandler(http.HandlerFunc(s.HandleRequest)))
+	e.GET("/handshake/", echo.WrapHandler(http.HandlerFunc(s.HandleRequest)))
 	s.e = e
 	s.httpServer.Handler = e
 	return s
@@ -83,7 +87,6 @@ func (s *WSServer) HandleRequest(w http.ResponseWriter, req *http.Request) {
 	if err != nil {
 		return
 	}
-
 	remote := s.raw.GetRemote()
 	if err := s.raw.HandleTCPConn(wsc, remote); err != nil {
 		s.l.Errorf("HandleTCPConn meet error from:%s to:%s err:%s", wsc.RemoteAddr(), remote.Address, err)

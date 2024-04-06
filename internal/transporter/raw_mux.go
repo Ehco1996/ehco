@@ -15,12 +15,37 @@ import (
 	"github.com/Ehco1996/ehco/pkg/lb"
 )
 
-type MTCP struct {
+type MTCPClient struct {
 	*Raw
-	mtp *smuxTransporter
+	dialer *net.Dialer
+	mtp    *smuxTransporter
 }
 
-func (s *MTCP) dialRemote(remote *lb.Node) (net.Conn, error) {
+func newMTCPClient(raw *Raw) *MTCPClient {
+	dialer := &net.Dialer{Timeout: constant.DialTimeOut}
+	c := &MTCPClient{dialer: dialer, Raw: raw}
+	mtp := NewSmuxTransporter(raw.l.Named("mtcp"), c.initNewSession)
+	c.mtp = mtp
+	return c
+}
+
+func (c *MTCPClient) initNewSession(ctx context.Context, addr string) (*smux.Session, error) {
+	rc, err := c.dialer.Dial("tcp", addr)
+	if err != nil {
+		return nil, err
+	}
+	// stream multiplex
+	cfg := smux.DefaultConfig()
+	cfg.KeepAliveDisabled = true
+	session, err := smux.Client(rc, cfg)
+	if err != nil {
+		return nil, err
+	}
+	c.l.Infof("init new session to: %s", rc.RemoteAddr())
+	return session, nil
+}
+
+func (s *MTCPClient) dialRemote(remote *lb.Node) (net.Conn, error) {
 	t1 := time.Now()
 	mtcpc, err := s.mtp.Dial(context.TODO(), remote.Address)
 	if err != nil {
@@ -32,7 +57,7 @@ func (s *MTCP) dialRemote(remote *lb.Node) (net.Conn, error) {
 	return mtcpc, nil
 }
 
-func (s *MTCP) HandleTCPConn(c net.Conn, remote *lb.Node) error {
+func (s *MTCPClient) HandleTCPConn(c net.Conn, remote *lb.Node) error {
 	clonedRemote := remote.Clone()
 	mtcpc, err := s.dialRemote(clonedRemote)
 	if err != nil {
@@ -137,29 +162,4 @@ func (s *MTCPServer) ListenAndServe() error {
 
 func (s *MTCPServer) Close() error {
 	return s.listener.Close()
-}
-
-type MTCPClient struct {
-	l      *zap.SugaredLogger
-	dialer *net.Dialer
-}
-
-func NewMTCPClient(l *zap.SugaredLogger) *MTCPClient {
-	return &MTCPClient{l: l, dialer: &net.Dialer{Timeout: constant.DialTimeOut}}
-}
-
-func (c *MTCPClient) InitNewSession(ctx context.Context, addr string) (*smux.Session, error) {
-	rc, err := c.dialer.Dial("tcp", addr)
-	if err != nil {
-		return nil, err
-	}
-	// stream multiplex
-	cfg := smux.DefaultConfig()
-	cfg.KeepAliveDisabled = true
-	session, err := smux.Client(rc, cfg)
-	if err != nil {
-		return nil, err
-	}
-	c.l.Infof("init new session to: %s", rc.RemoteAddr())
-	return session, nil
 }
