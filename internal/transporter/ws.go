@@ -9,7 +9,6 @@ import (
 	"github.com/gobwas/ws"
 	"github.com/labstack/echo/v4"
 
-	"github.com/Ehco1996/ehco/internal/conn"
 	"github.com/Ehco1996/ehco/internal/constant"
 	"github.com/Ehco1996/ehco/internal/metrics"
 	"github.com/Ehco1996/ehco/internal/web"
@@ -58,22 +57,6 @@ func (s *WsClient) TCPHandShake(remote *lb.Node) (net.Conn, error) {
 	return wsc, nil
 }
 
-func (s *WsClient) RelayTCPConn(c net.Conn) error {
-	remote := s.GetRemote()
-	clonedRemote := remote.Clone()
-	wsc, err := s.TCPHandShake(clonedRemote)
-	if err != nil {
-		return err
-	}
-	s.l.Infof("RelayTCPConn from %s to %s", c.LocalAddr(), remote.Address)
-	relayConn := conn.NewRelayConn(
-		s.cfg.Label, c, wsc,
-		conn.WithHandshakeDuration(clonedRemote.HandShakeDuration))
-	s.cmgr.AddConnection(relayConn)
-	defer s.cmgr.RemoveConnection(relayConn)
-	return relayConn.Transport(remote.Label)
-}
-
 func (s *WsClient) ListenAndServe() error {
 	tp, err := NewRelayTransporter(s.cfg.TransportType, s.baseTransporter)
 	if err != nil {
@@ -92,7 +75,7 @@ func (s *WsClient) HandleRequest(w http.ResponseWriter, req *http.Request) {
 	if err != nil {
 		return
 	}
-	if err := s.tp.RelayTCPConn(wsc); err != nil {
+	if err := s.baseTransporter.RelayTCPConn(wsc, s.tp.TCPHandShake); err != nil {
 		s.l.Errorf("RelayTCPConn error: %s", err.Error())
 	}
 }

@@ -3,18 +3,17 @@ package transporter
 import (
 	"net"
 
-	"github.com/Ehco1996/ehco/internal/cmgr"
 	"github.com/Ehco1996/ehco/internal/constant"
-	"github.com/Ehco1996/ehco/internal/relay/conf"
 	"github.com/Ehco1996/ehco/pkg/lb"
-	"go.uber.org/zap"
 )
+
+type TCPHandShakeF func(remote *lb.Node) (net.Conn, error)
 
 // RelayTransporter
 type RelayTransporter interface {
 	// client side func
 	TCPHandShake(remote *lb.Node) (net.Conn, error)
-	RelayTCPConn(c net.Conn) error
+	RelayTCPConn(c net.Conn, handshakeF TCPHandShakeF) error
 
 	// server side func
 	ListenAndServe() error
@@ -36,28 +35,4 @@ func NewRelayTransporter(tpType string, base *baseTransporter) (RelayTransporter
 	default:
 		panic("unsupported transport type")
 	}
-}
-
-type baseTransporter struct {
-	cmgr       cmgr.Cmgr
-	cfg        *conf.Config
-	tCPRemotes lb.RoundRobin
-	l          *zap.SugaredLogger
-}
-
-func NewBaseTransporter(cfg *conf.Config, cmgr cmgr.Cmgr) *baseTransporter {
-	return &baseTransporter{
-		cfg:        cfg,
-		cmgr:       cmgr,
-		tCPRemotes: cfg.ToTCPRemotes(),
-		l:          zap.S().Named(cfg.GetLoggerName()),
-	}
-}
-
-func (b *baseTransporter) GetTCPListenAddr() (*net.TCPAddr, error) {
-	return net.ResolveTCPAddr("tcp", b.cfg.Listen)
-}
-
-func (b *baseTransporter) GetRemote() *lb.Node {
-	return b.tCPRemotes.Next()
 }

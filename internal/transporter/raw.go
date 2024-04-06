@@ -5,7 +5,6 @@ import (
 	"net"
 	"time"
 
-	"github.com/Ehco1996/ehco/internal/conn"
 	"github.com/Ehco1996/ehco/internal/constant"
 	"github.com/Ehco1996/ehco/internal/metrics"
 	"github.com/Ehco1996/ehco/pkg/lb"
@@ -46,24 +45,6 @@ func (raw *RawClient) TCPHandShake(remote *lb.Node) (net.Conn, error) {
 	return rc, nil
 }
 
-func (raw *RawClient) RelayTCPConn(c net.Conn) error {
-	remote := raw.GetRemote()
-	metrics.CurConnectionCount.WithLabelValues(remote.Label, metrics.METRIC_CONN_TYPE_TCP).Inc()
-	defer metrics.CurConnectionCount.WithLabelValues(remote.Label, metrics.METRIC_CONN_TYPE_TCP).Dec()
-
-	clonedRemote := remote.Clone()
-	rc, err := raw.TCPHandShake(clonedRemote)
-	if err != nil {
-		return err
-	}
-	raw.l.Infof("RelayTCPConn from %s to %s", c.LocalAddr(), remote.Address)
-	relayConn := conn.NewRelayConn(
-		raw.baseTransporter.cfg.Label, c, rc, conn.WithHandshakeDuration(clonedRemote.HandShakeDuration))
-	raw.cmgr.AddConnection(relayConn)
-	defer raw.cmgr.RemoveConnection(relayConn)
-	return relayConn.Transport(remote.Label)
-}
-
 func (s *RawClient) Close() error {
 	return s.lis.Close()
 }
@@ -84,7 +65,7 @@ func (s *RawClient) ListenAndServe() error {
 			return err
 		}
 		go func(c net.Conn) {
-			if err := tp.RelayTCPConn(c); err != nil {
+			if err := s.baseTransporter.RelayTCPConn(c, tp.TCPHandShake); err != nil {
 				s.l.Errorf("RelayTCPConn error: %s", err.Error())
 			}
 		}(c)
