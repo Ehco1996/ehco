@@ -80,12 +80,6 @@ func (r *Relay) ListenAndServe() error {
 			}()
 		}
 	}
-
-	if len(r.cfg.UDPRemotes) > 0 {
-		go func() {
-			errCh <- r.RunLocalUDPServer()
-		}()
-	}
 	return <-errCh
 }
 
@@ -131,33 +125,6 @@ func (r *Relay) RunLocalTCPServer() error {
 					c.RemoteAddr(), remote.Address, err)
 			}
 		}(c)
-	}
-}
-
-func (r *Relay) RunLocalUDPServer() error {
-	lis, err := net.ListenUDP("udp", r.LocalUDPAddr)
-	if err != nil {
-		return err
-	}
-	defer lis.Close() //nolint: errcheck
-	r.closeUdpF = func() error {
-		return lis.Close()
-	}
-	r.l.Infof("Start UDP relay Server: %s", r.Name)
-
-	buf := transporter.BufferPool.Get()
-	defer transporter.BufferPool.Put(buf)
-	for {
-		n, addr, err := lis.ReadFromUDP(buf)
-		if err != nil {
-			return err
-		}
-		bc := r.TP.GetOrCreateBufferCh(addr)
-		bc.Ch <- buf[0:n]
-		if !bc.Handled.Load() {
-			bc.Handled.Store(true)
-			go r.TP.HandleUDPConn(bc.UDPAddr, lis)
-		}
 	}
 }
 

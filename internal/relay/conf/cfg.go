@@ -57,6 +57,10 @@ func (r *Config) Validate() error {
 	if len(r.TCPRemotes) == 0 && len(r.UDPRemotes) == 0 {
 		return errors.New("both tcp and udp remotes are empty")
 	}
+
+	if len(r.UDPRemotes) > 0 {
+		zap.S().Warn("UDP RELAY WAS DISABLED FOR NOW, THIS FEATURE WILL BE AVAILABLE IN THE FUTURE")
+	}
 	return nil
 }
 

@@ -12,11 +12,6 @@ import (
 
 // RelayTransporter
 type RelayTransporter interface {
-	// UDP相关
-	GetOrCreateBufferCh(uaddr *net.UDPAddr) *BufferCh
-	HandleUDPConn(uaddr *net.UDPAddr, local *net.UDPConn)
-
-	// TCP相关
 	dialRemote(remote *lb.Node) (net.Conn, error)
 	HandleTCPConn(c net.Conn, remote *lb.Node) error
 	GetRemote() *lb.Node
@@ -30,14 +25,7 @@ func NewRelayTransporter(cfg *conf.Config, connMgr cmgr.Cmgr) RelayTransporter {
 			Label:   fmt.Sprintf("%s-%s", cfg.Label, addr),
 		}
 	}
-	udpNodeList := make([]*lb.Node, len(cfg.UDPRemotes))
-	for idx, addr := range cfg.UDPRemotes {
-		udpNodeList[idx] = &lb.Node{
-			Address: addr,
-			Label:   fmt.Sprintf("%s-%s", cfg.Label, addr),
-		}
-	}
-	raw := newRaw(cfg.Label, lb.NewRoundRobin(tcpNodeList), lb.NewRoundRobin(udpNodeList), connMgr)
+	raw := newRaw(cfg.Label, lb.NewRoundRobin(tcpNodeList), connMgr)
 
 	switch cfg.TransportType {
 	case constant.Transport_RAW:

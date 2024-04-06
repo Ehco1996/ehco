@@ -1,10 +1,6 @@
 package transporter
 
 import (
-	"net"
-
-	"go.uber.org/atomic"
-
 	"github.com/Ehco1996/ehco/internal/constant"
 )
 
@@ -49,19 +45,5 @@ func (bp *BytePool) Put(b []byte) {
 		// buffer went back into pool
 	default:
 		// buffer didn't go back into pool, just discard
-	}
-}
-
-type BufferCh struct {
-	Ch      chan []byte
-	Handled atomic.Bool
-	UDPAddr *net.UDPAddr
-}
-
-func newudpBufferCh(clientUDPAddr *net.UDPAddr) *BufferCh {
-	return &BufferCh{
-		Ch:      make(chan []byte, 100),
-		Handled: atomic.Bool{},
-		UDPAddr: clientUDPAddr,
 	}
 }
