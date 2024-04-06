@@ -16,30 +16,22 @@ var _ RelayTransporter = &RawClient{}
 type RawClient struct {
 	*baseTransporter
 
-	dialer *net.Dialer
-	lis    *net.TCPListener
+	dialer       *net.Dialer
+	localTCPAddr *net.TCPAddr
+	lis          *net.TCPListener
 }
 
 func newRawClient(base *baseTransporter) (*RawClient, error) {
-	localTCPAddr, err := net.ResolveTCPAddr("tcp", base.cfg.Listen)
-	if err != nil {
-		return nil, err
-	}
-
-	lis, err := net.ListenTCP("tcp", localTCPAddr)
+	localTCPAddr, err := base.GetTCPListenAddr()
 	if err != nil {
 		return nil, err
 	}
 	r := &RawClient{
-		lis:             lis,
 		baseTransporter: base,
+		localTCPAddr:    localTCPAddr,
 		dialer:          &net.Dialer{Timeout: constant.DialTimeOut},
 	}
 	return r, nil
-}
-
-func (raw *RawClient) GetRemote() *lb.Node {
-	return raw.baseTransporter.tCPRemotes.Next()
 }
 
 func (raw *RawClient) TCPHandShake(remote *lb.Node) (net.Conn, error) {
@@ -77,13 +69,23 @@ func (s *RawClient) Close() error {
 }
 
 func (s *RawClient) ListenAndServe() error {
+	lis, err := net.ListenTCP("tcp", s.localTCPAddr)
+	if err != nil {
+		return err
+	}
+	s.lis = lis
+	tp, err := NewRelayTransporter(s.cfg.TransportType, s.baseTransporter)
+	if err != nil {
+		return err
+	}
 	for {
 		c, err := s.lis.AcceptTCP()
 		if err != nil {
 			return err
 		}
 		go func(c net.Conn) {
-			if err := s.RelayTCPConn(c); err != nil {
+			if err := tp.RelayTCPConn(c); err != nil {
+				s.l.Errorf("RelayTCPConn error: %s", err.Error())
 			}
 		}(c)
 	}

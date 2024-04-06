@@ -1,95 +1,98 @@
 package transporter
 
-// import (
-// 	"context"
-// 	"net"
-// 	"net/http"
-// 	"time"
+import (
+	"context"
+	"net"
+	"net/http"
+	"time"
 
-// 	"github.com/gobwas/ws"
-// 	"github.com/labstack/echo/v4"
-// 	"go.uber.org/zap"
+	"github.com/gobwas/ws"
+	"github.com/labstack/echo/v4"
 
-// 	"github.com/Ehco1996/ehco/internal/conn"
-// 	"github.com/Ehco1996/ehco/internal/constant"
-// 	"github.com/Ehco1996/ehco/internal/metrics"
-// 	"github.com/Ehco1996/ehco/internal/web"
-// 	"github.com/Ehco1996/ehco/pkg/lb"
-// )
+	"github.com/Ehco1996/ehco/internal/conn"
+	"github.com/Ehco1996/ehco/internal/constant"
+	"github.com/Ehco1996/ehco/internal/metrics"
+	"github.com/Ehco1996/ehco/internal/web"
+	"github.com/Ehco1996/ehco/pkg/lb"
+)
 
-// var _ RelayTransporter = &WsClient{}
+var _ RelayTransporter = &WsClient{}
 
-// type WsClient struct {
-// }
+type WsClient struct {
+	*baseTransporter
 
-// func newWsClient(raw *RawClient) *WsClient {
-// 	return &WsClient{RawClient: raw}
-// }
+	e          *echo.Echo
+	dialer     *ws.Dialer
+	httpServer *http.Server
+	tp         RelayTransporter
+}
 
-// func (s *WsClient) TCPHandShake(remote *lb.Node) (net.Conn, error) {
-// 	t1 := time.Now()
-// 	d := ws.Dialer{Timeout: constant.DialTimeOut}
-// 	wsc, _, _, err := d.Dial(context.TODO(), remote.Address+"/handshake/")
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	latency := time.Since(t1)
-// 	metrics.HandShakeDuration.WithLabelValues(remote.Label).Observe(float64(latency.Milliseconds()))
-// 	remote.HandShakeDuration = latency
-// 	return wsc, nil
-// }
+func newWsClient(base *baseTransporter) (*WsClient, error) {
+	localTCPAddr, err := base.GetTCPListenAddr()
+	if err != nil {
+		return nil, err
+	}
+	s := &WsClient{
+		baseTransporter: base,
+		httpServer: &http.Server{
+			Addr: localTCPAddr.String(), ReadHeaderTimeout: 30 * time.Second},
+		dialer: &ws.Dialer{Timeout: constant.DialTimeOut},
+	}
+	e := web.NewEchoServer()
+	e.GET("/", echo.WrapHandler(web.MakeIndexF()))
+	e.GET("/handshake/", echo.WrapHandler(http.HandlerFunc(s.HandleRequest)))
+	s.e = e
+	s.httpServer.Handler = e
+	return s, nil
+}
 
-// func (s *WsClient) RelayTCPConn(c net.Conn) error {
-// 	remote := s.GetRemote()
-// 	clonedRemote := remote.Clone()
-// 	wsc, err := s.TCPHandShake(clonedRemote)
-// 	if err != nil {
-// 		return err
-// 	}
-// 	s.l.Infof("RelayTCPConn from %s to %s", c.LocalAddr(), remote.Address)
-// 	relayConn := conn.NewRelayConn(
-// 		s.relayLabel, c, wsc,
-// 		conn.WithHandshakeDuration(clonedRemote.HandShakeDuration))
-// 	s.cmgr.AddConnection(relayConn)
-// 	defer s.cmgr.RemoveConnection(relayConn)
-// 	return relayConn.Transport(remote.Label)
-// }
+func (s *WsClient) TCPHandShake(remote *lb.Node) (net.Conn, error) {
+	t1 := time.Now()
+	wsc, _, _, err := s.dialer.Dial(context.TODO(), remote.Address+"/handshake/")
+	if err != nil {
+		return nil, err
+	}
+	latency := time.Since(t1)
+	metrics.HandShakeDuration.WithLabelValues(remote.Label).Observe(float64(latency.Milliseconds()))
+	remote.HandShakeDuration = latency
+	return wsc, nil
+}
 
-// type WSServer struct {
-// 	raw        *RawClient
-// 	e          *echo.Echo
-// 	httpServer *http.Server
-// 	l          *zap.SugaredLogger
-// }
+func (s *WsClient) RelayTCPConn(c net.Conn) error {
+	remote := s.GetRemote()
+	clonedRemote := remote.Clone()
+	wsc, err := s.TCPHandShake(clonedRemote)
+	if err != nil {
+		return err
+	}
+	s.l.Infof("RelayTCPConn from %s to %s", c.LocalAddr(), remote.Address)
+	relayConn := conn.NewRelayConn(
+		s.cfg.Label, c, wsc,
+		conn.WithHandshakeDuration(clonedRemote.HandShakeDuration))
+	s.cmgr.AddConnection(relayConn)
+	defer s.cmgr.RemoveConnection(relayConn)
+	return relayConn.Transport(remote.Label)
+}
 
-// func NewWSServer(listenAddr string, raw *RawClient) *WSServer {
-// 	s := &WSServer{
-// 		l:          l,
-// 		raw:        raw,
-// 		httpServer: &http.Server{Addr: listenAddr, ReadHeaderTimeout: 30 * time.Second},
-// 	}
-// 	e := web.NewEchoServer()
-// 	e.GET("/", echo.WrapHandler(web.MakeIndexF()))
-// 	e.GET("/handshake/", echo.WrapHandler(http.HandlerFunc(s.HandleRequest)))
-// 	s.e = e
-// 	s.httpServer.Handler = e
-// 	return s
-// }
+func (s *WsClient) ListenAndServe() error {
+	tp, err := NewRelayTransporter(s.cfg.TransportType, s.baseTransporter)
+	if err != nil {
+		return err
+	}
+	s.tp = tp
+	return s.e.StartServer(s.httpServer)
+}
 
-// func (s *WSServer) ListenAndServe() error {
-// 	return s.e.StartServer(s.httpServer)
-// }
+func (s *WsClient) Close() error {
+	return s.e.Close()
+}
 
-// func (s *WSServer) Close() error {
-// 	return s.e.Close()
-// }
-
-// func (s *WSServer) HandleRequest(w http.ResponseWriter, req *http.Request) {
-// 	wsc, _, _, err := ws.UpgradeHTTP(req, w)
-// 	if err != nil {
-// 		return
-// 	}
-// 	if err := s.raw.RelayTCPConn(wsc); err != nil {
-// 		s.l.Errorf("RelayTCPConn meet error from:%s to:%s err:%s", wsc.RemoteAddr(), remote.Address, err)
-// 	}
-// }
+func (s *WsClient) HandleRequest(w http.ResponseWriter, req *http.Request) {
+	wsc, _, _, err := ws.UpgradeHTTP(req, w)
+	if err != nil {
+		return
+	}
+	if err := s.tp.RelayTCPConn(wsc); err != nil {
+		s.l.Errorf("RelayTCPConn error: %s", err.Error())
+	}
+}

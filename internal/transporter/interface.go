@@ -13,7 +13,6 @@ import (
 // RelayTransporter
 type RelayTransporter interface {
 	// client side func
-	GetRemote() *lb.Node
 	TCPHandShake(remote *lb.Node) (net.Conn, error)
 	RelayTCPConn(c net.Conn) error
 
@@ -22,14 +21,12 @@ type RelayTransporter interface {
 	Close() error
 }
 
-func NewRelayTransporter(cfg *conf.Config, connMgr cmgr.Cmgr) (RelayTransporter, error) {
-	base := newBaseTransporter(cfg, connMgr)
-
-	switch cfg.TransportType {
+func NewRelayTransporter(tpType string, base *baseTransporter) (RelayTransporter, error) {
+	switch tpType {
 	case constant.Transport_RAW:
 		return newRawClient(base)
-	// case constant.Transport_WS:
-	// return newWsClient(raw)
+	case constant.Transport_WS:
+		return newWsClient(base)
 	// case constant.Transport_WSS:
 	// 	return newWSSClient(raw)
 	// case constant.Transport_MWSS:
@@ -48,11 +45,19 @@ type baseTransporter struct {
 	l          *zap.SugaredLogger
 }
 
-func newBaseTransporter(cfg *conf.Config, cmgr cmgr.Cmgr) *baseTransporter {
+func NewBaseTransporter(cfg *conf.Config, cmgr cmgr.Cmgr) *baseTransporter {
 	return &baseTransporter{
 		cfg:        cfg,
 		cmgr:       cmgr,
 		tCPRemotes: cfg.ToTCPRemotes(),
 		l:          zap.S().Named(cfg.GetLoggerName()),
 	}
+}
+
+func (b *baseTransporter) GetTCPListenAddr() (*net.TCPAddr, error) {
+	return net.ResolveTCPAddr("tcp", b.cfg.Listen)
+}
+
+func (b *baseTransporter) GetRemote() *lb.Node {
+	return b.tCPRemotes.Next()
 }

@@ -109,8 +109,8 @@ func (r *Config) Different(new *Config) bool {
 
 // todo make this shorter and more readable
 func (r *Config) DefaultLabel() string {
-	defaultLabel := fmt.Sprintf("<At=%s TCP-To=%s UDP-To=%s TP=%s>",
-		r.Listen, r.TCPRemotes, r.UDPRemotes, r.TransportType)
+	defaultLabel := fmt.Sprintf("<At=%s TCP-To=%s TP=%s>",
+		r.Listen, r.TCPRemotes, r.TransportType)
 	return defaultLabel
 }
 

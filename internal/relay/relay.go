@@ -11,25 +11,24 @@ import (
 type Relay struct {
 	Name string // unique name for all relay
 
-	TP transporter.RelayTransporter
+	ListenTP transporter.RelayTransporter
 
 	cfg *conf.Config
 	l   *zap.SugaredLogger
 }
 
 func NewRelay(cfg *conf.Config, connMgr cmgr.Cmgr) (*Relay, error) {
-	tp, err := transporter.NewRelayTransporter(cfg, connMgr)
+	base := transporter.NewBaseTransporter(cfg, connMgr)
+	tp, err := transporter.NewRelayTransporter(cfg.ListenType, base)
 	if err != nil {
 		return nil, err
-
 	}
 	r := &Relay{
-		TP:   tp,
-		cfg:  cfg,
-		Name: cfg.Label,
-		l:    zap.S().Named("relay"),
+		ListenTP: tp,
+		cfg:      cfg,
+		Name:     cfg.Label,
+		l:        zap.S().Named("relay"),
 	}
-
 	return r, nil
 }
 
@@ -37,14 +36,14 @@ func (r *Relay) ListenAndServe() error {
 	errCh := make(chan error)
 	go func() {
 		r.l.Infof("Start TCP Relay Server:%s", r.cfg.DefaultLabel())
-		errCh <- r.TP.ListenAndServe()
+		errCh <- r.ListenTP.ListenAndServe()
 	}()
 	return <-errCh
 }
 
 func (r *Relay) Close() {
-	r.l.Infof("Close relay label: %s", r.Name)
-	if err := r.TP.Close(); err != nil {
+	r.l.Infof("Close TCP Relay Server:%s", r.cfg.DefaultLabel())
+	if err := r.ListenTP.Close(); err != nil {
 		r.l.Errorf(err.Error())
 	}
 }
