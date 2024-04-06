@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/gobwas/ws"
-	"github.com/gorilla/mux"
+	"github.com/labstack/echo/v4"
 	"github.com/xtaci/smux"
 	"go.uber.org/zap"
 
@@ -69,12 +69,12 @@ func NewMWSSServer(listenAddr string, raw *Raw, l *zap.SugaredLogger) *MWSSServe
 		connChan: make(chan net.Conn, 1024),
 	}
 
-	mux := mux.NewRouter()
-	mux.Handle("/", web.MakeIndexF())
-	mux.Handle("/mwss/", http.HandlerFunc(s.HandleRequest))
+	e := web.NewEchoServer()
+	e.GET("/", echo.WrapHandler(web.MakeIndexF()))
+	e.GET("/mwss/", echo.WrapHandler(http.HandlerFunc(s.HandleRequest)))
 	s.httpServer = &http.Server{
 		Addr:              listenAddr,
-		Handler:           mux,
+		Handler:           e,
 		TLSConfig:         mytls.DefaultTLSConfig,
 		ReadHeaderTimeout: 30 * time.Second,
 	}

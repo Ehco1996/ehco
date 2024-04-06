@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/gobwas/ws"
-	"github.com/gorilla/mux"
+	"github.com/labstack/echo/v4"
 	"go.uber.org/zap"
 
 	"github.com/Ehco1996/ehco/internal/conn"
@@ -51,29 +51,31 @@ func (s *Ws) HandleTCPConn(c net.Conn, remote *lb.Node) error {
 
 type WSServer struct {
 	raw        *Raw
-	l          *zap.SugaredLogger
+	e          *echo.Echo
 	httpServer *http.Server
+	l          *zap.SugaredLogger
 }
 
 func NewWSServer(listenAddr string, raw *Raw, l *zap.SugaredLogger) *WSServer {
-	s := &WSServer{raw: raw, l: l}
-	mux := mux.NewRouter()
-	mux.HandleFunc("/", web.MakeIndexF())
-	mux.HandleFunc("/ws/", s.HandleRequest)
-	s.httpServer = &http.Server{
-		Addr:              listenAddr,
-		ReadHeaderTimeout: 30 * time.Second,
-		Handler:           mux,
+	s := &WSServer{
+		l:          l,
+		raw:        raw,
+		httpServer: &http.Server{Addr: listenAddr, ReadHeaderTimeout: 30 * time.Second},
 	}
+	e := web.NewEchoServer()
+	e.GET("/", echo.WrapHandler(web.MakeIndexF()))
+	e.GET("/ws/", echo.WrapHandler(http.HandlerFunc(s.HandleRequest)))
+	s.e = e
+	s.httpServer.Handler = e
 	return s
 }
 
 func (s *WSServer) ListenAndServe() error {
-	return s.httpServer.ListenAndServe()
+	return s.e.StartServer(s.httpServer)
 }
 
 func (s *WSServer) Close() error {
-	return s.httpServer.Close()
+	return s.e.Close()
 }
 
 func (s *WSServer) HandleRequest(w http.ResponseWriter, req *http.Request) {

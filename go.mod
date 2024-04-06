@@ -9,7 +9,6 @@ require (
 	github.com/getsentry/sentry-go v0.27.0
 	github.com/go-ping/ping v1.1.0
 	github.com/gobwas/ws v1.3.2
-	github.com/gorilla/mux v1.8.1
 	github.com/labstack/echo/v4 v4.11.4
 	github.com/prometheus/client_golang v1.19.0
 	github.com/prometheus/common v0.48.0
