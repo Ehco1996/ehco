@@ -49,10 +49,7 @@ func NewServer(cfg *config.Config, relayReloader reloader.Reloader, connMgr cmgr
 	for _, temp := range templates.Templates() {
 		l.Debug("template name: ", temp.Name())
 	}
-	e := echo.New()
-	e.Debug = true
-	e.HidePort = true
-	e.HideBanner = true
+	e := NewEchoServer()
 	e.Use(NginxLogMiddleware(l))
 	e.Renderer = &echoTemplate{templates: templates}
 	if cfg.WebToken != "" {

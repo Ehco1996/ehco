@@ -3,19 +3,17 @@ package transporter
 
 import (
 	"context"
-	"crypto/tls"
 	"net"
 	"net/http"
 	"time"
 
 	"github.com/gobwas/ws"
-	"github.com/gorilla/mux"
+	"github.com/labstack/echo/v4"
 	"go.uber.org/zap"
 
 	"github.com/Ehco1996/ehco/internal/conn"
 	"github.com/Ehco1996/ehco/internal/metrics"
 	mytls "github.com/Ehco1996/ehco/internal/tls"
-	"github.com/Ehco1996/ehco/internal/web"
 	"github.com/Ehco1996/ehco/pkg/lb"
 )
 
@@ -50,48 +48,15 @@ func (s *Wss) HandleTCPConn(c net.Conn, remote *lb.Node) error {
 	return relayConn.Transport(remote.Label)
 }
 
-type WSSServer struct {
-	raw        *Raw
-	l          *zap.SugaredLogger
-	httpServer *http.Server
-}
+type WSSServer struct{ WSServer }
 
 func NewWSSServer(listenAddr string, raw *Raw, l *zap.SugaredLogger) *WSSServer {
-	s := &WSSServer{raw: raw, l: l}
-	mux := mux.NewRouter()
-	mux.HandleFunc("/", web.MakeIndexF())
-	mux.HandleFunc("/wss/", s.HandleRequest)
-
-	s.httpServer = &http.Server{
-		Handler:           mux,
-		Addr:              listenAddr,
-		ReadHeaderTimeout: 30 * time.Second,
-		TLSConfig:         mytls.DefaultTLSConfig,
-	}
-	return s
+	wsServer := NewWSServer(listenAddr, raw, l)
+	wsServer.e.GET("/wss/", echo.WrapHandler(http.HandlerFunc(wsServer.HandleRequest)))
+	return &WSSServer{WSServer: *wsServer}
 }
 
 func (s *WSSServer) ListenAndServe() error {
-	lis, err := net.Listen("tcp", s.httpServer.Addr)
-	if err != nil {
-		return err
-	}
-	defer lis.Close()
-	return s.httpServer.Serve(tls.NewListener(lis, s.httpServer.TLSConfig))
-}
-
-func (s *WSSServer) Close() error {
-	return s.httpServer.Close()
-}
-
-func (s *WSSServer) HandleRequest(w http.ResponseWriter, req *http.Request) {
-	wsc, _, _, err := ws.UpgradeHTTP(req, w)
-	if err != nil {
-		return
-	}
-
-	remote := s.raw.GetRemote()
-	if err := s.raw.HandleTCPConn(wsc, remote); err != nil {
-		s.l.Errorf("HandleTCPConn meet error from:%s to:%s err:%s", wsc.RemoteAddr(), remote.Address, err)
-	}
+	s.httpServer.TLSConfig = mytls.DefaultTLSConfig
+	return s.WSServer.ListenAndServe()
 }
