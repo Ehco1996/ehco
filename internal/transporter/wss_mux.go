@@ -22,14 +22,14 @@ import (
 )
 
 type MWSSClient struct {
-	*Raw
+	*RawClient
 	dialer *ws.Dialer
 	mtp    *smuxTransporter
 }
 
-func newMWSSClient(raw *Raw) *MWSSClient {
+func newMWSSClient(raw *RawClient) *MWSSClient {
 	dialer := &ws.Dialer{TLSConfig: mytls.DefaultTLSConfig, Timeout: constant.DialTimeOut}
-	c := &MWSSClient{dialer: dialer, Raw: raw}
+	c := &MWSSClient{dialer: dialer, RawClient: raw}
 	mtp := NewSmuxTransporter(raw.l.Named("mwss"), c.initNewSession)
 	c.mtp = mtp
 	return c
@@ -78,7 +78,7 @@ func (s *MWSSClient) HandleTCPConn(c net.Conn, remote *lb.Node) error {
 }
 
 type MWSSServer struct {
-	raw        *Raw
+	raw        *RawClient
 	httpServer *http.Server
 	l          *zap.SugaredLogger
 
@@ -86,7 +86,7 @@ type MWSSServer struct {
 	errChan  chan error
 }
 
-func NewMWSSServer(listenAddr string, raw *Raw, l *zap.SugaredLogger) *MWSSServer {
+func NewMWSSServer(listenAddr string, raw *RawClient, l *zap.SugaredLogger) *MWSSServer {
 	s := &MWSSServer{
 		raw:      raw,
 		l:        l,

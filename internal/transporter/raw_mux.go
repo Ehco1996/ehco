@@ -16,14 +16,14 @@ import (
 )
 
 type MTCPClient struct {
-	*Raw
+	*RawClient
 	dialer *net.Dialer
 	mtp    *smuxTransporter
 }
 
-func newMTCPClient(raw *Raw) *MTCPClient {
+func newMTCPClient(raw *RawClient) *MTCPClient {
 	dialer := &net.Dialer{Timeout: constant.DialTimeOut}
-	c := &MTCPClient{dialer: dialer, Raw: raw}
+	c := &MTCPClient{dialer: dialer, RawClient: raw}
 	mtp := NewSmuxTransporter(raw.l.Named("mtcp"), c.initNewSession)
 	c.mtp = mtp
 	return c
@@ -71,7 +71,7 @@ func (s *MTCPClient) HandleTCPConn(c net.Conn, remote *lb.Node) error {
 }
 
 type MTCPServer struct {
-	raw        *Raw
+	raw        *RawClient
 	listenAddr string
 	listener   net.Listener
 	l          *zap.SugaredLogger
@@ -80,7 +80,7 @@ type MTCPServer struct {
 	connChan chan net.Conn
 }
 
-func NewMTCPServer(listenAddr string, raw *Raw, l *zap.SugaredLogger) *MTCPServer {
+func NewMTCPServer(listenAddr string, raw *RawClient, l *zap.SugaredLogger) *MTCPServer {
 	return &MTCPServer{
 		l:          l,
 		raw:        raw,

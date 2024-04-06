@@ -25,8 +25,7 @@ func NewRelayTransporter(cfg *conf.Config, connMgr cmgr.Cmgr) RelayTransporter {
 			Label:   fmt.Sprintf("%s-%s", cfg.Label, addr),
 		}
 	}
-	raw := newRaw(cfg.Label, lb.NewRoundRobin(tcpNodeList), connMgr)
-
+	raw := newRawClient(cfg.Label, lb.NewRoundRobin(tcpNodeList), connMgr)
 	switch cfg.TransportType {
 	case constant.Transport_RAW:
 		return raw

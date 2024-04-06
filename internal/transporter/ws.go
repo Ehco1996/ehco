@@ -18,11 +18,11 @@ import (
 )
 
 type WsClient struct {
-	*Raw
+	*RawClient
 }
 
-func newWsClient(raw *Raw) *WsClient {
-	return &WsClient{Raw: raw}
+func newWsClient(raw *RawClient) *WsClient {
+	return &WsClient{RawClient: raw}
 }
 
 func (s *WsClient) dialRemote(remote *lb.Node) (net.Conn, error) {
@@ -54,13 +54,13 @@ func (s *WsClient) HandleTCPConn(c net.Conn, remote *lb.Node) error {
 }
 
 type WSServer struct {
-	raw        *Raw
+	raw        *RawClient
 	e          *echo.Echo
 	httpServer *http.Server
 	l          *zap.SugaredLogger
 }
 
-func NewWSServer(listenAddr string, raw *Raw, l *zap.SugaredLogger) *WSServer {
+func NewWSServer(listenAddr string, raw *RawClient, l *zap.SugaredLogger) *WSServer {
 	s := &WSServer{
 		l:          l,
 		raw:        raw,

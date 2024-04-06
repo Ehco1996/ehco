@@ -7,22 +7,19 @@ import (
 
 	"github.com/Ehco1996/ehco/internal/cmgr"
 	"github.com/Ehco1996/ehco/internal/constant"
-	"github.com/Ehco1996/ehco/internal/metrics"
 	"github.com/Ehco1996/ehco/internal/relay/conf"
 	"github.com/Ehco1996/ehco/internal/transporter"
 )
 
 type Relay struct {
-	Name          string // unique name for all relay\
+	Name          string // unique name for all relay
 	TransportType string
 	ListenType    string
-	TP            transporter.RelayTransporter
+
+	TP transporter.RelayTransporter
 
 	LocalTCPAddr *net.TCPAddr
-	LocalUDPAddr *net.UDPAddr
-
-	closeTcpF func() error
-	closeUdpF func() error
+	closeTcpF    func() error
 
 	cfg *conf.Config
 	l   *zap.SugaredLogger
@@ -33,10 +30,6 @@ func NewRelay(cfg *conf.Config, connMgr cmgr.Cmgr) (*Relay, error) {
 	if err != nil {
 		return nil, err
 	}
-	localUDPAddr, err := net.ResolveUDPAddr("udp", cfg.Listen)
-	if err != nil {
-		return nil, err
-	}
 
 	r := &Relay{
 		cfg: cfg,
@@ -44,7 +37,6 @@ func NewRelay(cfg *conf.Config, connMgr cmgr.Cmgr) (*Relay, error) {
 
 		Name:          cfg.Label,
 		LocalTCPAddr:  localTCPAddr,
-		LocalUDPAddr:  localUDPAddr,
 		ListenType:    cfg.ListenType,
 		TransportType: cfg.TransportType,
 		TP:            transporter.NewRelayTransporter(cfg, connMgr),
@@ -85,12 +77,6 @@ func (r *Relay) ListenAndServe() error {
 
 func (r *Relay) Close() {
 	r.l.Infof("Close relay label: %s", r.Name)
-	if r.closeUdpF != nil {
-		err := r.closeUdpF()
-		if err != nil {
-			r.l.Errorf(err.Error())
-		}
-	}
 	if r.closeTcpF != nil {
 		err := r.closeTcpF()
 		if err != nil {
@@ -100,36 +86,19 @@ func (r *Relay) Close() {
 }
 
 func (r *Relay) RunLocalTCPServer() error {
-	lis, err := net.ListenTCP("tcp", r.LocalTCPAddr)
+	rawServer, err := transporter.NewRawServer(r.LocalTCPAddr.String(), r.TP)
 	if err != nil {
 		return err
 	}
-	defer lis.Close() //nolint: errcheck
 	r.closeTcpF = func() error {
-		return lis.Close()
+		return rawServer.Close()
 	}
 	r.l.Infof("Start TCP relay Server: %s", r.Name)
-	for {
-		c, err := lis.AcceptTCP()
-		if err != nil {
-			return err
-		}
-
-		go func(c net.Conn) {
-			remote := r.TP.GetRemote()
-			metrics.CurConnectionCount.WithLabelValues(remote.Label, metrics.METRIC_CONN_TYPE_TCP).Inc()
-			defer metrics.CurConnectionCount.WithLabelValues(remote.Label, metrics.METRIC_CONN_TYPE_TCP).Dec()
-			if err := r.TP.HandleTCPConn(c, remote); err != nil {
-				r.l.Errorf("HandleTCPConn meet error tp:%s from:%s to:%s err:%s",
-					r.TransportType,
-					c.RemoteAddr(), remote.Address, err)
-			}
-		}(c)
-	}
+	return rawServer.ListenAndServe()
 }
 
 func (r *Relay) RunLocalMTCPServer() error {
-	tp := r.TP.(*transporter.Raw)
+	tp := r.TP.(*transporter.RawClient)
 	mTCPServer := transporter.NewMTCPServer(r.LocalTCPAddr.String(), tp, r.l.Named("MTCPServer"))
 	r.closeTcpF = func() error {
 		return mTCPServer.Close()
@@ -139,7 +108,7 @@ func (r *Relay) RunLocalMTCPServer() error {
 }
 
 func (r *Relay) RunLocalWSServer() error {
-	tp := r.TP.(*transporter.Raw)
+	tp := r.TP.(*transporter.RawClient)
 	wsServer := transporter.NewWSServer(r.LocalTCPAddr.String(), tp, r.l.Named("WSServer"))
 	r.closeTcpF = func() error {
 		return wsServer.Close()
@@ -149,7 +118,7 @@ func (r *Relay) RunLocalWSServer() error {
 }
 
 func (r *Relay) RunLocalWSSServer() error {
-	tp := r.TP.(*transporter.Raw)
+	tp := r.TP.(*transporter.RawClient)
 	wssServer := transporter.NewWSSServer(r.LocalTCPAddr.String(), tp, r.l.Named("WSSServer"))
 	r.closeTcpF = func() error {
 		return wssServer.Close()
@@ -159,7 +128,7 @@ func (r *Relay) RunLocalWSSServer() error {
 }
 
 func (r *Relay) RunLocalMWSSServer() error {
-	tp := r.TP.(*transporter.Raw)
+	tp := r.TP.(*transporter.RawClient)
 	mwssServer := transporter.NewMWSSServer(r.LocalTCPAddr.String(), tp, r.l.Named("MWSSServer"))
 	r.closeTcpF = func() error {
 		return mwssServer.Close()

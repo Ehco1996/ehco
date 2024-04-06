@@ -14,18 +14,15 @@ import (
 	"github.com/Ehco1996/ehco/pkg/lb"
 )
 
-type Raw struct {
+type RawClient struct {
 	relayLabel string
-
-	// TCP
 	cmgr       cmgr.Cmgr
 	tCPRemotes lb.RoundRobin
-
-	l *zap.SugaredLogger
+	l          *zap.SugaredLogger
 }
 
-func newRaw(relayLabel string, tcpRemotes lb.RoundRobin, cmgr cmgr.Cmgr) *Raw {
-	r := &Raw{
+func newRawClient(relayLabel string, tcpRemotes lb.RoundRobin, cmgr cmgr.Cmgr) *RawClient {
+	r := &RawClient{
 		cmgr:       cmgr,
 		relayLabel: relayLabel,
 		tCPRemotes: tcpRemotes,
@@ -34,11 +31,11 @@ func newRaw(relayLabel string, tcpRemotes lb.RoundRobin, cmgr cmgr.Cmgr) *Raw {
 	return r
 }
 
-func (raw *Raw) GetRemote() *lb.Node {
+func (raw *RawClient) GetRemote() *lb.Node {
 	return raw.tCPRemotes.Next()
 }
 
-func (raw *Raw) dialRemote(remote *lb.Node) (net.Conn, error) {
+func (raw *RawClient) dialRemote(remote *lb.Node) (net.Conn, error) {
 	t1 := time.Now()
 	d := net.Dialer{Timeout: constant.DialTimeOut}
 	rc, err := d.Dial("tcp", remote.Address)
@@ -51,7 +48,7 @@ func (raw *Raw) dialRemote(remote *lb.Node) (net.Conn, error) {
 	return rc, nil
 }
 
-func (raw *Raw) HandleTCPConn(c net.Conn, remote *lb.Node) error {
+func (raw *RawClient) HandleTCPConn(c net.Conn, remote *lb.Node) error {
 	metrics.CurConnectionCount.WithLabelValues(remote.Label, metrics.METRIC_CONN_TYPE_TCP).Inc()
 	defer metrics.CurConnectionCount.WithLabelValues(remote.Label, metrics.METRIC_CONN_TYPE_TCP).Dec()
 
@@ -65,4 +62,45 @@ func (raw *Raw) HandleTCPConn(c net.Conn, remote *lb.Node) error {
 	raw.cmgr.AddConnection(relayConn)
 	defer raw.cmgr.RemoveConnection(relayConn)
 	return relayConn.Transport(remote.Label)
+}
+
+type RawServer struct {
+	rtp RelayTransporter
+	lis *net.TCPListener
+	l   *zap.SugaredLogger
+}
+
+func NewRawServer(addr string, rtp RelayTransporter) (*RawServer, error) {
+	tcpAddr, err := net.ResolveTCPAddr("tcp", addr)
+	if err != nil {
+		return nil, err
+	}
+	lis, err := net.ListenTCP("tcp", tcpAddr)
+	if err != nil {
+		return nil, err
+	}
+	return &RawServer{lis: lis, rtp: rtp}, nil
+}
+
+func (s *RawServer) Close() error {
+	return s.lis.Close()
+}
+
+func (s *RawServer) ListenAndServe() error {
+	for {
+		c, err := s.lis.AcceptTCP()
+		if err != nil {
+			return err
+		}
+		go func(c net.Conn) {
+			remote := s.rtp.GetRemote()
+			metrics.CurConnectionCount.WithLabelValues(remote.Label, metrics.METRIC_CONN_TYPE_TCP).Inc()
+			defer metrics.CurConnectionCount.WithLabelValues(remote.Label, metrics.METRIC_CONN_TYPE_TCP).Dec()
+			if err := s.rtp.HandleTCPConn(c, remote); err != nil {
+				s.l.Errorf("HandleTCPConn meet error tp:%s from:%s to:%s err:%s",
+					s.rtp,
+					c.RemoteAddr(), remote.Address, err)
+			}
+		}(c)
+	}
 }

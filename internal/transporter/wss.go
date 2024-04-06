@@ -19,7 +19,7 @@ type WSSClient struct {
 	WsClient
 }
 
-func newWSSClient(raw *Raw) *WSSClient {
+func newWSSClient(raw *RawClient) *WSSClient {
 	return &WSSClient{*newWsClient(raw)}
 }
 
@@ -53,7 +53,7 @@ func (s *WSSClient) HandleTCPConn(c net.Conn, remote *lb.Node) error {
 
 type WSSServer struct{ WSServer }
 
-func NewWSSServer(listenAddr string, raw *Raw, l *zap.SugaredLogger) *WSSServer {
+func NewWSSServer(listenAddr string, raw *RawClient, l *zap.SugaredLogger) *WSSServer {
 	wsServer := NewWSServer(listenAddr, raw, l)
 	return &WSSServer{WSServer: *wsServer}
 }
