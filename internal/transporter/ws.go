@@ -15,8 +15,10 @@ import (
 	"github.com/Ehco1996/ehco/pkg/lb"
 )
 
-var _ RelayClient = &WsClient{}
-var _ RelayServer = &WsServer{}
+var (
+	_ RelayClient = &WsClient{}
+	_ RelayServer = &WsServer{}
+)
 
 type WsClient struct {
 	*baseTransporter
@@ -60,7 +62,8 @@ func newWsServer(base *baseTransporter) (*WsServer, error) {
 	s := &WsServer{
 		baseTransporter: base,
 		httpServer: &http.Server{
-			Addr: localTCPAddr.String(), ReadHeaderTimeout: 30 * time.Second},
+			Addr: localTCPAddr.String(), ReadHeaderTimeout: 30 * time.Second,
+		},
 	}
 	e := web.NewEchoServer()
 	e.GET("/", echo.WrapHandler(web.MakeIndexF()))

@@ -10,8 +10,10 @@ import (
 	"github.com/Ehco1996/ehco/pkg/lb"
 )
 
-var _ RelayClient = &RawClient{}
-var _ RelayServer = &RawServer{}
+var (
+	_ RelayClient = &RawClient{}
+	_ RelayServer = &RawServer{}
+)
 
 type RawClient struct {
 	*baseTransporter
