@@ -84,6 +84,7 @@ jobs:
       - name: Rename the binary
         run: |
           cp /tmp/ehco/ehco-${{ matrix.platform }} /tmp/ehco/ehco
+          chmod +x /tmp/ehco/ehco
           /tmp/ehco/ehco -v
 
       - name: Set up qemu
