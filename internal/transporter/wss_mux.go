@@ -17,6 +17,7 @@ import (
 var (
 	_ RelayClient = &MwssClient{}
 	_ RelayServer = &MwssServer{}
+	_ muxServer   = &MwssServer{}
 )
 
 type MwssClient struct {
@@ -65,9 +66,7 @@ func (s *MwssClient) TCPHandShake(remote *lb.Node) (net.Conn, error) {
 
 type MwssServer struct {
 	*WssServer
-
-	connChan chan net.Conn
-	errChan  chan error
+	*muxServerImpl
 }
 
 func newMwssServer(base *baseTransporter) (*MwssServer, error) {
@@ -76,9 +75,8 @@ func newMwssServer(base *baseTransporter) (*MwssServer, error) {
 		return nil, err
 	}
 	s := &MwssServer{
-		errChan:   make(chan error, 1),
-		connChan:  make(chan net.Conn, 1024),
-		WssServer: wssServer,
+		WssServer:     wssServer,
+		muxServerImpl: newMuxServer(base.cfg.Listen, base.l.Named("mwss")),
 	}
 	s.e.GET("/handshake/", echo.WrapHandler(http.HandlerFunc(s.HandleRequest)))
 	return s, nil
@@ -109,44 +107,6 @@ func (s *MwssServer) HandleRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.mux(conn)
-}
-
-func (s *MwssServer) mux(conn net.Conn) {
-	defer conn.Close()
-
-	cfg := smux.DefaultConfig()
-	cfg.KeepAliveDisabled = true
-	session, err := smux.Server(conn, cfg)
-	if err != nil {
-		s.l.Debugf("server err %s - %s : %s", conn.RemoteAddr(), s.httpServer.Addr, err)
-		return
-	}
-	defer session.Close() // nolint: errcheck
-
-	s.l.Debugf("session init %s  %s", conn.RemoteAddr(), s.httpServer.Addr)
-	defer s.l.Debugf("session close %s >-< %s", conn.RemoteAddr(), s.httpServer.Addr)
-
-	for {
-		stream, err := session.AcceptStream()
-		if err != nil {
-			s.l.Errorf("accept stream err: %s", err)
-			break
-		}
-		select {
-		case s.connChan <- stream:
-		default:
-			stream.Close() // nolint: errcheck
-			s.l.Infof("%s - %s: connection queue is full", conn.RemoteAddr(), conn.LocalAddr())
-		}
-	}
-}
-
-func (s *MwssServer) Accept() (conn net.Conn, err error) {
-	select {
-	case conn = <-s.connChan:
-	case err = <-s.errChan:
-	}
-	return
 }
 
 func (s *MwssServer) Close() error {

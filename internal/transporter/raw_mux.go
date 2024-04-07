@@ -61,9 +61,7 @@ func (s *MtcpClient) TCPHandShake(remote *lb.Node) (net.Conn, error) {
 
 type MtcpServer struct {
 	*RawServer
-
-	errChan  chan error
-	connChan chan net.Conn
+	*muxServerImpl
 }
 
 func newMtcpServer(base *baseTransporter) (*MtcpServer, error) {
@@ -72,54 +70,14 @@ func newMtcpServer(base *baseTransporter) (*MtcpServer, error) {
 		return nil, err
 	}
 	s := &MtcpServer{
-		RawServer: raw,
-		errChan:   make(chan error, 1),
-		connChan:  make(chan net.Conn, 1024),
+		RawServer:     raw,
+		muxServerImpl: newMuxServer(base.cfg.Listen, base.l.Named("mtcp")),
 	}
 
 	return s, nil
 }
 
-func (s *MtcpServer) mux(conn net.Conn) {
-	defer conn.Close()
-
-	cfg := smux.DefaultConfig()
-	cfg.KeepAliveDisabled = true
-	session, err := smux.Server(conn, cfg)
-	if err != nil {
-		s.l.Debugf("server err %s - %s : %s", conn.RemoteAddr(), s.localTCPAddr, err)
-		return
-	}
-	defer session.Close() // nolint: errcheck
-
-	s.l.Debugf("session init %s  %s", conn.RemoteAddr(), s.localTCPAddr)
-	defer s.l.Debugf("session close %s >-< %s", conn.RemoteAddr(), s.localTCPAddr)
-
-	for {
-		stream, err := session.AcceptStream()
-		if err != nil {
-			s.l.Errorf("accept stream err: %s", err)
-			break
-		}
-		select {
-		case s.connChan <- stream:
-		default:
-			stream.Close() // nolint: errcheck
-			s.l.Infof("%s - %s: connection queue is full", conn.RemoteAddr(), conn.LocalAddr())
-		}
-	}
-}
-
-func (s *MtcpServer) Accept() (conn net.Conn, err error) {
-	select {
-	case conn = <-s.connChan:
-	case err = <-s.errChan:
-	}
-	return
-}
-
 func (s *MtcpServer) ListenAndServe() error {
-
 	go func() {
 		for {
 			c, err := s.lis.Accept()
