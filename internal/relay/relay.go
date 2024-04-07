@@ -9,11 +9,14 @@ import (
 )
 
 type Relay struct {
-	Name string // unique name for all relay
-	cfg  *conf.Config
-	l    *zap.SugaredLogger
+	cfg *conf.Config
+	l   *zap.SugaredLogger
 
 	relayServer transporter.RelayServer
+}
+
+func (r *Relay) UniqueID() string {
+	return r.cfg.Label
 }
 
 func NewRelay(cfg *conf.Config, connMgr cmgr.Cmgr) (*Relay, error) {
@@ -25,7 +28,6 @@ func NewRelay(cfg *conf.Config, connMgr cmgr.Cmgr) (*Relay, error) {
 	r := &Relay{
 		relayServer: s,
 		cfg:         cfg,
-		Name:        cfg.Label,
 		l:           zap.S().Named("relay"),
 	}
 	return r, nil

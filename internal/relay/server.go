@@ -46,18 +46,18 @@ func NewServer(cfg *config.Config) (*Server, error) {
 }
 
 func (s *Server) startOneRelay(r *Relay) {
-	s.relayM.Store(r.Name, r)
+	s.relayM.Store(r.UniqueID(), r)
 	// mute closed network error for tcp server and mute http.ErrServerClosed for http server when config reload
 	if err := r.ListenAndServe(); err != nil &&
 		!errors.Is(err, net.ErrClosed) && !errors.Is(err, http.ErrServerClosed) {
-		s.l.Errorf("start relay %s meet error: %s", r.Name, err)
+		s.l.Errorf("start relay %s meet error: %s", r.UniqueID(), err)
 		s.errCH <- err
 	}
 }
 
 func (s *Server) stopOneRelay(r *Relay) {
 	r.Close()
-	s.relayM.Delete(r.Name)
+	s.relayM.Delete(r.UniqueID())
 }
 
 func (s *Server) Start(ctx context.Context) error {
