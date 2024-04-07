@@ -49,10 +49,10 @@ func loadConfig() (cfg *config.Config, err error) {
 		}
 	}
 
-	// init tls
+	// init tls when need
 	for _, cfg := range cfg.RelayConfigs {
-		if cfg.ListenType == constant.Listen_WSS || cfg.ListenType == constant.Listen_MWSS ||
-			cfg.TransportType == constant.Transport_WSS || cfg.TransportType == constant.Transport_MWSS {
+		if cfg.ListenType == constant.RelayTypeWSS || cfg.ListenType == constant.RelayTypeMWSS ||
+			cfg.TransportType == constant.RelayTypeWSS || cfg.TransportType == constant.RelayTypeMWSS {
 			if err := tls.InitTlsCfg(); err != nil {
 				return nil, err
 			}

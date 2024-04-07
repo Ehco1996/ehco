@@ -133,8 +133,8 @@ func (p *Proxies) ToRelayConfig(listenHost string, listenPort string, newName st
 	remoteAddr := net.JoinHostPort(p.Server, p.Port)
 	r := &relay_cfg.Config{
 		Label:         newName,
-		ListenType:    constant.Listen_RAW,
-		TransportType: constant.Transport_RAW,
+		ListenType:    constant.RelayTypeRaw,
+		TransportType: constant.RelayTypeRaw,
 		Listen:        net.JoinHostPort(listenHost, listenPort),
 		TCPRemotes:    []string{remoteAddr},
 	}

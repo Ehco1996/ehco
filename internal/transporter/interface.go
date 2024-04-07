@@ -14,17 +14,17 @@ type RelayClient interface {
 	RelayTCPConn(c net.Conn, handshakeF TCPHandShakeF) error
 }
 
-func NewRelayClient(tpType string, base *baseTransporter) (RelayClient, error) {
-	switch tpType {
-	case constant.Transport_RAW:
+func NewRelayClient(relayType string, base *baseTransporter) (RelayClient, error) {
+	switch relayType {
+	case constant.RelayTypeRaw:
 		return newRawClient(base)
-	case constant.Transport_WS:
+	case constant.RelayTypeWS:
 		return newWsClient(base)
-	case constant.Transport_WSS:
+	case constant.RelayTypeWSS:
 		return newWssClient(base)
-	case constant.Transport_MWSS:
+	case constant.RelayTypeMWSS:
 		return newMwssClient(base)
-	case constant.Transport_MTCP:
+	case constant.RelayTypeMTCP:
 		return newMtcpClient(base)
 	default:
 		panic("unsupported transport type")
@@ -36,17 +36,17 @@ type RelayServer interface {
 	Close() error
 }
 
-func NewRelayServer(tpType string, base *baseTransporter) (RelayServer, error) {
-	switch tpType {
-	case constant.Transport_RAW:
+func NewRelayServer(relayType string, base *baseTransporter) (RelayServer, error) {
+	switch relayType {
+	case constant.RelayTypeRaw:
 		return newRawServer(base)
-	case constant.Transport_WS:
+	case constant.RelayTypeWS:
 		return newWsServer(base)
-	case constant.Transport_WSS:
+	case constant.RelayTypeWSS:
 		return newWssServer(base)
-	case constant.Transport_MWSS:
+	case constant.RelayTypeMWSS:
 		return newMwssServer(base)
-	case constant.Transport_MTCP:
+	case constant.RelayTypeMTCP:
 		return newMtcpServer(base)
 	default:
 		panic("unsupported transport type")

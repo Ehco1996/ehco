@@ -24,19 +24,19 @@ func (r *Config) Validate() error {
 	if r.Adjust() != nil {
 		return errors.New("adjust config failed")
 	}
-	if r.ListenType != constant.Listen_RAW &&
-		r.ListenType != constant.Listen_WS &&
-		r.ListenType != constant.Listen_WSS &&
-		r.ListenType != constant.Listen_MTCP &&
-		r.ListenType != constant.Listen_MWSS {
+	if r.ListenType != constant.RelayTypeRaw &&
+		r.ListenType != constant.RelayTypeWS &&
+		r.ListenType != constant.RelayTypeWSS &&
+		r.ListenType != constant.RelayTypeMTCP &&
+		r.ListenType != constant.RelayTypeMWSS {
 		return fmt.Errorf("invalid listen type:%s", r.ListenType)
 	}
 
-	if r.TransportType != constant.Transport_RAW &&
-		r.TransportType != constant.Transport_WS &&
-		r.TransportType != constant.Transport_WSS &&
-		r.TransportType != constant.Transport_MTCP &&
-		r.TransportType != constant.Transport_MWSS {
+	if r.TransportType != constant.RelayTypeRaw &&
+		r.TransportType != constant.RelayTypeWS &&
+		r.TransportType != constant.RelayTypeWSS &&
+		r.TransportType != constant.RelayTypeMTCP &&
+		r.TransportType != constant.RelayTypeMWSS {
 		return fmt.Errorf("invalid transport type:%s", r.ListenType)
 	}
 

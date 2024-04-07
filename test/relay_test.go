@@ -56,66 +56,66 @@ func init() {
 			// raw cfg
 			{
 				Listen:        RAW_LISTEN,
-				ListenType:    constant.Listen_RAW,
+				ListenType:    constant.RelayTypeRaw,
 				TCPRemotes:    []string{ECHO_SERVER},
 				UDPRemotes:    []string{ECHO_SERVER},
-				TransportType: constant.Transport_RAW,
+				TransportType: constant.RelayTypeRaw,
 			},
 
 			// ws
 			{
 				Listen:        WS_LISTEN,
-				ListenType:    constant.Listen_RAW,
+				ListenType:    constant.RelayTypeRaw,
 				TCPRemotes:    []string{WS_REMOTE},
-				TransportType: constant.Transport_WS,
+				TransportType: constant.RelayTypeWS,
 			},
 			{
 				Listen:        WS_SERVER,
-				ListenType:    constant.Listen_WS,
+				ListenType:    constant.RelayTypeWS,
 				TCPRemotes:    []string{ECHO_SERVER},
-				TransportType: constant.Transport_RAW,
+				TransportType: constant.RelayTypeRaw,
 			},
 
 			// wss
 			{
 				Listen:        WSS_LISTEN,
-				ListenType:    constant.Listen_RAW,
+				ListenType:    constant.RelayTypeRaw,
 				TCPRemotes:    []string{WSS_REMOTE},
-				TransportType: constant.Transport_WSS,
+				TransportType: constant.RelayTypeWSS,
 			},
 			{
 				Listen:        WSS_SERVER,
-				ListenType:    constant.Listen_WSS,
+				ListenType:    constant.RelayTypeWSS,
 				TCPRemotes:    []string{ECHO_SERVER},
-				TransportType: constant.Transport_RAW,
+				TransportType: constant.RelayTypeRaw,
 			},
 
 			// mwss
 			{
 				Listen:        MWSS_LISTEN,
-				ListenType:    constant.Listen_RAW,
+				ListenType:    constant.RelayTypeRaw,
 				TCPRemotes:    []string{MWSS_REMOTE},
-				TransportType: constant.Transport_MWSS,
+				TransportType: constant.RelayTypeMWSS,
 			},
 			{
 				Listen:        MWSS_SERVER,
-				ListenType:    constant.Listen_MWSS,
+				ListenType:    constant.RelayTypeMWSS,
 				TCPRemotes:    []string{ECHO_SERVER},
-				TransportType: constant.Transport_RAW,
+				TransportType: constant.RelayTypeRaw,
 			},
 
 			// mtcp
 			{
 				Listen:        MTCP_LISTEN,
-				ListenType:    constant.Listen_RAW,
+				ListenType:    constant.RelayTypeRaw,
 				TCPRemotes:    []string{MTCP_REMOTE},
-				TransportType: constant.Transport_MTCP,
+				TransportType: constant.RelayTypeMTCP,
 			},
 			{
 				Listen:        MTCP_SERVER,
-				ListenType:    constant.Listen_MTCP,
+				ListenType:    constant.RelayTypeMTCP,
 				TCPRemotes:    []string{ECHO_SERVER},
-				TransportType: constant.Transport_RAW,
+				TransportType: constant.RelayTypeRaw,
 			},
 		},
 	}
