@@ -18,8 +18,8 @@ func NewRelayClient(tpType string, base *baseTransporter) (RelayClient, error) {
 	switch tpType {
 	case constant.Transport_RAW:
 		return newRawClient(base)
-	// case constant.Transport_WS:
-	// return newWsClient(base)
+	case constant.Transport_WS:
+		return newWsClient(base)
 	// case constant.Transport_WSS:
 	// 	return newWSSClient(raw)
 	// case constant.Transport_MWSS:
@@ -40,8 +40,8 @@ func NewRelayServer(tpType string, base *baseTransporter) (RelayServer, error) {
 	switch tpType {
 	case constant.Transport_RAW:
 		return newRawServer(base)
-	// case constant.Transport_WS:
-	// return newWsServer(base)
+	case constant.Transport_WS:
+		return newWsServer(base)
 	// case constant.Transport_WSS:
 	// 	return newWSSServer(raw)
 	// case constant.Transport_MWSS:

@@ -11,6 +11,7 @@ import (
 )
 
 var _ RelayClient = &RawClient{}
+var _ RelayServer = &RawServer{}
 
 type RawClient struct {
 	*baseTransporter
@@ -54,7 +55,6 @@ func newRawServer(base *baseTransporter) (*RawServer, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	relayer, err := NewRelayClient(base.cfg.TransportType, base)
 	if err != nil {
 		return nil, err
@@ -78,7 +78,7 @@ func (s *RawServer) ListenAndServe() error {
 			return err
 		}
 		go func(c net.Conn) {
-			if err := s.baseTransporter.RelayTCPConn(c, s.relayer.TCPHandShake); err != nil {
+			if err := s.RelayTCPConn(c, s.relayer.TCPHandShake); err != nil {
 				s.l.Errorf("RelayTCPConn error: %s", err.Error())
 			}
 		}(c)
