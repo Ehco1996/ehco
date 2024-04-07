@@ -9,29 +9,45 @@ import (
 
 type TCPHandShakeF func(remote *lb.Node) (net.Conn, error)
 
-// RelayTransporter
-type RelayTransporter interface {
-	// client side func
+type RelayClient interface {
 	TCPHandShake(remote *lb.Node) (net.Conn, error)
 	RelayTCPConn(c net.Conn, handshakeF TCPHandShakeF) error
-
-	// server side func
-	ListenAndServe() error
-	Close() error
 }
 
-func NewRelayTransporter(tpType string, base *baseTransporter) (RelayTransporter, error) {
+func NewRelayClient(tpType string, base *baseTransporter) (RelayClient, error) {
 	switch tpType {
 	case constant.Transport_RAW:
 		return newRawClient(base)
-	case constant.Transport_WS:
-		return newWsClient(base)
+	// case constant.Transport_WS:
+	// return newWsClient(base)
 	// case constant.Transport_WSS:
 	// 	return newWSSClient(raw)
 	// case constant.Transport_MWSS:
 	// 	return newMWSSClient(raw)
 	// case constant.Transport_MTCP:
 	// 	return newMTCPClient(raw)
+	default:
+		panic("unsupported transport type")
+	}
+}
+
+type RelayServer interface {
+	ListenAndServe() error
+	Close() error
+}
+
+func NewRelayServer(tpType string, base *baseTransporter) (RelayServer, error) {
+	switch tpType {
+	case constant.Transport_RAW:
+		return newRawServer(base)
+	// case constant.Transport_WS:
+	// return newWsServer(base)
+	// case constant.Transport_WSS:
+	// 	return newWSSServer(raw)
+	// case constant.Transport_MWSS:
+	// 	return newMWSSServer(raw)
+	// case constant.Transport_MTCP:
+	// 	return newMTCPServer(raw)
 	default:
 		panic("unsupported transport type")
 	}

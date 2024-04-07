@@ -10,24 +10,17 @@ import (
 	"github.com/Ehco1996/ehco/pkg/lb"
 )
 
-var _ RelayTransporter = &RawClient{}
+var _ RelayClient = &RawClient{}
 
 type RawClient struct {
 	*baseTransporter
 
-	dialer       *net.Dialer
-	localTCPAddr *net.TCPAddr
-	lis          *net.TCPListener
+	dialer *net.Dialer
 }
 
 func newRawClient(base *baseTransporter) (*RawClient, error) {
-	localTCPAddr, err := base.GetTCPListenAddr()
-	if err != nil {
-		return nil, err
-	}
 	r := &RawClient{
 		baseTransporter: base,
-		localTCPAddr:    localTCPAddr,
 		dialer:          &net.Dialer{Timeout: constant.DialTimeOut},
 	}
 	return r, nil
@@ -45,27 +38,47 @@ func (raw *RawClient) TCPHandShake(remote *lb.Node) (net.Conn, error) {
 	return rc, nil
 }
 
-func (s *RawClient) Close() error {
+type RawServer struct {
+	*baseTransporter
+	localTCPAddr *net.TCPAddr
+	lis          *net.TCPListener
+	relayer      RelayClient
+}
+
+func newRawServer(base *baseTransporter) (*RawServer, error) {
+	addr, err := base.GetTCPListenAddr()
+	if err != nil {
+		return nil, err
+	}
+	lis, err := net.ListenTCP("tcp", addr)
+	if err != nil {
+		return nil, err
+	}
+
+	relayer, err := NewRelayClient(base.cfg.TransportType, base)
+	if err != nil {
+		return nil, err
+	}
+	return &RawServer{
+		lis:             lis,
+		baseTransporter: base,
+		localTCPAddr:    addr,
+		relayer:         relayer,
+	}, nil
+}
+
+func (s *RawServer) Close() error {
 	return s.lis.Close()
 }
 
-func (s *RawClient) ListenAndServe() error {
-	lis, err := net.ListenTCP("tcp", s.localTCPAddr)
-	if err != nil {
-		return err
-	}
-	s.lis = lis
-	tp, err := NewRelayTransporter(s.cfg.TransportType, s.baseTransporter)
-	if err != nil {
-		return err
-	}
+func (s *RawServer) ListenAndServe() error {
 	for {
 		c, err := s.lis.AcceptTCP()
 		if err != nil {
 			return err
 		}
 		go func(c net.Conn) {
-			if err := s.baseTransporter.RelayTCPConn(c, tp.TCPHandShake); err != nil {
+			if err := s.baseTransporter.RelayTCPConn(c, s.relayer.TCPHandShake); err != nil {
 				s.l.Errorf("RelayTCPConn error: %s", err.Error())
 			}
 		}(c)
