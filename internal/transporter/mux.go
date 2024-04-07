@@ -136,3 +136,66 @@ func (tr *smuxTransporter) Dial(ctx context.Context, addr string) (conn net.Conn
 	curSM.streamList = append(curSM.streamList, stream)
 	return stream, nil
 }
+
+type muxServer interface {
+	ListenAndServe() error
+	Accept() (net.Conn, error)
+	Close() error
+	mux(net.Conn)
+}
+
+func newMuxServer(listenAddr string, l *zap.SugaredLogger) *muxServerImpl {
+	return &muxServerImpl{
+		errChan:    make(chan error, 1),
+		connChan:   make(chan net.Conn, 1024),
+		listenAddr: listenAddr,
+		l:          l,
+	}
+}
+
+type muxServerImpl struct {
+	errChan  chan error
+	connChan chan net.Conn
+
+	listenAddr string
+	l          *zap.SugaredLogger
+}
+
+func (s *muxServerImpl) Accept() (net.Conn, error) {
+	select {
+	case conn := <-s.connChan:
+		return conn, nil
+	case err := <-s.errChan:
+		return nil, err
+	}
+}
+
+func (s *muxServerImpl) mux(conn net.Conn) {
+	defer conn.Close()
+
+	cfg := smux.DefaultConfig()
+	cfg.KeepAliveDisabled = true
+	session, err := smux.Server(conn, cfg)
+	if err != nil {
+		s.l.Debugf("server err %s - %s : %s", conn.RemoteAddr(), s.listenAddr, err)
+		return
+	}
+	defer session.Close() // nolint: errcheck
+
+	s.l.Debugf("session init %s  %s", conn.RemoteAddr(), s.listenAddr)
+	defer s.l.Debugf("session close %s >-< %s", conn.RemoteAddr(), s.listenAddr)
+
+	for {
+		stream, err := session.AcceptStream()
+		if err != nil {
+			s.l.Errorf("accept stream err: %s", err)
+			break
+		}
+		select {
+		case s.connChan <- stream:
+		default:
+			stream.Close() // nolint: errcheck
+			s.l.Infof("%s - %s: connection queue is full", conn.RemoteAddr(), conn.LocalAddr())
+		}
+	}
+}

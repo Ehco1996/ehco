@@ -5,6 +5,8 @@ import (
 	"fmt"
 
 	"github.com/Ehco1996/ehco/internal/constant"
+
+	"github.com/Ehco1996/ehco/pkg/lb"
 	"go.uber.org/zap"
 )
 
@@ -106,16 +108,31 @@ func (r *Config) Different(new *Config) bool {
 }
 
 // todo make this shorter and more readable
-func (r *Config) defaultLabel() string {
-	defaultLabel := fmt.Sprintf("<At=%s Over=%s TCP-To=%s UDP-To=%s Through=%s>",
-		r.Listen, r.ListenType, r.TCPRemotes, r.UDPRemotes, r.TransportType)
+func (r *Config) DefaultLabel() string {
+	defaultLabel := fmt.Sprintf("<At=%s TCP-To=%s TP=%s>",
+		r.Listen, r.TCPRemotes, r.TransportType)
 	return defaultLabel
 }
 
 func (r *Config) Adjust() error {
 	if r.Label == "" {
-		r.Label = r.defaultLabel()
+		r.Label = r.DefaultLabel()
 		zap.S().Debugf("label is empty, set default label:%s", r.Label)
 	}
 	return nil
+}
+
+func (r *Config) ToTCPRemotes() lb.RoundRobin {
+	tcpNodeList := make([]*lb.Node, len(r.TCPRemotes))
+	for idx, addr := range r.TCPRemotes {
+		tcpNodeList[idx] = &lb.Node{
+			Address: addr,
+			Label:   fmt.Sprintf("%s-%s", r.Label, addr),
+		}
+	}
+	return lb.NewRoundRobin(tcpNodeList)
+}
+
+func (r *Config) GetLoggerName() string {
+	return fmt.Sprintf("%s(%s<->%s)", r.Label, r.ListenType, r.TransportType)
 }

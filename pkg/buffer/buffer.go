@@ -1,4 +1,4 @@
-package transporter
+package buffer
 
 import (
 	"github.com/Ehco1996/ehco/internal/constant"

@@ -1,4 +1,3 @@
-// nolint: errcheck
 package transporter
 
 import (
@@ -7,29 +6,32 @@ import (
 	"time"
 
 	"github.com/xtaci/smux"
-	"go.uber.org/zap"
 
-	"github.com/Ehco1996/ehco/internal/conn"
-	"github.com/Ehco1996/ehco/internal/constant"
 	"github.com/Ehco1996/ehco/internal/metrics"
 	"github.com/Ehco1996/ehco/pkg/lb"
 )
 
-type MTCPClient struct {
+var (
+	_ RelayClient = &MtcpClient{}
+	_ RelayServer = &MtcpServer{}
+)
+
+type MtcpClient struct {
 	*RawClient
-	dialer *net.Dialer
-	mtp    *smuxTransporter
+	muxTP *smuxTransporter
 }
 
-func newMTCPClient(raw *RawClient) *MTCPClient {
-	dialer := &net.Dialer{Timeout: constant.DialTimeOut}
-	c := &MTCPClient{dialer: dialer, RawClient: raw}
-	mtp := NewSmuxTransporter(raw.l.Named("mtcp"), c.initNewSession)
-	c.mtp = mtp
-	return c
+func newMtcpClient(base *baseTransporter) (*MtcpClient, error) {
+	raw, err := newRawClient(base)
+	if err != nil {
+		return nil, err
+	}
+	c := &MtcpClient{RawClient: raw}
+	c.muxTP = NewSmuxTransporter(raw.l.Named("mtcp"), c.initNewSession)
+	return c, nil
 }
 
-func (c *MTCPClient) initNewSession(ctx context.Context, addr string) (*smux.Session, error) {
+func (c *MtcpClient) initNewSession(ctx context.Context, addr string) (*smux.Session, error) {
 	rc, err := c.dialer.Dial("tcp", addr)
 	if err != nil {
 		return nil, err
@@ -45,9 +47,9 @@ func (c *MTCPClient) initNewSession(ctx context.Context, addr string) (*smux.Ses
 	return session, nil
 }
 
-func (s *MTCPClient) dialRemote(remote *lb.Node) (net.Conn, error) {
+func (s *MtcpClient) TCPHandShake(remote *lb.Node) (net.Conn, error) {
 	t1 := time.Now()
-	mtcpc, err := s.mtp.Dial(context.TODO(), remote.Address)
+	mtcpc, err := s.muxTP.Dial(context.TODO(), remote.Address)
 	if err != nil {
 		return nil, err
 	}
@@ -57,87 +59,28 @@ func (s *MTCPClient) dialRemote(remote *lb.Node) (net.Conn, error) {
 	return mtcpc, nil
 }
 
-func (s *MTCPClient) HandleTCPConn(c net.Conn, remote *lb.Node) error {
-	clonedRemote := remote.Clone()
-	mtcpc, err := s.dialRemote(clonedRemote)
+type MtcpServer struct {
+	*RawServer
+	*muxServerImpl
+}
+
+func newMtcpServer(base *baseTransporter) (*MtcpServer, error) {
+	raw, err := newRawServer(base)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	s.l.Infof("HandleTCPConn from:%s to:%s", c.LocalAddr(), remote.Address)
-	relayConn := conn.NewRelayConn(s.relayLabel, c, mtcpc, conn.WithHandshakeDuration(clonedRemote.HandShakeDuration))
-	s.cmgr.AddConnection(relayConn)
-	defer s.cmgr.RemoveConnection(relayConn)
-	return relayConn.Transport(remote.Label)
+	s := &MtcpServer{
+		RawServer:     raw,
+		muxServerImpl: newMuxServer(base.cfg.Listen, base.l.Named("mtcp")),
+	}
+
+	return s, nil
 }
 
-type MTCPServer struct {
-	raw        *RawClient
-	listenAddr string
-	listener   net.Listener
-	l          *zap.SugaredLogger
-
-	errChan  chan error
-	connChan chan net.Conn
-}
-
-func NewMTCPServer(listenAddr string, raw *RawClient, l *zap.SugaredLogger) *MTCPServer {
-	return &MTCPServer{
-		l:          l,
-		raw:        raw,
-		listenAddr: listenAddr,
-		errChan:    make(chan error, 1),
-		connChan:   make(chan net.Conn, 1024),
-	}
-}
-
-func (s *MTCPServer) mux(conn net.Conn) {
-	defer conn.Close()
-
-	cfg := smux.DefaultConfig()
-	cfg.KeepAliveDisabled = true
-	session, err := smux.Server(conn, cfg)
-	if err != nil {
-		s.l.Debugf("server err %s - %s : %s", conn.RemoteAddr(), s.listenAddr, err)
-		return
-	}
-	defer session.Close()
-
-	s.l.Debugf("session init %s  %s", conn.RemoteAddr(), s.listenAddr)
-	defer s.l.Debugf("session close %s >-< %s", conn.RemoteAddr(), s.listenAddr)
-
-	for {
-		stream, err := session.AcceptStream()
-		if err != nil {
-			s.l.Errorf("accept stream err: %s", err)
-			break
-		}
-		select {
-		case s.connChan <- stream:
-		default:
-			stream.Close()
-			s.l.Infof("%s - %s: connection queue is full", conn.RemoteAddr(), conn.LocalAddr())
-		}
-	}
-}
-
-func (s *MTCPServer) Accept() (conn net.Conn, err error) {
-	select {
-	case conn = <-s.connChan:
-	case err = <-s.errChan:
-	}
-	return
-}
-
-func (s *MTCPServer) ListenAndServe() error {
-	lis, err := net.Listen("tcp", s.listenAddr)
-	if err != nil {
-		return err
-	}
-	s.listener = lis
-
+func (s *MtcpServer) ListenAndServe() error {
 	go func() {
 		for {
-			c, err := lis.Accept()
+			c, err := s.lis.Accept()
 			if err != nil {
 				s.errChan <- err
 				continue
@@ -152,14 +95,13 @@ func (s *MTCPServer) ListenAndServe() error {
 			return e
 		}
 		go func(c net.Conn) {
-			remote := s.raw.GetRemote()
-			if err := s.raw.HandleTCPConn(c, remote); err != nil {
-				s.l.Errorf("HandleTCPConn meet error from:%s to:%s err:%s", c.RemoteAddr(), remote.Address, err)
+			if err := s.RelayTCPConn(c, s.relayer.TCPHandShake); err != nil {
+				s.l.Errorf("RelayTCPConn error: %s", err.Error())
 			}
 		}(conn)
 	}
 }
 
-func (s *MTCPServer) Close() error {
-	return s.listener.Close()
+func (s *MtcpServer) Close() error {
+	return s.lis.Close()
 }

@@ -8,27 +8,35 @@ import (
 
 	"github.com/gobwas/ws"
 	"github.com/labstack/echo/v4"
-	"go.uber.org/zap"
 
-	"github.com/Ehco1996/ehco/internal/conn"
 	"github.com/Ehco1996/ehco/internal/constant"
 	"github.com/Ehco1996/ehco/internal/metrics"
 	"github.com/Ehco1996/ehco/internal/web"
 	"github.com/Ehco1996/ehco/pkg/lb"
 )
 
+var (
+	_ RelayClient = &WsClient{}
+	_ RelayServer = &WsServer{}
+)
+
 type WsClient struct {
-	*RawClient
+	*baseTransporter
+
+	dialer *ws.Dialer
 }
 
-func newWsClient(raw *RawClient) *WsClient {
-	return &WsClient{RawClient: raw}
+func newWsClient(base *baseTransporter) (*WsClient, error) {
+	s := &WsClient{
+		baseTransporter: base,
+		dialer:          &ws.Dialer{Timeout: constant.DialTimeOut},
+	}
+	return s, nil
 }
 
-func (s *WsClient) dialRemote(remote *lb.Node) (net.Conn, error) {
+func (s *WsClient) TCPHandShake(remote *lb.Node) (net.Conn, error) {
 	t1 := time.Now()
-	d := ws.Dialer{Timeout: constant.DialTimeOut}
-	wsc, _, _, err := d.Dial(context.TODO(), remote.Address+"/handshake/")
+	wsc, _, _, err := s.dialer.Dial(context.TODO(), remote.Address+"/handshake/")
 	if err != nil {
 		return nil, err
 	}
@@ -38,57 +46,51 @@ func (s *WsClient) dialRemote(remote *lb.Node) (net.Conn, error) {
 	return wsc, nil
 }
 
-func (s *WsClient) HandleTCPConn(c net.Conn, remote *lb.Node) error {
-	clonedRemote := remote.Clone()
-	wsc, err := s.dialRemote(clonedRemote)
-	if err != nil {
-		return err
-	}
-	s.l.Infof("HandleTCPConn from %s to %s", c.LocalAddr(), remote.Address)
-	relayConn := conn.NewRelayConn(
-		s.relayLabel, c, wsc,
-		conn.WithHandshakeDuration(clonedRemote.HandShakeDuration))
-	s.cmgr.AddConnection(relayConn)
-	defer s.cmgr.RemoveConnection(relayConn)
-	return relayConn.Transport(remote.Label)
-}
+type WsServer struct {
+	*baseTransporter
 
-type WSServer struct {
-	raw        *RawClient
 	e          *echo.Echo
 	httpServer *http.Server
-	l          *zap.SugaredLogger
+	relayer    RelayClient
 }
 
-func NewWSServer(listenAddr string, raw *RawClient, l *zap.SugaredLogger) *WSServer {
-	s := &WSServer{
-		l:          l,
-		raw:        raw,
-		httpServer: &http.Server{Addr: listenAddr, ReadHeaderTimeout: 30 * time.Second},
+func newWsServer(base *baseTransporter) (*WsServer, error) {
+	localTCPAddr, err := base.GetTCPListenAddr()
+	if err != nil {
+		return nil, err
+	}
+	s := &WsServer{
+		baseTransporter: base,
+		httpServer: &http.Server{
+			Addr: localTCPAddr.String(), ReadHeaderTimeout: 30 * time.Second,
+		},
 	}
 	e := web.NewEchoServer()
 	e.GET("/", echo.WrapHandler(web.MakeIndexF()))
 	e.GET("/handshake/", echo.WrapHandler(http.HandlerFunc(s.HandleRequest)))
 	s.e = e
-	s.httpServer.Handler = e
-	return s
+	relayer, err := NewRelayClient(base.cfg.TransportType, base)
+	if err != nil {
+		return nil, err
+	}
+	s.relayer = relayer
+	return s, nil
 }
 
-func (s *WSServer) ListenAndServe() error {
+func (s *WsServer) ListenAndServe() error {
 	return s.e.StartServer(s.httpServer)
 }
 
-func (s *WSServer) Close() error {
+func (s *WsServer) Close() error {
 	return s.e.Close()
 }
 
-func (s *WSServer) HandleRequest(w http.ResponseWriter, req *http.Request) {
+func (s *WsServer) HandleRequest(w http.ResponseWriter, req *http.Request) {
 	wsc, _, _, err := ws.UpgradeHTTP(req, w)
 	if err != nil {
 		return
 	}
-	remote := s.raw.GetRemote()
-	if err := s.raw.HandleTCPConn(wsc, remote); err != nil {
-		s.l.Errorf("HandleTCPConn meet error from:%s to:%s err:%s", wsc.RemoteAddr(), remote.Address, err)
+	if err := s.RelayTCPConn(wsc, s.relayer.TCPHandShake); err != nil {
+		s.l.Errorf("RelayTCPConn error: %s", err.Error())
 	}
 }

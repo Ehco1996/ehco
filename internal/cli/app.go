@@ -10,7 +10,7 @@ import (
 	cli "github.com/urfave/cli/v2"
 )
 
-var cliLogger = log.MustNewLogger("info").Sugar().Named("cli-app")
+var cliLogger = log.MustNewLogger("info").Sugar().Named("cli")
 
 func startAction(ctx *cli.Context) error {
 	cfg, err := InitConfigAndComponents()

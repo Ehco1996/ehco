@@ -1,42 +1,54 @@
 package transporter
 
 import (
-	"fmt"
 	"net"
 
-	"github.com/Ehco1996/ehco/internal/cmgr"
 	"github.com/Ehco1996/ehco/internal/constant"
-	"github.com/Ehco1996/ehco/internal/relay/conf"
 	"github.com/Ehco1996/ehco/pkg/lb"
 )
 
-// RelayTransporter
-type RelayTransporter interface {
-	dialRemote(remote *lb.Node) (net.Conn, error)
-	HandleTCPConn(c net.Conn, remote *lb.Node) error
-	GetRemote() *lb.Node
+type TCPHandShakeF func(remote *lb.Node) (net.Conn, error)
+
+type RelayClient interface {
+	TCPHandShake(remote *lb.Node) (net.Conn, error)
+	RelayTCPConn(c net.Conn, handshakeF TCPHandShakeF) error
 }
 
-func NewRelayTransporter(cfg *conf.Config, connMgr cmgr.Cmgr) RelayTransporter {
-	tcpNodeList := make([]*lb.Node, len(cfg.TCPRemotes))
-	for idx, addr := range cfg.TCPRemotes {
-		tcpNodeList[idx] = &lb.Node{
-			Address: addr,
-			Label:   fmt.Sprintf("%s-%s", cfg.Label, addr),
-		}
-	}
-	raw := newRawClient(cfg.Label, lb.NewRoundRobin(tcpNodeList), connMgr)
-	switch cfg.TransportType {
+func NewRelayClient(tpType string, base *baseTransporter) (RelayClient, error) {
+	switch tpType {
 	case constant.Transport_RAW:
-		return raw
+		return newRawClient(base)
 	case constant.Transport_WS:
-		return newWsClient(raw)
+		return newWsClient(base)
 	case constant.Transport_WSS:
-		return newWSSClient(raw)
+		return newWssClient(base)
 	case constant.Transport_MWSS:
-		return newMWSSClient(raw)
+		return newMwssClient(base)
 	case constant.Transport_MTCP:
-		return newMTCPClient(raw)
+		return newMtcpClient(base)
+	default:
+		panic("unsupported transport type")
 	}
-	return nil
+}
+
+type RelayServer interface {
+	ListenAndServe() error
+	Close() error
+}
+
+func NewRelayServer(tpType string, base *baseTransporter) (RelayServer, error) {
+	switch tpType {
+	case constant.Transport_RAW:
+		return newRawServer(base)
+	case constant.Transport_WS:
+		return newWsServer(base)
+	case constant.Transport_WSS:
+		return newWssServer(base)
+	case constant.Transport_MWSS:
+		return newMwssServer(base)
+	case constant.Transport_MTCP:
+		return newMtcpServer(base)
+	default:
+		panic("unsupported transport type")
+	}
 }
