@@ -166,9 +166,12 @@ jobs:
           echo "Creating manifest list..."
           AMD64_DIGEST=$(ls amd64/)
           ARM64_DIGEST=$(ls arm64/)
-          docker buildx imagetools create $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
-            --append ${{ env.REGISTRY_IMAGE }}@sha256:$AMD64_DIGEST \
-            --append ${{ env.REGISTRY_IMAGE }}@sha256:$ARM64_DIGEST
+          echo "AMD64_DIGEST: $AMD64_DIGEST"
+          echo "ARM64_DIGEST: $ARM64_DIGEST"
+          docker buildx imagetools create \
+            --tag ${{ env.REGISTRY_IMAGE }}:latest \
+            ${{ env.REGISTRY_IMAGE }}@sha256:$AMD64_DIGEST \
+            ${{ env.REGISTRY_IMAGE }}@sha256:$ARM64_DIGEST
 
       - name: Inspect image
         run: |
