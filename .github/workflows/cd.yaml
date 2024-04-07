@@ -84,8 +84,6 @@ jobs:
       - name: Rename the binary
         run: |
           cp /tmp/ehco/ehco-${{ matrix.platform }} /tmp/ehco/ehco
-          chmod +x /tmp/ehco/ehco
-          /tmp/ehco/ehco -v
 
       - name: Set up qemu
         uses: docker/setup-qemu-action@v3
@@ -106,8 +104,9 @@ jobs:
           context: /tmp/ehco
           file: /tmp/ehco/Dockerfile
           platforms: linux/${{ matrix.platform }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          no-cache: true
+          # cache-from: type=gha
+          # cache-to: type=gha,mode=max
           outputs: type=image,name=${{ env.REGISTRY_IMAGE }},push-by-digest=true,name-canonical=true,push=true
 
       - name: Export digest
