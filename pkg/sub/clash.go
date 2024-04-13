@@ -115,15 +115,38 @@ func (c *ClashSub) Refresh() error {
 // a new free port will be used as relay listen port for each group
 func (c *ClashSub) ToRelayConfigs(listenHost string) ([]*relay_cfg.Config, error) {
 	relayConfigs := []*relay_cfg.Config{}
+	portSet := map[int]struct{}{}
+
+	const minPort = 10000
+	const maxPort = 65535
+	nextPort := minPort
+	getNextAvailablePort := func() int {
+		for ; nextPort <= maxPort; nextPort++ {
+			if _, occupied := portSet[nextPort]; !occupied {
+				portSet[nextPort] = struct{}{}
+				defer func() { nextPort++ }()
+				return nextPort
+			}
+		}
+		return -1
+	}
+
 	// generate relay config for each proxy
 	for _, proxy := range *c.cCfg.Proxies {
+		proxyPort, err := strconv.Atoi(proxy.Port)
+		if err != nil {
+			return nil, err
+		}
+		if _, ok := portSet[proxyPort]; ok {
+			proxyPort = getNextAvailablePort()
+		}
 		var newName string
 		if strings.HasSuffix(proxy.Name, "-") {
 			newName = fmt.Sprintf("%s%s", proxy.Name, c.Name)
 		} else {
 			newName = fmt.Sprintf("%s-%s", proxy.Name, c.Name)
 		}
-		rc, err := proxy.ToRelayConfig(listenHost, proxy.Port, newName)
+		rc, err := proxy.ToRelayConfig(listenHost, strconv.Itoa(proxyPort), newName)
 		if err != nil {
 			return nil, err
 		}
@@ -133,7 +156,6 @@ func (c *ClashSub) ToRelayConfigs(listenHost string) ([]*relay_cfg.Config, error
 	// generate relay config for each group
 	groupProxy := c.cCfg.groupByLongestCommonPrefix()
 	for groupName, proxies := range groupProxy {
-		// only use first proxy will be show in proxy provider, other will be merged into load balance in relay
 		groupLeader := proxies[0].getOrCreateGroupLeader()
 		var newName string
 		if strings.HasSuffix(groupName, "-") {
@@ -141,28 +163,17 @@ func (c *ClashSub) ToRelayConfigs(listenHost string) ([]*relay_cfg.Config, error
 		} else {
 			newName = fmt.Sprintf("%s-lb", groupName)
 		}
-
-		// group listen port is the max port in group + 1
-		port := 0
-		for _, proxy := range proxies {
-			pp, err := strconv.Atoi(proxy.Port)
-			if err != nil {
-				return nil, err
-			}
-			if pp > port {
-				port = pp
-			}
+		port := getNextAvailablePort()
+		if port == -1 {
+			return nil, fmt.Errorf("no available port")
 		}
-		port++
 		rc, err := groupLeader.ToRelayConfig(listenHost, strconv.Itoa(port), newName)
 		if err != nil {
 			return nil, err
 		}
-
 		// add other proxies address in group to relay config
 		for _, proxy := range proxies[1:] {
 			remote := net.JoinHostPort(proxy.rawServer, proxy.rawPort)
-			// skip duplicate remote, because the relay cfg for this leader will be cached when first init
 			if strInArray(remote, rc.TCPRemotes) {
 				continue
 			}
