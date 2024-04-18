@@ -50,7 +50,7 @@ Type=simple
 LimitNOFILE=65535
 ExecStart=$EXECUTABLE_INSTALL_PATH -c "$API_OR_CONFIG_PATH"
 WorkingDirectory=~
-NoNewPrivileges=trues
+NoNewPrivileges=true
 Restart=always
 
 [Install]
