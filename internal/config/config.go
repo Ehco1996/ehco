@@ -49,8 +49,8 @@ func (c *Config) NeedSyncFromServer() bool {
 	return strings.Contains(c.PATH, "http")
 }
 
-func (c *Config) LoadConfig() error {
-	if c.ReloadInterval > 0 && time.Since(c.lastLoadTime).Seconds() < float64(c.ReloadInterval) {
+func (c *Config) LoadConfig(force bool) error {
+	if c.ReloadInterval > 0 && time.Since(c.lastLoadTime).Seconds() < float64(c.ReloadInterval) && !force {
 		c.l.Warnf("Skip Load Config, last load time: %s", c.lastLoadTime)
 		return nil
 	}

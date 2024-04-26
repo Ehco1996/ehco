@@ -1,5 +1,5 @@
 package reloader
 
 type Reloader interface {
-	Reload() error
+	Reload(force bool) error
 }

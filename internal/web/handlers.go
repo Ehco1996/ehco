@@ -52,7 +52,7 @@ func (s *Server) HandleClashProxyProvider(c echo.Context) error {
 
 func (s *Server) handleClashProxyProvider(c echo.Context, subName string, grouped bool) error {
 	if s.relayServerReloader != nil {
-		if err := s.relayServerReloader.Reload(); err != nil {
+		if err := s.relayServerReloader.Reload(true); err != nil {
 			return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 		}
 	} else {
@@ -85,7 +85,7 @@ func (s *Server) HandleReload(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "reload not support")
 	}
 
-	err := s.relayServerReloader.Reload()
+	err := s.relayServerReloader.Reload(true)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}

@@ -116,7 +116,7 @@ func (s *Server) WatchAndReload(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-s.reloadCH:
-			if err := s.Reload(); err != nil {
+			if err := s.Reload(false); err != nil {
 				s.l.Errorf("auto reloading relay conf meet error: %s will retry in next loop", err)
 			}
 		}

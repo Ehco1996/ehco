@@ -9,7 +9,7 @@ import (
 // make sure Server implements the reloader.Reloader interface
 var _ reloader.Reloader = (*Server)(nil)
 
-func (s *Server) Reload() error {
+func (s *Server) Reload(force bool) error {
 	// k:name v: *Config
 	oldRelayCfgM := make(map[string]*conf.Config)
 	for _, v := range s.cfg.RelayConfigs {
@@ -18,7 +18,7 @@ func (s *Server) Reload() error {
 	allRelayLabelList := make([]string, 0)
 
 	// NOTE: this is for reuse cached clash sub, because clash sub to relay config will change port every time when call
-	if err := s.cfg.LoadConfig(); err != nil {
+	if err := s.cfg.LoadConfig(force); err != nil {
 		s.l.Error("load new cfg meet error", zap.Error(err))
 		return err
 	}

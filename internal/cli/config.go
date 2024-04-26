@@ -19,7 +19,7 @@ import (
 func loadConfig() (cfg *config.Config, err error) {
 	if ConfigPath != "" {
 		cfg = config.NewConfig(ConfigPath)
-		if err := cfg.LoadConfig(); err != nil {
+		if err := cfg.LoadConfig(true); err != nil {
 			return nil, err
 		}
 	} else {
