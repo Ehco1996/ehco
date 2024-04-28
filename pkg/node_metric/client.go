@@ -64,74 +64,115 @@ func NewNodeMetricReader(metricsURL string) *nodeMetricReader {
 	}
 }
 
-func (b *nodeMetricReader) parseCpuInfo(lines *[]string, nm *NodeMetrics) error {
-	var (
-		cpuCores  int
-		cpuLoad1  float64
-		cpuLoad5  float64
-		cpuLoad15 float64
+func (b *nodeMetricReader) parseCpuInfo(metricMap map[string]*dto.MetricFamily, nm *NodeMetrics) error {
+	handleMetric := func(metricName string, handleValue func(float64, string)) error {
+		metric, ok := metricMap[metricName]
+		if !ok {
+			return fmt.Errorf("%s not found", metricName)
+		}
 
+		for _, m := range metric.Metric {
+			g := m.GetCounter()
+			mode := ""
+			for _, label := range m.GetLabel() {
+				if label.GetName() == "mode" {
+					mode = label.GetValue()
+				}
+			}
+			handleValue(g.GetValue(), mode)
+		}
+		return nil
+	}
+
+	var (
 		totalIdleTime float64
 		totalCpuTime  float64
+		cpuCores      int
 	)
 
-	for _, line := range *lines {
-		if strings.HasPrefix(line, "node_cpu_seconds_total") {
-			time := parseFloat(strings.Split(line, " ")[1])
-			totalCpuTime += time
-			if strings.Contains(line, `mode="idle"`) {
-				totalIdleTime += time
-				cpuCores++
-			}
+	err := handleMetric("node_cpu_seconds_total", func(val float64, mode string) {
+		totalCpuTime += val
+		if mode == "idle" {
+			totalIdleTime += val
+			cpuCores++
 		}
-		if strings.HasPrefix(line, "node_load1") && !strings.HasPrefix(line, "node_load15") {
-			load1 := strings.Split(line, " ")[1]
-			cpuLoad1 = parseFloat(load1)
-		}
-		if strings.HasPrefix(line, "node_load5") {
-			load5 := strings.Split(line, " ")[1]
-			cpuLoad5 = parseFloat(load5)
-		}
-		if strings.HasPrefix(line, "node_load15") {
-			load15 := strings.Split(line, " ")[1]
-			cpuLoad15 = parseFloat(load15)
-		}
+	})
+	if err != nil {
+		return err
 	}
+
 	nm.CpuCoreCount = cpuCores
 	nm.CpuUsagePercent = 100 * (totalCpuTime - totalIdleTime) / totalCpuTime
-	nm.CpuLoadInfo = fmt.Sprintf("%.2f | %.2f | %.2f", cpuLoad1, cpuLoad5, cpuLoad15)
+	for _, load := range []string{"1", "5", "15"} {
+		loadMetricName := fmt.Sprintf("node_load%s", load)
+		loadMetric, ok := metricMap[loadMetricName]
+		if !ok {
+			return fmt.Errorf("%s not found", loadMetricName)
+		}
+		for _, m := range loadMetric.Metric {
+			g := m.GetGauge()
+			nm.CpuLoadInfo += fmt.Sprintf("%.2f|", g.GetValue())
+		}
+	}
+	nm.CpuLoadInfo = strings.TrimRight(nm.CpuLoadInfo, "|")
 	return nil
 }
 
-func (b *nodeMetricReader) parseMemoryInfo(lines *[]string, nm *NodeMetrics) error {
-	var (
-		totalMem, usageMem, freeMem float64
-	)
-	for _, line := range *lines {
-		// handle macos
-		if strings.HasPrefix(line, "node_memory_total_bytes") {
-			totalMem = parseFloat(strings.Split(line, " ")[1])
+func (b *nodeMetricReader) parseMemoryInfo(metricMap map[string]*dto.MetricFamily, nm *NodeMetrics) error {
+	handleMetric := func(metricName string, handleValue func(float64)) error {
+		metric, ok := metricMap[metricName]
+		if !ok {
+			return fmt.Errorf("%s not found", metricName)
 		}
-		if strings.HasPrefix(line, "node_memory_active_bytes") {
-			usageMem += parseFloat(strings.Split(line, " ")[1])
+		for _, m := range metric.Metric {
+			g := m.GetGauge()
+			handleValue(g.GetValue())
 		}
-		if strings.HasPrefix(line, "node_memory_inactive_bytes") {
-			usageMem += parseFloat(strings.Split(line, " ")[1])
+		return nil
+	}
+
+	isMac := false
+	if _, ok := metricMap["node_memory_total_bytes"]; ok {
+		isMac = true
+	}
+
+	if isMac {
+		err := handleMetric("node_memory_total_bytes", func(val float64) {
+			nm.MemoryTotalBytes = val
+		})
+		if err != nil {
+			return err
 		}
 
-		// handle linux
-		if strings.HasPrefix(line, "node_memory_MemTotal_bytes") {
-			totalMem = parseFloat(strings.Split(line, " ")[1])
+		err = handleMetric("node_memory_active_bytes", func(val float64) {
+			nm.MemoryUsageBytes += val
+		})
+		if err != nil {
+			return err
 		}
-		if strings.HasPrefix(line, "node_memory_MemAvailable_bytes") {
-			freeMem = parseFloat(strings.Split(line, " ")[1])
+
+		err = handleMetric("node_memory_inactive_bytes", func(val float64) {
+			nm.MemoryUsageBytes += val
+		})
+		if err != nil {
+			return err
+		}
+	} else {
+		err := handleMetric("node_memory_MemTotal_bytes", func(val float64) {
+			nm.MemoryTotalBytes = val
+		})
+		if err != nil {
+			return err
+		}
+
+		err = handleMetric("node_memory_MemAvailable_bytes", func(val float64) {
+			nm.MemoryUsageBytes = nm.MemoryTotalBytes - val
+		})
+		if err != nil {
+			return err
 		}
 	}
-	nm.MemoryTotalBytes = totalMem
-	if usageMem == 0 {
-		usageMem = totalMem - freeMem
-	}
-	nm.MemoryUsageBytes = usageMem
+
 	return nil
 }
 
@@ -145,63 +186,51 @@ func getDiskName(devicePath string) string {
 }
 
 func (b *nodeMetricReader) parseDiskInfo(metricMap map[string]*dto.MetricFamily, nm *NodeMetrics) error {
-	// handle disk total
-	diskMap := make(map[string]float64)
-	totalMetric, ok := metricMap["node_filesystem_size_bytes"]
-	if !ok {
-		return fmt.Errorf("node_filesystem_size_bytes not found")
+	handleMetric := func(metricName string, handleValue func(float64)) error {
+		forMac := false
+		diskMap := make(map[string]float64)
+		metric, ok := metricMap[metricName]
+		if !ok {
+			return fmt.Errorf("%s not found", metricName)
+		}
+		for _, m := range metric.Metric {
+			g := m.GetGauge()
+			disk := ""
+			for _, label := range m.GetLabel() {
+				if label.GetName() == "device" {
+					disk = getDiskName(label.GetValue())
+				}
+				if label.GetName() == "fstype" && label.GetValue() == "apfs" {
+					forMac = true
+				}
+			}
+			diskMap[disk] = g.GetValue()
+		}
+		// 对于macos，的apfs文件系统，可能会有多个相同大小的磁盘，这是因为apfs磁盘（卷）会共享物理磁盘
+		seenVal := map[float64]bool{}
+		for _, val := range diskMap {
+			if seenVal[val] && forMac {
+				continue
+			}
+			handleValue(val)
+			seenVal[val] = true
+		}
+		return nil
 	}
 
-	forMac := false
-	for _, metric := range totalMetric.Metric {
-		g := metric.GetGauge()
-		disk := ""
-		for _, label := range metric.GetLabel() {
-			if label.GetName() == "device" {
-				disk = getDiskName(label.GetValue())
-			}
-			if label.GetName() == "fstype" && label.GetValue() == "apfs" {
-				forMac = true
-			}
-		}
-		diskMap[getDiskName(disk)] = g.GetValue()
-	}
-	// 对于macos，的apfs文件系统，可能会有多个相同大小的磁盘，这是因为apfs磁盘（卷）会共享物理磁盘
-	seenVal := map[float64]bool{}
-	for _, val := range diskMap {
-		if seenVal[val] && forMac {
-			continue
-		}
+	err := handleMetric("node_filesystem_size_bytes", func(val float64) {
 		nm.DiskTotalBytes += val
-		seenVal[val] = true
+	})
+	if err != nil {
+		return err
 	}
 
-	// handle disk usage
-	var availDisk float64
-	usageMetric, ok := metricMap["node_filesystem_avail_bytes"]
-	if !ok {
-		return fmt.Errorf("node_filesystem_avail_bytes not found")
+	err = handleMetric("node_filesystem_avail_bytes", func(val float64) {
+		nm.DiskUsageBytes += val
+	})
+	if err != nil {
+		return err
 	}
-	diskMap = make(map[string]float64)
-	for _, metric := range usageMetric.Metric {
-		g := metric.GetGauge()
-		disk := ""
-		for _, label := range metric.GetLabel() {
-			if *label.Name == "device" {
-				disk = getDiskName(label.GetValue())
-			}
-		}
-		diskMap[disk] = g.GetValue()
-	}
-	seenVal = map[float64]bool{}
-	for _, val := range diskMap {
-		if seenVal[val] && forMac {
-			continue
-		}
-		availDisk += val
-		seenVal[val] = true
-	}
-	nm.DiskUsageBytes = nm.DiskTotalBytes - availDisk
 	return nil
 }
 
@@ -216,21 +245,19 @@ func (b *nodeMetricReader) RecordOnce(ctx context.Context) (*NodeMetrics, error)
 	if err != nil {
 		return nil, err
 	}
-	lines := strings.Split(string(body), "\n")
-
-	nm := &NodeMetrics{}
-	if err := b.parseCpuInfo(&lines, nm); err != nil {
-		return nil, err
-	}
-	if err := b.parseMemoryInfo(&lines, nm); err != nil {
-		return nil, err
-	}
 	var parser expfmt.TextParser
 	parsed, err := parser.TextToMetricFamilies(strings.NewReader(string(body)))
 	if err != nil {
 		return nil, err
 	}
 
+	nm := &NodeMetrics{}
+	if err := b.parseCpuInfo(parsed, nm); err != nil {
+		return nil, err
+	}
+	if err := b.parseMemoryInfo(parsed, nm); err != nil {
+		return nil, err
+	}
 	if err := b.parseDiskInfo(parsed, nm); err != nil {
 		return nil, err
 	}
