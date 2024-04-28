@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
@@ -29,26 +28,26 @@ type NodeMetrics struct {
 	DiskUsageBytes float64 `json:"disk_usage_bytes"`
 
 	// network
-	UploadBandwidthBytes   float64 `json:"upload_bandwidth_bytes"`
-	DownloadBandwidthBytes float64 `json:"download_bandwidth_bytes"`
+	NetworkReceiveBytesTotal  float64 `json:"network_receive_bytes_total"`
+	NetworkTransmitBytesTotal float64 `json:"network_transmit_bytes_total"`
 }
 
 func (n *NodeMetrics) TOString() string {
-
 	// cpu
 	cpu := fmt.Sprintf("cpu core count: %d\ncpu usage percent: %.2f \ncpu load info: %s\n", n.CpuCoreCount, n.CpuUsagePercent, n.CpuLoadInfo)
-
 	// memory
 	memory := fmt.Sprintf("memory total bytes: %s\nmemory usage bytes: %s\n",
 		bytes.PrettyByteSize(n.MemoryTotalBytes),
 		bytes.PrettyByteSize(n.MemoryUsageBytes))
-
 	// disk
 	disk := fmt.Sprintf("disk total bytes: %s\ndisk usage bytes: %s\n",
 		bytes.PrettyByteSize(n.DiskTotalBytes),
 		bytes.PrettyByteSize(n.DiskUsageBytes))
-
-	return cpu + memory + disk
+	// network
+	network := fmt.Sprintf("network receive bytes total: %s\nnetwork transmit bytes total: %s\n",
+		bytes.PrettyByteSize(n.NetworkReceiveBytesTotal),
+		bytes.PrettyByteSize(n.NetworkTransmitBytesTotal))
+	return cpu + memory + disk + network
 }
 
 type nodeMetricReader struct {
@@ -234,6 +233,35 @@ func (b *nodeMetricReader) parseDiskInfo(metricMap map[string]*dto.MetricFamily,
 	return nil
 }
 
+func (b *nodeMetricReader) parseNetworkInfo(metricMap map[string]*dto.MetricFamily, nm *NodeMetrics) error {
+	handleMetric := func(metricName string, handleValue func(float64)) error {
+		metric, ok := metricMap[metricName]
+		if !ok {
+			return fmt.Errorf("%s not found", metricName)
+		}
+		for _, m := range metric.Metric {
+			g := m.GetCounter()
+			handleValue(g.GetValue())
+		}
+		return nil
+	}
+
+	err := handleMetric("node_network_receive_bytes_total", func(val float64) {
+		nm.NetworkReceiveBytesTotal += val
+	})
+	if err != nil {
+		return err
+	}
+
+	err = handleMetric("node_network_transmit_bytes_total", func(val float64) {
+		nm.NetworkTransmitBytesTotal += val
+	})
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func (b *nodeMetricReader) RecordOnce(ctx context.Context) (*NodeMetrics, error) {
 	response, err := b.httpClient.Get(b.metricsURL)
 	if err != nil {
@@ -261,11 +289,8 @@ func (b *nodeMetricReader) RecordOnce(ctx context.Context) (*NodeMetrics, error)
 	if err := b.parseDiskInfo(parsed, nm); err != nil {
 		return nil, err
 	}
-
+	if err := b.parseNetworkInfo(parsed, nm); err != nil {
+		return nil, err
+	}
 	return nm, nil
-}
-
-func parseFloat(s string) float64 {
-	value, _ := strconv.ParseFloat(s, 64)
-	return value
 }
