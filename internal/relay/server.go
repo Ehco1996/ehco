@@ -32,6 +32,7 @@ func NewServer(cfg *config.Config) (*Server, error) {
 	cmgrCfg := &cmgr.Config{
 		SyncURL:      cfg.RelaySyncURL,
 		SyncInterval: cfg.RelaySyncInterval,
+		MetricsURL:   cfg.GetMetricURL(),
 	}
 	cmgrCfg.Adjust()
 	s := &Server{

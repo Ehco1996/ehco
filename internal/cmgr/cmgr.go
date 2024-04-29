@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/Ehco1996/ehco/internal/conn"
+	"github.com/Ehco1996/ehco/pkg/node_metric"
 	"go.uber.org/zap"
 )
 
@@ -36,6 +37,7 @@ type cmgrImpl struct {
 	lock sync.RWMutex
 	cfg  *Config
 	l    *zap.SugaredLogger
+	mr   node_metric.Reader
 
 	// k: relay label, v: connection list
 	activeConnectionsMap map[string][]conn.RelayConn
@@ -43,12 +45,16 @@ type cmgrImpl struct {
 }
 
 func NewCmgr(cfg *Config) Cmgr {
-	return &cmgrImpl{
+	cmgr := &cmgrImpl{
 		cfg:                  cfg,
 		l:                    zap.S().Named("cmgr"),
 		activeConnectionsMap: make(map[string][]conn.RelayConn),
 		closedConnectionsMap: make(map[string][]conn.RelayConn),
 	}
+	if cfg.NeedMetrics() {
+		cmgr.mr = node_metric.NewReader(cfg.MetricsURL)
+	}
+	return cmgr
 }
 
 func (cm *cmgrImpl) ListConnections(connType string, page, pageSize int) []conn.RelayConn {
@@ -163,7 +169,7 @@ func (cm *cmgrImpl) Start(ctx context.Context, errCH chan error) {
 			cm.l.Info("sync stop")
 			return
 		case <-ticker.C:
-			if err := cm.syncOnce(); err != nil {
+			if err := cm.syncOnce(ctx); err != nil {
 				cm.l.Errorf("meet non retry error: %s ,exit now", err)
 				errCH <- err
 			}

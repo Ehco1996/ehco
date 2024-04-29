@@ -1,11 +1,13 @@
 package cmgr
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/Ehco1996/ehco/internal/conn"
 	"github.com/Ehco1996/ehco/internal/constant"
 	myhttp "github.com/Ehco1996/ehco/pkg/http"
+	"github.com/Ehco1996/ehco/pkg/node_metric"
 )
 
 type StatsPerRule struct {
@@ -18,8 +20,9 @@ type StatsPerRule struct {
 }
 
 type VersionInfo struct {
-	Version     string `json:"version"`
-	ShortCommit string `json:"short_commit"`
+	Version     string                  `json:"version"`
+	NodeMetrics node_metric.NodeMetrics `json:"node_metrics"`
+	ShortCommit string                  `json:"short_commit"`
 }
 
 type syncReq struct {
@@ -27,7 +30,7 @@ type syncReq struct {
 	Stats   []StatsPerRule `json:"stats"`
 }
 
-func (cm *cmgrImpl) syncOnce() error {
+func (cm *cmgrImpl) syncOnce(ctx context.Context) error {
 	cm.l.Infof("sync once total closed connections: %d", cm.countClosedConnection())
 	// todo: opt lock
 	cm.lock.Lock()
@@ -40,6 +43,17 @@ func (cm *cmgrImpl) syncOnce() error {
 		Stats:   []StatsPerRule{},
 		Version: VersionInfo{Version: constant.Version, ShortCommit: shorCommit},
 	}
+
+	if cm.cfg.NeedMetrics() {
+		metrics, err := cm.mr.ReadOnce(ctx)
+		if err != nil {
+			cm.l.Errorf("read metrics failed: %v", err)
+		} else {
+			cm.l.Debugf("read metrics: %s", metrics.ToString())
+			req.Version.NodeMetrics = *metrics
+		}
+	}
+
 	for label, conns := range cm.closedConnectionsMap {
 		s := StatsPerRule{
 			RelayLabel: label,

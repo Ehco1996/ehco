@@ -5,65 +5,32 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 
-	"github.com/Ehco1996/ehco/pkg/bytes"
 	dto "github.com/prometheus/client_model/go"
 	"github.com/prometheus/common/expfmt"
 )
 
-type NodeMetrics struct {
-	// cpu
-	CpuCoreCount    int     `json:"cpu_core_count"`
-	CpuUsagePercent float64 `json:"cpu_usage_percent"`
-	CpuLoadInfo     string  `json:"cpu_load_info"`
-
-	// memory
-	MemoryTotalBytes float64 `json:"memory_total_bytes"`
-	MemoryUsageBytes float64 `json:"memory_usage_bytes"`
-
-	// disk
-	DiskTotalBytes float64 `json:"disk_total_bytes"`
-	DiskUsageBytes float64 `json:"disk_usage_bytes"`
-
-	// network
-	NetworkReceiveBytesTotal  float64 `json:"network_receive_bytes_total"`
-	NetworkTransmitBytesTotal float64 `json:"network_transmit_bytes_total"`
+type Reader interface {
+	ReadOnce(ctx context.Context) (*NodeMetrics, error)
 }
 
-func (n *NodeMetrics) TOString() string {
-	// cpu
-	cpu := fmt.Sprintf("cpu core count: %d\ncpu usage percent: %.2f \ncpu load info: %s\n", n.CpuCoreCount, n.CpuUsagePercent, n.CpuLoadInfo)
-	// memory
-	memory := fmt.Sprintf("memory total bytes: %s\nmemory usage bytes: %s\n",
-		bytes.PrettyByteSize(n.MemoryTotalBytes),
-		bytes.PrettyByteSize(n.MemoryUsageBytes))
-	// disk
-	disk := fmt.Sprintf("disk total bytes: %s\ndisk usage bytes: %s\n",
-		bytes.PrettyByteSize(n.DiskTotalBytes),
-		bytes.PrettyByteSize(n.DiskUsageBytes))
-	// network
-	network := fmt.Sprintf("network receive bytes total: %s\nnetwork transmit bytes total: %s\n",
-		bytes.PrettyByteSize(n.NetworkReceiveBytesTotal),
-		bytes.PrettyByteSize(n.NetworkTransmitBytesTotal))
-	return cpu + memory + disk + network
-}
-
-type nodeMetricReader struct {
+type readerImpl struct {
 	httpClient *http.Client
 	metricsURL string
 }
 
-func NewNodeMetricReader(metricsURL string) *nodeMetricReader {
+func NewReader(metricsURL string) *readerImpl {
 	c := &http.Client{Timeout: 30 * time.Second}
-	return &nodeMetricReader{
+	return &readerImpl{
 		httpClient: c,
 		metricsURL: metricsURL,
 	}
 }
 
-func (b *nodeMetricReader) parseCpuInfo(metricMap map[string]*dto.MetricFamily, nm *NodeMetrics) error {
+func (b *readerImpl) parseCpuInfo(metricMap map[string]*dto.MetricFamily, nm *NodeMetrics) error {
 	handleMetric := func(metricName string, handleValue func(float64, string)) error {
 		metric, ok := metricMap[metricName]
 		if !ok {
@@ -117,7 +84,7 @@ func (b *nodeMetricReader) parseCpuInfo(metricMap map[string]*dto.MetricFamily, 
 	return nil
 }
 
-func (b *nodeMetricReader) parseMemoryInfo(metricMap map[string]*dto.MetricFamily, nm *NodeMetrics) error {
+func (b *readerImpl) parseMemoryInfo(metricMap map[string]*dto.MetricFamily, nm *NodeMetrics) error {
 	handleMetric := func(metricName string, handleValue func(float64)) error {
 		metric, ok := metricMap[metricName]
 		if !ok {
@@ -150,7 +117,7 @@ func (b *nodeMetricReader) parseMemoryInfo(metricMap map[string]*dto.MetricFamil
 			return err
 		}
 
-		err = handleMetric("node_memory_inactive_bytes", func(val float64) {
+		err = handleMetric("node_memory_wired_bytes", func(val float64) {
 			nm.MemoryUsageBytes += val
 		})
 		if err != nil {
@@ -176,15 +143,11 @@ func (b *nodeMetricReader) parseMemoryInfo(metricMap map[string]*dto.MetricFamil
 }
 
 func getDiskName(devicePath string) string {
-	parts := strings.Split(devicePath, "/")
-	lastPart := parts[len(parts)-1]
-	diskName := strings.TrimRightFunc(lastPart, func(r rune) bool {
-		return r != 's' && (r >= '0' && r <= '9')
-	})
-	return diskName
+	re := regexp.MustCompile(`/dev/disk(\d+)|ntfs://disk(\d+)`)
+	return re.FindString(devicePath)
 }
 
-func (b *nodeMetricReader) parseDiskInfo(metricMap map[string]*dto.MetricFamily, nm *NodeMetrics) error {
+func (b *readerImpl) parseDiskInfo(metricMap map[string]*dto.MetricFamily, nm *NodeMetrics) error {
 	handleMetric := func(metricName string, handleValue func(float64)) error {
 		forMac := false
 		diskMap := make(map[string]float64)
@@ -205,7 +168,7 @@ func (b *nodeMetricReader) parseDiskInfo(metricMap map[string]*dto.MetricFamily,
 			}
 			diskMap[disk] = g.GetValue()
 		}
-		// 对于macos，的apfs文件系统，可能会有多个相同大小的磁盘，这是因为apfs磁盘（卷）会共享物理磁盘
+		// 对于 macos 的 apfs 文件系统，可能会有多个相同大小的磁盘，这是因为 apfs 磁盘（卷）会共享物理磁盘
 		seenVal := map[float64]bool{}
 		for _, val := range diskMap {
 			if seenVal[val] && forMac {
@@ -224,16 +187,18 @@ func (b *nodeMetricReader) parseDiskInfo(metricMap map[string]*dto.MetricFamily,
 		return err
 	}
 
+	var availBytes float64
 	err = handleMetric("node_filesystem_avail_bytes", func(val float64) {
-		nm.DiskUsageBytes += val
+		availBytes += val
 	})
 	if err != nil {
 		return err
 	}
+	nm.DiskUsageBytes = nm.DiskTotalBytes - availBytes
 	return nil
 }
 
-func (b *nodeMetricReader) parseNetworkInfo(metricMap map[string]*dto.MetricFamily, nm *NodeMetrics) error {
+func (b *readerImpl) parseNetworkInfo(metricMap map[string]*dto.MetricFamily, nm *NodeMetrics) error {
 	handleMetric := func(metricName string, handleValue func(float64)) error {
 		metric, ok := metricMap[metricName]
 		if !ok {
@@ -262,7 +227,7 @@ func (b *nodeMetricReader) parseNetworkInfo(metricMap map[string]*dto.MetricFami
 	return nil
 }
 
-func (b *nodeMetricReader) RecordOnce(ctx context.Context) (*NodeMetrics, error) {
+func (b *readerImpl) ReadOnce(ctx context.Context) (*NodeMetrics, error) {
 	response, err := b.httpClient.Get(b.metricsURL)
 	if err != nil {
 		return nil, err
