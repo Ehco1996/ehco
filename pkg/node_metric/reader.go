@@ -17,8 +17,9 @@ type Reader interface {
 }
 
 type readerImpl struct {
-	httpClient *http.Client
-	metricsURL string
+	metricsURL  string
+	httpClient  *http.Client
+	lastMetrics *NodeMetrics
 }
 
 func NewReader(metricsURL string) *readerImpl {
@@ -137,7 +138,9 @@ func (b *readerImpl) parseMemoryInfo(metricMap map[string]*dto.MetricFamily, nm 
 			return err
 		}
 	}
-
+	if nm.MemoryTotalBytes != 0 {
+		nm.MemoryUsagePercent = 100 * nm.MemoryUsageBytes / nm.MemoryTotalBytes
+	}
 	return nil
 }
 
@@ -189,10 +192,14 @@ func (b *readerImpl) parseDiskInfo(metricMap map[string]*dto.MetricFamily, nm *N
 		return err
 	}
 	nm.DiskUsageBytes = nm.DiskTotalBytes - availBytes
+	if nm.DiskTotalBytes != 0 {
+		nm.DiskUsagePercent = 100 * nm.DiskUsageBytes / nm.DiskTotalBytes
+	}
 	return nil
 }
 
 func (b *readerImpl) parseNetworkInfo(metricMap map[string]*dto.MetricFamily, nm *NodeMetrics) error {
+	now := time.Now()
 	handleMetric := func(metricName string, handleValue func(float64)) error {
 		metric, ok := metricMap[metricName]
 		if !ok {
@@ -218,6 +225,12 @@ func (b *readerImpl) parseNetworkInfo(metricMap map[string]*dto.MetricFamily, nm
 	if err != nil {
 		return err
 	}
+
+	if b.lastMetrics != nil {
+		passedTime := now.Sub(b.lastMetrics.syncTime).Seconds()
+		nm.NetworkReceiveBytesRate = (nm.NetworkReceiveBytesTotal - b.lastMetrics.NetworkReceiveBytesTotal) / passedTime
+		nm.NetworkTransmitBytesRate = (nm.NetworkTransmitBytesTotal - b.lastMetrics.NetworkTransmitBytesTotal) / passedTime
+	}
 	return nil
 }
 
@@ -238,7 +251,7 @@ func (b *readerImpl) ReadOnce(ctx context.Context) (*NodeMetrics, error) {
 		return nil, err
 	}
 
-	nm := &NodeMetrics{}
+	nm := &NodeMetrics{syncTime: time.Now()}
 	if err := b.parseCpuInfo(parsed, nm); err != nil {
 		return nil, err
 	}
@@ -251,5 +264,6 @@ func (b *readerImpl) ReadOnce(ctx context.Context) (*NodeMetrics, error) {
 	if err := b.parseNetworkInfo(parsed, nm); err != nil {
 		return nil, err
 	}
+	b.lastMetrics = nm
 	return nm, nil
 }
