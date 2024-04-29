@@ -8,6 +8,7 @@ import (
 	"github.com/Ehco1996/ehco/internal/constant"
 	myhttp "github.com/Ehco1996/ehco/pkg/http"
 	"github.com/Ehco1996/ehco/pkg/node_metric"
+	"go.uber.org/zap"
 )
 
 type StatsPerRule struct {
@@ -20,14 +21,14 @@ type StatsPerRule struct {
 }
 
 type VersionInfo struct {
-	Version     string                  `json:"version"`
-	NodeMetrics node_metric.NodeMetrics `json:"node_metrics"`
-	ShortCommit string                  `json:"short_commit"`
+	Version     string `json:"version"`
+	ShortCommit string `json:"short_commit"`
 }
 
 type syncReq struct {
-	Version VersionInfo    `json:"version"`
-	Stats   []StatsPerRule `json:"stats"`
+	Version VersionInfo             `json:"version"`
+	Node    node_metric.NodeMetrics `json:"node"`
+	Stats   []StatsPerRule          `json:"stats"`
 }
 
 func (cm *cmgrImpl) syncOnce(ctx context.Context) error {
@@ -49,8 +50,7 @@ func (cm *cmgrImpl) syncOnce(ctx context.Context) error {
 		if err != nil {
 			cm.l.Errorf("read metrics failed: %v", err)
 		} else {
-			cm.l.Debugf("read metrics: %s", metrics.ToString())
-			req.Version.NodeMetrics = *metrics
+			req.Node = *metrics
 		}
 	}
 
@@ -73,6 +73,7 @@ func (cm *cmgrImpl) syncOnce(ctx context.Context) error {
 	cm.closedConnectionsMap = make(map[string][]conn.RelayConn)
 	cm.lock.Unlock()
 	if cm.cfg.NeedSync() {
+		cm.l.Debug("syncing data to server", zap.Any("data", req))
 		return myhttp.PostJson(http.DefaultClient, cm.cfg.SyncURL, &req)
 	} else {
 		cm.l.Debugf("remove %d closed connections", len(req.Stats))

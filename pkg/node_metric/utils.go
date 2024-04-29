@@ -16,7 +16,7 @@ var (
 func getDiskName(devicePath string) string {
 	matches := diskNameRegex.FindStringSubmatch(devicePath)
 	if matches != nil {
-		for _, match := range matches[1:] {
+		for _, match := range matches {
 			if match != "" {
 				return match
 			}
