@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"regexp"
 	"strings"
 	"time"
 
@@ -140,15 +139,6 @@ func (b *readerImpl) parseMemoryInfo(metricMap map[string]*dto.MetricFamily, nm 
 	}
 
 	return nil
-}
-
-func getDiskName(devicePath string) string {
-	// parse disk name from device path,such as:
-	// e.g. /dev/disk1 -> disk1
-	// e.g. ntfs://disk1 -> disk1
-	// e.g. /dev/sda -> sda
-	re := regexp.MustCompile(`/dev/disk(\d+)|ntfs://disk(\d+)|/dev/sd[a-zA-Z]`)
-	return re.FindString(devicePath)
 }
 
 func (b *readerImpl) parseDiskInfo(metricMap map[string]*dto.MetricFamily, nm *NodeMetrics) error {
