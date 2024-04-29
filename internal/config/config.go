@@ -149,6 +149,10 @@ func (c *Config) GetMetricURL() string {
 	if c.WebToken != "" {
 		url += fmt.Sprintf("?token=%s", c.WebToken)
 	}
+	// for basic auth
+	if c.WebAuthUser != "" && c.WebAuthPass != "" {
+		url = fmt.Sprintf("http://%s:%s@%s:%d/metrics/", c.WebAuthUser, c.WebAuthPass, c.WebHost, c.WebPort)
+	}
 	return url
 }
 
