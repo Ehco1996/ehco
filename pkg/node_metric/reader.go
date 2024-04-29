@@ -143,7 +143,11 @@ func (b *readerImpl) parseMemoryInfo(metricMap map[string]*dto.MetricFamily, nm 
 }
 
 func getDiskName(devicePath string) string {
-	re := regexp.MustCompile(`/dev/disk(\d+)|ntfs://disk(\d+)`)
+	// parse disk name from device path,such as:
+	// e.g. /dev/disk1 -> disk1
+	// e.g. ntfs://disk1 -> disk1
+	// e.g. /dev/sda -> sda
+	re := regexp.MustCompile(`/dev/disk(\d+)|ntfs://disk(\d+)|/dev/sd[a-zA-Z]`)
 	return re.FindString(devicePath)
 }
 
