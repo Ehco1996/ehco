@@ -17,7 +17,7 @@ SYSTEMD_SERVICES_DIR="/etc/systemd/system"
 # curl command line flags.
 # To using a proxy, please specify ALL_PROXY in the environ variable, such like:
 # export ALL_PROXY=socks5h://192.0.2.1:1080
-CURL_FLAGS=(-L -f -q --retry 5 --retry-delay 10 --retry-max-time 60)
+CURL_FLAGS=(-L --retry 5 --retry-delay 10 --retry-max-time 60)
 
 ###
 # ARGUMENTS
@@ -66,12 +66,12 @@ function _check_install_required() {
 
     # check jq and curl
     if ! command -v jq &>/dev/null; then
-        _print_error_msg "jq is required to parse JSON data."
+        _print_error_msg "jq is required to parse JSON data. please use apt/yum to install jq."
         exit 1
     fi
 
     if ! command -v curl &>/dev/null; then
-        _print_error_msg "curl is required to download files."
+        _print_error_msg "curl is required to download files. please use apt/yum to install curl."
         exit 1
     fi
 }
@@ -97,6 +97,7 @@ function _detect_arch() {
         echo "Unsupported architecture: $arch" >&2
         ;;
     esac
+    _print_warning_msg "Detected architecture: $TARGET_ARCH"
 }
 
 function _print_error_msg() {
@@ -119,9 +120,10 @@ function _set_default_version() {
 
 # TODO check the checksum and current bin file, if the same, skip download
 function _download_bin() {
+    printf "Downloading Ehco version: %s\n" "$VERSION"
     local api_url="https://api.github.com/repos/Ehco1996/ehco/releases/tags/$VERSION"
     local _assets_json
-    _assets_json=$(curl -s "${CURL_FLAGS[@]}" "$api_url")
+    _assets_json=$(curl "${CURL_FLAGS[@]}" "$api_url")
 
     # Extract the download URL for the target architecture using jq
     download_url=$(echo "$_assets_json" | jq -r --arg TARGET_ARCH "$TARGET_ARCH" '.assets[] | select(.name | contains("ehco_" + $TARGET_ARCH)) | .browser_download_url')
@@ -135,6 +137,11 @@ function _download_bin() {
     chmod +x "$EXECUTABLE_INSTALL_PATH"
 }
 
+function _update_bin() {
+    rm -f "$EXECUTABLE_INSTALL_PATH"
+    _download_bin
+}
+
 function _install_systemd_service() {
     local _service_name="ehco.service"
     local _service_path="$SYSTEMD_SERVICES_DIR/$_service_name"
@@ -142,6 +149,11 @@ function _install_systemd_service() {
     systemctl daemon-reload
     systemctl enable "$_service_name"
     systemctl start "$_service_name"
+}
+
+function _reload_systemd_service() {
+    systemctl daemon-reload
+    systemctl restart ehco.service
 }
 
 function _remove_systemd_service_and_delete_bin() {
@@ -155,6 +167,15 @@ function _remove_systemd_service_and_delete_bin() {
     rm -f "$EXECUTABLE_INSTALL_PATH"
 }
 
+function _check_systemd_service() {
+    local _service_name="ehco.service"
+    local _service_path="$SYSTEMD_SERVICES_DIR/$_service_name"
+    if [ ! -f "$_service_path" ]; then
+        _print_error_msg "Ehco service not found. please install it first."
+        exit 1
+    fi
+}
+
 function print_help() {
     echo "Usage: $SCRIPT_NAME [options]"
     echo
@@ -164,7 +185,7 @@ function print_help() {
     echo "  -i, --install       Install the Ehco."
     echo "  -c, --config        Specify the configuration file path or api endpoint."
     echo "  -r, --remove        Remove the Ehco."
-    # echo "  -u, --check-update  Check if an update is available."
+    echo "  -u, --check-update  Check And Update if an update is available."
 }
 
 function parse_arguments() {
@@ -188,9 +209,9 @@ function parse_arguments() {
         -r | --remove)
             OPERATION="remove"
             ;;
-        # -u | --check-update)
-        #     OPERATION="check_update"
-        #     ;;
+        -u | --check-update)
+            OPERATION="check-update"
+            ;;
         *)
             _print_error_msg "Unknown argument: $1"
             exit 1
@@ -220,6 +241,16 @@ function perform_remove() {
     _print_warning_msg "Ehco has been removed."
 }
 
+function perform_check_update() {
+    _check_systemd_service
+    _set_default_version
+    _detect_arch
+
+    _update_bin
+    _reload_systemd_service
+    _print_warning_msg "Ehco has been Updated."
+}
+
 ###
 # Entrypoint
 ###
@@ -232,8 +263,8 @@ function main() {
     "remove")
         perform_remove
         ;;
-    "check_update")
-        # perform_check_update
+    "check-update")
+        perform_check_update
         ;;
     *)
         _print_error_msg "Unknown operation: '$OPERATION'."
