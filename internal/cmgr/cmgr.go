@@ -29,6 +29,8 @@ type Cmgr interface {
 	// CountConnection returns the number of active connections.
 	CountConnection(connType string) int
 
+	GetActiveConnectCntByRelayLabel(label string) int
+
 	// Start starts the connection manager.
 	Start(ctx context.Context, errCH chan error)
 }
@@ -156,6 +158,12 @@ func (cm *cmgrImpl) countClosedConnection() int {
 		cnt += len(v)
 	}
 	return cnt
+}
+
+func (cm *cmgrImpl) GetActiveConnectCntByRelayLabel(label string) int {
+	cm.lock.RLock()
+	defer cm.lock.RUnlock()
+	return len(cm.activeConnectionsMap[label])
 }
 
 func (cm *cmgrImpl) Start(ctx context.Context, errCH chan error) {

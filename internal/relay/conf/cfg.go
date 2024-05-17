@@ -17,7 +17,8 @@ type Config struct {
 	TCPRemotes    []string `json:"tcp_remotes"`
 	UDPRemotes    []string `json:"udp_remotes"`
 
-	Label string `json:"label,omitempty"`
+	Label         string `json:"label,omitempty"`
+	MaxConnection int    `json:"max_connection,omitempty"`
 }
 
 func (r *Config) Validate() error {

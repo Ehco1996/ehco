@@ -8,25 +8,28 @@ import (
 	"os"
 	"strconv"
 	"time"
+
+	"go.uber.org/zap"
 )
 
 func echo(conn net.Conn) {
+	logger := zap.S().Named(("echo-test-server"))
 	defer conn.Close()
 	defer fmt.Println("conn closed", conn.RemoteAddr().String())
 	buf := make([]byte, 10)
 	for {
 		i, err := conn.Read(buf)
 		if err == io.EOF {
-			fmt.Println("read eof")
+			logger.Info("conn closed,read eof ", conn.RemoteAddr().String())
 			return
 		}
 		if err != nil {
-			fmt.Println(err.Error())
+			logger.Error(err.Error())
 			return
 		}
 		_, err = conn.Write(buf[:i])
 		if err != nil {
-			fmt.Println(err.Error())
+			logger.Error(err.Error())
 			return
 		}
 	}
@@ -112,6 +115,33 @@ func SendTcpMsg(msg []byte, address string) []byte {
 	conn.Close()
 	println("conn closed", conn.RemoteAddr().String())
 	return buf[:n]
+}
+
+func EchoTcpMsgLong(msg []byte, sleepTime time.Duration, address string) error {
+	logger := zap.S()
+	buf := make([]byte, len(msg))
+	conn, err := net.Dial("tcp", address)
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+	logger.Infof("conn start %s %s", conn.RemoteAddr().String(), conn.LocalAddr().String())
+	for i := 0; i < 10; i++ {
+		if _, err := conn.Write(msg); err != nil {
+			return err
+		}
+		n, err := conn.Read(buf)
+		if err != nil {
+			return err
+		}
+		if string(buf[:n]) != string(msg) {
+			return fmt.Errorf("msg not equal")
+		}
+		// to fake a long connection
+		time.Sleep(sleepTime)
+	}
+	logger.Infof("conn closed %s %s", conn.RemoteAddr().String(), conn.LocalAddr().String())
+	return nil
 }
 
 func SendUdpMsg(msg []byte, address string) []byte {

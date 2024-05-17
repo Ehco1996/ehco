@@ -23,7 +23,8 @@ const (
 	ECHO_PORT   = 9002
 	ECHO_SERVER = "0.0.0.0:9002"
 
-	RAW_LISTEN = "0.0.0.0:1234"
+	RAW_LISTEN                     = "0.0.0.0:1234"
+	RAW_LISTEN_WITH_MAX_CONNECTION = "0.0.0.0:2234"
 
 	WS_LISTEN = "0.0.0.0:1235"
 	WS_REMOTE = "ws://0.0.0.0:2000"
@@ -60,6 +61,15 @@ func init() {
 				TCPRemotes:    []string{ECHO_SERVER},
 				UDPRemotes:    []string{ECHO_SERVER},
 				TransportType: constant.RelayTypeRaw,
+			},
+			// raw cfg with max connection
+			{
+				Listen:        RAW_LISTEN_WITH_MAX_CONNECTION,
+				ListenType:    constant.RelayTypeRaw,
+				TCPRemotes:    []string{ECHO_SERVER},
+				UDPRemotes:    []string{ECHO_SERVER},
+				TransportType: constant.RelayTypeRaw,
+				MaxConnection: 1,
 			},
 
 			// ws
@@ -153,6 +163,24 @@ func TestRelayOverRaw(t *testing.T) {
 	// 	t.Fatal(res)
 	// }
 	// t.Log("test udp done!")
+}
+
+func TestRelayWithMaxConnectionCount(t *testing.T) {
+	msg := []byte("hello")
+
+	// first connection will be accepted
+	go func() {
+		err := echo.EchoTcpMsgLong(msg, time.Second, RAW_LISTEN_WITH_MAX_CONNECTION)
+		if err != nil {
+			t.Error(err)
+		}
+	}()
+
+	// second connection will be rejected
+	time.Sleep(time.Second) // wait for first connection
+	if err := echo.EchoTcpMsgLong(msg, time.Second, RAW_LISTEN_WITH_MAX_CONNECTION); err == nil {
+		t.Fatal("need error here")
+	}
 }
 
 func TestRelayWithDeadline(t *testing.T) {

@@ -41,11 +41,18 @@ func (b *baseTransporter) RelayTCPConn(c net.Conn, handshakeF TCPHandShakeF) err
 	metrics.CurConnectionCount.WithLabelValues(remote.Label, metrics.METRIC_CONN_TYPE_TCP).Inc()
 	defer metrics.CurConnectionCount.WithLabelValues(remote.Label, metrics.METRIC_CONN_TYPE_TCP).Dec()
 
+	// check limit
+	if b.cfg.MaxConnection > 0 && b.cmgr.CountConnection(cmgr.ConnectionTypeActive) >= b.cfg.MaxConnection {
+		b.l.Warnf("Relay %s active connection count exceed limit", remote.Label)
+		c.Close()
+	}
+
 	clonedRemote := remote.Clone()
 	rc, err := handshakeF(clonedRemote)
 	if err != nil {
 		return err
 	}
+
 	b.l.Infof("RelayTCPConn from %s to %s", c.LocalAddr(), remote.Address)
 	relayConn := conn.NewRelayConn(
 		b.cfg.Label, c, rc, conn.WithHandshakeDuration(clonedRemote.HandShakeDuration))
