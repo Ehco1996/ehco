@@ -10,6 +10,11 @@ import (
 	"go.uber.org/zap"
 )
 
+const (
+	ProtocolHTTP = "http"
+	ProtocolTLS  = "tls"
+)
+
 type Config struct {
 	Listen        string   `json:"listen"`
 	ListenType    string   `json:"listen_type"`
@@ -17,8 +22,9 @@ type Config struct {
 	TCPRemotes    []string `json:"tcp_remotes"`
 	UDPRemotes    []string `json:"udp_remotes"`
 
-	Label         string `json:"label,omitempty"`
-	MaxConnection int    `json:"max_connection,omitempty"`
+	Label            string   `json:"label,omitempty"`
+	MaxConnection    int      `json:"max_connection,omitempty"`
+	BlockedProtocols []string `json:"blocked_protocols,omitempty"`
 }
 
 func (r *Config) Validate() error {
@@ -63,6 +69,12 @@ func (r *Config) Validate() error {
 
 	if len(r.UDPRemotes) > 0 {
 		zap.S().Warn("UDP RELAY WAS DISABLED FOR NOW, THIS FEATURE WILL BE AVAILABLE IN THE FUTURE")
+	}
+
+	for _, protocol := range r.BlockedProtocols {
+		if protocol != ProtocolHTTP && protocol != ProtocolTLS {
+			return fmt.Errorf("invalid blocked protocol:%s", protocol)
+		}
 	}
 	return nil
 }
