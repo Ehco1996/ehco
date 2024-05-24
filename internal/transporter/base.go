@@ -49,6 +49,7 @@ func (b *baseTransporter) RelayTCPConn(c net.Conn, handshakeF TCPHandShakeF) err
 
 	// check limit
 	if b.cfg.MaxConnection > 0 && b.cmgr.CountConnection(cmgr.ConnectionTypeActive) >= b.cfg.MaxConnection {
+		c.Close()
 		return fmt.Errorf("relay:%s active connection count exceed limit %d", b.cfg.Label, b.cfg.MaxConnection)
 	}
 
@@ -66,7 +67,8 @@ func (b *baseTransporter) RelayTCPConn(c net.Conn, handshakeF TCPHandShakeF) err
 			b.l.Infof("sniffed protocol: %s", sniffMetadata.Protocol)
 			for _, p := range b.cfg.BlockedProtocols {
 				if sniffMetadata.Protocol == p {
-					return fmt.Errorf("relay:%s blocked protocol:%s", b.cfg.Label, sniffMetadata.Protocol)
+					c.Close()
+					return fmt.Errorf("relay:%s want to  relay blocked protocol:%s", b.cfg.Label, sniffMetadata.Protocol)
 				}
 			}
 		}

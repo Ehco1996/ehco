@@ -1,0 +1,36 @@
+{
+    "log_level": "debug",
+    "relay_configs": [
+        {
+            "label": "relay-to-http-success",
+            "listen": "127.0.0.1:1234",
+            "listen_type": "raw",
+            "transport_type": "raw",
+            "tcp_remotes": ["google.com:80"],
+            "blocked_protocols": ["tls"]
+        },
+        {
+            "label": "relay-to-http-fail",
+            "listen": "127.0.0.1:1235",
+            "listen_type": "raw",
+            "transport_type": "raw",
+            "tcp_remotes": ["google.com:80"],
+            "blocked_protocols": ["http"]
+        },
+        {
+            "label": "relay-to-tls-success",
+            "listen": "127.0.0.1:1236",
+            "listen_type": "raw",
+            "transport_type": "raw",
+            "tcp_remotes": ["google.com:443"]
+        },
+        {
+            "label": "relay-to-tls-fail",
+            "listen": "127.0.0.1:1237",
+            "listen_type": "raw",
+            "transport_type": "raw",
+            "tcp_remotes": ["google.com:443"],
+            "blocked_protocols": ["tls"]
+        }
+    ]
+}
