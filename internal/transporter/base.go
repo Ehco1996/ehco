@@ -61,7 +61,8 @@ func (b *baseTransporter) RelayTCPConn(c net.Conn, handshakeF TCPHandShakeF) err
 			ctx, c, buffer, constant.SniffTimeOut,
 			sniff.TLSClientHello, sniff.HTTPHost)
 		if err != nil {
-			b.l.Warnf("sniff error: %s", err)
+			// this mean no protocol sniffed
+			b.l.Debug("sniff error: %s", err)
 		}
 		if sniffMetadata != nil {
 			b.l.Infof("sniffed protocol: %s", sniffMetadata.Protocol)
