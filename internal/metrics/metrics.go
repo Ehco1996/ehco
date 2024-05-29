@@ -3,6 +3,7 @@ package metrics
 import (
 	"fmt"
 	"math"
+	"net/url"
 	"os"
 	"runtime"
 	"strings"
@@ -103,69 +104,89 @@ var (
 	}, []string{METRIC_LABEL_REMOTE})
 )
 
-type PingGroup struct {
-	Pingers  []*ping.Pinger
-	LabelMap map[string]string
-}
-
-func initPinger(host string) *ping.Pinger {
-	pinger := ping.New(host)
+func (pg *PingGroup) newPinger(addr string) (*ping.Pinger, error) {
+	pinger := ping.New(addr)
 	if err := pinger.Resolve(); err != nil {
-		zap.S().Named("web").Errorf("failed to resolve pinger host:%s err:%s\n", host, err.Error())
-		return nil
+		pg.logger.Error("failed to resolve pinger", zap.String("addr", addr), zap.Error(err))
+		return nil, err
 	}
-	zap.S().Named("web").Infof("Resolved %s as %s", host, pinger.IPAddr())
 	pinger.Interval = pingInterval
 	pinger.Timeout = time.Duration(math.MaxInt64)
 	pinger.RecordRtts = false
 	if runtime.GOOS != "darwin" {
 		pinger.SetPrivileged(true)
 	}
-	return pinger
+	return pinger, nil
+}
+
+type PingGroup struct {
+	logger *zap.Logger
+
+	// k: addr
+	Pingers map[string]*ping.Pinger
+
+	// k: addr v:relay rule label joined by ","
+	PingerLabels map[string]string
+}
+
+func extractHost(input string) (string, error) {
+	// Check if the input string has a scheme, if not, add "http://"
+	if !strings.Contains(input, "://") {
+		input = "http://" + input
+	}
+	// Parse the URL
+	u, err := url.Parse(input)
+	if err != nil {
+		return "", err
+	}
+	return u.Hostname(), nil
 }
 
 func NewPingGroup(cfg *config.Config) *PingGroup {
-	seen := make(map[string]*ping.Pinger)
-	labelMap := make(map[string]string)
+	logger := zap.L().Named("pinger")
 
+	pg := &PingGroup{
+		logger:       logger,
+		Pingers:      make(map[string]*ping.Pinger),
+		PingerLabels: map[string]string{},
+	}
+
+	// parse addr from rule
 	for _, relayCfg := range cfg.RelayConfigs {
-		// NOTE (https/ws/wss)://xxx.com -> xxx.com
-		for _, host := range relayCfg.TCPRemotes {
-			if strings.Contains(host, "//") {
-				host = strings.Split(host, "//")[1]
+		// NOTE for (https/ws/wss)://xxx.com -> xxx.com
+		for _, remote := range relayCfg.TCPRemotes {
+			addr, err := extractHost(remote)
+			if err != nil {
+				pg.logger.Error("try parse host error", zap.Error(err))
 			}
-			// NOTE xxx:1234 -> xxx
-			if strings.Contains(host, ":") {
-				host = strings.Split(host, ":")[0]
-			}
-			if _, ok := seen[host]; ok {
+			if _, ok := pg.Pingers[addr]; ok {
+				// append rule label when remote host is same
+				pg.PingerLabels[addr] += fmt.Sprintf(",%s", relayCfg.Label)
 				continue
 			}
-			seen[host] = initPinger(host)
-			labelMap[host] = relayCfg.Label
+			if pinger, err := pg.newPinger(addr); err != nil {
+				pg.logger.Error("new pinger meet error", zap.Error(err))
+			} else {
+				pg.Pingers[pinger.Addr()] = pinger
+				pg.PingerLabels[addr] = relayCfg.Label
+			}
 		}
 	}
 
-	pingers := make([]*ping.Pinger, len(seen))
-	i := 0
-	for _, pinger := range seen {
+	// update metrics
+	for addr, pinger := range pg.Pingers {
 		pinger.OnRecv = func(pkt *ping.Packet) {
 			PingResponseDurationSeconds.WithLabelValues(
-				pkt.IPAddr.String(), pkt.Addr, labelMap[pkt.Addr]).Observe(pkt.Rtt.Seconds())
-			zap.S().Named("web").Infof("%d bytes from %s: icmp_seq=%d time=%v ttl=%v",
+				pkt.IPAddr.String(), pkt.Addr, pg.PingerLabels[addr]).Observe(pkt.Rtt.Seconds())
+			pg.logger.Sugar().Infof("%d bytes from %s icmp_seq=%d time=%v ttl=%v",
 				pkt.Nbytes, pkt.Addr, pkt.Seq, pkt.Rtt, pkt.Ttl)
 		}
 		pinger.OnDuplicateRecv = func(pkt *ping.Packet) {
-			zap.S().Named("web").Infof("%d bytes from %s: icmp_seq=%d time=%v ttl=%v (DUP!)",
+			pg.logger.Sugar().Infof("%d bytes from %s icmp_seq=%d time=%v ttl=%v (DUP!)",
 				pkt.Nbytes, pkt.IPAddr, pkt.Seq, pkt.Rtt, pkt.Ttl)
 		}
-		pingers[i] = pinger
-		i += 1
 	}
-	return &PingGroup{
-		Pingers:  pingers,
-		LabelMap: labelMap,
-	}
+	return pg
 }
 
 func (pg *PingGroup) Describe(ch chan<- *prometheus.Desc) {
@@ -173,7 +194,7 @@ func (pg *PingGroup) Describe(ch chan<- *prometheus.Desc) {
 }
 
 func (pg *PingGroup) Collect(ch chan<- prometheus.Metric) {
-	for _, pinger := range pg.Pingers {
+	for addr, pinger := range pg.Pingers {
 		stats := pinger.Statistics()
 		ch <- prometheus.MustNewConstMetric(
 			PingRequestTotal,
@@ -181,7 +202,7 @@ func (pg *PingGroup) Collect(ch chan<- prometheus.Metric) {
 			float64(stats.PacketsSent),
 			stats.IPAddr.String(),
 			stats.Addr,
-			pg.LabelMap[stats.Addr],
+			pg.PingerLabels[addr],
 		)
 	}
 }
@@ -190,15 +211,13 @@ func (pg *PingGroup) Run() {
 	if len(pg.Pingers) <= 0 {
 		return
 	}
+	pg.logger.Sugar().Infof("Start Ping Group now total pinger: %d", len(pg.Pingers))
 	splay := time.Duration(pingInterval.Nanoseconds() / int64(len(pg.Pingers)))
-	zap.S().Named("web").Infof("Waiting %s between starting pingers", splay)
-	for idx := range pg.Pingers {
+	for addr, pinger := range pg.Pingers {
 		go func() {
-			pinger := pg.Pingers[idx]
 			if err := pinger.Run(); err != nil {
-				zap.S().Named("web").Infof("Starting prober err: %s", err)
+				pg.logger.Error("Starting pinger meet err", zap.String("addr", addr), zap.Error(err))
 			}
-			zap.S().Named("web").Infof("Starting prober for %s", pinger.Addr())
 		}()
 		time.Sleep(splay)
 	}
