@@ -14,7 +14,6 @@ import (
 	"github.com/go-ping/ping"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/common/promlog"
-	"github.com/prometheus/common/version"
 	"github.com/prometheus/node_exporter/collector"
 	"go.uber.org/zap"
 )
@@ -258,10 +257,6 @@ func RegisterNodeExporterMetrics(cfg *config.Config) error {
 	if err != nil {
 		return fmt.Errorf("couldn't create collector: %s", err)
 	}
-	// nc.Collectors = collectors
-	prometheus.MustRegister(
-		nc,
-		version.NewCollector("node_exporter"),
-	)
+	prometheus.MustRegister(nc)
 	return nil
 }
