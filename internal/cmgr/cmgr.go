@@ -167,7 +167,7 @@ func (cm *cmgrImpl) GetActiveConnectCntByRelayLabel(label string) int {
 }
 
 func (cm *cmgrImpl) Start(ctx context.Context, errCH chan error) {
-	cm.l.Infof("start sync interval=%d", cm.cfg.SyncInterval)
+	cm.l.Infof("Start Cmgr sync interval=%d", cm.cfg.SyncInterval)
 	ticker := time.NewTicker(time.Second * time.Duration(cm.cfg.SyncInterval))
 	defer ticker.Stop()
 
