@@ -1,0 +1,16 @@
+{
+    "relay_configs": [
+        {
+            "listen": "127.0.0.1:2234",
+            "listen_type": "raw",
+            "transport_type": "ws",
+            "tcp_remotes": ["ws://0.0.0.0:2443"]
+        },
+        {
+            "listen": "127.0.0.1:2443",
+            "listen_type": "ws",
+            "transport_type": "raw",
+            "tcp_remotes": ["127.0.0.1:2333"]
+        }
+    ]
+}

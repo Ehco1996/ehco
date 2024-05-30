@@ -43,7 +43,8 @@ func (s *WsClient) TCPHandShake(remote *lb.Node) (net.Conn, error) {
 	latency := time.Since(t1)
 	metrics.HandShakeDuration.WithLabelValues(remote.Label).Observe(float64(latency.Milliseconds()))
 	remote.HandShakeDuration = latency
-	return wsc, nil
+	c := newWsConn(wsc, false)
+	return c, nil
 }
 
 type WsServer struct {
@@ -90,7 +91,8 @@ func (s *WsServer) HandleRequest(w http.ResponseWriter, req *http.Request) {
 	if err != nil {
 		return
 	}
-	if err := s.RelayTCPConn(wsc, s.relayer.TCPHandShake); err != nil {
+	c := newWsConn(wsc, true)
+	if err := s.RelayTCPConn(c, s.relayer.TCPHandShake); err != nil {
 		s.l.Errorf("RelayTCPConn error: %s", err.Error())
 	}
 }

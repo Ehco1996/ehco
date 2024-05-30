@@ -27,6 +27,7 @@ func echo(conn net.Conn) {
 			logger.Error(err.Error())
 			return
 		}
+		println("echo server receive", string(buf[:i]))
 		_, err = conn.Write(buf[:i])
 		if err != nil {
 			logger.Error(err.Error())
@@ -135,7 +136,7 @@ func EchoTcpMsgLong(msg []byte, sleepTime time.Duration, address string) error {
 			return err
 		}
 		if string(buf[:n]) != string(msg) {
-			return fmt.Errorf("msg not equal")
+			return fmt.Errorf("msg not equal at %d send:%s receive:%s n:%d", i, msg, buf[:n], n)
 		}
 		// to fake a long connection
 		time.Sleep(sleepTime)

@@ -132,4 +132,3 @@ func (pg *PingGroup) Run() {
 		time.Sleep(splay)
 	}
 }
-
