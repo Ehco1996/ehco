@@ -7,7 +7,7 @@ builds:
     main: ./cmd/ehco/main.go
     flags:
       - -trimpath
-    -tags:
+    tags:
       - nofibrechannel
       - nomountstats
     ldflags:
