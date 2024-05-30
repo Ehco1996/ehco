@@ -13,12 +13,11 @@ PACKAGE_LIST  := go list ./...
 FILES         := $(shell find . -name "*.go" -type f)
 FAIL_ON_STDOUT := awk '{ print } END { if (NR > 0) { exit 1 } }'
 
-
+BUILD_TAG_FOR_NODE_EXPORTER="nofibrechannel,nomountstats"
 # -w -s 参数的解释：You will get the smallest binaries if you compile with -ldflags '-w -s'. The -w turns off DWARF debugging information
 # for more information, please refer to https://stackoverflow.com/questions/22267189/what-does-the-w-flag-mean-when-passed-in-via-the-ldflags-option-to-the-go-comman
-# we need CGO_ENABLED=1 because we import the node_exporter ,and we need install `glibc-source,libc6` to make it work
-# TODO check if node_exporter collector with CGO_ENABLED=0 is enough
-GOBUILD=CGO_ENABLED=0 go build -trimpath -ldflags="-w -s -X ${PACKAGE}.GitBranch=${BRANCH} -X ${PACKAGE}.GitRevision=${REVISION} -X ${PACKAGE}.BuildTime=${BUILDTIME}"
+GOBUILD=CGO_ENABLED=0 go build -tags ${BUILD_TAG_FOR_NODE_EXPORTER} -trimpath -ldflags="-w -s -X ${PACKAGE}.GitBranch=${BRANCH} -X ${PACKAGE}.GitRevision=${REVISION} -X ${PACKAGE}.BuildTime=${BUILDTIME}"
+
 
 tools:
 	@echo "run setup tools"
@@ -35,7 +34,7 @@ fmt: tools
 	@tools/bin/gofumpt -l -w $(FILES) 2>&1 | $(FAIL_ON_STDOUT)
 
 test:
-	go test -v -count=1 -timeout=1m ./...
+	go test -tags ${BUILD_TAG_FOR_NODE_EXPORTER} -v -count=1 -timeout=1m ./...
 
 build:
 	${GOBUILD} -o $(BINDIR)/$(NAME) cmd/ehco/main.go
