@@ -11,6 +11,7 @@ import (
 	"github.com/Ehco1996/ehco/internal/relay/conf"
 	"github.com/Ehco1996/ehco/internal/tls"
 	"github.com/Ehco1996/ehco/internal/web"
+	"github.com/Ehco1996/ehco/pkg/buffer"
 	"github.com/Ehco1996/ehco/pkg/log"
 	"github.com/Ehco1996/ehco/pkg/xray"
 	"github.com/getsentry/sentry-go"
@@ -77,6 +78,12 @@ func initLogger(cfg *config.Config) error {
 	return nil
 }
 
+func initGlobalBufferPool() {
+	if BufferSize > 0 {
+		buffer.ReplaceBufferPool(BufferSize)
+	}
+}
+
 func InitConfigAndComponents() (*config.Config, error) {
 	cfg, err := loadConfig()
 	if err != nil {
@@ -88,7 +95,7 @@ func InitConfigAndComponents() (*config.Config, error) {
 	if err := initSentry(); err != nil {
 		return nil, err
 	}
-
+	initGlobalBufferPool()
 	return cfg, nil
 }
 

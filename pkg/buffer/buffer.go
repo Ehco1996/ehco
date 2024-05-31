@@ -5,7 +5,9 @@ import (
 )
 
 // 全局pool
-var BufferPool *BytePool
+var (
+	BufferPool *BytePool
+)
 
 func init() {
 	BufferPool = NewBytePool(constant.BUFFER_POOL_SIZE, constant.BUFFER_SIZE)
@@ -46,4 +48,8 @@ func (bp *BytePool) Put(b []byte) {
 	default:
 		// buffer didn't go back into pool, just discard
 	}
+}
+
+func ReplaceBufferPool(size int) {
+	BufferPool = NewBytePool(constant.BUFFER_POOL_SIZE, size)
 }

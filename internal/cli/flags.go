@@ -15,6 +15,7 @@ var (
 	SystemFilePath       = "/etc/systemd/system/ehco.service"
 	LogLevel             string
 	ConfigReloadInterval int
+	BufferSize           int
 )
 
 var RootFlags = []cli.Flag{
@@ -90,5 +91,11 @@ var RootFlags = []cli.Flag{
 		EnvVars:     []string{"EHCO_CONFIG_RELOAD_INTERVAL"},
 		Destination: &ConfigReloadInterval,
 		DefaultText: "60",
+	},
+	&cli.IntFlag{
+		Name:        "buffer_size",
+		Usage:       "set buffer size to when transport data default 20 * 1024(20KB)",
+		EnvVars:     []string{"EHCO_BUFFER_SIZE"},
+		Destination: &BufferSize,
 	},
 }

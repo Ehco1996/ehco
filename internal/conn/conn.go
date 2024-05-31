@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/Ehco1996/ehco/internal/metrics"
+	"github.com/Ehco1996/ehco/pkg/buffer"
 	"github.com/Ehco1996/ehco/pkg/bytes"
 	"go.uber.org/zap"
 )
@@ -113,10 +114,12 @@ func connectionName(conn net.Conn) string {
 }
 
 func copyConn(conn1, conn2 *innerConn) error {
+	buf := buffer.BufferPool.Get()
+	defer buffer.BufferPool.Put(buf)
 	errCH := make(chan error, 1)
 	// copy conn1 to conn2,read from conn1 and write to conn2
 	go func() {
-		_, err := io.Copy(conn2, conn1)
+		_, err := io.CopyBuffer(conn2, conn1, buf)
 		_ = conn2.CloseWrite() // all data is written to conn2 now, so close the write side of conn2 to send eof
 		errCH <- err
 	}()
