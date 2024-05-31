@@ -9,6 +9,7 @@ import (
 	"github.com/gobwas/ws"
 	"github.com/labstack/echo/v4"
 
+	"github.com/Ehco1996/ehco/internal/conn"
 	"github.com/Ehco1996/ehco/internal/constant"
 	"github.com/Ehco1996/ehco/internal/metrics"
 	"github.com/Ehco1996/ehco/internal/web"
@@ -43,7 +44,7 @@ func (s *WsClient) TCPHandShake(remote *lb.Node) (net.Conn, error) {
 	latency := time.Since(t1)
 	metrics.HandShakeDuration.WithLabelValues(remote.Label).Observe(float64(latency.Milliseconds()))
 	remote.HandShakeDuration = latency
-	c := newWsConn(wsc, false)
+	c := conn.NewWSConn(wsc, false)
 	return c, nil
 }
 
@@ -91,8 +92,8 @@ func (s *WsServer) HandleRequest(w http.ResponseWriter, req *http.Request) {
 	if err != nil {
 		return
 	}
-	c := newWsConn(wsc, true)
-	if err := s.RelayTCPConn(c, s.relayer.TCPHandShake); err != nil {
+
+	if err := s.RelayTCPConn(conn.NewWSConn(wsc, true), s.relayer.TCPHandShake); err != nil {
 		s.l.Errorf("RelayTCPConn error: %s", err.Error())
 	}
 }

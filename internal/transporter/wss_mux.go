@@ -1,3 +1,6 @@
+// NOTE CAN NOT use real ws frame to transport smux frame
+// err: accept stream err: buffer size:8 too small to transport ws payload size:45
+// so this transport just use ws protocol to handshake and then use smux protocol to transport
 package transporter
 
 import (
@@ -101,12 +104,12 @@ func (s *MwssServer) ListenAndServe() error {
 }
 
 func (s *MwssServer) HandleRequest(w http.ResponseWriter, r *http.Request) {
-	conn, _, _, err := ws.UpgradeHTTP(r, w)
+	c, _, _, err := ws.UpgradeHTTP(r, w)
 	if err != nil {
 		s.l.Error(err)
 		return
 	}
-	s.mux(conn)
+	s.mux(c)
 }
 
 func (s *MwssServer) Close() error {

@@ -5,6 +5,7 @@ go 1.22
 toolchain go1.22.1
 
 require (
+	github.com/alecthomas/kingpin/v2 v2.4.0
 	github.com/getsentry/sentry-go v0.27.0
 	github.com/go-ping/ping v1.1.0
 	github.com/gobwas/ws v1.3.2
@@ -27,7 +28,6 @@ require (
 )
 
 require (
-	github.com/alecthomas/kingpin/v2 v2.4.0 // indirect
 	github.com/alecthomas/units v0.0.0-20231202071711-9a357b53e9c9 // indirect
 	github.com/andybalholm/brotli v1.1.0 // indirect
 	github.com/beevik/ntp v1.4.2 // indirect

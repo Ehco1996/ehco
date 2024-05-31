@@ -1,4 +1,4 @@
-package transporter
+package conn
 
 import (
 	"fmt"
@@ -9,6 +9,7 @@ import (
 	"github.com/Ehco1996/ehco/pkg/buffer"
 	"github.com/gobwas/ws"
 	"github.com/gobwas/ws/wsutil"
+	"go.uber.org/zap"
 )
 
 type wsConn struct {
@@ -17,7 +18,7 @@ type wsConn struct {
 	buf      []byte
 }
 
-func newWsConn(conn net.Conn, isServer bool) *wsConn {
+func NewWSConn(conn net.Conn, isServer bool) *wsConn {
 	return &wsConn{conn: conn, isServer: isServer, buf: buffer.BufferPool.Get()}
 }
 
@@ -27,6 +28,7 @@ func (c *wsConn) Read(b []byte) (n int, err error) {
 		return 0, err
 	}
 	if header.Length > int64(cap(c.buf)) {
+		zap.S().Warnf("ws payload size:%d is larger than buffer size:%d", header.Length, cap(c.buf))
 		c.buf = make([]byte, header.Length)
 	}
 	payload := c.buf[:header.Length]
@@ -38,7 +40,7 @@ func (c *wsConn) Read(b []byte) (n int, err error) {
 		ws.Cipher(payload, header.Mask, 0)
 	}
 	if len(payload) > len(b) {
-		return 0, fmt.Errorf("buffer too small to transport ws msg")
+		return 0, fmt.Errorf("buffer size:%d too small to transport ws payload size:%d", len(b), len(payload))
 	}
 	copy(b, payload)
 	return len(payload), nil

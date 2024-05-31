@@ -1,4 +1,4 @@
-package transporter
+package conn
 
 import (
 	"context"
@@ -23,7 +23,7 @@ func TestClientConn_ReadWrite(t *testing.T) {
 		}
 		go func() {
 			defer conn.Close()
-			wsc := newWsConn(conn, true)
+			wsc := NewWSConn(conn, true)
 
 			buf := make([]byte, 1024)
 			for {
@@ -53,7 +53,7 @@ func TestClientConn_ReadWrite(t *testing.T) {
 	}
 	defer conn.Close()
 
-	wsClientConn := newWsConn(conn, false)
+	wsClientConn := NewWSConn(conn, false)
 	for i := 0; i < 3; i++ {
 		// test write
 		n, err := wsClientConn.Write(data)
