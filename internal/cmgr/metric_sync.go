@@ -7,7 +7,7 @@ import (
 	"github.com/Ehco1996/ehco/internal/conn"
 	"github.com/Ehco1996/ehco/internal/constant"
 	myhttp "github.com/Ehco1996/ehco/pkg/http"
-	"github.com/Ehco1996/ehco/pkg/node_metric"
+	"github.com/Ehco1996/ehco/pkg/metric_reader"
 	"go.uber.org/zap"
 )
 
@@ -26,9 +26,9 @@ type VersionInfo struct {
 }
 
 type syncReq struct {
-	Version VersionInfo             `json:"version"`
-	Node    node_metric.NodeMetrics `json:"node"`
-	Stats   []StatsPerRule          `json:"stats"`
+	Version VersionInfo               `json:"version"`
+	Node    metric_reader.NodeMetrics `json:"node"`
+	Stats   []StatsPerRule            `json:"stats"`
 }
 
 func (cm *cmgrImpl) syncOnce(ctx context.Context) error {

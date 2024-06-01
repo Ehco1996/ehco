@@ -1,4 +1,4 @@
-package node_metric
+package metric_reader
 
 import (
 	"context"
@@ -28,6 +28,25 @@ func NewReader(metricsURL string) *readerImpl {
 		httpClient: c,
 		metricsURL: metricsURL,
 	}
+}
+
+func (b *readerImpl) parsePingInfo(metricMap map[string]*dto.MetricFamily, nm *NodeMetrics) error {
+	metric, ok := metricMap["ehco_ping_response_duration_seconds"]
+	if !ok {
+		return fmt.Errorf("ehco_ping_response_duration_seconds_bucket not found")
+	}
+	for _, m := range metric.Metric {
+		g := m.GetHistogram()
+		ip := ""
+		val := float64(g.GetSampleSum()) / float64(g.GetSampleCount()) * 1000 // to ms
+		for _, label := range m.GetLabel() {
+			if label.GetName() == "ip" {
+				ip = label.GetValue()
+			}
+		}
+		nm.PingMetrics = append(nm.PingMetrics, PingMetric{Latency: val, Target: ip})
+	}
+	return nil
 }
 
 func (b *readerImpl) parseCpuInfo(metricMap map[string]*dto.MetricFamily, nm *NodeMetrics) error {
@@ -250,8 +269,7 @@ func (b *readerImpl) ReadOnce(ctx context.Context) (*NodeMetrics, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	nm := &NodeMetrics{syncTime: time.Now()}
+	nm := &NodeMetrics{syncTime: time.Now(), PingMetrics: []PingMetric{}}
 	if err := b.parseCpuInfo(parsed, nm); err != nil {
 		return nil, err
 	}
@@ -264,6 +282,14 @@ func (b *readerImpl) ReadOnce(ctx context.Context) (*NodeMetrics, error) {
 	if err := b.parseNetworkInfo(parsed, nm); err != nil {
 		return nil, err
 	}
+	if err := b.parsePingInfo(parsed, nm); err != nil {
+		return nil, err
+	}
+
+	for _, pm := range nm.PingMetrics {
+		println(pm.Target, pm.Latency)
+	}
+
 	b.lastMetrics = nm
 	return nm, nil
 }

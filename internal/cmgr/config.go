@@ -3,9 +3,9 @@ package cmgr
 var DummyConfig = &Config{}
 
 type Config struct {
-	SyncURL      string `json:"sync_url,omitempty"`
-	MetricsURL   string `json:"metrics_url,omitempty"`
-	SyncInterval int    `json:"sync_interval,omitempty"` // in seconds
+	SyncURL      string
+	MetricsURL   string
+	SyncInterval int // in seconds
 }
 
 func (c *Config) NeedSync() bool {

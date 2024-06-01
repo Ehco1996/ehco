@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/Ehco1996/ehco/internal/conn"
-	"github.com/Ehco1996/ehco/pkg/node_metric"
+	"github.com/Ehco1996/ehco/pkg/metric_reader"
 	"go.uber.org/zap"
 )
 
@@ -39,7 +39,7 @@ type cmgrImpl struct {
 	lock sync.RWMutex
 	cfg  *Config
 	l    *zap.SugaredLogger
-	mr   node_metric.Reader
+	mr   metric_reader.Reader
 
 	// k: relay label, v: connection list
 	activeConnectionsMap map[string][]conn.RelayConn
@@ -54,7 +54,7 @@ func NewCmgr(cfg *Config) Cmgr {
 		closedConnectionsMap: make(map[string][]conn.RelayConn),
 	}
 	if cfg.NeedMetrics() {
-		cmgr.mr = node_metric.NewReader(cfg.MetricsURL)
+		cmgr.mr = metric_reader.NewReader(cfg.MetricsURL)
 	}
 	return cmgr
 }

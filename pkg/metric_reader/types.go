@@ -1,6 +1,8 @@
-package node_metric
+package metric_reader
 
-import "time"
+import (
+	"time"
+)
 
 type NodeMetrics struct {
 	// cpu
@@ -24,5 +26,13 @@ type NodeMetrics struct {
 	NetworkReceiveBytesRate   float64 `json:"network_receive_bytes_rate"`
 	NetworkTransmitBytesRate  float64 `json:"network_transmit_bytes_rate"`
 
+	// ping
+	PingMetrics []PingMetric `json:"ping_metrics"`
+
 	syncTime time.Time
+}
+
+type PingMetric struct {
+	Latency float64 `json:"latency"` // in ms
+	Target  string  `json:"target"`
 }

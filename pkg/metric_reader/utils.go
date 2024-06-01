@@ -1,4 +1,4 @@
-package node_metric
+package metric_reader
 
 import "regexp"
 
