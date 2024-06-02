@@ -286,10 +286,6 @@ func (b *readerImpl) ReadOnce(ctx context.Context) (*NodeMetrics, error) {
 		return nil, err
 	}
 
-	for _, pm := range nm.PingMetrics {
-		println(pm.Target, pm.Latency)
-	}
-
 	b.lastMetrics = nm
 	return nm, nil
 }
