@@ -10,6 +10,7 @@ import (
 
 	dto "github.com/prometheus/client_model/go"
 	"github.com/prometheus/common/expfmt"
+	"go.uber.org/zap"
 )
 
 type Reader interface {
@@ -33,7 +34,9 @@ func NewReader(metricsURL string) *readerImpl {
 func (b *readerImpl) parsePingInfo(metricMap map[string]*dto.MetricFamily, nm *NodeMetrics) error {
 	metric, ok := metricMap["ehco_ping_response_duration_seconds"]
 	if !ok {
-		return fmt.Errorf("ehco_ping_response_duration_seconds_bucket not found")
+		// this metric is optional when enable_ping = false
+		zap.S().Warn("ping metric not found")
+		return nil
 	}
 	for _, m := range metric.Metric {
 		g := m.GetHistogram()
