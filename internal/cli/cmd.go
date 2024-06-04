@@ -15,7 +15,7 @@ After=network.target
 
 [Service]
 LimitNOFILE=65535
-ExecStart=/root/ehco -c ""
+ExecStart=ehco -c ""
 Restart=always
 
 [Install]
