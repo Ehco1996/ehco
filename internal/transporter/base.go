@@ -19,10 +19,11 @@ import (
 )
 
 type baseTransporter struct {
+	cfg *conf.Config
+	l   *zap.SugaredLogger
+
 	cmgr       cmgr.Cmgr
-	cfg        *conf.Config
 	tCPRemotes lb.RoundRobin
-	l          *zap.SugaredLogger
 }
 
 func NewBaseTransporter(cfg *conf.Config, cmgr cmgr.Cmgr) *baseTransporter {

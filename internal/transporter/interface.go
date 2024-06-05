@@ -3,7 +3,9 @@ package transporter
 import (
 	"net"
 
+	"github.com/Ehco1996/ehco/internal/cmgr"
 	"github.com/Ehco1996/ehco/internal/constant"
+	"github.com/Ehco1996/ehco/internal/relay/conf"
 	"github.com/Ehco1996/ehco/pkg/lb"
 )
 
@@ -14,8 +16,8 @@ type RelayClient interface {
 	RelayTCPConn(c net.Conn, handshakeF TCPHandShakeF) error
 }
 
-func NewRelayClient(relayType string, base *baseTransporter) (RelayClient, error) {
-	switch relayType {
+func newRelayClient(base *baseTransporter) (RelayClient, error) {
+	switch base.cfg.TransportType {
 	case constant.RelayTypeRaw:
 		return newRawClient(base)
 	case constant.RelayTypeWS:
@@ -27,7 +29,7 @@ func NewRelayClient(relayType string, base *baseTransporter) (RelayClient, error
 	case constant.RelayTypeMTCP:
 		return newMtcpClient(base)
 	default:
-		panic("unsupported transport type")
+		panic("unsupported transport type" + base.cfg.TransportType)
 	}
 }
 
@@ -36,8 +38,9 @@ type RelayServer interface {
 	Close() error
 }
 
-func NewRelayServer(relayType string, base *baseTransporter) (RelayServer, error) {
-	switch relayType {
+func NewRelayServer(cfg *conf.Config, cmgr cmgr.Cmgr) (RelayServer, error) {
+	base := NewBaseTransporter(cfg, cmgr)
+	switch cfg.ListenType {
 	case constant.RelayTypeRaw:
 		return newRawServer(base)
 	case constant.RelayTypeWS:
@@ -49,6 +52,6 @@ func NewRelayServer(relayType string, base *baseTransporter) (RelayServer, error
 	case constant.RelayTypeMTCP:
 		return newMtcpServer(base)
 	default:
-		panic("unsupported transport type")
+		panic("unsupported transport type" + cfg.ListenType)
 	}
 }

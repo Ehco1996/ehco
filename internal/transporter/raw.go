@@ -57,7 +57,7 @@ func newRawServer(base *baseTransporter) (*RawServer, error) {
 	if err != nil {
 		return nil, err
 	}
-	relayer, err := NewRelayClient(base.cfg.TransportType, base)
+	relayer, err := newRelayClient(base)
 	if err != nil {
 		return nil, err
 	}

@@ -19,12 +19,12 @@ func (r *Relay) UniqueID() string {
 	return r.cfg.Label
 }
 
-func NewRelay(cfg *conf.Config, connMgr cmgr.Cmgr) (*Relay, error) {
-	base := transporter.NewBaseTransporter(cfg, connMgr)
-	s, err := transporter.NewRelayServer(cfg.ListenType, base)
+func NewRelay(cfg *conf.Config, cmgr cmgr.Cmgr) (*Relay, error) {
+	s, err := transporter.NewRelayServer(cfg, cmgr)
 	if err != nil {
 		return nil, err
 	}
+
 	r := &Relay{
 		relayServer: s,
 		cfg:         cfg,

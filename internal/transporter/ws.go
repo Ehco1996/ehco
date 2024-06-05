@@ -71,7 +71,7 @@ func newWsServer(base *baseTransporter) (*WsServer, error) {
 	e.GET("/", echo.WrapHandler(web.MakeIndexF()))
 	e.GET("/handshake/", echo.WrapHandler(http.HandlerFunc(s.HandleRequest)))
 	s.e = e
-	relayer, err := NewRelayClient(base.cfg.TransportType, base)
+	relayer, err := newRelayClient(base)
 	if err != nil {
 		return nil, err
 	}
