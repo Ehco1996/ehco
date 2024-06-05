@@ -11,9 +11,14 @@ import (
 )
 
 const (
-	ProtocolHTTP = "http"
-	ProtocolTLS  = "tls"
+	ProtocolHTTP      = "http"
+	ProtocolTLS       = "tls"
+	WS_HANDSHAKE_PATH = "handshake"
 )
+
+type WSConfig struct {
+	Path string `json:"path,omitempty"`
+}
 
 type Config struct {
 	Listen        string   `json:"listen"`
@@ -22,9 +27,17 @@ type Config struct {
 	TCPRemotes    []string `json:"tcp_remotes"`
 	UDPRemotes    []string `json:"udp_remotes"`
 
-	Label            string   `json:"label,omitempty"`
-	MaxConnection    int      `json:"max_connection,omitempty"`
-	BlockedProtocols []string `json:"blocked_protocols,omitempty"`
+	Label            string    `json:"label,omitempty"`
+	MaxConnection    int       `json:"max_connection,omitempty"`
+	BlockedProtocols []string  `json:"blocked_protocols,omitempty"`
+	WSConfig         *WSConfig `json:"ws_config,omitempty"`
+}
+
+func (r *Config) GetWSHandShakePath() string {
+	if r.WSConfig != nil && r.WSConfig.Path != "" {
+		return r.WSConfig.Path
+	}
+	return WS_HANDSHAKE_PATH
 }
 
 func (r *Config) Validate() error {

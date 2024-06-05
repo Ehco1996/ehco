@@ -80,6 +80,7 @@ func (s *RawServer) ListenAndServe() error {
 			return err
 		}
 		go func(c net.Conn) {
+			defer c.Close()
 			if err := s.RelayTCPConn(c, s.relayer.TCPHandShake); err != nil {
 				s.l.Errorf("RelayTCPConn error: %s", err.Error())
 			}
