@@ -19,8 +19,8 @@ async function handleRequest(request) {
 	}
 
 	const url = new URL(request.url);
-	console.log('Request URL:', url.href);
 	const queryParams = url.searchParams;
+	console.log('Request URL:', url.href, url.searchParams);
 	for (const [key, value] of queryParams) {
 		console.log(`${key}: ${value}`);
 	}
@@ -28,17 +28,26 @@ async function handleRequest(request) {
 	const [client, server] = Object.values(webSocketPair);
 	server.accept();
 
+	const address = { hostname: '127.0.0.1', port: 5201 };
+	const tcpSocket = connect(address);
+
 	const readableStream = new ReadableStream({
 		start(controller) {
-			server.onmessage = (event) => {
+			server.addEventListener('message', (event) => {
 				controller.enqueue(event.data);
-			};
-			server.onclose = () => {
+			});
+			server.addEventListener('close', () => {
 				controller.close();
-			};
-			server.onerror = (err) => {
+				client.close();
+				server.close();
+				tcpSocket.close();
+			});
+			server.addEventListener('error', (err) => {
 				controller.error(err);
-			};
+				client.close();
+				server.close();
+				tcpSocket.close();
+			});
 		},
 	});
 
@@ -47,27 +56,43 @@ async function handleRequest(request) {
 			server.send(chunk);
 		},
 		close() {
+			client.close();
 			server.close();
+			tcpSocket.close();
 		},
 		abort(err) {
 			console.error('Stream error:', err);
+			client.close();
 			server.close();
+			tcpSocket.close();
 		},
 	});
 
-	const address = { hostname: '127.0.0.1', port: 5201 };
-	const tcpSocket = connect(address);
-	readableStream.pipeTo(tcpSocket.writable);
-	tcpSocket.readable.pipeTo(writableStream);
+	readableStream
+		.pipeTo(tcpSocket.writable)
+		.then(() => console.log('All data successfully written!'))
+		.catch((e) => {
+			console.error('Something went wrong on read!', e.message);
+			client.close();
+			server.close();
+			tcpSocket.close();
+		});
+
+	tcpSocket.readable
+		.pipeTo(writableStream)
+		.then(() => console.log('All data successfully written!'))
+		.catch((e) => {
+			console.error('Something went wrong on write!', e.message);
+			client.close();
+			server.close();
+			tcpSocket.close();
+		});
+
 	return new Response(null, {
 		status: 101,
 		webSocket: client,
 	});
 }
-
-addEventListener('fetch', (event) => {
-	event.respondWith(handleRequest(event.request));
-});
 
 export default {
 	async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {

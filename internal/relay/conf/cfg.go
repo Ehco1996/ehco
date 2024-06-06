@@ -17,7 +17,8 @@ const (
 )
 
 type WSConfig struct {
-	Path string `json:"path,omitempty"`
+	Path       string `json:"path,omitempty"`
+	RemoteAddr string `json:"remote_addr,omitempty"`
 }
 
 type Config struct {
@@ -35,7 +36,11 @@ type Config struct {
 
 func (r *Config) GetWSHandShakePath() string {
 	if r.WSConfig != nil && r.WSConfig.Path != "" {
-		return r.WSConfig.Path
+		base := r.WSConfig.Path
+		if r.WSConfig.RemoteAddr != "" {
+			base += fmt.Sprintf("?remote_addr=%s", r.WSConfig.RemoteAddr)
+			return base
+		}
 	}
 	return WS_HANDSHAKE_PATH
 }
