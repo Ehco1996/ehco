@@ -12,9 +12,10 @@ import (
 )
 
 const (
-	ProtocolHTTP      = "http"
-	ProtocolTLS       = "tls"
-	WS_HANDSHAKE_PATH = "handshake"
+	ProtocolHTTP         = "http"
+	ProtocolTLS          = "tls"
+	WS_HANDSHAKE_PATH    = "handshake"
+	WS_QUERY_REMOTE_ADDR = "remote_addr"
 )
 
 type WSConfig struct {
@@ -43,16 +44,12 @@ func (r *Config) GetWSHandShakePath() string {
 }
 
 func (r *Config) GetWSRemoteAddr(baseAddr string) (string, error) {
-	if r.WSConfig == nil {
-		return baseAddr, nil
-	}
 	addr, err := url.JoinPath(baseAddr, r.GetWSHandShakePath())
 	if err != nil {
 		return "", err
 	}
-	if r.WSConfig.RemoteAddr != "" {
-		addr += "?remote_addr="
-		addr += r.WSConfig.RemoteAddr
+	if r.WSConfig != nil && r.WSConfig.RemoteAddr != "" {
+		addr += fmt.Sprintf("?%s=%s", WS_QUERY_REMOTE_ADDR, r.WSConfig.RemoteAddr)
 	}
 	return addr, nil
 }
