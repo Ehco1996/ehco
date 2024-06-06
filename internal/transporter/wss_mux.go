@@ -7,7 +7,6 @@ import (
 	"context"
 	"net"
 	"net/http"
-	"net/url"
 	"time"
 
 	"github.com/gobwas/ws"
@@ -58,7 +57,7 @@ func (c *MwssClient) initNewSession(ctx context.Context, addr string) (*smux.Ses
 
 func (s *MwssClient) TCPHandShake(remote *lb.Node) (net.Conn, error) {
 	t1 := time.Now()
-	addr, err := url.JoinPath(remote.Address, s.cfg.GetWSHandShakePath())
+	addr, err := s.cfg.GetWSRemoteAddr(remote.Address)
 	if err != nil {
 		return nil, err
 	}

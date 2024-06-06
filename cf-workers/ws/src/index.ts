@@ -20,16 +20,13 @@ async function handleRequest(request) {
 
 	const url = new URL(request.url);
 	const queryParams = url.searchParams;
-	console.log('Request URL:', url.href, url.searchParams);
-	for (const [key, value] of queryParams) {
-		console.log(`${key}: ${value}`);
-	}
+	const remoteAddr = queryParams.get('remote_addr');
+
 	const webSocketPair = new WebSocketPair();
 	const [client, server] = Object.values(webSocketPair);
 	server.accept();
 
-	const address = { hostname: '127.0.0.1', port: 5201 };
-	const tcpSocket = connect(address);
+	const tcpSocket = connect(remoteAddr);
 
 	const readableStream = new ReadableStream({
 		start(controller) {

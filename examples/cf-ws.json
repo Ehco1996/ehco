@@ -1,4 +1,5 @@
 {
+    "web_port": 9000,
     "relay_configs": [
         {
             "listen": "127.0.0.1:1235",
@@ -7,7 +8,7 @@
             "tcp_remotes": ["ws://0.0.0.0:8787"],
             "ws_config": {
                 "path": "pwd",
-                "remote_addr": "127.0.0.1"
+                "remote_addr": "127.0.0.1:5201"
             }
         }
     ]

@@ -3,6 +3,7 @@ package conf
 import (
 	"errors"
 	"fmt"
+	"net/url"
 
 	"github.com/Ehco1996/ehco/internal/constant"
 
@@ -36,13 +37,24 @@ type Config struct {
 
 func (r *Config) GetWSHandShakePath() string {
 	if r.WSConfig != nil && r.WSConfig.Path != "" {
-		base := r.WSConfig.Path
-		if r.WSConfig.RemoteAddr != "" {
-			base += fmt.Sprintf("?remote_addr=%s", r.WSConfig.RemoteAddr)
-			return base
-		}
+		return r.WSConfig.Path
 	}
 	return WS_HANDSHAKE_PATH
+}
+
+func (r *Config) GetWSRemoteAddr(baseAddr string) (string, error) {
+	if r.WSConfig == nil {
+		return baseAddr, nil
+	}
+	addr, err := url.JoinPath(baseAddr, r.GetWSHandShakePath())
+	if err != nil {
+		return "", err
+	}
+	if r.WSConfig.RemoteAddr != "" {
+		addr += "?remote_addr="
+		addr += r.WSConfig.RemoteAddr
+	}
+	return addr, nil
 }
 
 func (r *Config) Validate() error {
