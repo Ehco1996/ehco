@@ -4,11 +4,11 @@ import (
 	"context"
 	"net"
 	"net/http"
-	"net/url"
 	"time"
 
 	"github.com/gobwas/ws"
 	"github.com/labstack/echo/v4"
+	"go.uber.org/zap"
 
 	"github.com/Ehco1996/ehco/internal/conn"
 	"github.com/Ehco1996/ehco/internal/constant"
@@ -38,15 +38,12 @@ func newWsClient(base *baseTransporter) (*WsClient, error) {
 
 func (s *WsClient) TCPHandShake(remote *lb.Node) (net.Conn, error) {
 	t1 := time.Now()
-
-	addr, err := url.JoinPath(remote.Address, s.cfg.GetWSHandShakePath())
+	addr, err := s.cfg.GetWSRemoteAddr(remote.Address)
 	if err != nil {
 		return nil, err
 	}
-
 	wsc, _, _, err := s.dialer.Dial(context.TODO(), addr)
 	if err != nil {
-		println("err,", err.Error(), addr)
 		return nil, err
 	}
 	latency := time.Since(t1)
@@ -76,6 +73,7 @@ func newWsServer(base *baseTransporter) (*WsServer, error) {
 		},
 	}
 	e := web.NewEchoServer()
+	e.Use(web.NginxLogMiddleware(zap.S().Named("ws-server")))
 
 	e.GET("/", echo.WrapHandler(web.MakeIndexF()))
 	e.GET(base.cfg.GetWSHandShakePath(), echo.WrapHandler(http.HandlerFunc(s.HandleRequest)))
