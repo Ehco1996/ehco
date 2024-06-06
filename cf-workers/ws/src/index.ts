@@ -28,6 +28,12 @@ async function handleRequest(request) {
 
 	const tcpSocket = connect(remoteAddr);
 
+	function closeAll() {
+		client.close();
+		server.close();
+		tcpSocket.close();
+	}
+
 	const readableStream = new ReadableStream({
 		start(controller) {
 			server.addEventListener('message', (event) => {
@@ -35,15 +41,11 @@ async function handleRequest(request) {
 			});
 			server.addEventListener('close', () => {
 				controller.close();
-				client.close();
-				server.close();
-				tcpSocket.close();
+				closeAll();
 			});
 			server.addEventListener('error', (err) => {
 				controller.error(err);
-				client.close();
-				server.close();
-				tcpSocket.close();
+				closeAll();
 			});
 		},
 	});
@@ -53,15 +55,11 @@ async function handleRequest(request) {
 			server.send(chunk);
 		},
 		close() {
-			client.close();
-			server.close();
-			tcpSocket.close();
+			closeAll();
 		},
 		abort(err) {
 			console.error('Stream error:', err);
-			client.close();
-			server.close();
-			tcpSocket.close();
+			closeAll();
 		},
 	});
 
@@ -70,9 +68,7 @@ async function handleRequest(request) {
 		.then(() => console.log('All data successfully written!'))
 		.catch((e) => {
 			console.error('Something went wrong on read!', e.message);
-			client.close();
-			server.close();
-			tcpSocket.close();
+			closeAll();
 		});
 
 	tcpSocket.readable
@@ -80,9 +76,7 @@ async function handleRequest(request) {
 		.then(() => console.log('All data successfully written!'))
 		.catch((e) => {
 			console.error('Something went wrong on write!', e.message);
-			client.close();
-			server.close();
-			tcpSocket.close();
+			closeAll();
 		});
 
 	return new Response(null, {
