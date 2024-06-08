@@ -24,16 +24,17 @@ type WSConfig struct {
 }
 
 type Config struct {
+	Label         string   `json:"label,omitempty"`
 	Listen        string   `json:"listen"`
 	ListenType    string   `json:"listen_type"`
 	TransportType string   `json:"transport_type"`
 	TCPRemotes    []string `json:"tcp_remotes"`
 	UDPRemotes    []string `json:"udp_remotes"`
 
-	Label            string    `json:"label,omitempty"`
-	MaxConnection    int       `json:"max_connection,omitempty"`
-	BlockedProtocols []string  `json:"blocked_protocols,omitempty"`
-	WSConfig         *WSConfig `json:"ws_config,omitempty"`
+	MaxConnection    int      `json:"max_connection,omitempty"`
+	BlockedProtocols []string `json:"blocked_protocols,omitempty"`
+
+	WSConfig *WSConfig `json:"ws_config,omitempty"`
 }
 
 func (r *Config) GetWSHandShakePath() string {
@@ -58,20 +59,9 @@ func (r *Config) Validate() error {
 	if r.Adjust() != nil {
 		return errors.New("adjust config failed")
 	}
-	if r.ListenType != constant.RelayTypeRaw &&
-		r.ListenType != constant.RelayTypeWS &&
-		r.ListenType != constant.RelayTypeWSS &&
-		r.ListenType != constant.RelayTypeMTCP &&
-		r.ListenType != constant.RelayTypeMWSS {
-		return fmt.Errorf("invalid listen type:%s", r.ListenType)
-	}
 
-	if r.TransportType != constant.RelayTypeRaw &&
-		r.TransportType != constant.RelayTypeWS &&
-		r.TransportType != constant.RelayTypeWSS &&
-		r.TransportType != constant.RelayTypeMTCP &&
-		r.TransportType != constant.RelayTypeMWSS {
-		return fmt.Errorf("invalid transport type:%s", r.ListenType)
+	if err := r.validateType(); err != nil {
+		return err
 	}
 
 	if r.Listen == "" {
@@ -175,4 +165,25 @@ func (r *Config) ToTCPRemotes() lb.RoundRobin {
 
 func (r *Config) GetLoggerName() string {
 	return fmt.Sprintf("%s(%s<->%s)", r.Label, r.ListenType, r.TransportType)
+}
+
+func (r *Config) validateType() error {
+	if r.ListenType != constant.RelayTypeRaw &&
+		r.ListenType != constant.RelayTypeWS &&
+		r.ListenType != constant.RelayTypeMWS &&
+		r.ListenType != constant.RelayTypeWSS &&
+		r.ListenType != constant.RelayTypeMTCP &&
+		r.ListenType != constant.RelayTypeMWSS {
+		return fmt.Errorf("invalid listen type:%s", r.ListenType)
+	}
+
+	if r.TransportType != constant.RelayTypeRaw &&
+		r.TransportType != constant.RelayTypeWS &&
+		r.TransportType != constant.RelayTypeMWS &&
+		r.TransportType != constant.RelayTypeWSS &&
+		r.TransportType != constant.RelayTypeMTCP &&
+		r.TransportType != constant.RelayTypeMWSS {
+		return fmt.Errorf("invalid transport type:%s", r.ListenType)
+	}
+	return nil
 }

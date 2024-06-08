@@ -29,9 +29,13 @@ const (
 
 // relay type
 const (
+	// tcp relay
 	RelayTypeRaw  = "raw"
+	RelayTypeMTCP = "mtcp"
+
+	// ws relay
 	RelayTypeWS   = "ws"
+	RelayTypeMWS  = "mws"
 	RelayTypeWSS  = "wss"
 	RelayTypeMWSS = "mwss"
-	RelayTypeMTCP = "mtcp"
 )
