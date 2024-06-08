@@ -41,6 +41,10 @@ const (
 	MTCP_LISTEN = "0.0.0.0:1238"
 	MTCP_REMOTE = "0.0.0.0:2003"
 	MTCP_SERVER = "0.0.0.0:2003"
+
+	MWS_LISTEN = "0.0.0.0:1239"
+	MWS_REMOTE = "ws://0.0.0.0:2004"
+	MSS_SERVER = "0.0.0.0:2004"
 )
 
 func init() {
@@ -124,6 +128,20 @@ func init() {
 			{
 				Listen:        MTCP_SERVER,
 				ListenType:    constant.RelayTypeMTCP,
+				TCPRemotes:    []string{ECHO_SERVER},
+				TransportType: constant.RelayTypeRaw,
+			},
+
+			// mws
+			{
+				Listen:        MWS_LISTEN,
+				ListenType:    constant.RelayTypeRaw,
+				TCPRemotes:    []string{MWS_REMOTE},
+				TransportType: constant.RelayTypeMWS,
+			},
+			{
+				Listen:        MSS_SERVER,
+				ListenType:    constant.RelayTypeMWS,
 				TCPRemotes:    []string{ECHO_SERVER},
 				TransportType: constant.RelayTypeRaw,
 			},
@@ -263,6 +281,16 @@ func TestRelayOverMTCP(t *testing.T) {
 	}
 	wg.Wait()
 	t.Log("test tcp over mtcp done!")
+}
+
+func TestRelayOverMWS(t *testing.T) {
+	msg := []byte("hello")
+	// test tcp
+	res := echo.SendTcpMsg(msg, MWS_LISTEN)
+	if string(res) != string(msg) {
+		t.Fatal(res)
+	}
+	t.Log("test tcp over mws done!")
 }
 
 func BenchmarkTcpRelay(b *testing.B) {

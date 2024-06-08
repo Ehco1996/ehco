@@ -22,6 +22,8 @@ func newRelayClient(base *baseTransporter) (RelayClient, error) {
 		return newRawClient(base)
 	case constant.RelayTypeWS:
 		return newWsClient(base)
+	case constant.RelayTypeMWS:
+		return newMwsClient(base)
 	case constant.RelayTypeWSS:
 		return newWssClient(base)
 	case constant.RelayTypeMWSS:
@@ -45,6 +47,8 @@ func NewRelayServer(cfg *conf.Config, cmgr cmgr.Cmgr) (RelayServer, error) {
 		return newRawServer(base)
 	case constant.RelayTypeWS:
 		return newWsServer(base)
+	case constant.RelayTypeMWS:
+		return newMwsServer(base)
 	case constant.RelayTypeWSS:
 		return newWssServer(base)
 	case constant.RelayTypeMWSS:
