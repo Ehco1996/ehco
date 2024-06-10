@@ -2,7 +2,6 @@ package cmgr
 
 import (
 	"context"
-	"net/http"
 
 	"github.com/Ehco1996/ehco/internal/conn"
 	"github.com/Ehco1996/ehco/internal/constant"
@@ -72,9 +71,10 @@ func (cm *cmgrImpl) syncOnce(ctx context.Context) error {
 	}
 	cm.closedConnectionsMap = make(map[string][]conn.RelayConn)
 	cm.lock.Unlock()
+
 	if cm.cfg.NeedSync() {
 		cm.l.Debug("syncing data to server", zap.Any("data", req))
-		return myhttp.PostJson(http.DefaultClient, cm.cfg.SyncURL, &req)
+		return myhttp.PostJSONWithRetry(cm.cfg.SyncURL, &req)
 	} else {
 		cm.l.Debugf("remove %d closed connections", len(req.Stats))
 	}

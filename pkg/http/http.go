@@ -4,19 +4,35 @@ import (
 	"bytes"
 	"encoding/json"
 	"io"
-	"net/http"
+
+	"github.com/hashicorp/go-retryablehttp"
 )
 
-func PostJson(c *http.Client, url string, dataStruct interface{}) error {
+func PostJSONWithRetry(url string, dataStruct interface{}) error {
+	retryClient := retryablehttp.NewClient()
+	retryClient.RetryMax = 3
+
 	buf := new(bytes.Buffer)
 	if err := json.NewEncoder(buf).Encode(dataStruct); err != nil {
 		return err
 	}
-	r, err := http.Post(url, "application/json", buf)
+	r, err := retryClient.Post(url, "application/json", buf)
 	if err != nil {
 		return err
 	}
 	defer r.Body.Close()
 	_, err = io.ReadAll(r.Body)
 	return err
+}
+
+func GetJSONWithRetry(url string, dataStruct interface{}) error {
+	retryClient := retryablehttp.NewClient()
+	retryClient.RetryMax = 3
+
+	resp, err := retryablehttp.Get(url)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	return json.NewDecoder(resp.Body).Decode(&dataStruct)
 }

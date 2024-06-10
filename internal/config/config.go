@@ -3,10 +3,11 @@ package config
 import (
 	"encoding/json"
 	"fmt"
-	"net/http"
 	"os"
 	"strings"
 	"time"
+
+	myhttp "github.com/Ehco1996/ehco/pkg/http"
 
 	"github.com/Ehco1996/ehco/internal/relay/conf"
 	"github.com/Ehco1996/ehco/pkg/sub"
@@ -79,14 +80,8 @@ func (c *Config) readFromFile() error {
 }
 
 func (c *Config) readFromHttp() error {
-	httpc := &http.Client{Timeout: 10 * time.Second}
-	r, err := httpc.Get(c.PATH)
-	if err != nil {
-		return err
-	}
-	defer r.Body.Close()
 	c.l.Infof("Load Config From HTTP: %s", c.PATH)
-	return json.NewDecoder(r.Body).Decode(&c)
+	return myhttp.GetJSONWithRetry(c.PATH, &c)
 }
 
 func (c *Config) Adjust() error {
