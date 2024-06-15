@@ -9,7 +9,7 @@
             "listen": "127.0.0.1:1234",
             "listen_type": "raw",
             "transport_type": "raw",
-            "label": "relay1",
+            "label": "iperf3",
             "tcp_remotes": ["0.0.0.0:5201"]
         }
     ]
