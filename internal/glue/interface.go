@@ -2,8 +2,6 @@ package glue
 
 import (
 	"context"
-
-	"github.com/Ehco1996/ehco/pkg/lb"
 )
 
 type Reloader interface {
@@ -11,5 +9,6 @@ type Reloader interface {
 }
 
 type HealthChecker interface {
-	HealthCheck(ctx context.Context, remote *lb.Node) error
+	// get relay by ID and check the connection health
+	HealthCheck(ctx context.Context, RelayID string) error
 }

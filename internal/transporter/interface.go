@@ -7,7 +7,6 @@ import (
 
 	"github.com/Ehco1996/ehco/internal/cmgr"
 	"github.com/Ehco1996/ehco/internal/constant"
-	"github.com/Ehco1996/ehco/internal/glue"
 	"github.com/Ehco1996/ehco/internal/relay/conf"
 	"github.com/Ehco1996/ehco/pkg/lb"
 )
@@ -15,7 +14,7 @@ import (
 type TCPHandShakeF func(remote *lb.Node) (net.Conn, error)
 
 type RelayClient interface {
-	glue.HealthChecker
+	HealthCheck(ctx context.Context, remote *lb.Node) error
 	TCPHandShake(remote *lb.Node) (net.Conn, error)
 }
 
