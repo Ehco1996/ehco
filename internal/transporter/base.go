@@ -24,15 +24,21 @@ type baseTransporter struct {
 
 	cmgr       cmgr.Cmgr
 	tCPRemotes lb.RoundRobin
+	relayer    RelayClient
 }
 
-func NewBaseTransporter(cfg *conf.Config, cmgr cmgr.Cmgr) *baseTransporter {
+func NewBaseTransporter(cfg *conf.Config, cmgr cmgr.Cmgr) (*baseTransporter, error) {
+	relayer, err := newRelayClient(cfg)
+	if err != nil {
+		return nil, err
+	}
 	return &baseTransporter{
 		cfg:        cfg,
 		cmgr:       cmgr,
 		tCPRemotes: cfg.ToTCPRemotes(),
 		l:          zap.S().Named(cfg.GetLoggerName()),
-	}
+		relayer:    relayer,
+	}, nil
 }
 
 func (b *baseTransporter) GetTCPListenAddr() (*net.TCPAddr, error) {
@@ -93,4 +99,8 @@ func (b *baseTransporter) RelayTCPConn(c net.Conn, handshakeF TCPHandShakeF) err
 	b.cmgr.AddConnection(relayConn)
 	defer b.cmgr.RemoveConnection(relayConn)
 	return relayConn.Transport(remote.Label)
+}
+
+func (b *baseTransporter) HealthCheck(ctx context.Context) error {
+	return b.relayer.HealthCheck(ctx, b.GetRemote().Clone())
 }

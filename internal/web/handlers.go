@@ -12,7 +12,7 @@ import (
 	"go.uber.org/zap"
 )
 
-const defaultPageSize = 10
+const defaultPageSize = 20
 
 func MakeIndexF() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -51,13 +51,15 @@ func (s *Server) HandleClashProxyProvider(c echo.Context) error {
 }
 
 func (s *Server) handleClashProxyProvider(c echo.Context, subName string, grouped bool) error {
-	if s.relayServerReloader != nil {
-		if err := s.relayServerReloader.Reload(true); err != nil {
+	if s.Reloader != nil {
+		if err := s.Reloader.Reload(true); err != nil {
 			return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 		}
 	} else {
-		s.l.Debugf("relayServerReloader is nil this should not happen")
+		s.l.Debugf("Reloader is nil this should not happen")
+		return echo.NewHTTPError(http.StatusBadRequest, "should not happen error happen :)")
 	}
+
 	clashSubList, err := s.cfg.GetClashSubList()
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
@@ -81,11 +83,10 @@ func (s *Server) handleClashProxyProvider(c echo.Context, subName string, groupe
 }
 
 func (s *Server) HandleReload(c echo.Context) error {
-	if s.relayServerReloader == nil {
+	if s.Reloader == nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "reload not support")
 	}
-
-	err := s.relayServerReloader.Reload(true)
+	err := s.Reloader.Reload(true)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
@@ -95,6 +96,18 @@ func (s *Server) HandleReload(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
 	return nil
+}
+
+func (s *Server) HandleHealthCheck(c echo.Context) error {
+	relayLabel := c.QueryParam("relay_label")
+	if relayLabel == "" {
+		return echo.NewHTTPError(http.StatusBadRequest, "relay_label is required")
+	}
+	if err := s.HealthCheck(c.Request().Context(), relayLabel); err != nil {
+		res := CommonResp{Message: err.Error()}
+		return c.JSON(http.StatusBadRequest, res)
+	}
+	return c.JSON(http.StatusOK, CommonResp{Message: "connect success"})
 }
 
 func (s *Server) CurrentConfig(c echo.Context) error {

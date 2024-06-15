@@ -13,6 +13,7 @@ import (
 	"github.com/Ehco1996/ehco/internal/conn"
 	"github.com/Ehco1996/ehco/internal/constant"
 	"github.com/Ehco1996/ehco/internal/metrics"
+	"github.com/Ehco1996/ehco/internal/relay/conf"
 	"github.com/Ehco1996/ehco/internal/web"
 	"github.com/Ehco1996/ehco/pkg/lb"
 )
@@ -23,15 +24,16 @@ var (
 )
 
 type WsClient struct {
-	*baseTransporter
-
 	dialer *ws.Dialer
+	cfg    *conf.Config
+	l      *zap.SugaredLogger
 }
 
-func newWsClient(base *baseTransporter) (*WsClient, error) {
+func newWsClient(cfg *conf.Config) (*WsClient, error) {
 	s := &WsClient{
-		baseTransporter: base,
-		dialer:          &ws.Dialer{Timeout: constant.DialTimeOut},
+		cfg:    cfg,
+		l:      zap.S().Named(cfg.TransportType),
+		dialer: &ws.Dialer{Timeout: constant.DialTimeOut},
 	}
 	return s, nil
 }
@@ -53,12 +55,23 @@ func (s *WsClient) TCPHandShake(remote *lb.Node) (net.Conn, error) {
 	return c, nil
 }
 
+func (s *WsClient) HealthCheck(ctx context.Context, remote *lb.Node) error {
+	l := zap.S().Named("health-check")
+	l.Infof("start send req to %s", remote.Address)
+	c, err := s.TCPHandShake(remote)
+	if err != nil {
+		l.Errorf("send req to %s meet error:%s", remote.Address, err)
+		return err
+	}
+	c.Close()
+	return nil
+}
+
 type WsServer struct {
 	*baseTransporter
 
 	e          *echo.Echo
 	httpServer *http.Server
-	relayer    RelayClient
 }
 
 func newWsServer(base *baseTransporter) (*WsServer, error) {
@@ -79,11 +92,6 @@ func newWsServer(base *baseTransporter) (*WsServer, error) {
 	e.GET(base.cfg.GetWSHandShakePath(), echo.WrapHandler(http.HandlerFunc(s.HandleRequest)))
 
 	s.e = e
-	relayer, err := newRelayClient(base)
-	if err != nil {
-		return nil, err
-	}
-	s.relayer = relayer
 	return s, nil
 }
 

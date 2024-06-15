@@ -116,7 +116,7 @@ func MustStartComponents(mainCtx context.Context, cfg *config.Config) {
 	}()
 
 	if cfg.NeedStartWebServer() {
-		webS, err := web.NewServer(cfg, rs, rs.Cmgr)
+		webS, err := web.NewServer(cfg, rs, rs, rs.Cmgr)
 		if err != nil {
 			cliLogger.Fatalf("NewWebServer meet err=%s", err.Error())
 		}

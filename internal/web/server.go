@@ -17,21 +17,23 @@ import (
 
 	"github.com/Ehco1996/ehco/internal/cmgr"
 	"github.com/Ehco1996/ehco/internal/config"
+	"github.com/Ehco1996/ehco/internal/glue"
 	"github.com/Ehco1996/ehco/internal/metrics"
-	"github.com/Ehco1996/ehco/internal/reloader"
 )
 
 //go:embed templates/*.html
 var templatesFS embed.FS
 
 type Server struct {
+	glue.Reloader
+	glue.HealthChecker
+
 	e    *echo.Echo
 	addr string
 	l    *zap.SugaredLogger
 	cfg  *config.Config
 
-	relayServerReloader reloader.Reloader
-	connMgr             cmgr.Cmgr
+	connMgr cmgr.Cmgr
 }
 
 type echoTemplate struct {
@@ -42,7 +44,11 @@ func (t *echoTemplate) Render(w io.Writer, name string, data interface{}, c echo
 	return t.templates.ExecuteTemplate(w, name, data)
 }
 
-func NewServer(cfg *config.Config, relayReloader reloader.Reloader, connMgr cmgr.Cmgr) (*Server, error) {
+func NewServer(
+	cfg *config.Config,
+	relayReloader glue.Reloader,
+	healthChecker glue.HealthChecker,
+	connMgr cmgr.Cmgr) (*Server, error) {
 	l := zap.S().Named("web")
 
 	templates := template.Must(template.ParseFS(templatesFS, "templates/*.html"))
@@ -79,12 +85,14 @@ func NewServer(cfg *config.Config, relayReloader reloader.Reloader, connMgr cmgr
 		return nil, err
 	}
 	s := &Server{
-		e:                   e,
-		l:                   l,
-		cfg:                 cfg,
-		connMgr:             connMgr,
-		relayServerReloader: relayReloader,
-		addr:                net.JoinHostPort(cfg.WebHost, fmt.Sprintf("%d", cfg.WebPort)),
+		Reloader:      relayReloader,
+		HealthChecker: healthChecker,
+
+		e:       e,
+		l:       l,
+		cfg:     cfg,
+		connMgr: connMgr,
+		addr:    net.JoinHostPort(cfg.WebHost, fmt.Sprintf("%d", cfg.WebPort)),
 	}
 
 	// register handler
@@ -99,7 +107,7 @@ func NewServer(cfg *config.Config, relayReloader reloader.Reloader, connMgr cmgr
 	api := e.Group("/api/v1")
 	api.GET("/config/", s.CurrentConfig)
 	api.POST("/config/reload/", s.HandleReload)
-
+	api.GET("/health_check/", s.HandleHealthCheck)
 	return s, nil
 }
 

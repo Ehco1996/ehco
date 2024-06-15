@@ -2,12 +2,15 @@
 package transporter
 
 import (
+	"context"
 	"net"
 	"time"
 
 	"github.com/Ehco1996/ehco/internal/constant"
 	"github.com/Ehco1996/ehco/internal/metrics"
+	"github.com/Ehco1996/ehco/internal/relay/conf"
 	"github.com/Ehco1996/ehco/pkg/lb"
+	"go.uber.org/zap"
 )
 
 var (
@@ -16,15 +19,16 @@ var (
 )
 
 type RawClient struct {
-	*baseTransporter
-
 	dialer *net.Dialer
+	cfg    *conf.Config
+	l      *zap.SugaredLogger
 }
 
-func newRawClient(base *baseTransporter) (*RawClient, error) {
+func newRawClient(cfg *conf.Config) (*RawClient, error) {
 	r := &RawClient{
-		baseTransporter: base,
-		dialer:          &net.Dialer{Timeout: constant.DialTimeOut},
+		l:      zap.S().Named("raw"),
+		cfg:    cfg,
+		dialer: &net.Dialer{Timeout: constant.DialTimeOut},
 	}
 	return r, nil
 }
@@ -41,11 +45,22 @@ func (raw *RawClient) TCPHandShake(remote *lb.Node) (net.Conn, error) {
 	return rc, nil
 }
 
+func (raw *RawClient) HealthCheck(ctx context.Context, remote *lb.Node) error {
+	l := zap.S().Named("health-check")
+	l.Infof("start send req to %s", remote.Address)
+	c, err := raw.TCPHandShake(remote)
+	if err != nil {
+		l.Errorf("send req to %s meet error:%s", remote.Address, err)
+		return err
+	}
+	c.Close()
+	return nil
+}
+
 type RawServer struct {
 	*baseTransporter
 	localTCPAddr *net.TCPAddr
 	lis          *net.TCPListener
-	relayer      RelayClient
 }
 
 func newRawServer(base *baseTransporter) (*RawServer, error) {
@@ -57,15 +72,10 @@ func newRawServer(base *baseTransporter) (*RawServer, error) {
 	if err != nil {
 		return nil, err
 	}
-	relayer, err := newRelayClient(base)
-	if err != nil {
-		return nil, err
-	}
 	return &RawServer{
 		lis:             lis,
 		baseTransporter: base,
 		localTCPAddr:    addr,
-		relayer:         relayer,
 	}, nil
 }
 
