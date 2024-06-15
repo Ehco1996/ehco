@@ -101,6 +101,6 @@ func (b *baseTransporter) RelayTCPConn(c net.Conn, handshakeF TCPHandShakeF) err
 	return relayConn.Transport(remote.Label)
 }
 
-func (b *baseTransporter) GetRelayer() RelayClient {
-	return b.relayer
+func (b *baseTransporter) HealthCheck(ctx context.Context) error {
+	return b.relayer.HealthCheck(ctx, b.GetRemote().Clone())
 }

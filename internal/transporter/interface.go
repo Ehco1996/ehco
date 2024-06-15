@@ -7,6 +7,7 @@ import (
 
 	"github.com/Ehco1996/ehco/internal/cmgr"
 	"github.com/Ehco1996/ehco/internal/constant"
+	"github.com/Ehco1996/ehco/internal/glue"
 	"github.com/Ehco1996/ehco/internal/relay/conf"
 	"github.com/Ehco1996/ehco/pkg/lb"
 )
@@ -14,8 +15,8 @@ import (
 type TCPHandShakeF func(remote *lb.Node) (net.Conn, error)
 
 type RelayClient interface {
+	glue.HealthChecker
 	TCPHandShake(remote *lb.Node) (net.Conn, error)
-	HealthCheck(ctx context.Context, remote *lb.Node) error
 }
 
 func newRelayClient(cfg *conf.Config) (RelayClient, error) {
@@ -40,7 +41,7 @@ func newRelayClient(cfg *conf.Config) (RelayClient, error) {
 type RelayServer interface {
 	ListenAndServe() error
 	Close() error
-	GetRelayer() RelayClient
+	HealthCheck(ctx context.Context) error
 }
 
 func NewRelayServer(cfg *conf.Config, cmgr cmgr.Cmgr) (RelayServer, error) {

@@ -1,13 +1,13 @@
 package relay
 
 import (
+	"github.com/Ehco1996/ehco/internal/glue"
 	"github.com/Ehco1996/ehco/internal/relay/conf"
-	"github.com/Ehco1996/ehco/internal/reloader"
 	"go.uber.org/zap"
 )
 
 // make sure Server implements the reloader.Reloader interface
-var _ reloader.Reloader = (*Server)(nil)
+var _ glue.Reloader = (*Server)(nil)
 
 func (s *Server) Reload(force bool) error {
 	// k:name v: *Config

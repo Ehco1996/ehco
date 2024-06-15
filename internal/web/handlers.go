@@ -12,7 +12,7 @@ import (
 	"go.uber.org/zap"
 )
 
-const defaultPageSize = 10
+const defaultPageSize = 20
 
 func MakeIndexF() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {

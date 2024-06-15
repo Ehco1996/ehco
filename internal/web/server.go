@@ -17,8 +17,8 @@ import (
 
 	"github.com/Ehco1996/ehco/internal/cmgr"
 	"github.com/Ehco1996/ehco/internal/config"
+	"github.com/Ehco1996/ehco/internal/glue"
 	"github.com/Ehco1996/ehco/internal/metrics"
-	"github.com/Ehco1996/ehco/internal/reloader"
 )
 
 //go:embed templates/*.html
@@ -30,7 +30,7 @@ type Server struct {
 	l    *zap.SugaredLogger
 	cfg  *config.Config
 
-	relayServerReloader reloader.Reloader
+	relayServerReloader glue.Reloader
 	connMgr             cmgr.Cmgr
 }
 
@@ -42,7 +42,7 @@ func (t *echoTemplate) Render(w io.Writer, name string, data interface{}, c echo
 	return t.templates.ExecuteTemplate(w, name, data)
 }
 
-func NewServer(cfg *config.Config, relayReloader reloader.Reloader, connMgr cmgr.Cmgr) (*Server, error) {
+func NewServer(cfg *config.Config, relayReloader glue.Reloader, connMgr cmgr.Cmgr) (*Server, error) {
 	l := zap.S().Named("web")
 
 	templates := template.Must(template.ParseFS(templatesFS, "templates/*.html"))
