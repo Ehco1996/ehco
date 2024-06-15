@@ -1,6 +1,7 @@
 package transporter
 
 import (
+	"github.com/Ehco1996/ehco/internal/relay/conf"
 	mytls "github.com/Ehco1996/ehco/internal/tls"
 )
 
@@ -13,8 +14,8 @@ type WssClient struct {
 	*WsClient
 }
 
-func newWssClient(base *baseTransporter) (*WssClient, error) {
-	wc, err := newWsClient(base)
+func newWssClient(cfg *conf.Config) (*WssClient, error) {
+	wc, err := newWsClient(cfg)
 	if err != nil {
 		return nil, err
 	}

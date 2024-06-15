@@ -1,7 +1,9 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
     <head>
         <meta charset="UTF-8" />
+        <meta name="description" content="ehco web" />
+        <meta name="keywords" content="ehco-relay" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <link
             rel="stylesheet"
@@ -18,7 +20,6 @@
                     <h1 class="title has-text-centered">
                         ehco is a network relay tool and a typo :)
                     </h1>
-
                     <!-- Build Info Card -->
                     <div class="card">
                         <header class="card-header">
@@ -38,7 +39,6 @@
                             </div>
                         </div>
                     </div>
-
                     <!-- Stylish Links Card -->
                     <div class="card">
                         <header class="card-header">
@@ -82,7 +82,7 @@
                         </div>
                     </div>
                     <!-- Clash Providers card -->
-                    {{if .SubConfigs}}
+                    {{ if .SubConfigs }}
                     <div class="card">
                         <header class="card-header">
                             <p class="card-header-title has-text-centered">
@@ -92,7 +92,7 @@
                         <div class="card-content">
                             <div class="content">
                                 <ul>
-                                    {{range .SubConfigs}}
+                                    {{ range .SubConfigs }}
                                     <li>
                                         <a
                                             class="button is-info is-light"
@@ -108,12 +108,11 @@
                                         >
                                     </li>
                                 </ul>
-                                {{end}}
+                                {{ end }}
                             </div>
                         </div>
                     </div>
-                    {{end}}
-
+                    {{ end }}
                     <!-- Reload Config Button -->
                     <div class="has-text-centered">
                         <button
@@ -125,7 +124,6 @@
                     </div>
                 </div>
             </div>
-
             <!-- Footer -->
             <div class="hero-foot">
                 <footer class="footer">
@@ -137,7 +135,6 @@
                 </footer>
             </div>
         </section>
-
         <script>
             $(document).ready(function () {
                 $("#reloadButton").click(function () {

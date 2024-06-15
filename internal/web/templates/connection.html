@@ -3,7 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bulma/1.0.0/css/bulma.min.css">
+    <meta name="description" content="ehco web">
+    <meta name="keywords" content="ehco-relay">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bulma/1.0.1/css/bulma.min.css">
     <title>Connections</title>
 </head>
 <body>
@@ -57,9 +59,9 @@
                     {{if gt .CurrentPage 1}}
                         <li><a class="pagination-link" href="?conn_type={{.ConnType}}&page=1&page_size={{.PageSize}}">1</a></li>
                     {{end}}
-                    <li><span class="pagination-ellipsis">&hellip;</span></li>
+                    <li><span class="pagination-ellipsis">…</span></li>
                     <li><a class="pagination-link is-current" aria-label="Page {{.CurrentPage}}" aria-current="page">{{.CurrentPage}}</a></li>
-                    <li><span class="pagination-ellipsis">&hellip;</span></li>
+                    <li><span class="pagination-ellipsis">…</span></li>
                     {{if lt .CurrentPage .TotalPage}}
                     <li><a class="pagination-link" href="?conn_type={{.ConnType}}&page={{.TotalPage}}&page_size={{.PageSize}}">{{.TotalPage}}</a></li>
                     {{end}}

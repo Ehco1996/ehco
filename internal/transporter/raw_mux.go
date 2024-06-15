@@ -6,8 +6,10 @@ import (
 	"time"
 
 	"github.com/xtaci/smux"
+	"go.uber.org/zap"
 
 	"github.com/Ehco1996/ehco/internal/metrics"
+	"github.com/Ehco1996/ehco/internal/relay/conf"
 	"github.com/Ehco1996/ehco/pkg/lb"
 )
 
@@ -21,13 +23,13 @@ type MtcpClient struct {
 	muxTP *smuxTransporter
 }
 
-func newMtcpClient(base *baseTransporter) (*MtcpClient, error) {
-	raw, err := newRawClient(base)
+func newMtcpClient(cfg *conf.Config) (*MtcpClient, error) {
+	raw, err := newRawClient(cfg)
 	if err != nil {
 		return nil, err
 	}
 	c := &MtcpClient{RawClient: raw}
-	c.muxTP = NewSmuxTransporter(raw.l.Named("mtcp"), c.initNewSession)
+	c.muxTP = NewSmuxTransporter(zap.S().Named("mtcp"), c.initNewSession)
 	return c, nil
 }
 

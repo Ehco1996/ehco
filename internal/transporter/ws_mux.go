@@ -14,6 +14,7 @@ import (
 	"github.com/xtaci/smux"
 
 	"github.com/Ehco1996/ehco/internal/metrics"
+	"github.com/Ehco1996/ehco/internal/relay/conf"
 	"github.com/Ehco1996/ehco/pkg/lb"
 )
 
@@ -29,8 +30,8 @@ type MwsClient struct {
 	muxTP *smuxTransporter
 }
 
-func newMwsClient(base *baseTransporter) (*MwsClient, error) {
-	wc, err := newWssClient(base)
+func newMwsClient(cfg *conf.Config) (*MwsClient, error) {
+	wc, err := newWssClient(cfg)
 	if err != nil {
 		return nil, err
 	}
