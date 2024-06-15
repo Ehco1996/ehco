@@ -46,10 +46,11 @@ func (raw *RawClient) TCPHandShake(remote *lb.Node) (net.Conn, error) {
 }
 
 func (raw *RawClient) HealthCheck(ctx context.Context, remote *lb.Node) error {
-	raw.l.Infof("start send req to %s", remote.Address)
+	l := zap.S().Named("health-check")
+	l.Infof("start send req to %s", remote.Address)
 	c, err := raw.TCPHandShake(remote)
 	if err != nil {
-		raw.l.Errorf("send req to %s meet error:%s", remote.Address, err)
+		l.Errorf("send req to %s meet error:%s", remote.Address, err)
 		return err
 	}
 	c.Close()
