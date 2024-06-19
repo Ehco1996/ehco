@@ -59,7 +59,7 @@ jobs:
       - name: GoReleaser Action
         uses: goreleaser/goreleaser-action@v5
         with:
-          version: latest
+          version: v0.0.0-nightly
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GORELEASER_GITHUB_TOKEN }}
