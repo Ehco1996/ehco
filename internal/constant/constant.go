@@ -2,6 +2,8 @@ package constant
 
 import "time"
 
+type RelayType string
+
 var (
 	// allow change in test
 	IdleTimeOut = 10 * time.Second
@@ -30,12 +32,12 @@ const (
 // relay type
 const (
 	// tcp relay
-	RelayTypeRaw  = "raw"
-	RelayTypeMTCP = "mtcp"
+	RelayTypeRaw  RelayType = "raw"
+	RelayTypeMTCP RelayType = "mtcp"
 
 	// ws relay
-	RelayTypeWS   = "ws"
-	RelayTypeMWS  = "mws"
-	RelayTypeWSS  = "wss"
-	RelayTypeMWSS = "mwss"
+	RelayTypeWS   RelayType = "ws"
+	RelayTypeMWS  RelayType = "mws"
+	RelayTypeWSS  RelayType = "wss"
+	RelayTypeMWSS RelayType = "mwss"
 )

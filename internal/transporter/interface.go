@@ -33,7 +33,7 @@ func newRelayClient(cfg *conf.Config) (RelayClient, error) {
 	case constant.RelayTypeMWSS:
 		return newMwssClient(cfg)
 	default:
-		return nil, fmt.Errorf("unsupported transport type" + cfg.TransportType)
+		return nil, fmt.Errorf("unsupported transport type: %s", cfg.TransportType)
 	}
 }
 
