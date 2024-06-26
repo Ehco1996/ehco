@@ -32,7 +32,7 @@ type WsClient struct {
 func newWsClient(cfg *conf.Config) (*WsClient, error) {
 	s := &WsClient{
 		cfg:    cfg,
-		l:      zap.S().Named(cfg.TransportType),
+		l:      zap.S().Named(string(cfg.TransportType)),
 		dialer: &ws.Dialer{Timeout: constant.DialTimeOut},
 	}
 	return s, nil

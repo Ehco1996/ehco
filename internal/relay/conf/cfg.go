@@ -24,12 +24,12 @@ type WSConfig struct {
 }
 
 type Config struct {
-	Label         string   `json:"label,omitempty"`
-	Listen        string   `json:"listen"`
-	ListenType    string   `json:"listen_type"`
-	TransportType string   `json:"transport_type"`
-	TCPRemotes    []string `json:"tcp_remotes"`
-	UDPRemotes    []string `json:"udp_remotes"`
+	Label         string             `json:"label,omitempty"`
+	Listen        string             `json:"listen"`
+	ListenType    constant.RelayType `json:"listen_type"`
+	TransportType constant.RelayType `json:"transport_type"`
+	TCPRemotes    []string           `json:"tcp_remotes"`
+	UDPRemotes    []string           `json:"udp_remotes"`
 
 	MaxConnection    int      `json:"max_connection,omitempty"`
 	BlockedProtocols []string `json:"blocked_protocols,omitempty"`

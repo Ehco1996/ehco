@@ -1,13 +1,17 @@
 package cli
 
-import cli "github.com/urfave/cli/v2"
+import (
+	"github.com/Ehco1996/ehco/internal/constant"
+
+	cli "github.com/urfave/cli/v2"
+)
 
 var (
 	LocalAddr            string
-	ListenType           string
+	ListenType           constant.RelayType
 	TCPRemoteAddr        string
 	UDPRemoteAddr        string
-	TransportType        string
+	TransportType        constant.RelayType
 	ConfigPath           string
 	WebPort              int
 	WebToken             string
@@ -30,7 +34,7 @@ var RootFlags = []cli.Flag{
 		Value:       "raw",
 		Usage:       "监听类型，可选项有 raw,ws,wss,mwss",
 		EnvVars:     []string{"EHCO_LISTEN_TYPE"},
-		Destination: &ListenType,
+		Destination: (*string)(&ListenType),
 		Required:    false,
 	},
 	&cli.StringFlag{
@@ -50,7 +54,7 @@ var RootFlags = []cli.Flag{
 		Value:       "raw",
 		Usage:       "传输类型，可选选有 raw,ws,wss,mwss",
 		EnvVars:     []string{"EHCO_TRANSPORT_TYPE"},
-		Destination: &TransportType,
+		Destination: (*string)(&TransportType),
 	},
 	&cli.StringFlag{
 		Name:        "c,config",
