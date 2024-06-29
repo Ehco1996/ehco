@@ -8,7 +8,10 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
-var doOnce sync.Once
+var (
+	doOnce      sync.Once
+	globalInitd bool
+)
 
 func initLogger(logLevel string, replaceGlobal bool) (*zap.Logger, error) {
 	level := zapcore.InfoLevel
@@ -41,6 +44,7 @@ func InitGlobalLogger(logLevel string) error {
 	var err error
 	doOnce.Do(func() {
 		_, err = initLogger(logLevel, true)
+		globalInitd = true
 	})
 	return err
 }

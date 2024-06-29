@@ -5,12 +5,19 @@ import (
 	"encoding/json"
 	"io"
 
+	"github.com/Ehco1996/ehco/pkg/log"
 	"github.com/hashicorp/go-retryablehttp"
 )
 
-func PostJSONWithRetry(url string, dataStruct interface{}) error {
+func generateRetirableClient() *retryablehttp.Client {
 	retryClient := retryablehttp.NewClient()
 	retryClient.RetryMax = 3
+	retryClient.Logger = log.NewZapLeveledLogger("http")
+	return retryClient
+}
+
+func PostJSONWithRetry(url string, dataStruct interface{}) error {
+	retryClient := generateRetirableClient()
 
 	buf := new(bytes.Buffer)
 	if err := json.NewEncoder(buf).Encode(dataStruct); err != nil {
@@ -26,10 +33,8 @@ func PostJSONWithRetry(url string, dataStruct interface{}) error {
 }
 
 func GetJSONWithRetry(url string, dataStruct interface{}) error {
-	retryClient := retryablehttp.NewClient()
-	retryClient.RetryMax = 3
-
-	resp, err := retryablehttp.Get(url)
+	retryClient := generateRetirableClient()
+	resp, err := retryClient.Get(url)
 	if err != nil {
 		return err
 	}

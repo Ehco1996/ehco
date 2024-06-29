@@ -48,7 +48,8 @@ func NewServer(
 	cfg *config.Config,
 	relayReloader glue.Reloader,
 	healthChecker glue.HealthChecker,
-	connMgr cmgr.Cmgr) (*Server, error) {
+	connMgr cmgr.Cmgr,
+) (*Server, error) {
 	l := zap.S().Named("web")
 
 	templates := template.Must(template.ParseFS(templatesFS, "templates/*.html"))

@@ -8,7 +8,7 @@ var (
 	// allow change in test
 	IdleTimeOut = 10 * time.Second
 
-	Version     = "1.1.4"
+	Version     = "1.1.5-dev"
 	GitBranch   string
 	GitRevision string
 	BuildTime   string
