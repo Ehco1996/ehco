@@ -55,6 +55,10 @@ func (r *Config) GetWSRemoteAddr(baseAddr string) (string, error) {
 	return addr, nil
 }
 
+func (r *Config) GetTCPRemotes() string {
+	return fmt.Sprintf("%v", r.TCPRemotes)
+}
+
 func (r *Config) Validate() error {
 	if r.Adjust() != nil {
 		return errors.New("adjust config failed")

@@ -101,6 +101,7 @@ func (b *baseTransporter) RelayTCPConn(c net.Conn, handshakeF TCPHandShakeF) err
 	return relayConn.Transport(remote.Label)
 }
 
-func (b *baseTransporter) HealthCheck(ctx context.Context) error {
-	return b.relayer.HealthCheck(ctx, b.GetRemote().Clone())
+func (b *baseTransporter) HealthCheck(ctx context.Context) (int64, error) {
+	remote := b.GetRemote().Clone()
+	return remote.HandShakeDuration.Milliseconds(), b.relayer.HealthCheck(ctx, remote)
 }

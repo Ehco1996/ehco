@@ -103,11 +103,12 @@ func (s *Server) HandleHealthCheck(c echo.Context) error {
 	if relayLabel == "" {
 		return echo.NewHTTPError(http.StatusBadRequest, "relay_label is required")
 	}
-	if err := s.HealthCheck(c.Request().Context(), relayLabel); err != nil {
-		res := CommonResp{Message: err.Error()}
+	latency, err := s.HealthCheck(c.Request().Context(), relayLabel)
+	if err != nil {
+		res := HealthCheckResp{Message: err.Error(), ErrorCode: -1}
 		return c.JSON(http.StatusBadRequest, res)
 	}
-	return c.JSON(http.StatusOK, CommonResp{Message: "connect success"})
+	return c.JSON(http.StatusOK, HealthCheckResp{Message: "connect success", Latency: latency})
 }
 
 func (s *Server) CurrentConfig(c echo.Context) error {
@@ -156,5 +157,11 @@ func (s *Server) ListConnections(c echo.Context) error {
 		"ActiveCount":    activeCount,
 		"ClosedCount":    closedCount,
 		"AllCount":       s.connMgr.CountConnection("active") + s.connMgr.CountConnection("closed"),
+	})
+}
+
+func (s *Server) ListRules(c echo.Context) error {
+	return c.Render(http.StatusOK, "rule_list.html", map[string]interface{}{
+		"Configs": s.cfg.RelayConfigs,
 	})
 }

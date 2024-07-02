@@ -1,5 +1,7 @@
 package web
 
-type CommonResp struct {
-	Message string `json:"msg"`
+type HealthCheckResp struct {
+	ErrorCode int    `json:"error_code"` // code = 0 means success
+	Message   string `json:"msg"`
+	Latency   int64  `json:"latency"`
 }

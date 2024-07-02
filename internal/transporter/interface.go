@@ -40,7 +40,7 @@ func newRelayClient(cfg *conf.Config) (RelayClient, error) {
 type RelayServer interface {
 	ListenAndServe() error
 	Close() error
-	HealthCheck(ctx context.Context) error
+	HealthCheck(ctx context.Context) (int64, error) // latency in ms
 }
 
 func NewRelayServer(cfg *conf.Config, cmgr cmgr.Cmgr) (RelayServer, error) {

@@ -10,5 +10,5 @@ type Reloader interface {
 
 type HealthChecker interface {
 	// get relay by ID and check the connection health
-	HealthCheck(ctx context.Context, RelayID string) error
+	HealthCheck(ctx context.Context, RelayID string) (int64, error)
 }
