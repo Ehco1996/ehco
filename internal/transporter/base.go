@@ -92,6 +92,7 @@ func (b *baseTransporter) RelayTCPConn(c net.Conn, handshakeF TCPHandShakeF) err
 	if err != nil {
 		return err
 	}
+	defer rc.Close()
 
 	b.l.Infof("RelayTCPConn from %s to %s", c.LocalAddr(), remote.Address)
 	relayConn := conn.NewRelayConn(
