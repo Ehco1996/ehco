@@ -33,6 +33,7 @@ type Config struct {
 
 	MaxConnection    int      `json:"max_connection,omitempty"`
 	BlockedProtocols []string `json:"blocked_protocols,omitempty"`
+	MaxReadRateKbps  int64    `json:"max_read_rate_kbps,omitempty"`
 
 	WSConfig *WSConfig `json:"ws_config,omitempty"`
 }
