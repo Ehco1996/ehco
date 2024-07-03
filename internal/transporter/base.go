@@ -94,6 +94,11 @@ func (b *baseTransporter) RelayTCPConn(c net.Conn, handshakeF TCPHandShakeF) err
 	}
 	defer rc.Close()
 
+	// rate limit
+	if b.cfg.MaxReadRateKbps > 0 {
+		c = conn.NewRateLimitedConn(c, b.cfg.MaxReadRateKbps)
+	}
+
 	b.l.Infof("RelayTCPConn from %s to %s", c.LocalAddr(), remote.Address)
 	relayConn := conn.NewRelayConn(
 		b.cfg.Label, c, rc, conn.WithHandshakeDuration(clonedRemote.HandShakeDuration))
