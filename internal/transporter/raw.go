@@ -59,8 +59,7 @@ func (raw *RawClient) HealthCheck(ctx context.Context, remote *lb.Node) error {
 
 type RawServer struct {
 	*baseTransporter
-	localTCPAddr *net.TCPAddr
-	lis          *net.TCPListener
+	lis *net.TCPListener
 }
 
 func newRawServer(base *baseTransporter) (*RawServer, error) {
@@ -75,7 +74,6 @@ func newRawServer(base *baseTransporter) (*RawServer, error) {
 	return &RawServer{
 		lis:             lis,
 		baseTransporter: base,
-		localTCPAddr:    addr,
 	}, nil
 }
 
