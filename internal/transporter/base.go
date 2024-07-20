@@ -8,13 +8,13 @@ import (
 	"github.com/Ehco1996/ehco/internal/cmgr"
 	"github.com/Ehco1996/ehco/internal/conn"
 	"github.com/Ehco1996/ehco/internal/constant"
+	"github.com/Ehco1996/ehco/internal/lb"
 	"github.com/Ehco1996/ehco/internal/metrics"
 	"github.com/Ehco1996/ehco/internal/relay/conf"
 	"github.com/sagernet/sing-box/common/sniff"
 	"github.com/sagernet/sing/common/buf"
 	"github.com/sagernet/sing/common/bufio"
 
-	"github.com/Ehco1996/ehco/pkg/lb"
 	"go.uber.org/zap"
 )
 

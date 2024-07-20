@@ -7,8 +7,8 @@ import (
 
 	"github.com/Ehco1996/ehco/internal/cmgr"
 	"github.com/Ehco1996/ehco/internal/constant"
+	"github.com/Ehco1996/ehco/internal/lb"
 	"github.com/Ehco1996/ehco/internal/relay/conf"
-	"github.com/Ehco1996/ehco/pkg/lb"
 )
 
 type TCPHandShakeF func(remote *lb.Node) (net.Conn, error)

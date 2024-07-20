@@ -6,8 +6,8 @@ import (
 	"net/url"
 
 	"github.com/Ehco1996/ehco/internal/constant"
+	"github.com/Ehco1996/ehco/internal/lb"
 
-	"github.com/Ehco1996/ehco/pkg/lb"
 	"go.uber.org/zap"
 )
 

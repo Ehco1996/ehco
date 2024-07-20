@@ -13,9 +13,9 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/xtaci/smux"
 
+	"github.com/Ehco1996/ehco/internal/lb"
 	"github.com/Ehco1996/ehco/internal/metrics"
 	"github.com/Ehco1996/ehco/internal/relay/conf"
-	"github.com/Ehco1996/ehco/pkg/lb"
 )
 
 var (
