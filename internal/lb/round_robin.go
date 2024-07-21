@@ -6,7 +6,6 @@ import (
 	"go.uber.org/atomic"
 )
 
-// todo: move to internal/lb
 type Node struct {
 	Address           string
 	Label             string
