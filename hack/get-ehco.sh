@@ -35,6 +35,9 @@ API_OR_CONFIG_PATH=
 # auto detect target arch
 TARGET_ARCH=
 
+# use cloudflare proxy to download
+USE_CF_PROXY=
+
 ###
 # HELPER FUNCTIONS
 ###
@@ -131,6 +134,14 @@ function _download_bin() {
         echo "Download URL for architecture $TARGET_ARCH not found."
         return 1
     fi
+
+    # replace host to `release.ehco-relay.cc` to use cf-proxy to download
+    if (( "$USE_CF_PROXY" == "true" )); then
+        download_url=$(echo "$download_url" | sed 's|https://github.com|https://release.ehco-relay.cc|')
+    fi
+
+    echo "Download URL: $download_url"
+
     # Download the file
     curl "${CURL_FLAGS[@]}" -o "$EXECUTABLE_INSTALL_PATH" "$download_url"
     echo "Downloaded and Install **ehco** to $EXECUTABLE_INSTALL_PATH"
@@ -183,9 +194,10 @@ function print_help() {
     echo "  -h, --help          Show this help message and exit."
     echo "  -v, --version       Specify the version to install."
     echo "  -i, --install       Install the Ehco."
-    echo "  -c, --config        Specify the configuration file path or api endpoint."
+    echo "  -c, --config         Specify the configuration file path or api endpoint."
     echo "  -r, --remove        Remove the Ehco."
     echo "  -u, --check-update  Check And Update if an update is available."
+    echo "  --cf-proxy          Use cloudflare proxy to download/update ehco bin."
 }
 
 function parse_arguments() {
@@ -211,6 +223,9 @@ function parse_arguments() {
             ;;
         -u | --check-update)
             OPERATION="check-update"
+            ;;
+        --cf-proxy)
+            USE_CF_PROXY="true"
             ;;
         *)
             _print_error_msg "Unknown argument: $1"
