@@ -30,6 +30,7 @@ func newRawClient(cfg *conf.Config) (*RawClient, error) {
 		cfg:    cfg,
 		dialer: &net.Dialer{Timeout: constant.DialTimeOut},
 	}
+	r.dialer.SetMultipathTCP(true)
 	return r, nil
 }
 
@@ -59,7 +60,7 @@ func (raw *RawClient) HealthCheck(ctx context.Context, remote *lb.Node) error {
 
 type RawServer struct {
 	*baseTransporter
-	lis *net.TCPListener
+	lis net.Listener
 }
 
 func newRawServer(base *baseTransporter) (*RawServer, error) {
@@ -67,7 +68,9 @@ func newRawServer(base *baseTransporter) (*RawServer, error) {
 	if err != nil {
 		return nil, err
 	}
-	lis, err := net.ListenTCP("tcp", addr)
+	cfg := net.ListenConfig{}
+	cfg.SetMultipathTCP(true)
+	lis, err := cfg.Listen(context.TODO(), "tcp", addr.String())
 	if err != nil {
 		return nil, err
 	}
@@ -83,10 +86,15 @@ func (s *RawServer) Close() error {
 
 func (s *RawServer) ListenAndServe() error {
 	for {
-		c, err := s.lis.AcceptTCP()
+		c, err := s.lis.Accept()
 		if err != nil {
 			return err
 		}
+		isMultipathTCP, err := c.(*net.TCPConn).MultipathTCP()
+		if err != nil {
+			s.l.Errorf("Check MultipathTCP meet error:%s", err)
+		}
+		s.l.Debug("isMultipathTCP:%v", isMultipathTCP)
 		go func(c net.Conn) {
 			defer c.Close()
 			if err := s.RelayTCPConn(c, s.relayer.TCPHandShake); err != nil {
