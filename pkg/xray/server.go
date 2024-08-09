@@ -31,7 +31,13 @@ func buildXrayInstanceCfg(cfg *conf.Config) (*core.Config, error) {
 				},
 			}
 			inbound.StreamSetting.TLSSettings.Certs = tlsConfigs
-			inbound.StreamSetting.SocketSettings.TcpMptcp = true
+			if inbound.StreamSetting.SocketSettings != nil {
+				inbound.StreamSetting.SocketSettings.TcpMptcp = true
+			} else {
+				inbound.StreamSetting.SocketSettings = &conf.SocketConfig{
+					TcpMptcp: true,
+				}
+			}
 		}
 	}
 	coreCfg, err := cfg.Build()
