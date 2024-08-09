@@ -92,9 +92,9 @@ func (s *RawServer) ListenAndServe() error {
 		}
 		isMultipathTCP, err := c.(*net.TCPConn).MultipathTCP()
 		if err != nil {
-			s.l.Errorf("Check MultipathTCP meet error:%s", err)
+			s.l.Errorf("MultipathTCP error: %s", err.Error())
 		}
-		s.l.Debug("isMultipathTCP:%v", isMultipathTCP)
+		s.l.Debugf("isMultipathTCP: %b", isMultipathTCP)
 		go func(c net.Conn) {
 			defer c.Close()
 			if err := s.RelayTCPConn(c, s.relayer.TCPHandShake); err != nil {
