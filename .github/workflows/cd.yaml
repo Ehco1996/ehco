@@ -2,17 +2,14 @@ name: build-image
 
 on:
   schedule:
-    # 每天 UTC 时间 00:00 自动触发构建
     - cron: "0 0 * * *"
   push:
     tags:
       - "*"
-    branches:
-      - master
-    paths:
-      - "cmd/**"
-      - "internal/**"
-      - "pkg/**"
+  workflow_run:
+    workflows: ["check-code"]
+    types:
+      - completed
   workflow_dispatch:
 
 env:
@@ -20,6 +17,7 @@ env:
 
 jobs:
   prepare-matrix:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
@@ -30,6 +28,7 @@ jobs:
           echo "matrix=$(cat matrix.json)" >> $GITHUB_OUTPUT
 
   build-bin:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     steps:
       - name: Set up Go
