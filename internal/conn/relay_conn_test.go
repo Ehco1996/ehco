@@ -67,7 +67,7 @@ func TestInnerConn_ReadWrite(t *testing.T) {
 	assert.Equal(t, int64(len(testData)), innerC.stats.Down)
 }
 
-func TestCopyConn(t *testing.T) {
+func TestCopyTCPConn(t *testing.T) {
 	// 设置监听端口，模拟外部服务器
 	echoServer, err := net.Listen("tcp", "127.0.0.1:0") // 0 表示自动选择端口
 	assert.NoError(t, err)
@@ -119,5 +119,66 @@ func TestCopyConn(t *testing.T) {
 	_ = clientConn.Close()
 	_ = remoteConn.Close()
 	// wait for the copyConn to finish
+	<-done
+}
+
+func TestCopyUDPConn(t *testing.T) {
+	// 设置监听地址，模拟外部UDP服务器
+	serverAddr, err := net.ResolveUDPAddr("udp", "127.0.0.1:0")
+	assert.NoError(t, err)
+
+	echoServer, err := net.ListenUDP("udp", serverAddr)
+	assert.NoError(t, err)
+	defer echoServer.Close()
+
+	msg := "Hello, UDP!"
+
+	go func() {
+		buffer := make([]byte, 1024)
+		for {
+			n, remoteAddr, err := echoServer.ReadFromUDP(buffer)
+			if err != nil {
+				return
+			}
+			_, err = echoServer.WriteToUDP(buffer[:n], remoteAddr)
+			if err != nil {
+				return
+			}
+		}
+	}()
+
+	clientConn, err := net.DialUDP("udp", nil, echoServer.LocalAddr().(*net.UDPAddr))
+	assert.NoError(t, err)
+	defer clientConn.Close()
+
+	remoteConn, err := net.DialUDP("udp", nil, echoServer.LocalAddr().(*net.UDPAddr))
+	assert.NoError(t, err)
+	defer remoteConn.Close()
+
+	c1 := &innerConn{Conn: clientConn, remoteLabel: "client", stats: &Stats{}}
+	c2 := &innerConn{Conn: remoteConn, remoteLabel: "server", stats: &Stats{}}
+
+	done := make(chan struct{})
+	go func() {
+		if err := copyConn(c1, c2); err != nil {
+			t.Log(err)
+		}
+		done <- struct{}{}
+		close(done)
+	}()
+
+	_, err = clientConn.Write([]byte(msg))
+	assert.NoError(t, err)
+
+	buffer := make([]byte, len(msg))
+	n, _, err := clientConn.ReadFromUDP(buffer)
+	assert.NoError(t, err)
+	assert.Equal(t, msg, string(buffer[:n]))
+
+	// 关闭连接
+	_ = clientConn.Close()
+	_ = remoteConn.Close()
+
+	// 等待 copyConn 完成
 	<-done
 }

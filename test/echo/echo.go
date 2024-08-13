@@ -1,3 +1,4 @@
+//nolint:errcheck
 package echo
 
 import (
@@ -5,97 +6,140 @@ import (
 	"io"
 	"log"
 	"net"
-	"os"
 	"strconv"
+	"sync"
 	"time"
 
 	"go.uber.org/zap"
 )
 
-func echo(conn net.Conn) {
-	logger := zap.S().Named(("echo-test-server"))
-	defer conn.Close()
-	defer fmt.Println("conn closed", conn.RemoteAddr().String())
-	buf := make([]byte, 10)
-	for {
-		i, err := conn.Read(buf)
-		if err == io.EOF {
-			logger.Info("conn closed,read eof ", conn.RemoteAddr().String())
-			return
-		}
-		if err != nil {
-			logger.Error(err.Error())
-			return
-		}
-		println("echo server receive", string(buf[:i]))
-		_, err = conn.Write(buf[:i])
-		if err != nil {
-			logger.Error(err.Error())
-			return
-		}
+type EchoServer struct {
+	host        string
+	port        int
+	tcpListener net.Listener
+	udpConn     *net.UDPConn
+	stopChan    chan struct{}
+	wg          sync.WaitGroup
+	logger      *zap.SugaredLogger
+}
+
+func NewEchoServer(host string, port int) *EchoServer {
+	return &EchoServer{
+		host:     host,
+		port:     port,
+		stopChan: make(chan struct{}),
+		logger:   zap.S().Named("echo-test-server"),
 	}
 }
 
-func ServeTcp(l net.Listener) {
-	for {
-		conn, err := l.Accept()
-		if err != nil {
-			fmt.Println("accept err", err.Error())
-			continue
-		}
-		go echo(conn)
-	}
-}
-
-func ServeUdp(conn *net.UDPConn) {
-	buf := make([]byte, 1500)
-	for {
-		number, remote, err := conn.ReadFromUDP(buf)
-		if err != nil {
-			fmt.Printf("net.ReadFromUDP() error: %s\n", err)
-		}
-		_, writeErr := conn.WriteTo(buf[0:number], remote)
-		if writeErr != nil {
-			fmt.Printf("net.WriteTo() error: %s\n", writeErr)
-		}
-	}
-}
-
-func RunEchoServer(host string, port int) {
+func (s *EchoServer) Run() error {
+	addr := s.host + ":" + strconv.Itoa(s.port)
 	var err error
-	tcpAddr := host + ":" + strconv.Itoa(port)
-	l, err := net.Listen("tcp", tcpAddr)
-	defer func() {
-		err = l.Close()
-		if err != nil {
-			fmt.Println(err.Error())
-		}
-	}()
 
+	// Start TCP server
+	s.tcpListener, err = net.Listen("tcp", addr)
 	if err != nil {
-		fmt.Println("ERROR", err)
-		os.Exit(1)
+		return fmt.Errorf("failed to start TCP server: %w", err)
 	}
 
-	udpAddr := net.UDPAddr{Port: port, IP: net.ParseIP(host)}
-	udpConn, err := net.ListenUDP("udp", &udpAddr)
-	defer func() {
-		err = udpConn.Close()
-		if err != nil {
-			fmt.Println(err.Error())
-		}
-	}()
-
+	// Start UDP server
+	udpAddr := net.UDPAddr{IP: net.ParseIP(s.host), Port: s.port}
+	s.udpConn, err = net.ListenUDP("udp", &udpAddr)
 	if err != nil {
-		fmt.Println("ERROR", err)
-		os.Exit(1)
+		return fmt.Errorf("failed to start UDP server: %w", err)
 	}
 
-	fmt.Println("start echo server at:", tcpAddr)
-	stop := make(chan error)
-	go ServeTcp(l)
-	go ServeUdp(udpConn)
-	<-stop
+	s.logger.Infof("Echo server started at: %s", addr)
+
+	s.wg.Add(2)
+	go s.serveTCP()
+	go s.serveUDP()
+
+	return nil
+}
+
+func (s *EchoServer) Stop() {
+	close(s.stopChan)
+	if s.tcpListener != nil {
+		s.tcpListener.Close()
+	}
+	if s.udpConn != nil {
+		s.udpConn.Close()
+	}
+	s.wg.Wait()
+	s.logger.Info("Echo server stopped")
+}
+
+func (s *EchoServer) serveTCP() {
+	defer s.wg.Done()
+	for {
+		select {
+		case <-s.stopChan:
+			return
+		default:
+			conn, err := s.tcpListener.Accept()
+			if err != nil {
+				select {
+				case <-s.stopChan:
+					return
+				default:
+					s.logger.Errorf("Failed to accept TCP connection: %v", err)
+				}
+				continue
+			}
+			go s.handleTCPConn(conn)
+		}
+	}
+}
+
+func (s *EchoServer) handleTCPConn(conn net.Conn) {
+	defer conn.Close()
+	s.logger.Infof("New TCP connection from: %s", conn.RemoteAddr())
+
+	buf := make([]byte, 1024)
+	for {
+		n, err := conn.Read(buf)
+		if err == io.EOF {
+			s.logger.Infof("Connection closed by client: %s", conn.RemoteAddr())
+			return
+		}
+		if err != nil {
+			s.logger.Errorf("Error reading from connection: %v", err)
+			return
+		}
+
+		s.logger.Infof("Received from %s: %s", conn.RemoteAddr(), string(buf[:n]))
+
+		_, err = conn.Write(buf[:n])
+		if err != nil {
+			s.logger.Errorf("Error writing to connection: %v", err)
+			return
+		}
+	}
+}
+
+func (s *EchoServer) serveUDP() {
+	defer s.wg.Done()
+	buf := make([]byte, 1024)
+	for {
+		select {
+		case <-s.stopChan:
+			return
+		default:
+			n, remoteAddr, err := s.udpConn.ReadFromUDP(buf)
+			if err != nil {
+				s.logger.Errorf("Error reading UDP: %v", err)
+				continue
+			}
+
+			s.logger.Infof("Received UDP from %s: %s", remoteAddr, string(buf[:n]))
+
+			_, err = s.udpConn.WriteToUDP(buf[:n], remoteAddr)
+			if err != nil {
+				s.logger.Errorf("Error writing UDP: %v", err)
+			}
+		}
+	}
 }
 
 func SendTcpMsg(msg []byte, address string) []byte {

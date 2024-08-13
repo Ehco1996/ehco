@@ -1,21 +1,26 @@
 package test
 
 import (
+	"bytes"
 	"context"
+	"fmt"
 	"net"
-	"sync"
+	"os"
 	"testing"
 	"time"
 
 	"github.com/Ehco1996/ehco/internal/cmgr"
 	"github.com/Ehco1996/ehco/internal/config"
+
 	"github.com/Ehco1996/ehco/internal/constant"
 	"github.com/Ehco1996/ehco/internal/relay"
 	"github.com/Ehco1996/ehco/internal/relay/conf"
 	"github.com/Ehco1996/ehco/internal/tls"
 	"github.com/Ehco1996/ehco/pkg/log"
 	"github.com/Ehco1996/ehco/test/echo"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
+	"golang.org/x/sync/errgroup"
 )
 
 const (
@@ -47,14 +52,31 @@ const (
 	MSS_SERVER = "0.0.0.0:2004"
 )
 
-func init() {
+func TestMain(m *testing.M) {
+	// Setup
 	_ = log.InitGlobalLogger("debug")
-	// Start the new echo server.
-	go echo.RunEchoServer(ECHO_HOST, ECHO_PORT)
-
-	// init tls,make linter happy
 	_ = tls.InitTlsCfg()
 
+	// Start echo server
+	echoServer := echo.NewEchoServer(ECHO_HOST, ECHO_PORT)
+	go echoServer.Run()
+
+	// Start relay servers
+	relayServers := startRelayServers()
+
+	// Run tests
+	code := m.Run()
+
+	// Cleanup
+	echoServer.Stop()
+	for _, server := range relayServers {
+		server.Close()
+	}
+
+	os.Exit(code)
+}
+
+func startRelayServers() []*relay.Relay {
 	cfg := config.Config{
 		PATH: "",
 		RelayConfigs: []*conf.Config{
@@ -147,58 +169,116 @@ func init() {
 			},
 		},
 	}
-	logger := zap.S()
 
+	var servers []*relay.Relay
 	for _, c := range cfg.RelayConfigs {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-
-		go func(ctx context.Context, c *conf.Config) {
-			r, err := relay.NewRelay(c, cmgr.NewCmgr(cmgr.DummyConfig))
-			if err != nil {
-				logger.Fatal(err)
-			}
-			logger.Fatal(r.ListenAndServe())
-		}(ctx, c)
+		r, err := relay.NewRelay(c, cmgr.NewCmgr(cmgr.DummyConfig))
+		if err != nil {
+			zap.S().Fatal(err)
+		}
+		go r.ListenAndServe()
+		servers = append(servers, r)
 	}
 
-	// wait for  init
+	// Wait for init
 	time.Sleep(time.Second)
+	return servers
 }
 
-func TestRelayOverRaw(t *testing.T) {
-	msg := []byte("hello")
-	// test tcp
-	res := echo.SendTcpMsg(msg, RAW_LISTEN)
-	if string(res) != string(msg) {
-		t.Fatal(res)
+func TestRelay(t *testing.T) {
+	testCases := []struct {
+		name     string
+		address  string
+		protocol string
+	}{
+		{"Raw", RAW_LISTEN, "raw"},
+		{"WS", WS_LISTEN, "ws"},
+		{"WSS", WSS_LISTEN, "wss"},
+		{"MWSS", MWSS_LISTEN, "mwss"},
+		{"MTCP", MTCP_LISTEN, "mtcp"},
+		{"MWS", MWS_LISTEN, "mws"},
 	}
-	t.Log("test tcp done!")
 
-	// test udp
-	// res = echo.SendUdpMsg(msg, RAW_LISTEN)
-	// if string(res) != string(msg) {
-	// 	t.Fatal(res)
-	// }
-	// t.Log("test udp done!")
+	for _, tc := range testCases {
+		tc := tc // capture range variable
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			testRelayCommon(t, tc.address, tc.protocol, false)
+		})
+	}
+}
+
+func TestRelayConcurrent(t *testing.T) {
+	testCases := []struct {
+		name        string
+		address     string
+		concurrency int
+	}{
+		{"MWSS", MWSS_LISTEN, 10},
+		{"MTCP", MTCP_LISTEN, 10},
+		{"MWS", MWS_LISTEN, 10},
+	}
+
+	for _, tc := range testCases {
+		tc := tc // capture range variable
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			testRelayCommon(t, tc.address, tc.name, true, tc.concurrency)
+		})
+	}
+}
+
+func testRelayCommon(t *testing.T, address, protocol string, concurrent bool, concurrency ...int) {
+	t.Helper()
+	msg := []byte("hello")
+
+	runTest := func() error {
+		res := echo.SendTcpMsg(msg, address)
+		if !bytes.Equal(msg, res) {
+			return fmt.Errorf("response mismatch: got %s, want %s", res, msg)
+		}
+		return nil
+	}
+
+	if concurrent {
+		n := 10
+		if len(concurrency) > 0 {
+			n = concurrency[0]
+		}
+		g, ctx := errgroup.WithContext(context.Background())
+		for i := 0; i < n; i++ {
+			g.Go(func() error {
+				select {
+				case <-ctx.Done():
+					return ctx.Err()
+				default:
+					return runTest()
+				}
+			})
+		}
+		require.NoError(t, g.Wait(), "Concurrent test failed")
+	} else {
+		require.NoError(t, runTest(), "Single test failed")
+	}
+
+	t.Logf("Test TCP over %s done!", protocol)
 }
 
 func TestRelayWithMaxConnectionCount(t *testing.T) {
 	msg := []byte("hello")
 
-	// first connection will be accepted
+	// First connection will be accepted
 	go func() {
 		err := echo.EchoTcpMsgLong(msg, time.Second, RAW_LISTEN_WITH_MAX_CONNECTION)
-		if err != nil {
-			t.Error(err)
-		}
+		require.NoError(t, err, "First connection should be accepted")
 	}()
 
-	// second connection will be rejected
-	time.Sleep(time.Second) // wait for first connection
-	if err := echo.EchoTcpMsgLong(msg, time.Second, RAW_LISTEN_WITH_MAX_CONNECTION); err == nil {
-		t.Fatal("need error here")
-	}
+	// Wait for first connection
+	time.Sleep(time.Second)
+
+	// Second connection should be rejected
+	err := echo.EchoTcpMsgLong(msg, time.Second, RAW_LISTEN_WITH_MAX_CONNECTION)
+	require.Error(t, err, "Second connection should be rejected")
 }
 
 func TestRelayWithDeadline(t *testing.T) {
@@ -219,86 +299,5 @@ func TestRelayWithDeadline(t *testing.T) {
 	_, err = conn.Read(buf)
 	if err != nil {
 		logger.Sugar().Fatal("need error here")
-	}
-}
-
-func TestRelayOverWs(t *testing.T) {
-	msg := []byte("hello")
-	// test tcp
-	res := echo.SendTcpMsg(msg, WS_LISTEN)
-	if string(res) != string(msg) {
-		t.Fatal(res)
-	}
-	t.Log("test tcp over ws done!")
-}
-
-func TestRelayOverWss(t *testing.T) {
-	msg := []byte("hello")
-	// test tcp
-	res := echo.SendTcpMsg(msg, WSS_LISTEN)
-	if string(res) != string(msg) {
-		t.Fatal(res)
-	}
-	t.Log("test tcp over wss done!")
-}
-
-func TestRelayOverMwss(t *testing.T) {
-	msg := []byte("hello")
-	var wg sync.WaitGroup
-	testCnt := 10
-	wg.Add(testCnt)
-	for i := 0; i < testCnt; i++ {
-		go func(i int) {
-			t.Logf("run no: %d test.", i)
-			res := echo.SendTcpMsg(msg, MWSS_LISTEN)
-			wg.Done()
-			if string(res) != string(msg) {
-				t.Log(res)
-				panic(1)
-			}
-		}(i)
-	}
-	wg.Wait()
-	t.Log("test tcp over mwss done!")
-}
-
-func TestRelayOverMTCP(t *testing.T) {
-	msg := []byte("hello")
-	var wg sync.WaitGroup
-
-	testCnt := 5
-	wg.Add(testCnt)
-	for i := 0; i < testCnt; i++ {
-		go func(i int) {
-			t.Logf("run no: %d test.", i)
-			res := echo.SendTcpMsg(msg, MTCP_LISTEN)
-			wg.Done()
-			if string(res) != string(msg) {
-				t.Log(res)
-				panic(1)
-			}
-		}(i)
-	}
-	wg.Wait()
-	t.Log("test tcp over mtcp done!")
-}
-
-func TestRelayOverMWS(t *testing.T) {
-	msg := []byte("hello")
-	// test tcp
-	res := echo.SendTcpMsg(msg, MWS_LISTEN)
-	if string(res) != string(msg) {
-		t.Fatal(res)
-	}
-	t.Log("test tcp over mws done!")
-}
-
-func BenchmarkTcpRelay(b *testing.B) {
-	msg := []byte("hello")
-	for i := 0; i <= b.N; i++ {
-		res := echo.SendTcpMsg(msg, RAW_LISTEN)
-		if string(res) != string(msg) {
-			b.Fatal(res)
-		}
 	}
 }

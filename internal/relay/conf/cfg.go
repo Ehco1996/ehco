@@ -89,10 +89,6 @@ func (r *Config) Validate() error {
 		return errors.New("both tcp and udp remotes are empty")
 	}
 
-	if len(r.UDPRemotes) > 0 {
-		zap.S().Warn("UDP RELAY WAS DISABLED FOR NOW, THIS FEATURE WILL BE AVAILABLE IN THE FUTURE")
-	}
-
 	for _, protocol := range r.BlockedProtocols {
 		if protocol != ProtocolHTTP && protocol != ProtocolTLS {
 			return fmt.Errorf("invalid blocked protocol:%s", protocol)

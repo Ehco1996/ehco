@@ -8,5 +8,6 @@ import (
 
 func main() {
 	log.Println("start tcp.udp echo server at: 0.0.0.0:2333")
-	echo.RunEchoServer("0.0.0.0", 2333)
+	es := echo.NewEchoServer("0.0.0.0", 2333)
+	_ = es.Run()
 }
