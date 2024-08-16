@@ -9,7 +9,6 @@ import (
 	"github.com/Ehco1996/ehco/internal/metrics"
 	"github.com/Ehco1996/ehco/internal/relay"
 	"github.com/Ehco1996/ehco/internal/relay/conf"
-	"github.com/Ehco1996/ehco/internal/tls"
 	"github.com/Ehco1996/ehco/internal/web"
 	"github.com/Ehco1996/ehco/pkg/buffer"
 	"github.com/Ehco1996/ehco/pkg/log"
@@ -42,24 +41,11 @@ func loadConfig() (cfg *config.Config, err error) {
 		if TCPRemoteAddr != "" {
 			cfg.RelayConfigs[0].TCPRemotes = []string{TCPRemoteAddr}
 		}
-		if UDPRemoteAddr != "" {
-			cfg.RelayConfigs[0].UDPRemotes = []string{UDPRemoteAddr}
-		}
 		if err := cfg.Adjust(); err != nil {
 			return nil, err
 		}
 	}
 
-	// init tls when need
-	for _, cfg := range cfg.RelayConfigs {
-		if cfg.ListenType == constant.RelayTypeWSS || cfg.ListenType == constant.RelayTypeMWSS ||
-			cfg.TransportType == constant.RelayTypeWSS || cfg.TransportType == constant.RelayTypeMWSS {
-			if err := tls.InitTlsCfg(); err != nil {
-				return nil, err
-			}
-			break
-		}
-	}
 	return cfg, nil
 }
 

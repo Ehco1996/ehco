@@ -4,6 +4,7 @@ import (
 	"context"
 	"net"
 	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/gobwas/ws"
@@ -11,7 +12,6 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/Ehco1996/ehco/internal/conn"
-	"github.com/Ehco1996/ehco/internal/constant"
 	"github.com/Ehco1996/ehco/internal/lb"
 	"github.com/Ehco1996/ehco/internal/metrics"
 	"github.com/Ehco1996/ehco/internal/relay/conf"
@@ -24,27 +24,48 @@ var (
 )
 
 type WsClient struct {
-	dialer *ws.Dialer
-	cfg    *conf.Config
-	l      *zap.SugaredLogger
+	dialer    *ws.Dialer
+	cfg       *conf.Config
+	netDialer *net.Dialer
+	l         *zap.SugaredLogger
 }
 
 func newWsClient(cfg *conf.Config) (*WsClient, error) {
 	s := &WsClient{
-		cfg:    cfg,
-		l:      zap.S().Named(string(cfg.TransportType)),
-		dialer: &ws.Dialer{Timeout: constant.DialTimeOut},
+		cfg:       cfg,
+		netDialer: NewNetDialer(cfg),
+		l:         zap.S().Named(string(cfg.TransportType)),
+		dialer:    &ws.DefaultDialer, // todo config buffer size
+	}
+	s.dialer.NetDial = func(ctx context.Context, network, addr string) (net.Conn, error) {
+		return s.netDialer.Dial(network, addr)
 	}
 	return s, nil
 }
 
-func (s *WsClient) TCPHandShake(remote *lb.Node) (net.Conn, error) {
+func (s *WsClient) addUDPQueryParam(addr string) string {
+	u, err := url.Parse(addr)
+	if err != nil {
+		s.l.Errorf("Failed to parse URL: %v", err)
+		return addr
+	}
+	q := u.Query()
+	q.Set("type", "udp")
+	u.RawQuery = q.Encode()
+	return u.String()
+}
+
+func (s *WsClient) HandShake(ctx context.Context, remote *lb.Node, isTCP bool) (net.Conn, error) {
 	t1 := time.Now()
 	addr, err := s.cfg.GetWSRemoteAddr(remote.Address)
 	if err != nil {
 		return nil, err
 	}
-	wsc, _, _, err := s.dialer.Dial(context.TODO(), addr)
+	if !isTCP {
+		addr = s.addUDPQueryParam(addr)
+	}
+
+	wsc, _, _, err := s.dialer.Dial(ctx, addr)
 	if err != nil {
 		return nil, err
 	}
@@ -55,61 +76,50 @@ func (s *WsClient) TCPHandShake(remote *lb.Node) (net.Conn, error) {
 	return c, nil
 }
 
-func (s *WsClient) HealthCheck(ctx context.Context, remote *lb.Node) error {
-	l := zap.S().Named("health-check")
-	l.Infof("start send req to %s", remote.Address)
-	c, err := s.TCPHandShake(remote)
-	if err != nil {
-		l.Errorf("send req to %s meet error:%s", remote.Address, err)
-		return err
-	}
-	c.Close()
-	return nil
-}
-
 type WsServer struct {
-	*baseTransporter
-
-	e          *echo.Echo
+	*BaseRelayServer
 	httpServer *http.Server
 }
 
-func newWsServer(base *baseTransporter) (*WsServer, error) {
-	localTCPAddr, err := base.GetTCPListenAddr()
-	if err != nil {
-		return nil, err
-	}
-	s := &WsServer{
-		baseTransporter: base,
-		httpServer: &http.Server{
-			Addr: localTCPAddr.String(), ReadHeaderTimeout: 30 * time.Second,
-		},
-	}
+func newWsServer(bs *BaseRelayServer) (*WsServer, error) {
+	s := &WsServer{BaseRelayServer: bs}
 	e := web.NewEchoServer()
 	e.Use(web.NginxLogMiddleware(zap.S().Named("ws-server")))
-
 	e.GET("/", echo.WrapHandler(web.MakeIndexF()))
-	e.GET(base.cfg.GetWSHandShakePath(), echo.WrapHandler(http.HandlerFunc(s.HandleRequest)))
-
-	s.e = e
+	e.GET(bs.cfg.GetWSHandShakePath(), echo.WrapHandler(http.HandlerFunc(s.handleRequest)))
+	s.httpServer = &http.Server{Handler: e}
 	return s, nil
 }
 
-func (s *WsServer) ListenAndServe() error {
-	return s.e.StartServer(s.httpServer)
-}
-
-func (s *WsServer) Close() error {
-	return s.e.Close()
-}
-
-func (s *WsServer) HandleRequest(w http.ResponseWriter, req *http.Request) {
+func (s *WsServer) handleRequest(w http.ResponseWriter, req *http.Request) {
+	// todo use bufio.ReadWriter
 	wsc, _, _, err := ws.UpgradeHTTP(req, w)
 	if err != nil {
 		return
 	}
-
-	if err := s.RelayTCPConn(conn.NewWSConn(wsc, true), s.relayer.TCPHandShake); err != nil {
-		s.l.Errorf("RelayTCPConn error: %s", err.Error())
+	if req.URL.Query().Get("type") == "udp" {
+		if !s.cfg.Options.EnableUDP {
+			s.l.Error("udp not support but request with udp type")
+			wsc.Close()
+			return
+		}
+		err = s.RelayUDPConn(req.Context(), conn.NewWSConn(wsc, true))
+	} else {
+		err = s.RelayTCPConn(req.Context(), conn.NewWSConn(wsc, true))
 	}
+	if err != nil {
+		s.l.Errorf("handleRequest meet error:%s", err)
+	}
+}
+
+func (s *WsServer) ListenAndServe(ctx context.Context) error {
+	listener, err := NewTCPListener(ctx, s.cfg)
+	if err != nil {
+		return err
+	}
+	return s.httpServer.Serve(listener)
+}
+
+func (s *WsServer) Close() error {
+	return s.httpServer.Close()
 }

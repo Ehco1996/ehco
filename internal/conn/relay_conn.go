@@ -3,18 +3,160 @@ package conn
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"net"
 	"time"
 
+	"github.com/Ehco1996/ehco/internal/constant"
+	"github.com/Ehco1996/ehco/internal/lb"
 	"github.com/Ehco1996/ehco/internal/metrics"
 	"github.com/Ehco1996/ehco/pkg/buffer"
 	"github.com/Ehco1996/ehco/pkg/bytes"
 	"go.uber.org/zap"
 )
 
-var idleTimeout = 30 * time.Second
+// RelayConn is the interface that represents a relay connection.
+// it contains two connections: clientConn and remoteConn
+// clientConn is the connection from the client to the relay server
+// remoteConn is the connection from the relay server to the remote server
+// and the main function is to transport data between the two connections
+type RelayConn interface {
+	// Transport transports data between the client and the remote connection.
+	Transport() error
+	GetRelayLabel() string
+	GetStats() *Stats
+	Close() error
+}
+
+type RelayConnOption func(*relayConnImpl)
+
+func NewRelayConn(clientConn, remoteConn net.Conn, opts ...RelayConnOption) RelayConn {
+	rci := &relayConnImpl{
+		clientConn: clientConn,
+		remoteConn: remoteConn,
+		Stats:      &Stats{},
+	}
+	for _, opt := range opts {
+		opt(rci)
+	}
+	if rci.l == nil {
+		rci.l = zap.S().Named(rci.RelayLabel)
+	}
+	return rci
+}
+
+type relayConnImpl struct {
+	clientConn net.Conn
+	remoteConn net.Conn
+
+	Closed bool `json:"closed"`
+
+	Stats     *Stats    `json:"stats"`
+	StartTime time.Time `json:"start_time"`
+	EndTime   time.Time `json:"end_time,omitempty"`
+
+	// options set those fields
+	l                 *zap.SugaredLogger
+	remote            *lb.Node
+	HandshakeDuration time.Duration
+	RelayLabel        string `json:"relay_label"`
+	ConnType          string `json:"conn_type"`
+}
+
+func WithRelayLabel(relayLabel string) RelayConnOption {
+	return func(rci *relayConnImpl) {
+		rci.RelayLabel = relayLabel
+	}
+}
+
+func WithHandshakeDuration(duration time.Duration) RelayConnOption {
+	return func(rci *relayConnImpl) {
+		rci.HandshakeDuration = duration
+	}
+}
+
+func WithConnType(connType string) RelayConnOption {
+	return func(rci *relayConnImpl) {
+		rci.ConnType = connType
+	}
+}
+
+func WithRemote(remote *lb.Node) RelayConnOption {
+	return func(rci *relayConnImpl) {
+		rci.remote = remote
+	}
+}
+
+func WithLogger(l *zap.SugaredLogger) RelayConnOption {
+	return func(rci *relayConnImpl) {
+		rci.l = l
+	}
+}
+
+func (rc *relayConnImpl) Transport() error {
+	defer rc.Close() // nolint: errcheck
+	cl := rc.l.Named(shortHashSHA256(rc.GetFlow()))
+	cl.Debugf("transport start, stats: %s", rc.Stats.String())
+	c1 := newInnerConn(rc.clientConn, rc)
+	c2 := newInnerConn(rc.remoteConn, rc)
+	rc.StartTime = time.Now().Local()
+	err := copyConn(c1, c2)
+	if err != nil {
+		cl.Errorf("transport error: %s", err.Error())
+	}
+	cl.Debugf("transport end, stats: %s", rc.Stats.String())
+	rc.EndTime = time.Now().Local()
+	return err
+}
+
+func (rc *relayConnImpl) Close() error {
+	err1 := rc.clientConn.Close()
+	err2 := rc.remoteConn.Close()
+	rc.Closed = true
+	return combineErrorsAndMuteEOF(err1, err2)
+}
+
+// functions that for web ui
+func (rc *relayConnImpl) GetTime() string {
+	if rc.EndTime.IsZero() {
+		return fmt.Sprintf("%s - N/A", rc.StartTime.Format(time.Stamp))
+	}
+	return fmt.Sprintf("%s - %s", rc.StartTime.Format(time.Stamp), rc.EndTime.Format(time.Stamp))
+}
+
+func (rc *relayConnImpl) GetFlow() string {
+	return fmt.Sprintf("%s <-> %s", rc.clientConn.RemoteAddr(), rc.remoteConn.RemoteAddr())
+}
+
+func (rc *relayConnImpl) GetRelayLabel() string {
+	return rc.RelayLabel
+}
+
+func (rc *relayConnImpl) GetStats() *Stats {
+	return rc.Stats
+}
+
+func (rc *relayConnImpl) GetConnType() string {
+	return rc.ConnType
+}
+
+func combineErrorsAndMuteEOF(err1, err2 error) error {
+	if err1 == io.EOF {
+		err1 = nil
+	}
+	if err2 == io.EOF {
+		return nil
+	}
+	if err1 != nil && err2 != nil {
+		return errors.Join(err1, err2)
+	}
+	if err1 != nil {
+		return err1
+	}
+	return err2
+}
 
 type Stats struct {
 	Up               int64
@@ -35,52 +177,69 @@ func (s *Stats) String() string {
 	)
 }
 
+// note that innerConn is a wrapper around net.Conn to allow io.Copy to be used
 type innerConn struct {
 	net.Conn
+	lastActive time.Time
 
-	remoteLabel string
-	stats       *Stats
+	rc *relayConnImpl
 }
 
-func (c *innerConn) setDeadline(isRead bool) {
-	// set the read deadline to avoid hanging read for non-TCP connections
-	// because tcp connections have closeWrite/closeRead so no need to set read deadline
-	if _, ok := c.Conn.(*net.TCPConn); !ok {
-		deadline := time.Now().Add(idleTimeout)
-		if isRead {
-			_ = c.Conn.SetReadDeadline(deadline)
+func newInnerConn(conn net.Conn, rc *relayConnImpl) *innerConn {
+	return &innerConn{Conn: conn, rc: rc, lastActive: time.Now()}
+}
+
+func (c *innerConn) recordStats(n int, isRead bool) {
+	if c.rc == nil {
+		return
+	}
+	if isRead {
+		metrics.NetWorkTransmitBytes.WithLabelValues(
+			c.rc.remote.Label, metrics.METRIC_CONN_TYPE_TCP, metrics.METRIC_CONN_FLOW_READ,
+		).Add(float64(n))
+		c.rc.Stats.Record(0, int64(n))
+	} else {
+		metrics.NetWorkTransmitBytes.WithLabelValues(
+			c.rc.remote.Label, metrics.METRIC_CONN_TYPE_TCP, metrics.METRIC_CONN_FLOW_WRITE,
+		).Add(float64(n))
+		c.rc.Stats.Record(int64(n), 0)
+	}
+}
+
+func (c *innerConn) Read(p []byte) (n int, err error) {
+	for {
+		deadline := time.Now().Add(constant.ReadTimeOut)
+		if err := c.Conn.SetReadDeadline(deadline); err != nil {
+			return 0, err
+		}
+		n, err = c.Conn.Read(p)
+		if err == nil {
+			c.recordStats(n, true)
+			c.lastActive = time.Now()
+			return
 		} else {
-			_ = c.Conn.SetWriteDeadline(deadline)
+			if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
+				if time.Since(c.lastActive) > constant.IdleTimeOut {
+					c.rc.l.Debugf("read idle,close remote: %s", c.rc.remote.Label)
+					return 0, io.EOF
+				}
+				continue
+			}
+			return n, err
 		}
 	}
 }
 
-func (c *innerConn) recordStats(n int, isRead bool) {
-	if isRead {
-		metrics.NetWorkTransmitBytes.WithLabelValues(
-			c.remoteLabel, metrics.METRIC_CONN_TYPE_TCP, metrics.METRIC_CONN_FLOW_READ,
-		).Add(float64(n))
-		c.stats.Record(0, int64(n))
-	} else {
-		metrics.NetWorkTransmitBytes.WithLabelValues(
-			c.remoteLabel, metrics.METRIC_CONN_TYPE_TCP, metrics.METRIC_CONN_FLOW_WRITE,
-		).Add(float64(n))
-		c.stats.Record(int64(n), 0)
-	}
-}
-
-// 修改Read和Write方法以使用recordStats
-func (c *innerConn) Read(p []byte) (n int, err error) {
-	c.setDeadline(true)
-	n, err = c.Conn.Read(p)
-	c.recordStats(n, true) // true for read operation
-	return
-}
-
 func (c *innerConn) Write(p []byte) (n int, err error) {
-	c.setDeadline(false)
+	if time.Since(c.lastActive) > constant.IdleTimeOut {
+		c.rc.l.Debugf("write idle,close remote: %s", c.rc.remote.Label)
+		return 0, io.EOF
+	}
 	n, err = c.Conn.Write(p)
 	c.recordStats(n, false) // false for write operation
+	if err != nil {
+		c.lastActive = time.Now()
+	}
 	return
 }
 
@@ -109,10 +268,6 @@ func shortHashSHA256(input string) string {
 	return hex.EncodeToString(hash)[:7]
 }
 
-func connectionName(conn net.Conn) string {
-	return fmt.Sprintf("l:<%s> r:<%s>", conn.LocalAddr(), conn.RemoteAddr())
-}
-
 func copyConn(conn1, conn2 *innerConn) error {
 	buf := buffer.BufferPool.Get()
 	defer buffer.BufferPool.Put(buf)
@@ -125,134 +280,13 @@ func copyConn(conn1, conn2 *innerConn) error {
 	}()
 
 	// reverse copy conn2 to conn1,read from conn2 and write to conn1
-	_, err := io.Copy(conn1, conn2)
+	buf2 := buffer.BufferPool.Get()
+	defer buffer.BufferPool.Put(buf2)
+	_, err := io.CopyBuffer(conn1, conn2, buf2)
 	_ = conn1.CloseWrite()
 
 	err2 := <-errCH
 	_ = conn1.CloseRead()
 	_ = conn2.CloseRead()
-
-	// handle errors, need to combine errors from both directions
-	if err != nil && err2 != nil {
-		err = fmt.Errorf("transport errors in both directions: %v, %v", err, err2)
-	}
-	if err != nil {
-		return err
-	}
-	return err2
-}
-
-type RelayConnOption func(*relayConnImpl)
-
-type RelayConn interface {
-	// Transport transports data between the client and the remote server.
-	// The remoteLabel is the label of the remote server.
-	Transport(remoteLabel string) error
-
-	// GetRelayLabel returns the label of the Relay instance.
-	GetRelayLabel() string
-
-	GetStats() *Stats
-
-	Close() error
-}
-
-func NewRelayConn(relayName string, clientConn, remoteConn net.Conn, opts ...RelayConnOption) RelayConn {
-	rci := &relayConnImpl{
-		RelayLabel: relayName,
-		clientConn: clientConn,
-		remoteConn: remoteConn,
-	}
-	for _, opt := range opts {
-		opt(rci)
-	}
-	s := &Stats{Up: 0, Down: 0, HandShakeLatency: rci.HandshakeDuration}
-	rci.Stats = s
-	return rci
-}
-
-type relayConnImpl struct {
-	RelayLabel string `json:"relay_label"`
-	Closed     bool   `json:"closed"`
-
-	StartTime time.Time `json:"start_time"`
-	EndTime   time.Time `json:"end_time,omitempty"`
-
-	Stats             *Stats `json:"stats"`
-	HandshakeDuration time.Duration
-
-	clientConn net.Conn
-	remoteConn net.Conn
-}
-
-func WithHandshakeDuration(duration time.Duration) RelayConnOption {
-	return func(rci *relayConnImpl) {
-		rci.HandshakeDuration = duration
-	}
-}
-
-func (rc *relayConnImpl) Transport(remoteLabel string) error {
-	defer rc.Close() // nolint: errcheck
-	name := rc.Name()
-	shortName := fmt.Sprintf("%s-%s", rc.RelayLabel, shortHashSHA256(name))
-	cl := zap.L().Named(shortName)
-	cl.Debug("transport start", zap.String("full name", name), zap.String("stats", rc.Stats.String()))
-	c1 := &innerConn{
-		stats:       rc.Stats,
-		remoteLabel: remoteLabel,
-		Conn:        rc.clientConn,
-	}
-	c2 := &innerConn{
-		stats:       rc.Stats,
-		remoteLabel: remoteLabel,
-		Conn:        rc.remoteConn,
-	}
-	rc.StartTime = time.Now().Local()
-	err := copyConn(c1, c2)
-	if err != nil {
-		cl.Error("transport error", zap.Error(err))
-	}
-	cl.Debug("transport end", zap.String("stats", rc.Stats.String()))
-	rc.EndTime = time.Now().Local()
-	return err
-}
-
-func (rc *relayConnImpl) GetTime() string {
-	if rc.EndTime.IsZero() {
-		return fmt.Sprintf("%s - N/A", rc.StartTime.Format(time.Stamp))
-	}
-	return fmt.Sprintf("%s - %s", rc.StartTime.Format(time.Stamp), rc.EndTime.Format(time.Stamp))
-}
-
-func (rc *relayConnImpl) Name() string {
-	return fmt.Sprintf("c1:[%s] c2:[%s]", connectionName(rc.clientConn), connectionName(rc.remoteConn))
-}
-
-func (rc *relayConnImpl) Flow() string {
-	return fmt.Sprintf("%s <-> %s", rc.clientConn.RemoteAddr(), rc.remoteConn.RemoteAddr())
-}
-
-func (rc *relayConnImpl) GetRelayLabel() string {
-	return rc.RelayLabel
-}
-
-func (rc *relayConnImpl) GetStats() *Stats {
-	return rc.Stats
-}
-
-func (rc *relayConnImpl) Close() error {
-	err1 := rc.clientConn.Close()
-	err2 := rc.remoteConn.Close()
-	rc.Closed = true
-	return combineErrors(err1, err2)
-}
-
-func combineErrors(err1, err2 error) error {
-	if err1 != nil && err2 != nil {
-		return fmt.Errorf("combineErrors: %v, %v", err1, err2)
-	}
-	if err1 != nil {
-		return err1
-	}
-	return err2
+	return combineErrorsAndMuteEOF(err, err2)
 }

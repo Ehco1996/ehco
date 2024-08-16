@@ -3,10 +3,11 @@ package transporter
 
 import (
 	"context"
+	"errors"
 	"net"
 	"time"
 
-	"github.com/Ehco1996/ehco/internal/constant"
+	"github.com/Ehco1996/ehco/internal/conn"
 	"github.com/Ehco1996/ehco/internal/lb"
 	"github.com/Ehco1996/ehco/internal/metrics"
 	"github.com/Ehco1996/ehco/internal/relay/conf"
@@ -26,17 +27,22 @@ type RawClient struct {
 
 func newRawClient(cfg *conf.Config) (*RawClient, error) {
 	r := &RawClient{
-		l:      zap.S().Named("raw"),
 		cfg:    cfg,
-		dialer: &net.Dialer{Timeout: constant.DialTimeOut},
+		dialer: NewNetDialer(cfg),
+		l:      zap.S().Named(string(cfg.TransportType)),
 	}
-	r.dialer.SetMultipathTCP(true)
 	return r, nil
 }
 
-func (raw *RawClient) TCPHandShake(remote *lb.Node) (net.Conn, error) {
+func (raw *RawClient) HandShake(ctx context.Context, remote *lb.Node, isTCP bool) (net.Conn, error) {
 	t1 := time.Now()
-	rc, err := raw.dialer.Dial("tcp", remote.Address)
+	var rc net.Conn
+	var err error
+	if isTCP {
+		rc, err = raw.dialer.DialContext(ctx, "tcp", remote.Address)
+	} else {
+		rc, err = raw.dialer.DialContext(ctx, "udp", remote.Address)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -46,55 +52,72 @@ func (raw *RawClient) TCPHandShake(remote *lb.Node) (net.Conn, error) {
 	return rc, nil
 }
 
-func (raw *RawClient) HealthCheck(ctx context.Context, remote *lb.Node) error {
-	l := zap.S().Named("health-check")
-	l.Infof("start send req to %s", remote.Address)
-	c, err := raw.TCPHandShake(remote)
-	if err != nil {
-		l.Errorf("send req to %s meet error:%s", remote.Address, err)
-		return err
-	}
-	c.Close()
-	return nil
-}
-
 type RawServer struct {
-	*baseTransporter
-	lis net.Listener
+	*BaseRelayServer
+
+	tcpLis net.Listener
+	udpLis *conn.UDPListener
 }
 
-func newRawServer(base *baseTransporter) (*RawServer, error) {
-	addr, err := base.GetTCPListenAddr()
-	if err != nil {
-		return nil, err
-	}
-	cfg := net.ListenConfig{}
-	cfg.SetMultipathTCP(true)
-	lis, err := cfg.Listen(context.TODO(), "tcp", addr.String())
-	if err != nil {
-		return nil, err
-	}
-	return &RawServer{
-		lis:             lis,
-		baseTransporter: base,
-	}, nil
+func newRawServer(bs *BaseRelayServer) (*RawServer, error) {
+	rs := &RawServer{BaseRelayServer: bs}
+
+	return rs, nil
 }
 
 func (s *RawServer) Close() error {
-	return s.lis.Close()
+	err := s.tcpLis.Close()
+	if s.udpLis != nil {
+		err2 := s.udpLis.Close()
+		err = errors.Join(err, err2)
+	}
+	return err
 }
 
-func (s *RawServer) ListenAndServe() error {
+func (s *RawServer) ListenAndServe(ctx context.Context) error {
+	ts, err := NewTCPListener(ctx, s.cfg)
+	if err != nil {
+		return err
+	}
+	s.tcpLis = ts
+
+	if s.cfg.Options != nil && s.cfg.Options.EnableUDP {
+		udpLis, err := conn.NewUDPListener(ctx, s.cfg.Listen)
+		if err != nil {
+			return err
+		}
+		s.udpLis = udpLis
+	}
+
+	if s.udpLis != nil {
+		go s.listenUDP(ctx)
+	}
 	for {
-		c, err := s.lis.Accept()
+		c, err := s.tcpLis.Accept()
 		if err != nil {
 			return err
 		}
 		go func(c net.Conn) {
 			defer c.Close()
-			if err := s.RelayTCPConn(c, s.relayer.TCPHandShake); err != nil {
-				s.l.Errorf("RelayTCPConn error: %s", err.Error())
+			if err := s.RelayTCPConn(ctx, c); err != nil {
+				s.l.Errorf("RelayTCPConn meet error: %s", err.Error())
 			}
 		}(c)
+	}
+}
+
+func (s *RawServer) listenUDP(ctx context.Context) error {
+	s.l.Infof("Start UDP server at %s", s.cfg.Listen)
+	for {
+		c, err := s.udpLis.Accept()
+		if err != nil {
+			s.l.Errorf("UDP accept error: %v", err)
+			return err
+		}
+		go func() {
+			if err := s.RelayUDPConn(ctx, c); err != nil {
+				s.l.Errorf("RelayUDPConn meet error: %s", err.Error())
+			}
+		}()
 	}
 }

@@ -6,11 +6,13 @@ import (
 
 // 全局pool
 var (
-	BufferPool *BytePool
+	BufferPool    *BytePool
+	UDPBufferPool *BytePool
 )
 
 func init() {
 	BufferPool = NewBytePool(constant.BUFFER_POOL_SIZE, constant.BUFFER_SIZE)
+	UDPBufferPool = NewBytePool(constant.BUFFER_POOL_SIZE, constant.UDPBufSize)
 }
 
 // BytePool implements a leaky pool of []byte in the form of a bounded channel

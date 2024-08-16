@@ -139,7 +139,9 @@ func (p *Proxies) ToRelayConfig(listenHost string, listenPort string, newName st
 		TCPRemotes:    []string{remoteAddr},
 	}
 	if p.UDP {
-		r.UDPRemotes = []string{remoteAddr}
+		r.Options = &relay_cfg.Options{
+			EnableUDP: true,
+		}
 	}
 	if err := r.Validate(); err != nil {
 		return nil, err

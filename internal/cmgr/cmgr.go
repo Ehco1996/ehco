@@ -16,7 +16,8 @@ const (
 	ConnectionTypeClosed = "closed"
 )
 
-// connection manager interface
+// connection manager interface/
+// TODO support closed connection
 type Cmgr interface {
 	ListConnections(connType string, page, pageSize int) []conn.RelayConn
 

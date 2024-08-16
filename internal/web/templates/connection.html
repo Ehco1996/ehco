@@ -28,6 +28,7 @@
                         <thead>
                             <tr>
                                 <th>Relay Label</th>
+                                <th>Type</th>
                                 <th>Flow</th>
                                 <th>Stats</th>
                                 <th>Time</th>
@@ -37,7 +38,8 @@
                             {{range .ConnectionList}}
                             <tr>
                                 <td>{{.RelayLabel}}</td>
-                                <td>{{.Flow}}</td>
+                                <td>{{.ConnType}}</td>
+                                <td>{{.GetFlow}}</td>
                                 <td>{{.Stats}}</td>
                                 <td>{{.GetTime}}</td>
                             </tr>

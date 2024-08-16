@@ -35,7 +35,7 @@ func (b *readerImpl) parsePingInfo(metricMap map[string]*dto.MetricFamily, nm *N
 	metric, ok := metricMap["ehco_ping_response_duration_seconds"]
 	if !ok {
 		// this metric is optional when enable_ping = false
-		zap.S().Warn("ping metric not found")
+		zap.S().Debug("ping metric not found")
 		return nil
 	}
 	for _, m := range metric.Metric {

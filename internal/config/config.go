@@ -7,9 +7,10 @@ import (
 	"strings"
 	"time"
 
-	myhttp "github.com/Ehco1996/ehco/pkg/http"
-
+	"github.com/Ehco1996/ehco/internal/constant"
 	"github.com/Ehco1996/ehco/internal/relay/conf"
+	"github.com/Ehco1996/ehco/internal/tls"
+	myhttp "github.com/Ehco1996/ehco/pkg/http"
 	"github.com/Ehco1996/ehco/pkg/sub"
 	xConf "github.com/xtls/xray-core/infra/conf"
 	"go.uber.org/zap"
@@ -120,6 +121,15 @@ func (c *Config) Adjust() error {
 			return fmt.Errorf("relay label %s is not unique", r.Label)
 		}
 		labelMap[r.Label] = struct{}{}
+	}
+	// init tls when need
+	for _, r := range c.RelayConfigs {
+		if r.ListenType == constant.RelayTypeWSS {
+			if err := tls.InitTlsCfg(); err != nil {
+				return err
+			}
+			break
+		}
 	}
 	return nil
 }
