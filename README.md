@@ -17,7 +17,4 @@ ehco 现在提供 SaaS（软件即服务）版本！这是一个全托管的解�
 
 -   tcp/udp relay
 -   tunnel relay (ws/wss/mwss/mtcp)
--   proxy server (内嵌了完整版本的 xray)
--   监控报警 (Prometheus/Grafana)
--   WebAPI (http://web_host:web_port)
 -   [更多功能请探索文档](https://docs.ehco-relay.cc/)
