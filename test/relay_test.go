@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"net"
 	"os"
 	"testing"
 	"time"
@@ -28,8 +27,7 @@ const (
 	ECHO_PORT   = 9002
 	ECHO_SERVER = "0.0.0.0:9002"
 
-	RAW_LISTEN                     = "0.0.0.0:1234"
-	RAW_LISTEN_WITH_MAX_CONNECTION = "0.0.0.0:2234"
+	RAW_LISTEN = "0.0.0.0:1234"
 
 	WS_LISTEN = "0.0.0.0:1235"
 	WS_REMOTE = "ws://0.0.0.0:2000"
@@ -38,22 +36,15 @@ const (
 	WSS_LISTEN = "0.0.0.0:1236"
 	WSS_REMOTE = "wss://0.0.0.0:2001"
 	WSS_SERVER = "0.0.0.0:2001"
-
-	MWSS_LISTEN = "0.0.0.0:1237"
-	MWSS_REMOTE = "wss://0.0.0.0:2002"
-	MWSS_SERVER = "0.0.0.0:2002"
-
-	MTCP_LISTEN = "0.0.0.0:1238"
-	MTCP_REMOTE = "0.0.0.0:2003"
-	MTCP_SERVER = "0.0.0.0:2003"
-
-	MWS_LISTEN = "0.0.0.0:1239"
-	MWS_REMOTE = "ws://0.0.0.0:2004"
-	MSS_SERVER = "0.0.0.0:2004"
 )
 
 func TestMain(m *testing.M) {
 	// Setup
+
+	// change the idle timeout to 1 second to make connection close faster in test
+	constant.IdleTimeOut = time.Second
+	constant.ReadTimeOut = time.Second
+
 	_ = log.InitGlobalLogger("debug")
 	_ = tls.InitTlsCfg()
 
@@ -78,38 +69,35 @@ func TestMain(m *testing.M) {
 
 func startRelayServers() []*relay.Relay {
 	cfg := config.Config{
-		PATH: "",
 		RelayConfigs: []*conf.Config{
-			// raw cfg
+			// raw
 			{
 				Listen:        RAW_LISTEN,
 				ListenType:    constant.RelayTypeRaw,
 				TCPRemotes:    []string{ECHO_SERVER},
-				UDPRemotes:    []string{ECHO_SERVER},
 				TransportType: constant.RelayTypeRaw,
+				Options: &conf.Options{
+					EnableUDP: true,
+				},
 			},
-			// raw cfg with max connection
-			{
-				Listen:        RAW_LISTEN_WITH_MAX_CONNECTION,
-				ListenType:    constant.RelayTypeRaw,
-				TCPRemotes:    []string{ECHO_SERVER},
-				UDPRemotes:    []string{ECHO_SERVER},
-				TransportType: constant.RelayTypeRaw,
-				MaxConnection: 1,
-			},
-
 			// ws
 			{
 				Listen:        WS_LISTEN,
 				ListenType:    constant.RelayTypeRaw,
 				TCPRemotes:    []string{WS_REMOTE},
 				TransportType: constant.RelayTypeWS,
+				Options: &conf.Options{
+					EnableUDP: true,
+				},
 			},
 			{
 				Listen:        WS_SERVER,
 				ListenType:    constant.RelayTypeWS,
 				TCPRemotes:    []string{ECHO_SERVER},
 				TransportType: constant.RelayTypeRaw,
+				Options: &conf.Options{
+					EnableUDP: true,
+				},
 			},
 
 			// wss
@@ -118,65 +106,30 @@ func startRelayServers() []*relay.Relay {
 				ListenType:    constant.RelayTypeRaw,
 				TCPRemotes:    []string{WSS_REMOTE},
 				TransportType: constant.RelayTypeWSS,
+				Options: &conf.Options{
+					EnableUDP: true,
+				},
 			},
 			{
 				Listen:        WSS_SERVER,
 				ListenType:    constant.RelayTypeWSS,
 				TCPRemotes:    []string{ECHO_SERVER},
 				TransportType: constant.RelayTypeRaw,
-			},
-
-			// mwss
-			{
-				Listen:        MWSS_LISTEN,
-				ListenType:    constant.RelayTypeRaw,
-				TCPRemotes:    []string{MWSS_REMOTE},
-				TransportType: constant.RelayTypeMWSS,
-			},
-			{
-				Listen:        MWSS_SERVER,
-				ListenType:    constant.RelayTypeMWSS,
-				TCPRemotes:    []string{ECHO_SERVER},
-				TransportType: constant.RelayTypeRaw,
-			},
-
-			// mtcp
-			{
-				Listen:        MTCP_LISTEN,
-				ListenType:    constant.RelayTypeRaw,
-				TCPRemotes:    []string{MTCP_REMOTE},
-				TransportType: constant.RelayTypeMTCP,
-			},
-			{
-				Listen:        MTCP_SERVER,
-				ListenType:    constant.RelayTypeMTCP,
-				TCPRemotes:    []string{ECHO_SERVER},
-				TransportType: constant.RelayTypeRaw,
-			},
-
-			// mws
-			{
-				Listen:        MWS_LISTEN,
-				ListenType:    constant.RelayTypeRaw,
-				TCPRemotes:    []string{MWS_REMOTE},
-				TransportType: constant.RelayTypeMWS,
-			},
-			{
-				Listen:        MSS_SERVER,
-				ListenType:    constant.RelayTypeMWS,
-				TCPRemotes:    []string{ECHO_SERVER},
-				TransportType: constant.RelayTypeRaw,
+				Options: &conf.Options{
+					EnableUDP: true,
+				},
 			},
 		},
 	}
 
 	var servers []*relay.Relay
 	for _, c := range cfg.RelayConfigs {
+		c.Adjust()
 		r, err := relay.NewRelay(c, cmgr.NewCmgr(cmgr.DummyConfig))
 		if err != nil {
 			zap.S().Fatal(err)
 		}
-		go r.ListenAndServe()
+		go r.ListenAndServe(context.TODO())
 		servers = append(servers, r)
 	}
 
@@ -194,16 +147,14 @@ func TestRelay(t *testing.T) {
 		{"Raw", RAW_LISTEN, "raw"},
 		{"WS", WS_LISTEN, "ws"},
 		{"WSS", WSS_LISTEN, "wss"},
-		{"MWSS", MWSS_LISTEN, "mwss"},
-		{"MTCP", MTCP_LISTEN, "mtcp"},
-		{"MWS", MWS_LISTEN, "mws"},
 	}
 
 	for _, tc := range testCases {
 		tc := tc // capture range variable
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			testRelayCommon(t, tc.address, tc.protocol, false)
+			testTCPRelay(t, tc.address, tc.protocol, false)
+			testUDPRelay(t, tc.address, false)
 		})
 	}
 }
@@ -214,21 +165,22 @@ func TestRelayConcurrent(t *testing.T) {
 		address     string
 		concurrency int
 	}{
-		{"MWSS", MWSS_LISTEN, 10},
-		{"MTCP", MTCP_LISTEN, 10},
-		{"MWS", MWS_LISTEN, 10},
+		{"Raw", RAW_LISTEN, 10},
+		{"WS", WS_LISTEN, 10},
+		{"WSS", WSS_LISTEN, 10},
 	}
 
 	for _, tc := range testCases {
 		tc := tc // capture range variable
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			testRelayCommon(t, tc.address, tc.name, true, tc.concurrency)
+			testTCPRelay(t, tc.address, tc.name, true, tc.concurrency)
+			testUDPRelay(t, tc.address, true, tc.concurrency)
 		})
 	}
 }
 
-func testRelayCommon(t *testing.T, address, protocol string, concurrent bool, concurrency ...int) {
+func testTCPRelay(t *testing.T, address, protocol string, concurrent bool, concurrency ...int) {
 	t.Helper()
 	msg := []byte("hello")
 
@@ -264,40 +216,42 @@ func testRelayCommon(t *testing.T, address, protocol string, concurrent bool, co
 	t.Logf("Test TCP over %s done!", protocol)
 }
 
-func TestRelayWithMaxConnectionCount(t *testing.T) {
-	msg := []byte("hello")
+func testUDPRelay(t *testing.T, address string, concurrent bool, concurrency ...int) {
+	t.Helper()
+	msg := []byte("hello udp")
 
-	// First connection will be accepted
-	go func() {
-		err := echo.EchoTcpMsgLong(msg, time.Second, RAW_LISTEN_WITH_MAX_CONNECTION)
-		require.NoError(t, err, "First connection should be accepted")
-	}()
+	runTest := func() error {
+		res := echo.SendUdpMsg(msg, address)
+		if !bytes.Equal(msg, res) {
+			return fmt.Errorf("response mismatch: got %s, want %s", res, msg)
+		}
+		return nil
+	}
 
-	// Wait for first connection
-	time.Sleep(time.Second)
-
-	// Second connection should be rejected
-	err := echo.EchoTcpMsgLong(msg, time.Second, RAW_LISTEN_WITH_MAX_CONNECTION)
-	require.Error(t, err, "Second connection should be rejected")
+	if concurrent {
+		n := 10
+		if len(concurrency) > 0 {
+			n = concurrency[0]
+		}
+		g, ctx := errgroup.WithContext(context.Background())
+		for i := 0; i < n; i++ {
+			g.Go(func() error {
+				select {
+				case <-ctx.Done():
+					return ctx.Err()
+				default:
+					return runTest()
+				}
+			})
+		}
+		require.NoError(t, g.Wait(), "Concurrent test failed")
+	} else {
+		require.NoError(t, runTest(), "Single test failed")
+	}
+	t.Logf("Test UDP over %s done!", address)
 }
 
-func TestRelayWithDeadline(t *testing.T) {
-	logger, _ := zap.NewDevelopment()
-	msg := []byte("hello")
-	conn, err := net.Dial("tcp", RAW_LISTEN)
-	if err != nil {
-		logger.Sugar().Fatal(err)
-	}
-	defer conn.Close()
-	if _, err := conn.Write(msg); err != nil {
-		logger.Sugar().Fatal(err)
-	}
-
-	buf := make([]byte, len(msg))
-	constant.IdleTimeOut = time.Second // change for test
-	time.Sleep(constant.IdleTimeOut)
-	_, err = conn.Read(buf)
-	if err != nil {
-		logger.Sugar().Fatal("need error here")
-	}
+func TestRelayIdleTimeout(t *testing.T) {
+	err := echo.EchoTcpMsgLong([]byte("hello"), time.Second, RAW_LISTEN)
+	require.Error(t, err, "Connection should be rejected")
 }

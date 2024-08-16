@@ -10,7 +10,6 @@ var (
 	LocalAddr            string
 	ListenType           constant.RelayType
 	TCPRemoteAddr        string
-	UDPRemoteAddr        string
 	TransportType        constant.RelayType
 	ConfigPath           string
 	WebPort              int
@@ -39,15 +38,9 @@ var RootFlags = []cli.Flag{
 	},
 	&cli.StringFlag{
 		Name:        "r,remote",
-		Usage:       "TCP 转发地址，例如 0.0.0.0:5201，通过 ws 隧道转发时应为 ws://0.0.0.0:2443",
+		Usage:       "转发地址，例如 0.0.0.0:5201，通过 ws 隧道转发时应为 ws://0.0.0.0:2443",
 		EnvVars:     []string{"EHCO_REMOTE_ADDR"},
 		Destination: &TCPRemoteAddr,
-	},
-	&cli.StringFlag{
-		Name:        "ur,udp_remote",
-		Usage:       "UDP 转发地址，例如 0.0.0.0:1234",
-		EnvVars:     []string{"EHCO_UDP_REMOTE_ADDR"},
-		Destination: &UDPRemoteAddr,
 	},
 	&cli.StringFlag{
 		Name:        "tt,transport_type",

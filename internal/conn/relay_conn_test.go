@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Ehco1996/ehco/internal/lb"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -18,11 +19,9 @@ func TestInnerConn_ReadWrite(t *testing.T) {
 	serverConn.SetDeadline(time.Now().Add(1 * time.Second))
 	defer clientConn.Close()
 	defer serverConn.Close()
-
-	innerC := &innerConn{Conn: clientConn, stats: &Stats{}, remoteLabel: "test"}
-
+	rc := relayConnImpl{Stats: &Stats{}, remote: &lb.Node{Label: "client"}}
+	innerC := newInnerConn(clientConn, &rc)
 	errChan := make(chan error, 1)
-
 	go func() {
 		_, err := innerC.Write(testData)
 		errChan <- err
@@ -39,7 +38,7 @@ func TestInnerConn_ReadWrite(t *testing.T) {
 	if err := <-errChan; err != nil {
 		t.Fatalf("write err: %v", err)
 	}
-	assert.Equal(t, int64(len(testData)), innerC.stats.Up)
+	assert.Equal(t, int64(len(testData)), rc.Stats.Up)
 
 	errChan = make(chan error, 1)
 	clientConn.SetDeadline(time.Now().Add(1 * time.Second))
@@ -64,7 +63,7 @@ func TestInnerConn_ReadWrite(t *testing.T) {
 	if err := <-errChan; err != nil {
 		t.Fatalf("write error: %v", err)
 	}
-	assert.Equal(t, int64(len(testData)), innerC.stats.Down)
+	assert.Equal(t, int64(len(testData)), rc.Stats.Down)
 }
 
 func TestCopyTCPConn(t *testing.T) {
@@ -96,8 +95,9 @@ func TestCopyTCPConn(t *testing.T) {
 	assert.NoError(t, err)
 	defer remoteConn.Close()
 
-	c1 := &innerConn{Conn: clientConn, remoteLabel: "client", stats: &Stats{}}
-	c2 := &innerConn{Conn: remoteConn, remoteLabel: "server", stats: &Stats{}}
+	rc := relayConnImpl{Stats: &Stats{}, remote: &lb.Node{Label: "client"}}
+	c1 := newInnerConn(clientConn, &rc)
+	c2 := newInnerConn(remoteConn, &rc)
 
 	done := make(chan struct{})
 	go func() {
@@ -155,8 +155,9 @@ func TestCopyUDPConn(t *testing.T) {
 	assert.NoError(t, err)
 	defer remoteConn.Close()
 
-	c1 := &innerConn{Conn: clientConn, remoteLabel: "client", stats: &Stats{}}
-	c2 := &innerConn{Conn: remoteConn, remoteLabel: "server", stats: &Stats{}}
+	rc := relayConnImpl{Stats: &Stats{}, remote: &lb.Node{Label: "client"}}
+	c1 := newInnerConn(clientConn, &rc)
+	c2 := newInnerConn(remoteConn, &rc)
 
 	done := make(chan struct{})
 	go func() {

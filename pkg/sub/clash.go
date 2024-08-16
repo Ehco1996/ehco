@@ -179,7 +179,9 @@ func (c *ClashSub) ToRelayConfigs(listenHost string) ([]*relay_cfg.Config, error
 			}
 			rc.TCPRemotes = append(rc.TCPRemotes, remote)
 			if proxy.UDP {
-				rc.UDPRemotes = append(rc.UDPRemotes, remote)
+				rc.Options = &relay_cfg.Options{
+					EnableUDP: true,
+				}
 			}
 		}
 		relayConfigs = append(relayConfigs, rc)

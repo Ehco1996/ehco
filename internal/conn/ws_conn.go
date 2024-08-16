@@ -12,6 +12,7 @@ import (
 	"go.uber.org/zap"
 )
 
+// wsConn represents a WebSocket connection to relay(io.Copy)
 type wsConn struct {
 	conn     net.Conn
 	isServer bool
@@ -29,7 +30,7 @@ func (c *wsConn) Read(b []byte) (n int, err error) {
 	}
 	if header.Length > int64(cap(c.buf)) {
 		zap.S().Warnf("ws payload size:%d is larger than buffer size:%d", header.Length, cap(c.buf))
-		c.buf = make([]byte, header.Length)
+		return 0, fmt.Errorf("buffer size:%d too small to transport ws payload size:%d", len(b), header.Length)
 	}
 	payload := c.buf[:header.Length]
 	_, err = io.ReadFull(c.conn, payload)

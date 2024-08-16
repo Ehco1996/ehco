@@ -1,6 +1,8 @@
 package relay
 
 import (
+	"context"
+
 	"github.com/Ehco1996/ehco/internal/glue"
 	"github.com/Ehco1996/ehco/internal/relay/conf"
 	"go.uber.org/zap"
@@ -48,7 +50,7 @@ func (s *Server) Reload(force bool) error {
 				s.l.Error("new relay meet error", zap.Error(err))
 				continue
 			}
-			go s.startOneRelay(r)
+			go s.startOneRelay(context.TODO(), r)
 		} else {
 			// when label not change, check if config changed
 			oldCfg, ok := oldRelayCfgM[newCfg.Label]
@@ -66,7 +68,7 @@ func (s *Server) Reload(force bool) error {
 					s.l.Error("new relay meet error", zap.Error(err))
 					continue
 				}
-				go s.startOneRelay(r)
+				go s.startOneRelay(context.TODO(), r)
 			}
 		}
 	}

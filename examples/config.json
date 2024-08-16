@@ -9,71 +9,41 @@
             "listen_type": "raw",
             "transport_type": "raw",
             "label": "relay1",
-            "tcp_remotes": ["0.0.0.0:5201"],
-            "udp_remotes": ["0.0.0.0:5201"]
+            "tcp_remotes": [
+                "0.0.0.0:5201"
+            ]
         },
         {
             "listen": "127.0.0.1:1235",
             "listen_type": "raw",
             "transport_type": "ws",
-            "tcp_remotes": ["ws://0.0.0.0:2443"],
-            "udp_remotes": ["0.0.0.0:5201"]
+            "tcp_remotes": [
+                "ws://0.0.0.0:2443"
+            ]
         },
         {
             "listen": "127.0.0.1:1236",
             "listen_type": "raw",
             "transport_type": "wss",
-            "tcp_remotes": ["wss://0.0.0.0:3443"],
-            "udp_remotes": ["0.0.0.0:5201"]
-        },
-        {
-            "listen": "127.0.0.1:1237",
-            "listen_type": "raw",
-            "transport_type": "mwss",
-            "tcp_remotes": ["wss://0.0.0.0:4443"],
-            "udp_remotes": ["0.0.0.0:5201"]
-        },
-        {
-            "listen": "127.0.0.1:1238",
-            "listen_type": "raw",
-            "transport_type": "mtcp",
-            "tcp_remotes": ["0.0.0.0:4444"],
-            "udp_remotes": ["0.0.0.0:5201"]
+            "tcp_remotes": [
+                "wss://0.0.0.0:3443"
+            ]
         },
         {
             "listen": "127.0.0.1:2443",
             "listen_type": "ws",
             "transport_type": "raw",
-            "tcp_remotes": ["0.0.0.0:5201"],
-            "udp_remotes": []
+            "tcp_remotes": [
+                "0.0.0.0:5201"
+            ]
         },
         {
             "listen": "127.0.0.1:3443",
             "listen_type": "wss",
             "transport_type": "raw",
-            "tcp_remotes": ["0.0.0.0:5201"],
-            "udp_remotes": []
-        },
-        {
-            "listen": "127.0.0.1:4443",
-            "listen_type": "mwss",
-            "transport_type": "raw",
-            "tcp_remotes": ["0.0.0.0:5201"],
-            "udp_remotes": []
-        },
-        {
-            "listen": "127.0.0.1:4444",
-            "listen_type": "mtcp",
-            "transport_type": "raw",
-            "tcp_remotes": ["0.0.0.0:5201"],
-            "udp_remotes": []
-        },
-        {
-            "label": "ping_test",
-            "listen": "127.0.0.1:8888",
-            "listen_type": "raw",
-            "transport_type": "raw",
-            "tcp_remotes": ["8.8.8.8:5201", "google.com:5201"]
+            "tcp_remotes": [
+                "0.0.0.0:5201"
+            ]
         }
     ]
 }

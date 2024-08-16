@@ -1,6 +1,9 @@
 package transporter
 
 import (
+	"context"
+	"crypto/tls"
+
 	"github.com/Ehco1996/ehco/internal/relay/conf"
 	mytls "github.com/Ehco1996/ehco/internal/tls"
 )
@@ -28,12 +31,19 @@ type WssServer struct {
 	*WsServer
 }
 
-func newWssServer(base *baseTransporter) (*WssServer, error) {
-	wsServer, err := newWsServer(base)
+func newWssServer(bs *BaseRelayServer) (*WssServer, error) {
+	wsServer, err := newWsServer(bs)
 	if err != nil {
 		return nil, err
 	}
-	// insert tls config
-	wsServer.httpServer.TLSConfig = mytls.DefaultTLSConfig
 	return &WssServer{WsServer: wsServer}, nil
+}
+
+func (s *WssServer) ListenAndServe(ctx context.Context) error {
+	listener, err := NewTCPListener(ctx, s.cfg)
+	if err != nil {
+		return err
+	}
+	tlsListener := tls.NewListener(listener, mytls.DefaultTLSConfig)
+	return s.httpServer.Serve(tlsListener)
 }

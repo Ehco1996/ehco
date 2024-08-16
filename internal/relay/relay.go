@@ -1,6 +1,8 @@
 package relay
 
 import (
+	"context"
+
 	"go.uber.org/zap"
 
 	"github.com/Ehco1996/ehco/internal/cmgr"
@@ -33,17 +35,17 @@ func NewRelay(cfg *conf.Config, cmgr cmgr.Cmgr) (*Relay, error) {
 	return r, nil
 }
 
-func (r *Relay) ListenAndServe() error {
+func (r *Relay) ListenAndServe(ctx context.Context) error {
 	errCh := make(chan error)
 	go func() {
-		r.l.Infof("Start TCP Relay Server:%s", r.cfg.DefaultLabel())
-		errCh <- r.relayServer.ListenAndServe()
+		r.l.Infof("Start Relay Server(%s):%s", r.cfg.ListenType, r.cfg.DefaultLabel())
+		errCh <- r.relayServer.ListenAndServe(ctx)
 	}()
 	return <-errCh
 }
 
 func (r *Relay) Close() {
-	r.l.Infof("Close TCP Relay Server:%s", r.cfg.DefaultLabel())
+	r.l.Infof("Close Relay Server:%s", r.cfg.DefaultLabel())
 	if err := r.relayServer.Close(); err != nil {
 		r.l.Errorf(err.Error())
 	}

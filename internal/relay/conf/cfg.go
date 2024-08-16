@@ -23,24 +23,47 @@ type WSConfig struct {
 	RemoteAddr string `json:"remote_addr,omitempty"`
 }
 
+func (w *WSConfig) Clone() *WSConfig {
+	return &WSConfig{
+		Path:       w.Path,
+		RemoteAddr: w.RemoteAddr,
+	}
+}
+
+type Options struct {
+	WSConfig           *WSConfig `json:"ws_config,omitempty"`
+	EnableUDP          bool      `json:"enable_udp,omitempty"`
+	EnableMultipathTCP bool      `json:"enable_multipath_tcp,omitempty"`
+
+	MaxConnection    int      `json:"max_connection,omitempty"`
+	BlockedProtocols []string `json:"blocked_protocols,omitempty"`
+	MaxReadRateKbps  int64    `json:"max_read_rate_kbps,omitempty"`
+}
+
+func (o *Options) Clone() *Options {
+	opt := &Options{
+		EnableUDP:          o.EnableUDP,
+		EnableMultipathTCP: o.EnableMultipathTCP,
+	}
+	if o.WSConfig != nil {
+		opt.WSConfig = o.WSConfig.Clone()
+	}
+	return opt
+}
+
 type Config struct {
 	Label         string             `json:"label,omitempty"`
 	Listen        string             `json:"listen"`
 	ListenType    constant.RelayType `json:"listen_type"`
 	TransportType constant.RelayType `json:"transport_type"`
-	TCPRemotes    []string           `json:"tcp_remotes"`
-	UDPRemotes    []string           `json:"udp_remotes"`
+	TCPRemotes    []string           `json:"tcp_remotes"` // TODO rename to remotes
 
-	MaxConnection    int      `json:"max_connection,omitempty"`
-	BlockedProtocols []string `json:"blocked_protocols,omitempty"`
-	MaxReadRateKbps  int64    `json:"max_read_rate_kbps,omitempty"`
-
-	WSConfig *WSConfig `json:"ws_config,omitempty"`
+	Options *Options `json:"options,omitempty"`
 }
 
 func (r *Config) GetWSHandShakePath() string {
-	if r.WSConfig != nil && r.WSConfig.Path != "" {
-		return r.WSConfig.Path
+	if r.Options != nil && r.Options.WSConfig != nil && r.Options.WSConfig.Path != "" {
+		return r.Options.WSConfig.Path
 	}
 	return WS_HANDSHAKE_PATH
 }
@@ -50,8 +73,8 @@ func (r *Config) GetWSRemoteAddr(baseAddr string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if r.WSConfig != nil && r.WSConfig.RemoteAddr != "" {
-		addr += fmt.Sprintf("?%s=%s", WS_QUERY_REMOTE_ADDR, r.WSConfig.RemoteAddr)
+	if r.Options != nil && r.Options.WSConfig != nil && r.Options.WSConfig.RemoteAddr != "" {
+		addr += fmt.Sprintf("?%s=%s", WS_QUERY_REMOTE_ADDR, r.Options.WSConfig.RemoteAddr)
 	}
 	return addr, nil
 }
@@ -79,17 +102,7 @@ func (r *Config) Validate() error {
 		}
 	}
 
-	for _, addr := range r.UDPRemotes {
-		if addr == "" {
-			return fmt.Errorf("invalid udp remote addr:%s", addr)
-		}
-	}
-
-	if len(r.TCPRemotes) == 0 && len(r.UDPRemotes) == 0 {
-		return errors.New("both tcp and udp remotes are empty")
-	}
-
-	for _, protocol := range r.BlockedProtocols {
+	for _, protocol := range r.Options.BlockedProtocols {
 		if protocol != ProtocolHTTP && protocol != ProtocolTLS {
 			return fmt.Errorf("invalid blocked protocol:%s", protocol)
 		}
@@ -103,11 +116,10 @@ func (r *Config) Clone() *Config {
 		ListenType:    r.ListenType,
 		TransportType: r.TransportType,
 		Label:         r.Label,
+		Options:       r.Options.Clone(),
 	}
 	new.TCPRemotes = make([]string, len(r.TCPRemotes))
 	copy(new.TCPRemotes, r.TCPRemotes)
-	new.UDPRemotes = make([]string, len(r.UDPRemotes))
-	copy(new.UDPRemotes, r.UDPRemotes)
 	return new
 }
 
@@ -121,17 +133,8 @@ func (r *Config) Different(new *Config) bool {
 	if len(r.TCPRemotes) != len(new.TCPRemotes) {
 		return true
 	}
-
 	for i, addr := range r.TCPRemotes {
 		if addr != new.TCPRemotes[i] {
-			return true
-		}
-	}
-	if len(r.UDPRemotes) != len(new.UDPRemotes) {
-		return true
-	}
-	for i, addr := range r.UDPRemotes {
-		if addr != new.UDPRemotes[i] {
 			return true
 		}
 	}
@@ -140,7 +143,7 @@ func (r *Config) Different(new *Config) bool {
 
 // todo make this shorter and more readable
 func (r *Config) DefaultLabel() string {
-	defaultLabel := fmt.Sprintf("<At=%s TCP-To=%s TP=%s>",
+	defaultLabel := fmt.Sprintf("<At=%s To=%s TP=%s>",
 		r.Listen, r.TCPRemotes, r.TransportType)
 	return defaultLabel
 }
@@ -149,6 +152,12 @@ func (r *Config) Adjust() error {
 	if r.Label == "" {
 		r.Label = r.DefaultLabel()
 		zap.S().Debugf("label is empty, set default label:%s", r.Label)
+	}
+	if r.Options == nil {
+		r.Options = &Options{
+			WSConfig:           &WSConfig{},
+			EnableMultipathTCP: true,
+		}
 	}
 	return nil
 }
@@ -171,20 +180,14 @@ func (r *Config) GetLoggerName() string {
 func (r *Config) validateType() error {
 	if r.ListenType != constant.RelayTypeRaw &&
 		r.ListenType != constant.RelayTypeWS &&
-		r.ListenType != constant.RelayTypeMWS &&
-		r.ListenType != constant.RelayTypeWSS &&
-		r.ListenType != constant.RelayTypeMTCP &&
-		r.ListenType != constant.RelayTypeMWSS {
+		r.ListenType != constant.RelayTypeWSS {
 		return fmt.Errorf("invalid listen type:%s", r.ListenType)
 	}
 
 	if r.TransportType != constant.RelayTypeRaw &&
 		r.TransportType != constant.RelayTypeWS &&
-		r.TransportType != constant.RelayTypeMWS &&
-		r.TransportType != constant.RelayTypeWSS &&
-		r.TransportType != constant.RelayTypeMTCP &&
-		r.TransportType != constant.RelayTypeMWSS {
-		return fmt.Errorf("invalid transport type:%s", r.ListenType)
+		r.TransportType != constant.RelayTypeWSS {
+		return fmt.Errorf("invalid transport type:%s", r.TransportType)
 	}
 	return nil
 }
