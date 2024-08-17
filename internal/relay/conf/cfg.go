@@ -44,7 +44,11 @@ func (o *Options) Clone() *Options {
 	opt := &Options{
 		EnableUDP:          o.EnableUDP,
 		EnableMultipathTCP: o.EnableMultipathTCP,
+		MaxConnection:      o.MaxConnection,
+		MaxReadRateKbps:    o.MaxReadRateKbps,
+		BlockedProtocols:   make([]string, len(o.BlockedProtocols)),
 	}
+	copy(opt.BlockedProtocols, o.BlockedProtocols)
 	if o.WSConfig != nil {
 		opt.WSConfig = o.WSConfig.Clone()
 	}
@@ -156,7 +160,7 @@ func (r *Config) Adjust() error {
 	if r.Options == nil {
 		r.Options = &Options{
 			WSConfig:           &WSConfig{},
-			EnableMultipathTCP: true,
+			EnableMultipathTCP: true, // default enable multipath tcp
 		}
 	}
 	return nil
