@@ -12,19 +12,19 @@ require (
 	github.com/hashicorp/go-retryablehttp v0.7.7
 	github.com/juju/ratelimit v1.0.2
 	github.com/labstack/echo/v4 v4.12.0
-	github.com/prometheus/client_golang v1.19.1
+	github.com/prometheus/client_golang v1.20.0
 	github.com/prometheus/client_model v0.6.1
 	github.com/prometheus/common v0.55.0
-	github.com/prometheus/node_exporter v1.8.1
-	github.com/sagernet/sing v0.4.1
-	github.com/sagernet/sing-box v1.9.3
+	github.com/prometheus/node_exporter v1.8.2
+	github.com/sagernet/sing v0.4.2
+	github.com/sagernet/sing-box v1.9.4
 	github.com/stretchr/testify v1.9.0
-	github.com/urfave/cli/v2 v2.27.2
-	github.com/xtls/xray-core v1.8.16
+	github.com/urfave/cli/v2 v2.27.4
+	github.com/xtls/xray-core v1.8.23
 	go.uber.org/atomic v1.11.0
 	go.uber.org/zap v1.27.0
-	golang.org/x/sync v0.7.0
-	golang.org/x/time v0.5.0
+	golang.org/x/sync v0.8.0
+	golang.org/x/time v0.6.0
 	google.golang.org/grpc v1.65.0
 	gopkg.in/yaml.v3 v3.0.1
 )
@@ -66,7 +66,7 @@ require (
 	github.com/illumos/go-kstat v0.0.0-20210513183136-173c9b0a9973 // indirect
 	github.com/josharian/native v1.1.0 // indirect
 	github.com/jsimonetti/rtnetlink v1.4.2 // indirect
-	github.com/klauspost/compress v1.17.8 // indirect
+	github.com/klauspost/compress v1.17.9 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.7 // indirect
 	github.com/labstack/gommon v0.4.2 // indirect
 	github.com/logrusorgru/aurora v2.0.3+incompatible // indirect
@@ -89,33 +89,34 @@ require (
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/prometheus-community/go-runit v0.1.0 // indirect
 	github.com/prometheus/procfs v0.15.1 // indirect
-	github.com/quic-go/quic-go v0.45.0 // indirect
-	github.com/refraction-networking/utls v1.6.6 // indirect
+	github.com/quic-go/qpack v0.4.0 // indirect
+	github.com/quic-go/quic-go v0.45.1 // indirect
+	github.com/refraction-networking/utls v1.6.7 // indirect
 	github.com/riobard/go-bloom v0.0.0-20200614022211-cdc8013cb5b3 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/safchain/ethtool v0.3.0 // indirect
 	github.com/sagernet/gvisor v0.0.0-20240428053021-e691de28565f // indirect
 	github.com/sagernet/netlink v0.0.0-20240523065131-45e60152f9ba // indirect
-	github.com/sagernet/sing-dns v0.2.0 // indirect
-	github.com/sagernet/sing-shadowsocks v0.2.6 // indirect
+	github.com/sagernet/sing-dns v0.2.3 // indirect
+	github.com/sagernet/sing-shadowsocks v0.2.7 // indirect
 	github.com/sagernet/sing-tun v0.3.2 // indirect
-	github.com/seiflotfy/cuckoofilter v0.0.0-20220411075957-e3b120b3f5fb // indirect
+	github.com/seiflotfy/cuckoofilter v0.0.0-20240715131351-a2f2c23f1771 // indirect
 	github.com/v2fly/ss-bloomring v0.0.0-20210312155135-28617310f63e // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasttemplate v1.2.2 // indirect
 	github.com/vishvananda/netlink v1.2.1-beta.2.0.20230316163032-ced5aaba43e3 // indirect
 	github.com/vishvananda/netns v0.0.4 // indirect
 	github.com/xhit/go-str2duration/v2 v2.1.0 // indirect
-	github.com/xrash/smetrics v0.0.0-20240312152122-5f08fbb34913 // indirect
-	github.com/xtls/reality v0.0.0-20240429224917-ecc4401070cc // indirect
+	github.com/xrash/smetrics v0.0.0-20240521201337-686a1a2994c1 // indirect
+	github.com/xtls/reality v0.0.0-20240712055506-48f0b2d5ed6d // indirect
 	go.uber.org/mock v0.4.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go4.org/netipx v0.0.0-20231129151722-fdeea329fbba // indirect
-	golang.org/x/crypto v0.24.0 // indirect
+	golang.org/x/crypto v0.25.0 // indirect
 	golang.org/x/exp v0.0.0-20240531132922-fd00a4e0eefc // indirect
 	golang.org/x/mod v0.18.0 // indirect
-	golang.org/x/net v0.26.0 // indirect
-	golang.org/x/sys v0.21.0 // indirect
+	golang.org/x/net v0.27.0 // indirect
+	golang.org/x/sys v0.22.0 // indirect
 	golang.org/x/text v0.16.0 // indirect
 	golang.org/x/tools v0.22.0 // indirect
 	golang.zx2c4.com/wintun v0.0.0-20230126152724-0fa3db229ce2 // indirect
