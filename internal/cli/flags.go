@@ -9,7 +9,7 @@ import (
 var (
 	LocalAddr            string
 	ListenType           constant.RelayType
-	TCPRemoteAddr        string
+	RemoteAddr           string
 	TransportType        constant.RelayType
 	ConfigPath           string
 	WebPort              int
@@ -40,7 +40,7 @@ var RootFlags = []cli.Flag{
 		Name:        "r,remote",
 		Usage:       "转发地址，例如 0.0.0.0:5201，通过 ws 隧道转发时应为 ws://0.0.0.0:2443",
 		EnvVars:     []string{"EHCO_REMOTE_ADDR"},
-		Destination: &TCPRemoteAddr,
+		Destination: &RemoteAddr,
 	},
 	&cli.StringFlag{
 		Name:        "tt,transport_type",

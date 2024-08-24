@@ -38,7 +38,7 @@ func newBaseRelayServer(cfg *conf.Config, cmgr cmgr.Cmgr) (*BaseRelayServer, err
 		relayer: relayer,
 		cfg:     cfg,
 		cmgr:    cmgr,
-		remotes: cfg.ToTCPRemotes(),
+		remotes: cfg.ToRemotesLB(),
 		l:       zap.S().Named(cfg.GetLoggerName()),
 	}, nil
 }
@@ -98,10 +98,10 @@ func (b *BaseRelayServer) sniffAndBlockProtocol(c net.Conn) (net.Conn, error) {
 
 	buffer := buf.NewPacket()
 
-	ctx, cancel := context.WithTimeout(context.Background(), constant.SniffTimeOut)
+	ctx, cancel := context.WithTimeout(context.Background(), b.cfg.Options.SniffTimeout)
 	defer cancel()
 
-	sniffMetadata, err := sniff.PeekStream(ctx, c, buffer, constant.SniffTimeOut, sniff.TLSClientHello, sniff.HTTPHost)
+	sniffMetadata, err := sniff.PeekStream(ctx, c, buffer, b.cfg.Options.SniffTimeout, sniff.TLSClientHello, sniff.HTTPHost)
 	if err != nil {
 		b.l.Debugf("sniff error: %s", err)
 		return c, nil
@@ -137,6 +137,7 @@ func (b *BaseRelayServer) handleRelayConn(c, rc net.Conn, remote *lb.Node, connT
 		conn.WithRemote(remote),
 		conn.WithConnType(connType),
 		conn.WithRelayLabel(b.cfg.Label),
+		conn.WithRelayOptions(b.cfg.Options),
 		conn.WithHandshakeDuration(remote.HandShakeDuration),
 	}
 	relayConn := conn.NewRelayConn(c, rc, opts...)
@@ -161,7 +162,7 @@ func (b *BaseRelayServer) ListenAndServe(ctx context.Context) error {
 }
 
 func NewNetDialer(cfg *conf.Config) *net.Dialer {
-	dialer := &net.Dialer{Timeout: constant.DialTimeOut}
+	dialer := &net.Dialer{Timeout: constant.DefaultDialTimeOut}
 	dialer.SetMultipathTCP(cfg.Options.EnableMultipathTCP)
 	return dialer
 }

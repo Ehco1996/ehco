@@ -9,7 +9,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/Ehco1996/ehco/internal/constant"
+	"github.com/Ehco1996/ehco/internal/relay/conf"
 	"github.com/Ehco1996/ehco/pkg/buffer"
 )
 
@@ -33,7 +33,7 @@ func (c *uc) Read(b []byte) (int, error) {
 		c.lastActivity.Store(time.Now())
 		return n, nil
 	default:
-		if time.Since(c.lastActivity.Load().(time.Time)) > constant.IdleTimeOut {
+		if time.Since(c.lastActivity.Load().(time.Time)) > c.listener.cfg.Options.IdleTimeout {
 			return 0, io.EOF
 		}
 		return 0, nil
@@ -75,6 +75,7 @@ func (c *uc) SetWriteDeadline(t time.Time) error {
 }
 
 type UDPListener struct {
+	cfg        *conf.Config
 	listenAddr *net.UDPAddr
 	listenConn *net.UDPConn
 
@@ -90,8 +91,8 @@ type UDPListener struct {
 	closed atomic.Bool
 }
 
-func NewUDPListener(ctx context.Context, addr string) (*UDPListener, error) {
-	udpAddr, err := net.ResolveUDPAddr("udp", addr)
+func NewUDPListener(ctx context.Context, cfg *conf.Config) (*UDPListener, error) {
+	udpAddr, err := net.ResolveUDPAddr("udp", cfg.Listen)
 	if err != nil {
 		return nil, err
 	}
@@ -104,6 +105,7 @@ func NewUDPListener(ctx context.Context, addr string) (*UDPListener, error) {
 	ctx, cancel := context.WithCancel(ctx)
 
 	l := &UDPListener{
+		cfg:        cfg,
 		listenConn: conn,
 		listenAddr: udpAddr,
 
