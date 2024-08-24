@@ -38,8 +38,8 @@ func loadConfig() (cfg *config.Config, err error) {
 				},
 			},
 		}
-		if TCPRemoteAddr != "" {
-			cfg.RelayConfigs[0].TCPRemotes = []string{TCPRemoteAddr}
+		if RemoteAddr != "" {
+			cfg.RelayConfigs[0].Remotes = []string{RemoteAddr}
 		}
 		if err := cfg.Adjust(); err != nil {
 			return nil, err

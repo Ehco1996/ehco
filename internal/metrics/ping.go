@@ -64,7 +64,7 @@ func NewPingGroup(cfg *config.Config) *PingGroup {
 	// parse addr from rule
 	for _, relayCfg := range cfg.RelayConfigs {
 		// NOTE for (https/ws/wss)://xxx.com -> xxx.com
-		for _, remote := range relayCfg.TCPRemotes {
+		for _, remote := range relayCfg.Remotes {
 			addr, err := extractHost(remote)
 			if err != nil {
 				pg.logger.Error("try parse host error", zap.Error(err))

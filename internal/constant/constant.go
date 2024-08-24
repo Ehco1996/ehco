@@ -5,11 +5,6 @@ import "time"
 type RelayType string
 
 var (
-	// allow change in test
-	// TODO Set to Relay Config
-	ReadTimeOut = 5 * time.Second
-	IdleTimeOut = 30 * time.Second
-
 	Version     = "1.1.5-dev"
 	GitBranch   string
 	GitRevision string
@@ -18,9 +13,10 @@ var (
 )
 
 const (
-	DialTimeOut = 3 * time.Second
-
-	SniffTimeOut = 300 * time.Millisecond
+	DefaultDialTimeOut  = 3 * time.Second
+	DefaultReadTimeOut  = 5 * time.Second
+	DefaultIdleTimeOut  = 10 * time.Second
+	DefaultSniffTimeOut = 300 * time.Millisecond
 
 	// todo,support config in relay config
 	BUFFER_POOL_SIZE = 1024      // support 512 connections
