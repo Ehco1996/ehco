@@ -101,8 +101,29 @@ func (r *Config) GetWSRemoteAddr(baseAddr string) (string, error) {
 	return addr, nil
 }
 
+func (r *Config) Adjust() error {
+	if r.Label == "" {
+		r.Label = r.DefaultLabel()
+		zap.S().Debugf("label is empty, set default label:%s", r.Label)
+	}
+	if len(r.Remotes) == 0 && len(r.TCPRemotes) != 0 {
+		zap.S().Warnf("tcp remotes is deprecated, use remotes instead")
+		r.Remotes = r.TCPRemotes
+	}
+
+	if r.Options == nil {
+		r.Options = newDefaultOptions()
+	} else {
+		r.Options.DialTimeout = getDuration(r.Options.DialTimeoutSec, r.Options.DialTimeout)
+		r.Options.IdleTimeout = getDuration(r.Options.IdleTimeoutSec, r.Options.IdleTimeout)
+		r.Options.ReadTimeout = getDuration(r.Options.ReadTimeoutSec, r.Options.ReadTimeout)
+		r.Options.SniffTimeout = getDuration(r.Options.SniffTimeoutSec, r.Options.SniffTimeout)
+	}
+	return nil
+}
+
 func (r *Config) Validate() error {
-	if r.Adjust() != nil {
+	if err := r.Adjust(); err != nil {
 		return errors.New("adjust config failed")
 	}
 
@@ -111,18 +132,18 @@ func (r *Config) Validate() error {
 	}
 
 	if r.Listen == "" {
-		return fmt.Errorf("invalid listen:%s", r.Listen)
+		return fmt.Errorf("invalid listen: %s", r.Listen)
 	}
 
 	for _, addr := range r.Remotes {
 		if addr == "" {
-			return fmt.Errorf("invalid tcp remote addr:%s", addr)
+			return fmt.Errorf("invalid remote addr: %s", addr)
 		}
 	}
 
 	for _, protocol := range r.Options.BlockedProtocols {
 		if protocol != ProtocolHTTP && protocol != ProtocolTLS {
-			return fmt.Errorf("invalid blocked protocol:%s", protocol)
+			return fmt.Errorf("invalid blocked protocol: %s", protocol)
 		}
 	}
 	return nil
@@ -166,45 +187,6 @@ func (r *Config) DefaultLabel() string {
 	return defaultLabel
 }
 
-func (r *Config) Adjust() error {
-	if r.Label == "" {
-		r.Label = r.DefaultLabel()
-		zap.S().Debugf("label is empty, set default label:%s", r.Label)
-	}
-	if len(r.Remotes) == 0 && len(r.TCPRemotes) != 0 {
-		zap.S().Warnf("tcp remotes is deprecated, use remotes instead")
-		r.Remotes = r.TCPRemotes
-	}
-
-	if r.Options == nil {
-		r.Options = &Options{
-			WSConfig:           &WSConfig{},
-			EnableMultipathTCP: true, // default enable multipath tcp
-		}
-	}
-	if r.Options.DialTimeoutSec == 0 {
-		r.Options.DialTimeout = constant.DefaultDialTimeOut
-	} else {
-		r.Options.DialTimeout = time.Duration(r.Options.DialTimeoutSec) * time.Second
-	}
-	if r.Options.IdleTimeoutSec == 0 {
-		r.Options.IdleTimeout = constant.DefaultIdleTimeOut
-	} else {
-		r.Options.IdleTimeout = time.Duration(r.Options.IdleTimeoutSec) * time.Second
-	}
-	if r.Options.ReadTimeoutSec == 0 {
-		r.Options.ReadTimeout = constant.DefaultReadTimeOut
-	} else {
-		r.Options.ReadTimeout = time.Duration(r.Options.ReadTimeoutSec) * time.Second
-	}
-	if r.Options.SniffTimeoutSec == 0 {
-		r.Options.SniffTimeout = constant.DefaultSniffTimeOut
-	} else {
-		r.Options.SniffTimeout = time.Duration(r.Options.SniffTimeoutSec) * time.Second
-	}
-	return nil
-}
-
 func (r *Config) ToRemotesLB() lb.RoundRobin {
 	tcpNodeList := make([]*lb.Node, len(r.Remotes))
 	for idx, addr := range r.Remotes {
@@ -233,4 +215,22 @@ func (r *Config) validateType() error {
 		return fmt.Errorf("invalid transport type:%s", r.TransportType)
 	}
 	return nil
+}
+
+func getDuration(seconds int, defaultDuration time.Duration) time.Duration {
+	if seconds > 0 {
+		return time.Duration(seconds) * time.Second
+	}
+	return defaultDuration
+}
+
+func newDefaultOptions() *Options {
+	return &Options{
+		EnableMultipathTCP: true,
+		WSConfig:           &WSConfig{},
+		DialTimeout:        constant.DefaultDialTimeOut,
+		IdleTimeout:        constant.DefaultIdleTimeOut,
+		ReadTimeout:        constant.DefaultReadTimeOut,
+		SniffTimeout:       constant.DefaultSniffTimeOut,
+	}
 }
