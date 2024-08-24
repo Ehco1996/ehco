@@ -17,6 +17,14 @@ import (
 	"go.uber.org/zap"
 )
 
+const (
+	shortHashLength = 7
+)
+
+var (
+	ErrIdleTimeout = errors.New("connection closed due to idle timeout")
+)
+
 // RelayConn is the interface that represents a relay connection.
 // it contains two connections: clientConn and remoteConn
 // clientConn is the connection from the client to the relay server
@@ -103,7 +111,12 @@ func WithRelayOptions(opts *conf.Options) RelayConnOption {
 }
 
 func (rc *relayConnImpl) Transport() error {
-	defer rc.Close() // nolint: errcheck
+	defer func() {
+		err := rc.Close()
+		if err != nil {
+			rc.l.Errorf("error closing relay connection: %s", err.Error())
+		}
+	}()
 	rc.l = rc.l.Named(shortHashSHA256(rc.GetFlow()))
 	rc.l.Debugf("transport start")
 	c1 := newInnerConn(rc.clientConn, rc)
@@ -124,7 +137,7 @@ func (rc *relayConnImpl) Close() error {
 	err1 := rc.clientConn.Close()
 	err2 := rc.remoteConn.Close()
 	rc.Closed = true
-	return combineErrorsAndMuteEOF(err1, err2)
+	return combineErrorsAndMuteIDLE(err1, err2)
 }
 
 // functions that for web ui
@@ -151,11 +164,11 @@ func (rc *relayConnImpl) GetConnType() string {
 	return rc.ConnType
 }
 
-func combineErrorsAndMuteEOF(err1, err2 error) error {
-	if err1 == io.EOF {
+func combineErrorsAndMuteIDLE(err1, err2 error) error {
+	if err1 == ErrIdleTimeout {
 		err1 = nil
 	}
-	if err2 == io.EOF {
+	if err2 == ErrIdleTimeout {
 		return nil
 	}
 	if err1 != nil && err2 != nil {
@@ -231,9 +244,8 @@ func (c *innerConn) Read(p []byte) (n int, err error) {
 			if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
 				since := time.Since(c.lastActive)
 				if since > c.rc.Options.IdleTimeout {
-					c.l.Debugf("Read idle, close remote: %s, since: %s lastActive: %s",
-						c.rc.remote.Label, since, c.lastActive)
-					return 0, err
+					c.l.Debugf("Read idle, close remote: %s", c.rc.remote.Label)
+					return 0, ErrIdleTimeout
 				}
 				continue
 			}
@@ -274,7 +286,7 @@ func shortHashSHA256(input string) string {
 	hasher := sha256.New()
 	hasher.Write([]byte(input))
 	hash := hasher.Sum(nil)
-	return hex.EncodeToString(hash)[:7]
+	return hex.EncodeToString(hash)[:shortHashLength]
 }
 
 func copyConn(conn1, conn2 *innerConn) error {
@@ -298,5 +310,5 @@ func copyConn(conn1, conn2 *innerConn) error {
 	err2 := <-errCH
 	_ = conn1.CloseRead()
 	_ = conn2.CloseRead()
-	return combineErrorsAndMuteEOF(err, err2)
+	return combineErrorsAndMuteIDLE(err, err2)
 }

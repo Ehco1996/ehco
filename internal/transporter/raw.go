@@ -110,6 +110,10 @@ func (s *RawServer) listenUDP(ctx context.Context) error {
 	for {
 		c, err := s.udpLis.Accept()
 		if err != nil {
+			// Check if the error is due to context cancellation
+			if errors.Is(err, context.Canceled) {
+				return nil // Return without logging the error
+			}
 			s.l.Errorf("UDP accept error: %v", err)
 			return err
 		}

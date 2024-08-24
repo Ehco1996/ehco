@@ -56,7 +56,7 @@ func TestMain(m *testing.M) {
 	// Cleanup
 	echoServer.Stop()
 	for _, server := range relayServers {
-		server.Close()
+		server.Stop()
 	}
 
 	os.Exit(code)

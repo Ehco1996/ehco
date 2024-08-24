@@ -57,7 +57,7 @@ func (s *Server) startOneRelay(ctx context.Context, r *Relay) {
 }
 
 func (s *Server) stopOneRelay(r *Relay) {
-	r.Close()
+	_ = r.Stop()
 	s.relayM.Delete(r.UniqueID())
 }
 
@@ -85,23 +85,20 @@ func (s *Server) Start(ctx context.Context) error {
 		return err
 	case <-ctx.Done():
 		s.l.Info("ctx cancelled start to stop all relay servers")
-		s.relayM.Range(func(key, value interface{}) bool {
-			r := value.(*Relay)
-			r.Close()
-			return true
-		})
-		return nil
+		return s.Stop()
 	}
 }
 
 func (s *Server) Stop() error {
-	s.l.Info("relay server stop now")
+	var err error
 	s.relayM.Range(func(key, value interface{}) bool {
 		r := value.(*Relay)
-		r.Close()
+		if e := r.Stop(); e != nil {
+			err = errors.Join(err, e)
+		}
 		return true
 	})
-	return nil
+	return err
 }
 
 func (s *Server) TriggerReload() {

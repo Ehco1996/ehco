@@ -44,9 +44,6 @@ func (r *Relay) ListenAndServe(ctx context.Context) error {
 	return <-errCh
 }
 
-func (r *Relay) Close() {
-	r.l.Infof("Close Relay Server:%s", r.cfg.DefaultLabel())
-	if err := r.relayServer.Close(); err != nil {
-		r.l.Errorf(err.Error())
-	}
+func (r *Relay) Stop() error {
+	return r.relayServer.Close()
 }
