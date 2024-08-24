@@ -8,18 +8,23 @@ import (
 	"time"
 
 	"github.com/Ehco1996/ehco/internal/lb"
+	"github.com/Ehco1996/ehco/internal/relay/conf"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestInnerConn_ReadWrite(t *testing.T) {
 	testData := []byte("hello")
+	testOptions := conf.Options{
+		IdleTimeout: time.Second,
+		ReadTimeout: time.Second,
+	}
 
 	clientConn, serverConn := net.Pipe()
 	clientConn.SetDeadline(time.Now().Add(1 * time.Second))
 	serverConn.SetDeadline(time.Now().Add(1 * time.Second))
 	defer clientConn.Close()
 	defer serverConn.Close()
-	rc := relayConnImpl{Stats: &Stats{}, remote: &lb.Node{Label: "client"}}
+	rc := relayConnImpl{Stats: &Stats{}, remote: &lb.Node{Label: "client"}, Options: &testOptions}
 	innerC := newInnerConn(clientConn, &rc)
 	errChan := make(chan error, 1)
 	go func() {
@@ -94,8 +99,8 @@ func TestCopyTCPConn(t *testing.T) {
 	remoteConn, err := net.Dial("tcp", echoServer.Addr().String())
 	assert.NoError(t, err)
 	defer remoteConn.Close()
-
-	rc := relayConnImpl{Stats: &Stats{}, remote: &lb.Node{Label: "client"}}
+	testOptions := conf.Options{IdleTimeout: time.Second, ReadTimeout: time.Second}
+	rc := relayConnImpl{Stats: &Stats{}, remote: &lb.Node{Label: "client"}, Options: &testOptions}
 	c1 := newInnerConn(clientConn, &rc)
 	c2 := newInnerConn(remoteConn, &rc)
 
@@ -155,7 +160,8 @@ func TestCopyUDPConn(t *testing.T) {
 	assert.NoError(t, err)
 	defer remoteConn.Close()
 
-	rc := relayConnImpl{Stats: &Stats{}, remote: &lb.Node{Label: "client"}}
+	testOptions := conf.Options{IdleTimeout: time.Second, ReadTimeout: time.Second}
+	rc := relayConnImpl{Stats: &Stats{}, remote: &lb.Node{Label: "client"}, Options: &testOptions}
 	c1 := newInnerConn(clientConn, &rc)
 	c2 := newInnerConn(remoteConn, &rc)
 

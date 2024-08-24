@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"time"
 
 	"github.com/Ehco1996/ehco/internal/constant"
 	"github.com/Ehco1996/ehco/internal/lb"
@@ -31,13 +32,27 @@ func (w *WSConfig) Clone() *WSConfig {
 }
 
 type Options struct {
-	WSConfig           *WSConfig `json:"ws_config,omitempty"`
-	EnableUDP          bool      `json:"enable_udp,omitempty"`
-	EnableMultipathTCP bool      `json:"enable_multipath_tcp,omitempty"`
+	EnableUDP          bool `json:"enable_udp,omitempty"`
+	EnableMultipathTCP bool `json:"enable_multipath_tcp,omitempty"`
 
+	// connection limit
 	MaxConnection    int      `json:"max_connection,omitempty"`
 	BlockedProtocols []string `json:"blocked_protocols,omitempty"`
 	MaxReadRateKbps  int64    `json:"max_read_rate_kbps,omitempty"`
+
+	// ws related
+	WSConfig *WSConfig `json:"ws_config,omitempty"`
+
+	DialTimeoutSec  int `json:"dial_timeout_sec,omitempty"`
+	IdleTimeoutSec  int `json:"idle_timeout_sec,omitempty"`
+	ReadTimeoutSec  int `json:"read_timeout_sec,omitempty"`
+	SniffTimeoutSec int `json:"sniff_timeout_sec,omitempty"`
+
+	// timeout in duration
+	DialTimeout  time.Duration
+	IdleTimeout  time.Duration
+	ReadTimeout  time.Duration
+	SniffTimeout time.Duration
 }
 
 func (o *Options) Clone() *Options {
@@ -60,9 +75,12 @@ type Config struct {
 	Listen        string             `json:"listen"`
 	ListenType    constant.RelayType `json:"listen_type"`
 	TransportType constant.RelayType `json:"transport_type"`
-	TCPRemotes    []string           `json:"tcp_remotes"` // TODO rename to remotes
+	Remotes       []string           `json:"remotes"`
 
 	Options *Options `json:"options,omitempty"`
+
+	// deprecated
+	TCPRemotes []string `json:"tcp_remotes"`
 }
 
 func (r *Config) GetWSHandShakePath() string {
@@ -83,10 +101,6 @@ func (r *Config) GetWSRemoteAddr(baseAddr string) (string, error) {
 	return addr, nil
 }
 
-func (r *Config) GetTCPRemotes() string {
-	return fmt.Sprintf("%v", r.TCPRemotes)
-}
-
 func (r *Config) Validate() error {
 	if r.Adjust() != nil {
 		return errors.New("adjust config failed")
@@ -100,7 +114,7 @@ func (r *Config) Validate() error {
 		return fmt.Errorf("invalid listen:%s", r.Listen)
 	}
 
-	for _, addr := range r.TCPRemotes {
+	for _, addr := range r.Remotes {
 		if addr == "" {
 			return fmt.Errorf("invalid tcp remote addr:%s", addr)
 		}
@@ -122,8 +136,8 @@ func (r *Config) Clone() *Config {
 		Label:         r.Label,
 		Options:       r.Options.Clone(),
 	}
-	new.TCPRemotes = make([]string, len(r.TCPRemotes))
-	copy(new.TCPRemotes, r.TCPRemotes)
+	new.Remotes = make([]string, len(r.Remotes))
+	copy(new.Remotes, r.Remotes)
 	return new
 }
 
@@ -134,11 +148,11 @@ func (r *Config) Different(new *Config) bool {
 		r.Label != new.Label {
 		return true
 	}
-	if len(r.TCPRemotes) != len(new.TCPRemotes) {
+	if len(r.Remotes) != len(new.Remotes) {
 		return true
 	}
-	for i, addr := range r.TCPRemotes {
-		if addr != new.TCPRemotes[i] {
+	for i, addr := range r.Remotes {
+		if addr != new.Remotes[i] {
 			return true
 		}
 	}
@@ -147,8 +161,8 @@ func (r *Config) Different(new *Config) bool {
 
 // todo make this shorter and more readable
 func (r *Config) DefaultLabel() string {
-	defaultLabel := fmt.Sprintf("<At=%s To=%s TP=%s>",
-		r.Listen, r.TCPRemotes, r.TransportType)
+	defaultLabel := fmt.Sprintf("<At=%s To=%s By=%s>",
+		r.Listen, r.Remotes, r.TransportType)
 	return defaultLabel
 }
 
@@ -157,18 +171,43 @@ func (r *Config) Adjust() error {
 		r.Label = r.DefaultLabel()
 		zap.S().Debugf("label is empty, set default label:%s", r.Label)
 	}
+	if len(r.Remotes) == 0 && len(r.TCPRemotes) != 0 {
+		zap.S().Warnf("tcp remotes is deprecated, use remotes instead")
+		r.Remotes = r.TCPRemotes
+	}
+
 	if r.Options == nil {
 		r.Options = &Options{
 			WSConfig:           &WSConfig{},
 			EnableMultipathTCP: true, // default enable multipath tcp
 		}
 	}
+	if r.Options.DialTimeoutSec == 0 {
+		r.Options.DialTimeout = constant.DefaultDialTimeOut
+	} else {
+		r.Options.DialTimeout = time.Duration(r.Options.DialTimeoutSec) * time.Second
+	}
+	if r.Options.IdleTimeoutSec == 0 {
+		r.Options.IdleTimeout = constant.DefaultIdleTimeOut
+	} else {
+		r.Options.IdleTimeout = time.Duration(r.Options.IdleTimeoutSec) * time.Second
+	}
+	if r.Options.ReadTimeoutSec == 0 {
+		r.Options.ReadTimeout = constant.DefaultReadTimeOut
+	} else {
+		r.Options.ReadTimeout = time.Duration(r.Options.ReadTimeoutSec) * time.Second
+	}
+	if r.Options.SniffTimeoutSec == 0 {
+		r.Options.SniffTimeout = constant.DefaultSniffTimeOut
+	} else {
+		r.Options.SniffTimeout = time.Duration(r.Options.SniffTimeoutSec) * time.Second
+	}
 	return nil
 }
 
-func (r *Config) ToTCPRemotes() lb.RoundRobin {
-	tcpNodeList := make([]*lb.Node, len(r.TCPRemotes))
-	for idx, addr := range r.TCPRemotes {
+func (r *Config) ToRemotesLB() lb.RoundRobin {
+	tcpNodeList := make([]*lb.Node, len(r.Remotes))
+	for idx, addr := range r.Remotes {
 		tcpNodeList[idx] = &lb.Node{
 			Address: addr,
 			Label:   fmt.Sprintf("%s-%s", r.Label, addr),

@@ -174,10 +174,10 @@ func (c *ClashSub) ToRelayConfigs(listenHost string) ([]*relay_cfg.Config, error
 		// add other proxies address in group to relay config
 		for _, proxy := range proxies[1:] {
 			remote := net.JoinHostPort(proxy.rawServer, proxy.rawPort)
-			if strInArray(remote, rc.TCPRemotes) {
+			if strInArray(remote, rc.Remotes) {
 				continue
 			}
-			rc.TCPRemotes = append(rc.TCPRemotes, remote)
+			rc.Remotes = append(rc.Remotes, remote)
 			if proxy.UDP {
 				rc.Options = &relay_cfg.Options{
 					EnableUDP: true,

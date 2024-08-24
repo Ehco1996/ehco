@@ -40,11 +40,6 @@ const (
 
 func TestMain(m *testing.M) {
 	// Setup
-
-	// change the idle timeout to 1 second to make connection close faster in test
-	constant.IdleTimeOut = time.Second
-	constant.ReadTimeOut = time.Second
-
 	_ = log.InitGlobalLogger("debug")
 	_ = tls.InitTlsCfg()
 
@@ -68,59 +63,60 @@ func TestMain(m *testing.M) {
 }
 
 func startRelayServers() []*relay.Relay {
+	options := conf.Options{
+		EnableUDP:      true,
+		IdleTimeoutSec: 1,
+		ReadTimeoutSec: 1,
+	}
 	cfg := config.Config{
 		RelayConfigs: []*conf.Config{
 			// raw
 			{
+				Label:         "raw",
 				Listen:        RAW_LISTEN,
 				ListenType:    constant.RelayTypeRaw,
-				TCPRemotes:    []string{ECHO_SERVER},
+				Remotes:       []string{ECHO_SERVER},
 				TransportType: constant.RelayTypeRaw,
-				Options: &conf.Options{
-					EnableUDP: true,
-				},
+				Options:       &options,
 			},
 			// ws
 			{
+				Label:         "ws-in",
 				Listen:        WS_LISTEN,
 				ListenType:    constant.RelayTypeRaw,
-				TCPRemotes:    []string{WS_REMOTE},
+				Remotes:       []string{WS_REMOTE},
 				TransportType: constant.RelayTypeWS,
-				Options: &conf.Options{
-					EnableUDP: true,
-				},
+				Options:       &options,
 			},
 			{
+				Label:         "ws-out",
 				Listen:        WS_SERVER,
 				ListenType:    constant.RelayTypeWS,
-				TCPRemotes:    []string{ECHO_SERVER},
+				Remotes:       []string{ECHO_SERVER},
 				TransportType: constant.RelayTypeRaw,
-				Options: &conf.Options{
-					EnableUDP: true,
-				},
+				Options:       &options,
 			},
 
 			// wss
 			{
+				Label:         "wss-in",
 				Listen:        WSS_LISTEN,
 				ListenType:    constant.RelayTypeRaw,
-				TCPRemotes:    []string{WSS_REMOTE},
+				Remotes:       []string{WSS_REMOTE},
 				TransportType: constant.RelayTypeWSS,
-				Options: &conf.Options{
-					EnableUDP: true,
-				},
+				Options:       &options,
 			},
 			{
+				Label:         "wss-out",
 				Listen:        WSS_SERVER,
 				ListenType:    constant.RelayTypeWSS,
-				TCPRemotes:    []string{ECHO_SERVER},
+				Remotes:       []string{ECHO_SERVER},
 				TransportType: constant.RelayTypeRaw,
-				Options: &conf.Options{
-					EnableUDP: true,
-				},
+				Options:       &options,
 			},
 		},
 	}
+	cfg.Adjust()
 
 	var servers []*relay.Relay
 	for _, c := range cfg.RelayConfigs {
@@ -252,6 +248,6 @@ func testUDPRelay(t *testing.T, address string, concurrent bool, concurrency ...
 }
 
 func TestRelayIdleTimeout(t *testing.T) {
-	err := echo.EchoTcpMsgLong([]byte("hello"), time.Second, RAW_LISTEN)
+	err := echo.EchoTcpMsgLong([]byte("hello"), time.Second*2, RAW_LISTEN)
 	require.Error(t, err, "Connection should be rejected")
 }

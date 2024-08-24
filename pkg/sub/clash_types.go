@@ -136,7 +136,7 @@ func (p *Proxies) ToRelayConfig(listenHost string, listenPort string, newName st
 		ListenType:    constant.RelayTypeRaw,
 		TransportType: constant.RelayTypeRaw,
 		Listen:        net.JoinHostPort(listenHost, listenPort),
-		TCPRemotes:    []string{remoteAddr},
+		Remotes:       []string{remoteAddr},
 	}
 	if p.UDP {
 		r.Options = &relay_cfg.Options{
