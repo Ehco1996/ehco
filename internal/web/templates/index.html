@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
     <head>
+        <title>Ehco Web</title>
         <meta charset="UTF-8" />
         <meta name="description" content="ehco web" />
         <meta name="keywords" content="ehco-relay" />
@@ -13,9 +14,8 @@
             rel="stylesheet"
             href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css"
         />
-        <title>Ehco</title>
-        <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
-        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
     </head>
 
     <body>
@@ -335,30 +335,45 @@
                         label: "Memory",
                         borderColor: "rgb(153, 102, 255)",
                     }),
-                    connections: initChart("connectionsChart", "line", [
-                        {
-                            label: "TCP",
-                            borderColor: "rgb(255, 159, 64)",
-                        },
-                        {
-                            label: "UDP",
-                            borderColor: "rgb(54, 162, 235)",
-                        },
-                    ]),
-                    ping: initChart("pingChart", "line", [
-                        {
-                            label: "Ping to 1.1.1.1",
-                            borderColor: "rgb(255, 99, 132)",
-                        },
-                        {
-                            label: "Ping to 8.8.8.8",
-                            borderColor: "rgb(75, 192, 192)",
-                        },
-                    ]),
+                    connections: initChart(
+                        "connectionsChart",
+                        "line",
+                        [
+                            {
+                                label: "TCP",
+                                borderColor: "rgb(255, 159, 64)",
+                            },
+                            {
+                                label: "UDP",
+                                borderColor: "rgb(54, 162, 235)",
+                            },
+                        ],
+                        (legendPosition = "right")
+                    ),
+                    ping: initChart(
+                        "pingChart",
+                        "line",
+                        [
+                            {
+                                label: "Ping to 1.1.1.1",
+                                borderColor: "rgb(255, 99, 132)",
+                            },
+                            {
+                                label: "Ping to 8.8.8.8",
+                                borderColor: "rgb(75, 192, 192)",
+                            },
+                        ],
+                        (legendPosition = "right")
+                    ),
                 };
 
                 // Function to initialize a chart
-                function initChart(canvasId, type, datasets) {
+                function initChart(
+                    canvasId,
+                    type,
+                    datasets,
+                    legendPosition = "top"
+                ) {
                     const ctx = document
                         .getElementById(canvasId)
                         .getContext("2d");
@@ -371,17 +386,26 @@
                               }))
                             : [{ ...datasets, data: [] }],
                     };
-                    return new Chart(ctx, { type, data });
+                    return new Chart(ctx, {
+                        type,
+                        data,
+                        options: {
+                            plugins: {
+                                legend: {
+                                    position: legendPosition,
+                                },
+                            },
+                        },
+                    });
                 }
 
-                // Attach click event to dropdown items
                 // Attach click event to dropdown items
                 $(".dropdown-item").click(function () {
                     const timeRange = $(this).data("time");
                     const cpuData = generateMockData(timeRange, 1);
                     const memoryData = generateMockData(timeRange, 1);
                     const connectionsData = generateMockData(timeRange, 2);
-                    const pingData = generateMockData(timeRange, 2);
+                    const pingData = generateMockData(timeRange, 20);
 
                     // Update datasets and labels
                     updateChart(charts.cpu, cpuData.datasets, cpuData.labels);
@@ -402,23 +426,6 @@
                     );
                 });
 
-                // Function to update chart data
-                function updateChart(chart, newData, labels) {
-                    if (!Array.isArray(newData[0])) {
-                        // Single dataset chart
-                        chart.data.datasets.forEach((dataset, index) => {
-                            dataset.data = newData;
-                        });
-                    } else {
-                        // Multi-dataset chart
-                        chart.data.datasets.forEach((dataset, index) => {
-                            dataset.data = newData[index];
-                        });
-                    }
-                    chart.data.labels = labels;
-                    chart.update();
-                }
-                // Function to update chart data
                 // Function to update chart data
                 function updateChart(chart, newData, labels) {
                     if (!newData || !labels) {
