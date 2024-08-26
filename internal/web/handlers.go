@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/Ehco1996/ehco/internal/cmgr"
 	"github.com/Ehco1996/ehco/internal/constant"
 	"github.com/labstack/echo/v4"
 	"go.uber.org/zap"
@@ -119,4 +120,21 @@ func (s *Server) ListRules(c echo.Context) error {
 	return c.Render(http.StatusOK, "rule_list.html", map[string]interface{}{
 		"Configs": s.cfg.RelayConfigs,
 	})
+}
+
+func (s *Server) GetNodeMetrics(c echo.Context) error {
+	req := &cmgr.QueryNodeMetricsReq{TimeRange: c.QueryParam("time_range")}
+	num := c.QueryParam("num")
+	if num != "" {
+		n, err := strconv.Atoi(num)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+		}
+		req.Num = n
+	}
+	metrics, err := s.connMgr.QueryNodeMetrics(c.Request().Context(), req)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
+	return c.JSON(http.StatusOK, metrics)
 }

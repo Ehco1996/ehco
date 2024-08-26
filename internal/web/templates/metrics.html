@@ -1,260 +1,259 @@
 <div class="card" id="metrics-card">
-  <header class="card-header is-flex is-flex-wrap-wrap">
-    <p class="card-header-title has-text-centered">Metrics</p>
-    <div class="card-header-icon is-flex-grow-1 is-flex is-justify-content-flex-end">
-      <div class="dropdown is-hoverable">
-        <div class="dropdown-trigger">
-          <button class="button" aria-haspopup="true" aria-controls="dropdown-menu">
-            <span class="icon">
-              <i class="fas fa-clock"></i>
-            </span>
-            <span>Time</span>
-            <span class="icon is-small">
-              <i class="fas fa-angle-down" aria-hidden="true"></i>
-            </span>
-          </button>
+    <header class="card-header is-flex is-flex-wrap-wrap">
+        <p class="card-header-title has-text-centered">Node Metrics</p>
+        <div class="card-header-icon is-flex-grow-1 is-flex is-justify-content-flex-end">
+            <div class="dropdown is-hoverable">
+                <div class="dropdown-trigger">
+                    <button class="button" aria-haspopup="true" aria-controls="dropdown-menu">
+                        <span class="icon">
+                            <i class="fas fa-clock"></i>
+                        </span>
+                        <span>Time</span>
+                        <span class="icon is-small">
+                            <i class="fas fa-angle-down" aria-hidden="true"></i>
+                        </span>
+                    </button>
+                </div>
+                <div class="dropdown-menu" id="dropdown-menu" role="menu">
+                    <div class="dropdown-content">
+                        <a href="#" class="dropdown-item" data-time="15min">Last 15 Min</a>
+                        <a href="#" class="dropdown-item" data-time="30min">Last 30 Min</a>
+                        <a href="#" class="dropdown-item" data-time="1h">Last 1 hour</a>
+                        <a href="#" class="dropdown-item" data-time="6h">Last 6 hours</a>
+                        <a href="#" class="dropdown-item" data-time="12h">Last 12 hours</a>
+                        <a href="#" class="dropdown-item" data-time="24h">Last 24 hours</a>
+                    </div>
+                </div>
+            </div>
         </div>
-        <div class="dropdown-menu" id="dropdown-menu" role="menu">
-          <div class="dropdown-content">
-            <a href="#" class="dropdown-item" data-time="1h">Last 1 hour</a>
-            <a href="#" class="dropdown-item" data-time="6h">Last 6 hours</a>
-            <a href="#" class="dropdown-item" data-time="12h">Last 12 hours</a>
-            <a href="#" class="dropdown-item" data-time="24h">Last 24 hours</a>
-          </div>
+    </header>
+    <div class="card-content">
+        <div class="content">
+            <div class="columns is-multiline">
+                <div class="column is-4">
+                    <h2 class="subtitle is-5">CPU</h2>
+                    <canvas id="cpuChart"></canvas>
+                </div>
+                <div class="column is-4">
+                    <h2 class="subtitle is-5">Memory</h2>
+                    <canvas id="memoryChart"></canvas>
+                </div>
+                <div class="column is-4">
+                    <h2 class="subtitle is-5">Disk</h2>
+                    <canvas id="diskChart"></canvas>
+                </div>
+
+                <div class="column is-6">
+                    <h2 class="subtitle is-5">Network</h2>
+                    <canvas id="networkChart"></canvas>
+                </div>
+                <div class="column is-6">
+                    <h2 class="subtitle is-5">Ping</h2>
+                    <canvas id="pingChart"></canvas>
+                </div>
+            </div>
         </div>
-      </div>
     </div>
-  </header>
-  <div class="card-content">
-    <div class="content">
-      <div class="columns is-multiline">
-        <div class="column is-4">
-          <h2 class="subtitle is-5">CPU</h2>
-          <canvas id="cpuChart"></canvas>
-        </div>
-        <div class="column is-4">
-          <h2 class="subtitle is-5">Memory</h2>
-          <canvas id="memoryChart"></canvas>
-        </div>
-        <div class="column is-4">
-          <h2 class="subtitle is-5">Disk</h2>
-          <canvas id="diskChart"></canvas>
-        </div>
 
-        <div class="column is-6">
-          <h2 class="subtitle is-5">Network</h2>
-          <canvas id="networkChart"></canvas>
-        </div>
-        <div class="column is-6">
-          <h2 class="subtitle is-5">Ping</h2>
-          <canvas id="pingChart"></canvas>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <script>
-    function generateMockData(timeRange, pingTargetList = []) {
-      const now = new Date();
-      let interval = 10 * 60 * 1000; // 10 minutes in milliseconds
-      let numPoints;
-
-      switch (timeRange) {
-        case '1h':
-          numPoints = (60 * 60 * 1000) / interval;
-          break;
-        case '6h':
-          numPoints = (6 * 60 * 60 * 1000) / interval;
-          break;
-        case '12h':
-          numPoints = (12 * 60 * 60 * 1000) / interval;
-          break;
-        case '24h':
-          numPoints = (24 * 60 * 60 * 1000) / interval;
-          break;
-        default:
-          numPoints = 6; // Default to 6 points
-      }
-
-      const mockData = [];
-      for (let i = 0; i < numPoints; i++) {
-        let t = new Date(now - i * interval);
-        let pingMetrics = [];
-        if (pingTargetList.length > 0) {
-          pingMetrics = pingTargetList.map((target) => ({
-            Target: target,
-            Latency: Math.random() * 100, // Random latency between 0 and 100ms
-          }));
-        }
-        mockData.push({
-          CpuCoreCount: Math.floor(Math.random() * 4) + 1, // Random core count between 1 and 4
-          CpuLoadInfo: 'Mock Load Info',
-          CpuUsagePercent: Math.random() * 100, // Random CPU usage percentage
-          MemoryTotalBytes: Math.random() * 16 * 1024 * 1024 * 1024, // Random total memory in bytes (up to 16GB)
-          MemoryUsageBytes: Math.random() * 16 * 1024 * 1024 * 1024, // Random used memory in bytes
-          MemoryUsagePercent: Math.random() * 100, // Random memory usage percentage
-          DiskTotalBytes: Math.random() * 1000 * 1024 * 1024 * 1024, // Random total disk space in bytes (up to 1TB)
-          DiskUsageBytes: Math.random() * 1000 * 1024 * 1024 * 1024, // Random used disk space in bytes
-          DiskUsagePercent: Math.random() * 100, // Random disk usage percentage
-          NetworkReceiveBytesTotal: Math.random() * 1000 * 1024 * 1024, // Random total received bytes (up to 1GB)
-          NetworkTransmitBytesTotal: Math.random() * 1000 * 1024 * 1024, // Random total transmitted bytes (up to 1GB)
-          NetworkReceiveBytesRate: Math.random() * 10 * 1024, // Random receive rate in bytes/s (up to 10KB/s)
-          NetworkTransmitBytesRate: Math.random() * 10 * 1024, // Random transmit rate in bytes/s (up to 10KB/s)
-          syncTime: t.getMinutes() + ':' + t.getSeconds(),
-          PingMetrics: pingMetrics,
-        });
-      }
-      return mockData;
-    }
-
-    $(document).ready(function () {
-      // Initialize charts
-      const charts = {
-        cpu: initChart('cpuChart', 'line', {
-          label: 'CPU',
-        }),
-        memory: initChart('memoryChart', 'line', {
-          label: 'Memory',
-        }),
-        disk: initChart('diskChart', 'line', {
-          label: 'Disk',
-        }),
-        network: initChart('networkChart', 'line', [
-          {
-            label: 'Receive',
-          },
-          {
-            label: 'Transmit',
-          },
-        ]),
-        ping: initChart(
-          'pingChart',
-          'line',
-          [
-            {
-              label: '1.1.1.1',
-            },
-            {
-              label: '2.2.2.2',
-            },
-          ],
-          (legendPosition = 'right')
-        ),
-      };
-
-      // Function to initialize a chart
-      function initChart(canvasId, type, datasets, legendPosition = 'top', yDisplayText = 'Usage (%)') {
-        const ctx = document.getElementById(canvasId).getContext('2d');
-        const data = {
-          labels: [],
-          datasets: Array.isArray(datasets)
-            ? datasets.map((dataset) => ({
-                ...dataset,
-                data: [],
-              }))
-            : [{ ...datasets, data: [] }],
-        };
-        return new Chart(ctx, {
-          type,
-          data,
-          options: {
-            plugins: {
-              legend: {
-                position: legendPosition,
-              },
-            },
-            scales: {
-              y: {
-                beginAtZero: true,
-                title: {
-                  display: true,
-                  text: yDisplayText,
+    <script>
+        function initChart(canvasId, type, datasets, legendPosition = '', yDisplayText = '', additionalInfo = '') {
+            const ctx = document.getElementById(canvasId).getContext('2d');
+            const data = {
+                labels: [],
+                datasets: Array.isArray(datasets) ? datasets.map((dataset) => ({ ...dataset, data: [] })) : [{ ...datasets, data: [] }],
+            };
+            return new Chart(ctx, {
+                type,
+                data,
+                options: {
+                    plugins: {
+                        legend: {
+                            position: legendPosition,
+                        },
+                        title: {
+                            display: !!additionalInfo,
+                            text: additionalInfo,
+                            position: 'bottom',
+                            font: {
+                                size: 12,
+                            },
+                        },
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: yDisplayText,
+                            },
+                        },
+                    },
+                    elements: {
+                        line: {
+                            tension: 0.2,
+                        },
+                    },
                 },
-              },
-            },
-            elements: {
-              line: {
-                tension: 0.2,
-              },
-            },
-          },
-        });
-      }
+            });
+        }
 
-      // Attach click event to dropdown items
-      $('.dropdown-item').click(function () {
-        const mockData = generateMockData($(this).data('time'), ['1.1.1.1', '2.2.2.2']);
-        // Extract data for each chart from mockData
-        const cpuData = mockData.map((data) => data.CpuUsagePercent);
-        const memoryData = mockData.map((data) => data.MemoryUsagePercent);
-        const diskData = mockData.map((data) => data.DiskUsagePercent);
-        // network data has 2 datasets
-        const networkData = [mockData.map((data) => data.NetworkReceiveBytesRate), mockData.map((data) => data.NetworkTransmitBytesRate)];
-        // ping data has 2 datasets for each target
-        const pingData = [
-          [], //1.1.1.1
-          [], // 2.2.2.2
-        ];
-        mockData.forEach((data) => {
-          data.PingMetrics.forEach((pingMetric) => {
-            if (pingMetric.Target === '1.1.1.1') {
-              pingData[0].push(pingMetric.Latency);
+        function fetchLatestMetric(callback) {
+            $.ajax({
+                url: '/api/v1/node_metrics/',
+                data: { time_range: '15min', num: 1 },
+                method: 'GET',
+                success: function (response) {
+                    callback(response[0]);
+                },
+                error: function (error) {
+                    console.error('Error fetching latest metrics:', error);
+                },
+            });
+        }
+
+        function updateChart(chart, newData, labels) {
+            if (!newData || !labels) {
+                console.error('Invalid data or labels provided');
+                return;
+            }
+
+            // Handle datetime labels, only keep hour:min:second
+            const formattedLabels = labels.map((label) => {
+                const date = new Date(label);
+                return `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}:${date.getSeconds().toString().padStart(2, '0')}`;
+            });
+
+            if (Array.isArray(newData) && Array.isArray(newData[0])) {
+                chart.data.datasets.forEach((dataset, index) => {
+                    if (newData[index]) {
+                        dataset.data = newData[index];
+                    }
+                });
             } else {
-              pingData[1].push(pingMetric.Latency);
+                chart.data.datasets[0].data = newData;
             }
-          });
+
+            chart.data.labels = formattedLabels;
+            chart.update();
+        }
+
+        $(document).ready(function () {
+            let charts = {};
+            fetchLatestMetric(function (metric) {
+                //  metrics 看上去是这样的
+                // {
+                //   "cpu_core_count": 32,
+                //   "cpu_load_info": "2.19|2.06|1.96",
+                //   "cpu_usage_percent": 2.8583959418036935,
+                //   "memory_total_bytes": 34359738368,
+                //   "memory_usage_bytes": 18684477440,
+                //   "memory_usage_percent": 54.37898635864258,
+                //   "disk_total_bytes": 3023330934784,
+                //   "disk_usage_bytes": 1029069766656,
+                //   "disk_usage_percent": 34.03761575738719,
+                //   "network_receive_bytes_total": 2998727680,
+                //   "network_transmit_bytes_total": 1161889792,
+                //   "network_receive_bytes_rate": 0,
+                //   "network_transmit_bytes_rate": 0,
+                //   "ping_metrics": [
+                //     {
+                //       "latency": 0.055,
+                //       "target": "127.0.0.1"
+                //     }
+                //   ],
+                //   "SyncTime": "2024-08-26T23:11:22.420248+08:00"
+                // }
+                // Extract ping targets from ping metrics
+                const pingTargets = metric.ping_metrics.map((ping) => ping.target);
+                const pingLatencies = metric.ping_metrics.map((ping) => ping.latency);
+                charts = {
+                    cpu: initChart(
+                        'cpuChart',
+                        'line',
+                        { label: 'CPU' },
+                        'top',
+                        'Usage (%)',
+                        `Load: ${metric.cpu_load_info} | Cores: ${metric.cpu_core_count}`,
+                    ),
+                    memory: initChart(
+                        'memoryChart',
+                        'line',
+                        { label: 'Memory' },
+                        'top',
+                        'Usage (%)',
+                        `Total: ${(metric.memory_total_bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`,
+                    ),
+                    disk: initChart(
+                        'diskChart',
+                        'line',
+                        { label: 'Disk' },
+                        'top',
+                        'Usage (%)',
+                        `Total: ${(metric.disk_total_bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`,
+                    ),
+                    network: initChart('networkChart', 'line', [{ label: 'Receive' }, { label: 'Transmit' }], 'top', 'Rate (MB/s)'),
+                    ping: initChart(
+                        'pingChart',
+                        'line',
+                        pingTargets.map((target) => ({ label: target })),
+                        'right',
+                        'Latency (ms)',
+                    ),
+                };
+            });
+
+            $('.dropdown-item').click(function () {
+                const timeRange = $(this).data('time');
+                $.ajax({
+                    url: '/api/v1/node_metrics/',
+                    data: { time_range: timeRange },
+                    method: 'GET',
+                    success: function (response) {
+                        const metrics = response;
+
+                        // Extract data for each chart from metrics
+                        const cpuData = metrics.map((data) => data.cpu_usage_percent);
+                        const memoryData = metrics.map((data) => data.memory_usage_percent);
+                        const diskData = metrics.map((data) => data.disk_usage_percent);
+                        const networkData = [
+                            metrics.map((data) => data.network_receive_bytes_rate / (1024 * 1024)), // Convert to MB/s
+                            metrics.map((data) => data.network_transmit_bytes_rate / (1024 * 1024)), // Convert to MB/s
+                        ];
+
+                        // Extract ping data
+                        const pingTargets = [...new Set(metrics.flatMap((data) => data.ping_metrics.map((ping) => ping.target)))];
+                        const pingData = pingTargets.map((target) =>
+                            metrics.map((data) => {
+                                const pingMetric = data.ping_metrics.find((ping) => ping.target === target);
+                                return pingMetric ? pingMetric.latency : null;
+                            }),
+                        );
+
+                        const timestamps = metrics.map((data) => data.SyncTime);
+                        console.log(cpuData, memoryData, diskData);
+
+                        // Update charts with extracted data
+                        updateChart(charts.cpu, cpuData, timestamps);
+                        updateChart(charts.memory, memoryData, timestamps);
+                        updateChart(charts.disk, diskData, timestamps);
+                        updateChart(charts.network, networkData, timestamps);
+                        updateChart(charts.ping, pingData, timestamps);
+
+                        // Update additional info
+                        const latestMetric = metrics[metrics.length - 1];
+                        charts.cpu.options.plugins.title.text = `Load: ${latestMetric.cpu_load_info} | Cores: ${latestMetric.cpu_core_count}`;
+                        charts.memory.options.plugins.title.text = `Total: ${(latestMetric.memory_total_bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+                        charts.disk.options.plugins.title.text = `Total: ${(latestMetric.disk_total_bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+
+                        charts.cpu.update();
+                        charts.memory.update();
+                        charts.disk.update();
+                    },
+                    error: function (error) {
+                        console.error('Error fetching metrics:', error);
+                    },
+                });
+            });
         });
-        console.log(pingData);
-
-        // Update charts with extracted data
-        updateChart(
-          charts.cpu,
-          cpuData,
-          mockData.map((data) => data.syncTime)
-        );
-        updateChart(
-          charts.memory,
-          memoryData,
-          mockData.map((data) => data.syncTime)
-        );
-        updateChart(
-          charts.disk,
-          diskData,
-          mockData.map((data) => data.syncTime)
-        );
-        updateChart(
-          charts.network,
-          networkData,
-          mockData.map((data) => data.syncTime)
-        );
-        updateChart(
-          charts.ping,
-          pingData,
-          mockData.map((data) => data.syncTime)
-        );
-      });
-
-      // Function to update chart data
-      function updateChart(chart, newData, labels) {
-        if (!newData || !labels) {
-          console.error('Invalid data or labels provided');
-          return;
-        }
-
-        if (!Array.isArray(newData[0])) {
-          chart.data.datasets.forEach((dataset, index) => {
-            dataset.data = newData;
-          });
-        } else {
-          chart.data.datasets.forEach((dataset, index) => {
-            if (newData[index]) {
-              dataset.data = newData[index];
-            }
-          });
-        }
-        chart.data.labels = labels;
-        chart.update();
-      }
-    });
-  </script>
+    </script>
 </div>
