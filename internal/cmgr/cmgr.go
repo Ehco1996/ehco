@@ -180,6 +180,12 @@ func (cm *cmgrImpl) Start(ctx context.Context, errCH chan error) {
 	cm.l.Infof("Start Cmgr sync interval=%d", cm.cfg.SyncInterval)
 	ticker := time.NewTicker(time.Second * time.Duration(cm.cfg.SyncInterval))
 	defer ticker.Stop()
+	// sync once at the beginning
+	if err := cm.syncOnce(ctx); err != nil {
+		cm.l.Errorf("meet non retry error: %s ,exit now", err)
+		errCH <- err
+		return
+	}
 
 	for {
 		select {
