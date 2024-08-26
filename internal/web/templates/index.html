@@ -1,455 +1,125 @@
 <!DOCTYPE html>
 <html lang="en">
-    <head>
-        <title>Ehco Web</title>
-        <meta charset="UTF-8" />
-        <meta name="description" content="ehco web" />
-        <meta name="keywords" content="ehco-relay" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <link
-            rel="stylesheet"
-            href="https://cdnjs.cloudflare.com/ajax/libs/bulma/1.0.1/css/bulma.min.css"
-        />
-        <link
-            rel="stylesheet"
-            href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css"
-        />
-        <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
-        <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
-    </head>
+  <head>
+    <title>Ehco Web</title>
+    <meta charset="UTF-8" />
+    <meta name="description" content="ehco web" />
+    <meta name="keywords" content="ehco-relay" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bulma/1.0.1/css/bulma.min.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+  </head>
 
-    <body>
-        <section class="hero is-fullheight is-light">
-            <div class="hero-body">
-                <div class="container">
-                    <h1 class="title has-text-centered">Ehco Relay</h1>
-                    <div class="columns is-variable is-8 is-flex-grow">
-                        <div class="column is-flex">
-                            <!-- Build Info Card -->
-                            <div
-                                class="card is-flex is-flex-direction-column is-flex-grow-1"
-                            >
-                                <header class="card-header">
-                                    <p
-                                        class="card-header-title has-text-centered"
-                                    >
-                                        Build Info
-                                    </p>
-                                </header>
-                                <div class="card-content is-flex-grow-1">
-                                    <div class="content">
-                                        <ul>
-                                            <li>Version: {{.Version}}</li>
-                                            <li>GitBranch: {{.GitBranch}}</li>
-                                            <li>
-                                                GitRevision: {{.GitRevision}}
-                                            </li>
-                                            <li>BuildTime: {{.BuildTime}}</li>
-                                            <li>StartTime: {{.StartTime}}</li>
-                                        </ul>
-                                        <!-- Reload Config Button -->
-                                        <div class="has-text-centered">
-                                            <button
-                                                class="button is-danger is-outlined"
-                                                id="reloadButton"
-                                            >
-                                                <span class="icon"
-                                                    ><i
-                                                        class="fas fa-sync-alt"
-                                                    ></i
-                                                ></span>
-                                                <span>Reload Config</span>
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="column is-flex">
-                            <!-- Stylish Links Card -->
-                            <div
-                                class="card is-flex is-flex-direction-column is-flex-grow-1"
-                            >
-                                <header class="card-header">
-                                    <p
-                                        class="card-header-title has-text-centered"
-                                    >
-                                        Quick Links
-                                    </p>
-                                </header>
-                                <div class="card-content is-flex-grow-1">
-                                    <div class="content">
-                                        <ul>
-                                            <li>
-                                                <a
-                                                    href="/metrics/"
-                                                    class="button is-info is-light"
-                                                >
-                                                    <span class="icon"
-                                                        ><i
-                                                            class="fas fa-chart-bar"
-                                                        ></i
-                                                    ></span>
-                                                    <span>Metrics</span>
-                                                </a>
-                                            </li>
-                                            <li>
-                                                <a
-                                                    href="/debug/pprof/"
-                                                    class="button is-info is-light"
-                                                >
-                                                    <span class="icon"
-                                                        ><i
-                                                            class="fas fa-bug"
-                                                        ></i
-                                                    ></span>
-                                                    <span>Debug</span>
-                                                </a>
-                                            </li>
-                                            <li>
-                                                <a
-                                                    href="/connections/?conn_type=active"
-                                                    class="button is-info is-light"
-                                                >
-                                                    <span class="icon"
-                                                        ><i
-                                                            class="fas fa-link"
-                                                        ></i
-                                                    ></span>
-                                                    <span>Connections</span>
-                                                </a>
-                                            </li>
-                                            <li>
-                                                <a
-                                                    href="/rules/"
-                                                    class="button is-info is-light"
-                                                >
-                                                    <span class="icon"
-                                                        ><i
-                                                            class="fas fa-list"
-                                                        ></i
-                                                    ></span>
-                                                    <span>Rule List</span>
-                                                </a>
-                                            </li>
-                                            <li>
-                                                <a
-                                                    href="/api/v1/config/"
-                                                    class="button is-info is-light"
-                                                >
-                                                    <span class="icon"
-                                                        ><i
-                                                            class="fas fa-cog"
-                                                        ></i
-                                                    ></span>
-                                                    <span>Config</span>
-                                                </a>
-                                            </li>
-                                        </ul>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <!-- metrics -->
-                    <div class="card" id="metrics-card">
-                        <header class="card-header is-flex is-flex-wrap-wrap">
-                            <p class="card-header-title has-text-centered">
-                                Metrics
-                            </p>
-                            <div
-                                class="card-header-icon is-flex-grow-1 is-flex is-justify-content-flex-end"
-                            >
-                                <div class="dropdown is-hoverable">
-                                    <div class="dropdown-trigger">
-                                        <button
-                                            class="button"
-                                            aria-haspopup="true"
-                                            aria-controls="dropdown-menu"
-                                        >
-                                            <span class="icon">
-                                                <i class="fas fa-clock"></i>
-                                            </span>
-                                            <span>Time</span>
-                                            <span class="icon is-small">
-                                                <i
-                                                    class="fas fa-angle-down"
-                                                    aria-hidden="true"
-                                                ></i>
-                                            </span>
-                                        </button>
-                                    </div>
-                                    <div
-                                        class="dropdown-menu"
-                                        id="dropdown-menu"
-                                        role="menu"
-                                    >
-                                        <div class="dropdown-content">
-                                            <a
-                                                href="#"
-                                                class="dropdown-item"
-                                                data-time="1h"
-                                                >Last 1 hour</a
-                                            >
-                                            <a
-                                                href="#"
-                                                class="dropdown-item"
-                                                data-time="6h"
-                                                >Last 6 hours</a
-                                            >
-                                            <a
-                                                href="#"
-                                                class="dropdown-item"
-                                                data-time="12h"
-                                                >Last 12 hours</a
-                                            >
-                                            <a
-                                                href="#"
-                                                class="dropdown-item"
-                                                data-time="24h"
-                                                >Last 24 hours</a
-                                            >
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </header>
-                        <div class="card-content">
-                            <div class="content">
-                                <div class="columns is-multiline">
-                                    <div class="column is-6">
-                                        <canvas id="cpuChart"></canvas>
-                                    </div>
-                                    <div class="column is-6">
-                                        <canvas id="memoryChart"></canvas>
-                                    </div>
-                                    <div class="column is-12">
-                                        <canvas id="connectionsChart"></canvas>
-                                    </div>
-                                    <div class="column is-12">
-                                        <canvas id="pingChart"></canvas>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+  <body>
+    <section class="hero is-fullheight is-light">
+      <div class="hero-body">
+        <div class="container">
+          <h1 class="title has-text-centered">Ehco Relay</h1>
+          <div class="columns is-variable is-8 is-flex-grow">
+            <div class="column is-flex">
+              <!-- Build Info Card -->
+              <div class="card is-flex is-flex-direction-column is-flex-grow-1">
+                <header class="card-header">
+                  <p class="card-header-title has-text-centered">Build Info</p>
+                </header>
+                <div class="card-content is-flex-grow-1">
+                  <div class="content">
+                    <ul>
+                      <li>Version: {{.Version}}</li>
+                      <li>GitBranch: {{.GitBranch}}</li>
+                      <li>GitRevision: {{.GitRevision}}</li>
+                      <li>BuildTime: {{.BuildTime}}</li>
+                      <li>StartTime: {{.StartTime}}</li>
+                    </ul>
+                  </div>
                 </div>
-            </div>
-
-            <!-- Footer -->
-            <div class="hero-foot">
-                <footer class="footer">
-                    <div class="content has-text-centered">
-                        <a href="https://github.com/Ehco1996/ehco"
-                            ><i class="fab fa-github"></i> Source code</a
-                        >
-                    </div>
+                <footer class="card-footer">
+                  <button class="button is-danger is-outlined card-footer-item" id="reloadButton">
+                    <span class="icon"><i class="fas fa-sync-alt"></i></span>
+                    <span>Reload Config</span>
+                  </button>
                 </footer>
+              </div>
             </div>
-        </section>
 
-        <script>
-            function generateMockData(timeRange, numDatasets = 1) {
-                const now = new Date();
-                let interval = 10 * 60 * 1000; // 10 minutes in milliseconds
-                let numPoints;
+            <div class="column is-flex">
+              <!-- Stylish Links Card -->
+              <div class="card is-flex is-flex-direction-column is-flex-grow-1">
+                <header class="card-header">
+                  <p class="card-header-title has-text-centered">Quick Links</p>
+                </header>
+                <div class="card-content is-flex-grow-1">
+                  <div class="content">
+                    <ul>
+                      <li>
+                        <a href="/metrics/" class="button is-info is-light">
+                          <span class="icon"><i class="fas fa-chart-bar"></i></span>
+                          <span>Metrics</span>
+                        </a>
+                      </li>
+                      <li>
+                        <a href="/debug/pprof/" class="button is-info is-light">
+                          <span class="icon"><i class="fas fa-bug"></i></span>
+                          <span>Debug</span>
+                        </a>
+                      </li>
+                      <li>
+                        <a href="/connections/?conn_type=active" class="button is-info is-light">
+                          <span class="icon"><i class="fas fa-link"></i></span>
+                          <span>Connections</span>
+                        </a>
+                      </li>
+                      <li>
+                        <a href="/rules/" class="button is-info is-light">
+                          <span class="icon"><i class="fas fa-list"></i></span>
+                          <span>Rule List</span>
+                        </a>
+                      </li>
+                      <li>
+                        <a href="/api/v1/config/" class="button is-info is-light">
+                          <span class="icon"><i class="fas fa-cog"></i></span>
+                          <span>Config</span>
+                        </a>
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <!-- metrics -->
+          {{template "metrics.html"}}
+        </div>
+      </div>
 
-                switch (timeRange) {
-                    case "1h":
-                        numPoints = (60 * 60 * 1000) / interval;
-                        break;
-                    case "6h":
-                        numPoints = (6 * 60 * 60 * 1000) / interval;
-                        break;
-                    case "12h":
-                        numPoints = (12 * 60 * 60 * 1000) / interval;
-                        break;
-                    case "24h":
-                        numPoints = (24 * 60 * 60 * 1000) / interval;
-                        break;
-                    default:
-                        numPoints = 6; // Default to 6 points
-                }
+      <!-- Footer -->
+      <div class="hero-foot">
+        <footer class="footer">
+          <div class="content has-text-centered">
+            <a href="https://github.com/Ehco1996/ehco"><i class="fab fa-github"></i> Source code</a>
+          </div>
+        </footer>
+      </div>
+    </section>
 
-                let labels = [];
-                let datasets = [];
-
-                for (let i = 0; i < numPoints; i++) {
-                    const time = new Date(now.getTime() - i * interval);
-                    labels.unshift(
-                        time.toLocaleTimeString([], {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                        })
-                    );
-                }
-
-                for (let j = 0; j < numDatasets; j++) {
-                    let data = [];
-                    for (let i = 0; i < numPoints; i++) {
-                        data.unshift(Math.floor(Math.random() * 100)); // Random data for demonstration
-                    }
-                    datasets.push(data);
-                }
-
-                // Sampling logic to reduce the number of points
-                const maxPoints = 100; // Maximum number of points to display
-                if (labels.length > maxPoints) {
-                    const step = Math.ceil(labels.length / maxPoints);
-                    labels = labels.filter((_, index) => index % step === 0);
-                    datasets = datasets.map((data) =>
-                        data.filter((_, index) => index % step === 0)
-                    );
-                }
-
-                return { datasets, labels };
-            }
-
-            $(document).ready(function () {
-                // Reload config button click event
-                $("#reloadButton").click(function () {
-                    $.ajax({
-                        type: "POST",
-                        url: "/api/v1/config/reload/",
-                        success: function (response) {
-                            alert(
-                                "Reload config success. Response: " + response
-                            );
-                        },
-                        error: function (response) {
-                            alert(
-                                "Failed to reload config. Response: " +
-                                    response.responseText
-                            );
-                        },
-                    });
-                });
-
-                // Initialize charts
-                const charts = {
-                    cpu: initChart("cpuChart", "line", {
-                        label: "CPU",
-                        borderColor: "rgb(75, 192, 192)",
-                    }),
-                    memory: initChart("memoryChart", "line", {
-                        label: "Memory",
-                        borderColor: "rgb(153, 102, 255)",
-                    }),
-                    connections: initChart(
-                        "connectionsChart",
-                        "line",
-                        [
-                            {
-                                label: "TCP",
-                                borderColor: "rgb(255, 159, 64)",
-                            },
-                            {
-                                label: "UDP",
-                                borderColor: "rgb(54, 162, 235)",
-                            },
-                        ],
-                        (legendPosition = "right")
-                    ),
-                    ping: initChart(
-                        "pingChart",
-                        "line",
-                        [
-                            {
-                                label: "Ping to 1.1.1.1",
-                                borderColor: "rgb(255, 99, 132)",
-                            },
-                            {
-                                label: "Ping to 8.8.8.8",
-                                borderColor: "rgb(75, 192, 192)",
-                            },
-                        ],
-                        (legendPosition = "right")
-                    ),
-                };
-
-                // Function to initialize a chart
-                function initChart(
-                    canvasId,
-                    type,
-                    datasets,
-                    legendPosition = "top"
-                ) {
-                    const ctx = document
-                        .getElementById(canvasId)
-                        .getContext("2d");
-                    const data = {
-                        labels: [],
-                        datasets: Array.isArray(datasets)
-                            ? datasets.map((dataset) => ({
-                                  ...dataset,
-                                  data: [],
-                              }))
-                            : [{ ...datasets, data: [] }],
-                    };
-                    return new Chart(ctx, {
-                        type,
-                        data,
-                        options: {
-                            plugins: {
-                                legend: {
-                                    position: legendPosition,
-                                },
-                            },
-                        },
-                    });
-                }
-
-                // Attach click event to dropdown items
-                $(".dropdown-item").click(function () {
-                    const timeRange = $(this).data("time");
-                    const cpuData = generateMockData(timeRange, 1);
-                    const memoryData = generateMockData(timeRange, 1);
-                    const connectionsData = generateMockData(timeRange, 2);
-                    const pingData = generateMockData(timeRange, 20);
-
-                    // Update datasets and labels
-                    updateChart(charts.cpu, cpuData.datasets, cpuData.labels);
-                    updateChart(
-                        charts.memory,
-                        memoryData.datasets,
-                        memoryData.labels
-                    );
-                    updateChart(
-                        charts.connections,
-                        connectionsData.datasets,
-                        connectionsData.labels
-                    );
-                    updateChart(
-                        charts.ping,
-                        pingData.datasets,
-                        pingData.labels
-                    );
-                });
-
-                // Function to update chart data
-                function updateChart(chart, newData, labels) {
-                    if (!newData || !labels) {
-                        console.error("Invalid data or labels provided");
-                        return;
-                    }
-
-                    if (!Array.isArray(newData[0])) {
-                        // Single dataset chart
-                        chart.data.datasets.forEach((dataset, index) => {
-                            dataset.data = newData;
-                        });
-                    } else {
-                        // Multi-dataset chart
-                        chart.data.datasets.forEach((dataset, index) => {
-                            if (newData[index]) {
-                                dataset.data = newData[index];
-                            }
-                        });
-                    }
-                    chart.data.labels = labels;
-                    chart.update();
-                }
-            });
-        </script>
-    </body>
+    <script>
+      $(document).ready(function () {
+        // Reload config button click event
+        $('#reloadButton').click(function () {
+          $.ajax({
+            type: 'POST',
+            url: '/api/v1/config/reload/',
+            success: function (response) {
+              alert('Reload config success. Response: ' + response);
+            },
+            error: function (response) {
+              alert('Failed to reload config. Response: ' + response.responseText);
+            },
+          });
+        });
+      });
+    </script>
+  </body>
 </html>
