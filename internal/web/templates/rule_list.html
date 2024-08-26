@@ -1,86 +1,79 @@
 <!DOCTYPE html>
 <html lang="en">
-    <head>
-        <meta charset="UTF-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <meta name="description" content="ehco web" />
-        <meta name="keywords" content="ehco-relay" />
-        <link
-            rel="stylesheet"
-            href="https://cdnjs.cloudflare.com/ajax/libs/bulma/1.0.1/css/bulma.min.css"
-        />
-        <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
-        <title>Rules</title>
-    </head>
-    <body>
-        <section class="section">
-            <div class="container">
-                <h1 class="title">Rules</h1>
-                <table class="table is-striped is-fullwidth">
-                    <thead>
-                        <tr>
-                            <th>Label</th>
-                            <th>Listen</th>
-                            <th>Listen Type</th>
-                            <th>Transport Type</th>
-                            <th>Remote</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {{range .Configs}}
-                        <tr>
-                            <td>{{.Label}}</td>
-                            <td>{{.Listen}}</td>
-                            <td>{{.ListenType}}</td>
-                            <td>{{.TransportType}}</td>
-                            <td>{{.GetTCPRemotes}}</td>
-                            <td>
-                                <button
-                                    class="button is-small is-primary health-check"
-                                    data-label="{{.Label}}"
-                                    onclick="checkHealth('{{.Label}}')"
-                                >
-                                    Check Health
-                                </button>
-                            </td>
-                        </tr>
-                        {{end}}
-                    </tbody>
-                </table>
-            </div>
-        </section>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="ehco web" />
+    <meta name="keywords" content="ehco-relay" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bulma/1.0.1/css/bulma.min.css" />
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    <title>Rules</title>
+  </head>
+  <body>
+    <section class="section">
+      <div class="container">
+        <h1 class="title">Rules</h1>
+        <table class="table is-striped is-fullwidth">
+          <thead>
+            <tr>
+              <th>Label</th>
+              <th>Listen</th>
+              <th>Listen Type</th>
+              <th>Transport Type</th>
+              <th>Remote</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {{range .Configs}}
+            <tr>
+              <td>{{.Label}}</td>
+              <td>{{.Listen}}</td>
+              <td>{{.ListenType}}</td>
+              <td>{{.TransportType}}</td>
+              <td>{{.Remotes}}</td>
+              <td>
+                <button class="button is-small is-primary health-check" data-label="{{.Label}}" onclick="checkHealth('{{.Label}}')">
+                  Check Health
+                </button>
+              </td>
+            </tr>
+            {{end}}
+          </tbody>
+        </table>
+      </div>
+    </section>
 
-        <script>
-            function checkHealth(label) {
-                $.ajax({
-                    url: "/api/v1/health_check/?relay_label=" + label,
-                    method: "GET",
-                    success: function (response) {
-                        // Check if the response includes an error code
-                        if (response.error_code === 0) {
-                            // If no error, show success message with latency
-                            alert(
-                                "Health Check for " +
-                                    label +
-                                    ": " +
-                                    response.msg + // Use 'msg' as per Go struct
-                                    " (Latency: " +
-                                    response.latency + // Ensure this matches the Go struct field name
-                                    "ms)"
-                            );
-                        } else {
-                            // If error code is not 0, show error message
-                            alert("Error for " + label + ": " + response.msg);
-                        }
-                    },
-                    error: function (xhr) {
-                        // Parse the response JSON in case of HTTP error
-                        var response = JSON.parse(xhr.responseText);
-                        alert("Error: " + response.msg); // Use 'msg' as per Go struct
-                    },
-                });
+    <script>
+      function checkHealth(label) {
+        $.ajax({
+          url: '/api/v1/health_check/?relay_label=' + label,
+          method: 'GET',
+          success: function (response) {
+            // Check if the response includes an error code
+            if (response.error_code === 0) {
+              // If no error, show success message with latency
+              alert(
+                'Health Check for ' +
+                  label +
+                  ': ' +
+                  response.msg + // Use 'msg' as per Go struct
+                  ' (Latency: ' +
+                  response.latency + // Ensure this matches the Go struct field name
+                  'ms)'
+              );
+            } else {
+              // If error code is not 0, show error message
+              alert('Error for ' + label + ': ' + response.msg);
             }
-        </script>
-    </body>
+          },
+          error: function (xhr) {
+            // Parse the response JSON in case of HTTP error
+            var response = JSON.parse(xhr.responseText);
+            alert('Error: ' + response.msg); // Use 'msg' as per Go struct
+          },
+        });
+      }
+    </script>
+  </body>
 </html>

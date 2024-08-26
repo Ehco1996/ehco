@@ -249,7 +249,7 @@ func (b *readerImpl) parseNetworkInfo(metricMap map[string]*dto.MetricFamily, nm
 	}
 
 	if b.lastMetrics != nil {
-		passedTime := now.Sub(b.lastMetrics.syncTime).Seconds()
+		passedTime := now.Sub(b.lastMetrics.SyncTime).Seconds()
 		nm.NetworkReceiveBytesRate = (nm.NetworkReceiveBytesTotal - b.lastMetrics.NetworkReceiveBytesTotal) / passedTime
 		nm.NetworkTransmitBytesRate = (nm.NetworkTransmitBytesTotal - b.lastMetrics.NetworkTransmitBytesTotal) / passedTime
 	}
@@ -272,7 +272,7 @@ func (b *readerImpl) ReadOnce(ctx context.Context) (*NodeMetrics, error) {
 	if err != nil {
 		return nil, err
 	}
-	nm := &NodeMetrics{syncTime: time.Now(), PingMetrics: []PingMetric{}}
+	nm := &NodeMetrics{SyncTime: time.Now(), PingMetrics: []PingMetric{}}
 	if err := b.parseCpuInfo(parsed, nm); err != nil {
 		return nil, err
 	}

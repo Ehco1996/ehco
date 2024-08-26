@@ -35,13 +35,13 @@ func (cm *cmgrImpl) syncOnce(ctx context.Context) error {
 	// todo: opt lock
 	cm.lock.Lock()
 
-	shorCommit := constant.GitRevision
+	shortCommit := constant.GitRevision
 	if len(constant.GitRevision) > 7 {
-		shorCommit = constant.GitRevision[:7]
+		shortCommit = constant.GitRevision[:7]
 	}
 	req := syncReq{
 		Stats:   []StatsPerRule{},
-		Version: VersionInfo{Version: constant.Version, ShortCommit: shorCommit},
+		Version: VersionInfo{Version: constant.Version, ShortCommit: shortCommit},
 	}
 
 	if cm.cfg.NeedMetrics() {
@@ -50,6 +50,7 @@ func (cm *cmgrImpl) syncOnce(ctx context.Context) error {
 			cm.l.Errorf("read metrics failed: %v", err)
 		} else {
 			req.Node = *metrics
+			cm.ms = append(cm.ms, metrics)
 		}
 	}
 

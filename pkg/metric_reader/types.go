@@ -29,7 +29,7 @@ type NodeMetrics struct {
 	// ping
 	PingMetrics []PingMetric `json:"ping_metrics"`
 
-	syncTime time.Time
+	SyncTime time.Time
 }
 
 type PingMetric struct {

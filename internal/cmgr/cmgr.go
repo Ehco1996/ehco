@@ -16,6 +16,11 @@ const (
 	ConnectionTypeClosed = "closed"
 )
 
+type QueryNodeMetricsReq struct {
+	TimeRange string `json:"time_range"` // 15min/30min/1h/6h/12h/24h
+	Num       int    `json:"num"`        // number of nodes to query
+}
+
 // connection manager interface/
 // TODO support closed connection
 type Cmgr interface {
@@ -34,17 +39,21 @@ type Cmgr interface {
 
 	// Start starts the connection manager.
 	Start(ctx context.Context, errCH chan error)
+
+	QueryNodeMetrics(ctx context.Context, req *QueryNodeMetricsReq) ([]metric_reader.NodeMetrics, error)
 }
 
 type cmgrImpl struct {
 	lock sync.RWMutex
 	cfg  *Config
 	l    *zap.SugaredLogger
-	mr   metric_reader.Reader
 
 	// k: relay label, v: connection list
 	activeConnectionsMap map[string][]conn.RelayConn
 	closedConnectionsMap map[string][]conn.RelayConn
+
+	mr metric_reader.Reader
+	ms []*metric_reader.NodeMetrics // TODO gc this
 }
 
 func NewCmgr(cfg *Config) Cmgr {
@@ -171,6 +180,12 @@ func (cm *cmgrImpl) Start(ctx context.Context, errCH chan error) {
 	cm.l.Infof("Start Cmgr sync interval=%d", cm.cfg.SyncInterval)
 	ticker := time.NewTicker(time.Second * time.Duration(cm.cfg.SyncInterval))
 	defer ticker.Stop()
+	// sync once at the beginning
+	if err := cm.syncOnce(ctx); err != nil {
+		cm.l.Errorf("meet non retry error: %s ,exit now", err)
+		errCH <- err
+		return
+	}
 
 	for {
 		select {
@@ -184,4 +199,39 @@ func (cm *cmgrImpl) Start(ctx context.Context, errCH chan error) {
 			}
 		}
 	}
+}
+
+func (cm *cmgrImpl) QueryNodeMetrics(ctx context.Context, req *QueryNodeMetricsReq) ([]metric_reader.NodeMetrics, error) {
+	cm.lock.RLock()
+	defer cm.lock.RUnlock()
+
+	var startTime time.Time
+	switch req.TimeRange {
+	case "15min":
+		startTime = time.Now().Add(-15 * time.Minute)
+	case "30min":
+		startTime = time.Now().Add(-30 * time.Minute)
+	case "1h":
+		startTime = time.Now().Add(-1 * time.Hour)
+	case "6h":
+		startTime = time.Now().Add(-6 * time.Hour)
+	case "12h":
+		startTime = time.Now().Add(-12 * time.Hour)
+	case "24h":
+		startTime = time.Now().Add(-24 * time.Hour)
+	default:
+		// default to 15min
+		startTime = time.Now().Add(-15 * time.Minute)
+	}
+
+	res := []metric_reader.NodeMetrics{}
+	for _, metrics := range cm.ms {
+		if metrics.SyncTime.After(startTime) {
+			res = append(res, *metrics)
+		}
+		if req.Num > 0 && len(res) >= req.Num {
+			break
+		}
+	}
+	return res, nil
 }

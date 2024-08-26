@@ -107,7 +107,7 @@ func (r *Config) Adjust() error {
 		zap.S().Debugf("label is empty, set default label:%s", r.Label)
 	}
 	if len(r.Remotes) == 0 && len(r.TCPRemotes) != 0 {
-		zap.S().Warnf("tcp remotes is deprecated, use remotes instead")
+		zap.S().Warnf("tcp remotes is deprecated, please use remotes instead")
 		r.Remotes = r.TCPRemotes
 	}
 

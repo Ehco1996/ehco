@@ -109,6 +109,7 @@ func NewServer(
 	api.GET("/config/", s.CurrentConfig)
 	api.POST("/config/reload/", s.HandleReload)
 	api.GET("/health_check/", s.HandleHealthCheck)
+	api.GET("/node_metrics/", s.GetNodeMetrics)
 	return s, nil
 }
 
