@@ -29,23 +29,24 @@
     <div class="content">
       <div class="columns is-multiline">
         <div class="column is-4">
+          <h2 class="subtitle is-5">CPU</h2>
           <canvas id="cpuChart"></canvas>
         </div>
         <div class="column is-4">
+          <h2 class="subtitle is-5">Memory</h2>
           <canvas id="memoryChart"></canvas>
         </div>
         <div class="column is-4">
+          <h2 class="subtitle is-5">Disk</h2>
           <canvas id="diskChart"></canvas>
         </div>
 
         <div class="column is-6">
+          <h2 class="subtitle is-5">Network</h2>
           <canvas id="networkChart"></canvas>
         </div>
         <div class="column is-6">
-          <canvas id="connectionChart"></canvas>
-        </div>
-
-        <div class="column is-12">
+          <h2 class="subtitle is-5">Ping</h2>
           <canvas id="pingChart"></canvas>
         </div>
       </div>
@@ -53,7 +54,7 @@
   </div>
 
   <script>
-    function generateMockData(timeRange, numDatasets = 1) {
+    function generateMockData(timeRange, pingTargetList = []) {
       const now = new Date();
       let interval = 10 * 60 * 1000; // 10 minutes in milliseconds
       let numPoints;
@@ -75,36 +76,35 @@
           numPoints = 6; // Default to 6 points
       }
 
-      let labels = [];
-      let datasets = [];
-
+      const mockData = [];
       for (let i = 0; i < numPoints; i++) {
-        const time = new Date(now.getTime() - i * interval);
-        labels.unshift(
-          time.toLocaleTimeString([], {
-            hour: '2-digit',
-            minute: '2-digit',
-          })
-        );
-      }
-
-      for (let j = 0; j < numDatasets; j++) {
-        let data = [];
-        for (let i = 0; i < numPoints; i++) {
-          data.unshift(Math.floor(Math.random() * 100)); // Random data for demonstration
+        let t = new Date(now - i * interval);
+        let pingMetrics = [];
+        if (pingTargetList.length > 0) {
+          pingMetrics = pingTargetList.map((target) => ({
+            Target: target,
+            Latency: Math.random() * 100, // Random latency between 0 and 100ms
+          }));
         }
-        datasets.push(data);
+        mockData.push({
+          CpuCoreCount: Math.floor(Math.random() * 4) + 1, // Random core count between 1 and 4
+          CpuLoadInfo: 'Mock Load Info',
+          CpuUsagePercent: Math.random() * 100, // Random CPU usage percentage
+          MemoryTotalBytes: Math.random() * 16 * 1024 * 1024 * 1024, // Random total memory in bytes (up to 16GB)
+          MemoryUsageBytes: Math.random() * 16 * 1024 * 1024 * 1024, // Random used memory in bytes
+          MemoryUsagePercent: Math.random() * 100, // Random memory usage percentage
+          DiskTotalBytes: Math.random() * 1000 * 1024 * 1024 * 1024, // Random total disk space in bytes (up to 1TB)
+          DiskUsageBytes: Math.random() * 1000 * 1024 * 1024 * 1024, // Random used disk space in bytes
+          DiskUsagePercent: Math.random() * 100, // Random disk usage percentage
+          NetworkReceiveBytesTotal: Math.random() * 1000 * 1024 * 1024, // Random total received bytes (up to 1GB)
+          NetworkTransmitBytesTotal: Math.random() * 1000 * 1024 * 1024, // Random total transmitted bytes (up to 1GB)
+          NetworkReceiveBytesRate: Math.random() * 10 * 1024, // Random receive rate in bytes/s (up to 10KB/s)
+          NetworkTransmitBytesRate: Math.random() * 10 * 1024, // Random transmit rate in bytes/s (up to 10KB/s)
+          syncTime: t.getMinutes() + ':' + t.getSeconds(),
+          PingMetrics: pingMetrics,
+        });
       }
-
-      // Sampling logic to reduce the number of points
-      const maxPoints = 100; // Maximum number of points to display
-      if (labels.length > maxPoints) {
-        const step = Math.ceil(labels.length / maxPoints);
-        labels = labels.filter((_, index) => index % step === 0);
-        datasets = datasets.map((data) => data.filter((_, index) => index % step === 0));
-      }
-
-      return { datasets, labels };
+      return mockData;
     }
 
     $(document).ready(function () {
@@ -125,14 +125,6 @@
           },
           {
             label: 'Transmit',
-          },
-        ]),
-        connection: initChart('connectionChart', 'line', [
-          {
-            label: 'TCP',
-          },
-          {
-            label: 'UDP',
           },
         ]),
         ping: initChart(
@@ -191,21 +183,55 @@
 
       // Attach click event to dropdown items
       $('.dropdown-item').click(function () {
-        const timeRange = $(this).data('time');
-        const cpuData = generateMockData(timeRange, 1);
-        const memoryData = generateMockData(timeRange, 1);
-        const diskData = generateMockData(timeRange, 1);
-        const networkData = generateMockData(timeRange, 2);
-        const connectionData = generateMockData(timeRange, 2);
-        const pingData = generateMockData(timeRange, 20);
+        const mockData = generateMockData($(this).data('time'), ['1.1.1.1', '2.2.2.2']);
+        // Extract data for each chart from mockData
+        const cpuData = mockData.map((data) => data.CpuUsagePercent);
+        const memoryData = mockData.map((data) => data.MemoryUsagePercent);
+        const diskData = mockData.map((data) => data.DiskUsagePercent);
+        // network data has 2 datasets
+        const networkData = [mockData.map((data) => data.NetworkReceiveBytesRate), mockData.map((data) => data.NetworkTransmitBytesRate)];
+        // ping data has 2 datasets for each target
+        const pingData = [
+          [], //1.1.1.1
+          [], // 2.2.2.2
+        ];
+        mockData.forEach((data) => {
+          data.PingMetrics.forEach((pingMetric) => {
+            if (pingMetric.Target === '1.1.1.1') {
+              pingData[0].push(pingMetric.Latency);
+            } else {
+              pingData[1].push(pingMetric.Latency);
+            }
+          });
+        });
+        console.log(pingData);
 
-        // Update datasets and labels
-        updateChart(charts.cpu, cpuData.datasets, cpuData.labels);
-        updateChart(charts.memory, memoryData.datasets, memoryData.labels);
-        updateChart(charts.disk, diskData.datasets, diskData.labels);
-        updateChart(charts.network, networkData.datasets, networkData.labels);
-        updateChart(charts.connection, connectionData.datasets, connectionData.labels);
-        updateChart(charts.ping, pingData.datasets, pingData.labels);
+        // Update charts with extracted data
+        updateChart(
+          charts.cpu,
+          cpuData,
+          mockData.map((data) => data.syncTime)
+        );
+        updateChart(
+          charts.memory,
+          memoryData,
+          mockData.map((data) => data.syncTime)
+        );
+        updateChart(
+          charts.disk,
+          diskData,
+          mockData.map((data) => data.syncTime)
+        );
+        updateChart(
+          charts.network,
+          networkData,
+          mockData.map((data) => data.syncTime)
+        );
+        updateChart(
+          charts.ping,
+          pingData,
+          mockData.map((data) => data.syncTime)
+        );
       });
 
       // Function to update chart data
@@ -216,12 +242,10 @@
         }
 
         if (!Array.isArray(newData[0])) {
-          // Single dataset chart
           chart.data.datasets.forEach((dataset, index) => {
             dataset.data = newData;
           });
         } else {
-          // Multi-dataset chart
           chart.data.datasets.forEach((dataset, index) => {
             if (newData[index]) {
               dataset.data = newData[index];
