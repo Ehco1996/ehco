@@ -56,7 +56,28 @@
     </div>
 
     <script>
-        function initChart(canvasId, type, datasets, legendPosition = '', yDisplayText = '', additionalInfo = '') {
+        // Constants
+        const API_BASE_URL = '/api/v1/node_metrics/';
+        const BYTE_TO_MB = 1024 * 1024;
+        const BYTE_TO_GB = BYTE_TO_MB * 1024;
+
+        // Utility functions
+        const handleError = (error) => {
+            console.error('Error:', error);
+            // You can add user notifications here
+        };
+
+        const formatDate = (dateString) => {
+            const date = new Date(dateString);
+            return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        };
+
+        const formatBytes = (bytes, decimals = 2) => {
+            return (bytes / BYTE_TO_GB).toFixed(decimals);
+        };
+
+        // Chart functions
+        const initChart = (canvasId, type, datasets, legendPosition = '', yDisplayText = '', additionalInfo = '', unit = '') => {
             const ctx = document.getElementById(canvasId).getContext('2d');
             const data = {
                 labels: [],
@@ -66,62 +87,53 @@
                 type,
                 data,
                 options: {
+                    responsive: true,
                     plugins: {
-                        legend: {
-                            position: legendPosition,
-                        },
+                        legend: { position: legendPosition },
                         title: {
                             display: !!additionalInfo,
                             text: additionalInfo,
                             position: 'bottom',
-                            font: {
-                                size: 12,
+                            font: { size: 12 },
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function (context) {
+                                    let label = context.dataset.label || '';
+                                    if (label) {
+                                        label += ': ';
+                                    }
+                                    if (context.parsed.y !== null) {
+                                        label += context.parsed.y.toFixed(2) + ' ' + unit;
+                                    }
+                                    return label;
+                                },
                             },
                         },
                     },
                     scales: {
                         y: {
                             beginAtZero: true,
-                            title: {
-                                display: true,
-                                text: yDisplayText,
-                            },
+                            title: { display: true, text: yDisplayText },
                         },
                     },
-                    elements: {
-                        line: {
-                            tension: 0.2,
-                        },
+                    elements: { line: { tension: 0.2 } },
+                    downsample: {
+                        enabled: true,
+                        samples: 100,
+                        threshold: 50,
                     },
                 },
             });
-        }
+        };
 
-        function fetchLatestMetric(callback) {
-            $.ajax({
-                url: '/api/v1/node_metrics/',
-                data: { time_range: '15min', num: 1 },
-                method: 'GET',
-                success: function (response) {
-                    callback(response[0]);
-                },
-                error: function (error) {
-                    console.error('Error fetching latest metrics:', error);
-                },
-            });
-        }
-
-        function updateChart(chart, newData, labels) {
+        const updateChart = (chart, newData, labels) => {
             if (!newData || !labels) {
                 console.error('Invalid data or labels provided');
                 return;
             }
 
-            // Handle datetime labels, only keep hour:min:second
-            const formattedLabels = labels.map((label) => {
-                const date = new Date(label);
-                return `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}:${date.getSeconds().toString().padStart(2, '0')}`;
-            });
+            const formattedLabels = labels.map(formatDate);
 
             if (Array.isArray(newData) && Array.isArray(newData[0])) {
                 chart.data.datasets.forEach((dataset, index) => {
@@ -135,124 +147,137 @@
 
             chart.data.labels = formattedLabels;
             chart.update();
-        }
+        };
 
-        $(document).ready(function () {
-            let charts = {};
-            fetchLatestMetric(function (metric) {
-                //  metrics 看上去是这样的
-                // {
-                //   "cpu_core_count": 32,
-                //   "cpu_load_info": "2.19|2.06|1.96",
-                //   "cpu_usage_percent": 2.8583959418036935,
-                //   "memory_total_bytes": 34359738368,
-                //   "memory_usage_bytes": 18684477440,
-                //   "memory_usage_percent": 54.37898635864258,
-                //   "disk_total_bytes": 3023330934784,
-                //   "disk_usage_bytes": 1029069766656,
-                //   "disk_usage_percent": 34.03761575738719,
-                //   "network_receive_bytes_total": 2998727680,
-                //   "network_transmit_bytes_total": 1161889792,
-                //   "network_receive_bytes_rate": 0,
-                //   "network_transmit_bytes_rate": 0,
-                //   "ping_metrics": [
-                //     {
-                //       "latency": 0.055,
-                //       "target": "127.0.0.1"
-                //     }
-                //   ],
-                //   "SyncTime": "2024-08-26T23:11:22.420248+08:00"
-                // }
-                // Extract ping targets from ping metrics
-                const pingTargets = metric.ping_metrics.map((ping) => ping.target);
-                const pingLatencies = metric.ping_metrics.map((ping) => ping.latency);
-                charts = {
-                    cpu: initChart(
-                        'cpuChart',
-                        'line',
-                        { label: 'CPU' },
-                        'top',
-                        'Usage (%)',
-                        `Load: ${metric.cpu_load_info} | Cores: ${metric.cpu_core_count}`,
-                    ),
-                    memory: initChart(
-                        'memoryChart',
-                        'line',
-                        { label: 'Memory' },
-                        'top',
-                        'Usage (%)',
-                        `Total: ${(metric.memory_total_bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`,
-                    ),
-                    disk: initChart(
-                        'diskChart',
-                        'line',
-                        { label: 'Disk' },
-                        'top',
-                        'Usage (%)',
-                        `Total: ${(metric.disk_total_bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`,
-                    ),
-                    network: initChart('networkChart', 'line', [{ label: 'Receive' }, { label: 'Transmit' }], 'top', 'Rate (MB/s)'),
-                    ping: initChart(
-                        'pingChart',
-                        'line',
-                        pingTargets.map((target) => ({ label: target })),
-                        'right',
-                        'Latency (ms)',
-                    ),
-                };
-            });
+        // Data fetching functions
+        const fetchLatestMetric = async () => {
+            try {
+                const response = await fetch(`${API_BASE_URL}?time_range=15min&num=1`);
+                if (!response.ok) throw new Error('Network response was not ok');
+                const data = await response.json();
+                return data[0];
+            } catch (error) {
+                handleError(error);
+            }
+        };
 
-            $('.dropdown-item').click(function () {
+        const fetchMetrics = async (timeRange) => {
+            try {
+                const response = await fetch(`${API_BASE_URL}?time_range=${timeRange}`);
+                if (!response.ok) throw new Error('Network response was not ok');
+                return await response.json();
+            } catch (error) {
+                handleError(error);
+            }
+        };
+
+        // Chart initialization
+        const initializeCharts = async () => {
+            const metric = await fetchLatestMetric();
+            if (!metric) return null;
+
+            const pingTargets = metric.ping_metrics.map((ping) => ping.target);
+            return {
+                cpu: initChart(
+                    'cpuChart',
+                    'line',
+                    { label: 'CPU' },
+                    'top',
+                    'Usage (%)',
+                    `Load: ${metric.cpu_load_info} | Cores: ${metric.cpu_core_count}`,
+                    '%',
+                ),
+                memory: initChart(
+                    'memoryChart',
+                    'line',
+                    { label: 'Memory' },
+                    'top',
+                    'Usage (%)',
+                    `Total: ${formatBytes(metric.memory_total_bytes)} GB`,
+                    '%',
+                ),
+                disk: initChart(
+                    'diskChart',
+                    'line',
+                    { label: 'Disk' },
+                    'top',
+                    'Usage (%)',
+                    `Total: ${formatBytes(metric.disk_total_bytes)} GB`,
+                    '%',
+                ),
+                network: initChart('networkChart', 'line', [{ label: 'Receive' }, { label: 'Transmit' }], 'top', 'Rate (MB/s)', '', 'MB/s'),
+                ping: initChart(
+                    'pingChart',
+                    'line',
+                    pingTargets.map((target) => ({ label: target })),
+                    'right',
+                    'Latency (ms)',
+                    '',
+                    'ms',
+                ),
+            };
+        };
+
+        // Update functions
+        const updateCharts = (charts, metrics) => {
+            const timestamps = metrics.map((data) => data.SyncTime);
+
+            updateChart(
+                charts.cpu,
+                metrics.map((data) => data.cpu_usage_percent),
+                timestamps,
+            );
+            updateChart(
+                charts.memory,
+                metrics.map((data) => data.memory_usage_percent),
+                timestamps,
+            );
+            updateChart(
+                charts.disk,
+                metrics.map((data) => data.disk_usage_percent),
+                timestamps,
+            );
+            updateChart(
+                charts.network,
+                [
+                    metrics.map((data) => data.network_receive_bytes_rate / BYTE_TO_MB),
+                    metrics.map((data) => data.network_transmit_bytes_rate / BYTE_TO_MB),
+                ],
+                timestamps,
+            );
+
+            const pingTargets = [...new Set(metrics.flatMap((data) => data.ping_metrics.map((ping) => ping.target)))];
+            const pingData = pingTargets.map((target) =>
+                metrics.map((data) => {
+                    const pingMetric = data.ping_metrics.find((ping) => ping.target === target);
+                    return pingMetric ? pingMetric.latency : null;
+                }),
+            );
+            updateChart(charts.ping, pingData, timestamps);
+
+            const latestMetric = metrics[metrics.length - 1];
+            updateAdditionalInfo(charts, latestMetric);
+        };
+
+        const updateAdditionalInfo = (charts, metric) => {
+            charts.cpu.options.plugins.title.text = `Load: ${metric.cpu_load_info} | Cores: ${metric.cpu_core_count}`;
+            charts.memory.options.plugins.title.text = `Total: ${formatBytes(metric.memory_total_bytes)} GB`;
+            charts.disk.options.plugins.title.text = `Total: ${formatBytes(metric.disk_total_bytes)} GB`;
+
+            charts.cpu.update();
+            charts.memory.update();
+            charts.disk.update();
+        };
+
+        // Main execution
+        $(document).ready(async function () {
+            let charts = await initializeCharts();
+            if (!charts) return;
+
+            $('.dropdown-item').click(async function () {
                 const timeRange = $(this).data('time');
-                $.ajax({
-                    url: '/api/v1/node_metrics/',
-                    data: { time_range: timeRange },
-                    method: 'GET',
-                    success: function (response) {
-                        const metrics = response;
-
-                        // Extract data for each chart from metrics
-                        const cpuData = metrics.map((data) => data.cpu_usage_percent);
-                        const memoryData = metrics.map((data) => data.memory_usage_percent);
-                        const diskData = metrics.map((data) => data.disk_usage_percent);
-                        const networkData = [
-                            metrics.map((data) => data.network_receive_bytes_rate / (1024 * 1024)), // Convert to MB/s
-                            metrics.map((data) => data.network_transmit_bytes_rate / (1024 * 1024)), // Convert to MB/s
-                        ];
-
-                        // Extract ping data
-                        const pingTargets = [...new Set(metrics.flatMap((data) => data.ping_metrics.map((ping) => ping.target)))];
-                        const pingData = pingTargets.map((target) =>
-                            metrics.map((data) => {
-                                const pingMetric = data.ping_metrics.find((ping) => ping.target === target);
-                                return pingMetric ? pingMetric.latency : null;
-                            }),
-                        );
-
-                        const timestamps = metrics.map((data) => data.SyncTime);
-                        console.log(cpuData, memoryData, diskData);
-
-                        // Update charts with extracted data
-                        updateChart(charts.cpu, cpuData, timestamps);
-                        updateChart(charts.memory, memoryData, timestamps);
-                        updateChart(charts.disk, diskData, timestamps);
-                        updateChart(charts.network, networkData, timestamps);
-                        updateChart(charts.ping, pingData, timestamps);
-
-                        // Update additional info
-                        const latestMetric = metrics[metrics.length - 1];
-                        charts.cpu.options.plugins.title.text = `Load: ${latestMetric.cpu_load_info} | Cores: ${latestMetric.cpu_core_count}`;
-                        charts.memory.options.plugins.title.text = `Total: ${(latestMetric.memory_total_bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
-                        charts.disk.options.plugins.title.text = `Total: ${(latestMetric.disk_total_bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
-
-                        charts.cpu.update();
-                        charts.memory.update();
-                        charts.disk.update();
-                    },
-                    error: function (error) {
-                        console.error('Error fetching metrics:', error);
-                    },
-                });
+                const metrics = await fetchMetrics(timeRange);
+                if (metrics) updateCharts(charts, metrics);
             });
         });
     </script>
