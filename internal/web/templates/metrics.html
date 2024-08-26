@@ -28,183 +28,209 @@
   <div class="card-content">
     <div class="content">
       <div class="columns is-multiline">
-        <div class="column is-6">
+        <div class="column is-4">
           <canvas id="cpuChart"></canvas>
         </div>
-        <div class="column is-6">
+        <div class="column is-4">
           <canvas id="memoryChart"></canvas>
         </div>
-        <div class="column is-12">
-          <canvas id="connectionsChart"></canvas>
+        <div class="column is-4">
+          <canvas id="diskChart"></canvas>
         </div>
+
+        <div class="column is-6">
+          <canvas id="networkChart"></canvas>
+        </div>
+        <div class="column is-6">
+          <canvas id="connectionChart"></canvas>
+        </div>
+
         <div class="column is-12">
           <canvas id="pingChart"></canvas>
         </div>
       </div>
     </div>
   </div>
-</div>
 
-<script>
-  function generateMockData(timeRange, numDatasets = 1) {
-    const now = new Date();
-    let interval = 10 * 60 * 1000; // 10 minutes in milliseconds
-    let numPoints;
+  <script>
+    function generateMockData(timeRange, numDatasets = 1) {
+      const now = new Date();
+      let interval = 10 * 60 * 1000; // 10 minutes in milliseconds
+      let numPoints;
 
-    switch (timeRange) {
-      case '1h':
-        numPoints = (60 * 60 * 1000) / interval;
-        break;
-      case '6h':
-        numPoints = (6 * 60 * 60 * 1000) / interval;
-        break;
-      case '12h':
-        numPoints = (12 * 60 * 60 * 1000) / interval;
-        break;
-      case '24h':
-        numPoints = (24 * 60 * 60 * 1000) / interval;
-        break;
-      default:
-        numPoints = 6; // Default to 6 points
-    }
-
-    let labels = [];
-    let datasets = [];
-
-    for (let i = 0; i < numPoints; i++) {
-      const time = new Date(now.getTime() - i * interval);
-      labels.unshift(
-        time.toLocaleTimeString([], {
-          hour: '2-digit',
-          minute: '2-digit',
-        })
-      );
-    }
-
-    for (let j = 0; j < numDatasets; j++) {
-      let data = [];
-      for (let i = 0; i < numPoints; i++) {
-        data.unshift(Math.floor(Math.random() * 100)); // Random data for demonstration
+      switch (timeRange) {
+        case '1h':
+          numPoints = (60 * 60 * 1000) / interval;
+          break;
+        case '6h':
+          numPoints = (6 * 60 * 60 * 1000) / interval;
+          break;
+        case '12h':
+          numPoints = (12 * 60 * 60 * 1000) / interval;
+          break;
+        case '24h':
+          numPoints = (24 * 60 * 60 * 1000) / interval;
+          break;
+        default:
+          numPoints = 6; // Default to 6 points
       }
-      datasets.push(data);
+
+      let labels = [];
+      let datasets = [];
+
+      for (let i = 0; i < numPoints; i++) {
+        const time = new Date(now.getTime() - i * interval);
+        labels.unshift(
+          time.toLocaleTimeString([], {
+            hour: '2-digit',
+            minute: '2-digit',
+          })
+        );
+      }
+
+      for (let j = 0; j < numDatasets; j++) {
+        let data = [];
+        for (let i = 0; i < numPoints; i++) {
+          data.unshift(Math.floor(Math.random() * 100)); // Random data for demonstration
+        }
+        datasets.push(data);
+      }
+
+      // Sampling logic to reduce the number of points
+      const maxPoints = 100; // Maximum number of points to display
+      if (labels.length > maxPoints) {
+        const step = Math.ceil(labels.length / maxPoints);
+        labels = labels.filter((_, index) => index % step === 0);
+        datasets = datasets.map((data) => data.filter((_, index) => index % step === 0));
+      }
+
+      return { datasets, labels };
     }
 
-    // Sampling logic to reduce the number of points
-    const maxPoints = 100; // Maximum number of points to display
-    if (labels.length > maxPoints) {
-      const step = Math.ceil(labels.length / maxPoints);
-      labels = labels.filter((_, index) => index % step === 0);
-      datasets = datasets.map((data) => data.filter((_, index) => index % step === 0));
-    }
-
-    return { datasets, labels };
-  }
-
-  $(document).ready(function () {
-    // Initialize charts
-    const charts = {
-      cpu: initChart('cpuChart', 'line', {
-        label: 'CPU',
-        borderColor: 'rgb(75, 192, 192)',
-      }),
-      memory: initChart('memoryChart', 'line', {
-        label: 'Memory',
-        borderColor: 'rgb(153, 102, 255)',
-      }),
-      connections: initChart(
-        'connectionsChart',
-        'line',
-        [
+    $(document).ready(function () {
+      // Initialize charts
+      const charts = {
+        cpu: initChart('cpuChart', 'line', {
+          label: 'CPU',
+        }),
+        memory: initChart('memoryChart', 'line', {
+          label: 'Memory',
+        }),
+        disk: initChart('diskChart', 'line', {
+          label: 'Disk',
+        }),
+        network: initChart('networkChart', 'line', [
+          {
+            label: 'Receive',
+          },
+          {
+            label: 'Transmit',
+          },
+        ]),
+        connection: initChart('connectionChart', 'line', [
           {
             label: 'TCP',
-            borderColor: 'rgb(255, 159, 64)',
           },
           {
             label: 'UDP',
-            borderColor: 'rgb(54, 162, 235)',
           },
-        ],
-        (legendPosition = 'right')
-      ),
-      ping: initChart(
-        'pingChart',
-        'line',
-        [
-          {
-            label: 'Ping to 1.1.1.1',
-            borderColor: 'rgb(255, 99, 132)',
-          },
-          {
-            label: 'Ping to 8.8.8.8',
-            borderColor: 'rgb(75, 192, 192)',
-          },
-        ],
-        (legendPosition = 'right')
-      ),
-    };
-
-    // Function to initialize a chart
-    function initChart(canvasId, type, datasets, legendPosition = 'top') {
-      const ctx = document.getElementById(canvasId).getContext('2d');
-      const data = {
-        labels: [],
-        datasets: Array.isArray(datasets)
-          ? datasets.map((dataset) => ({
-              ...dataset,
-              data: [],
-            }))
-          : [{ ...datasets, data: [] }],
+        ]),
+        ping: initChart(
+          'pingChart',
+          'line',
+          [
+            {
+              label: '1.1.1.1',
+            },
+            {
+              label: '2.2.2.2',
+            },
+          ],
+          (legendPosition = 'right')
+        ),
       };
-      return new Chart(ctx, {
-        type,
-        data,
-        options: {
-          plugins: {
-            legend: {
-              position: legendPosition,
+
+      // Function to initialize a chart
+      function initChart(canvasId, type, datasets, legendPosition = 'top', yDisplayText = 'Usage (%)') {
+        const ctx = document.getElementById(canvasId).getContext('2d');
+        const data = {
+          labels: [],
+          datasets: Array.isArray(datasets)
+            ? datasets.map((dataset) => ({
+                ...dataset,
+                data: [],
+              }))
+            : [{ ...datasets, data: [] }],
+        };
+        return new Chart(ctx, {
+          type,
+          data,
+          options: {
+            plugins: {
+              legend: {
+                position: legendPosition,
+              },
+            },
+            scales: {
+              y: {
+                beginAtZero: true,
+                title: {
+                  display: true,
+                  text: yDisplayText,
+                },
+              },
+            },
+            elements: {
+              line: {
+                tension: 0.2,
+              },
             },
           },
-        },
+        });
+      }
+
+      // Attach click event to dropdown items
+      $('.dropdown-item').click(function () {
+        const timeRange = $(this).data('time');
+        const cpuData = generateMockData(timeRange, 1);
+        const memoryData = generateMockData(timeRange, 1);
+        const diskData = generateMockData(timeRange, 1);
+        const networkData = generateMockData(timeRange, 2);
+        const connectionData = generateMockData(timeRange, 2);
+        const pingData = generateMockData(timeRange, 20);
+
+        // Update datasets and labels
+        updateChart(charts.cpu, cpuData.datasets, cpuData.labels);
+        updateChart(charts.memory, memoryData.datasets, memoryData.labels);
+        updateChart(charts.disk, diskData.datasets, diskData.labels);
+        updateChart(charts.network, networkData.datasets, networkData.labels);
+        updateChart(charts.connection, connectionData.datasets, connectionData.labels);
+        updateChart(charts.ping, pingData.datasets, pingData.labels);
       });
-    }
 
-    // Attach click event to dropdown items
-    $('.dropdown-item').click(function () {
-      const timeRange = $(this).data('time');
-      const cpuData = generateMockData(timeRange, 1);
-      const memoryData = generateMockData(timeRange, 1);
-      const connectionsData = generateMockData(timeRange, 2);
-      const pingData = generateMockData(timeRange, 20);
+      // Function to update chart data
+      function updateChart(chart, newData, labels) {
+        if (!newData || !labels) {
+          console.error('Invalid data or labels provided');
+          return;
+        }
 
-      // Update datasets and labels
-      updateChart(charts.cpu, cpuData.datasets, cpuData.labels);
-      updateChart(charts.memory, memoryData.datasets, memoryData.labels);
-      updateChart(charts.connections, connectionsData.datasets, connectionsData.labels);
-      updateChart(charts.ping, pingData.datasets, pingData.labels);
+        if (!Array.isArray(newData[0])) {
+          // Single dataset chart
+          chart.data.datasets.forEach((dataset, index) => {
+            dataset.data = newData;
+          });
+        } else {
+          // Multi-dataset chart
+          chart.data.datasets.forEach((dataset, index) => {
+            if (newData[index]) {
+              dataset.data = newData[index];
+            }
+          });
+        }
+        chart.data.labels = labels;
+        chart.update();
+      }
     });
-
-    // Function to update chart data
-    function updateChart(chart, newData, labels) {
-      if (!newData || !labels) {
-        console.error('Invalid data or labels provided');
-        return;
-      }
-
-      if (!Array.isArray(newData[0])) {
-        // Single dataset chart
-        chart.data.datasets.forEach((dataset, index) => {
-          dataset.data = newData;
-        });
-      } else {
-        // Multi-dataset chart
-        chart.data.datasets.forEach((dataset, index) => {
-          if (newData[index]) {
-            dataset.data = newData[index];
-          }
-        });
-      }
-      chart.data.labels = labels;
-      chart.update();
-    }
-  });
-</script>
+  </script>
+</div>
