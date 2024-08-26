@@ -71,7 +71,7 @@ func (s *Server) Start(ctx context.Context) error {
 		go s.startOneRelay(ctx, r)
 	}
 
-	if s.cfg.PATH != "" && (s.cfg.ReloadInterval > 0 || len(s.cfg.SubConfigs) > 0) {
+	if s.cfg.PATH != "" && (s.cfg.ReloadInterval > 0) {
 		s.l.Infof("Start to watch relay config %s ", s.cfg.PATH)
 		go s.WatchAndReload(ctx)
 	}

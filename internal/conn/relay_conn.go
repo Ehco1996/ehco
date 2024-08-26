@@ -21,9 +21,7 @@ const (
 	shortHashLength = 7
 )
 
-var (
-	ErrIdleTimeout = errors.New("connection closed due to idle timeout")
-)
+var ErrIdleTimeout = errors.New("connection closed due to idle timeout")
 
 // RelayConn is the interface that represents a relay connection.
 // it contains two connections: clientConn and remoteConn

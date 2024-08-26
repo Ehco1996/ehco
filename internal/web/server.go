@@ -103,7 +103,6 @@ func NewServer(
 	e.GET("/", s.index)
 	e.GET("/connections/", s.ListConnections)
 	e.GET("/rules/", s.ListRules)
-	e.GET("/clash_proxy_provider/", s.HandleClashProxyProvider)
 
 	// api group
 	api := e.Group("/api/v1")

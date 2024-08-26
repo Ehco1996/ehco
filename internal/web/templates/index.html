@@ -7,7 +7,11 @@
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <link
             rel="stylesheet"
-            href="https://cdnjs.cloudflare.com/ajax/libs/bulma/1.0.0/css/bulma.min.css"
+            href="https://cdnjs.cloudflare.com/ajax/libs/bulma/1.0.1/css/bulma.min.css"
+        />
+        <link
+            rel="stylesheet"
+            href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css"
         />
         <title>Ehco</title>
         <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
@@ -16,10 +20,7 @@
         <section class="hero is-fullheight is-light">
             <div class="hero-body">
                 <div class="container">
-                    <!-- Title -->
-                    <h1 class="title has-text-centered">
-                        ehco is a network relay tool and a typo :)
-                    </h1>
+                    <h1 class="title has-text-centered">Ehco Relay</h1>
                     <!-- Build Info Card -->
                     <div class="card">
                         <header class="card-header">
@@ -53,90 +54,82 @@
                                         <a
                                             href="/metrics/"
                                             class="button is-info is-light"
-                                            >Metrics</a
                                         >
+                                            <span class="icon"
+                                                ><i class="fas fa-chart-bar"></i
+                                            ></span>
+                                            <span>Metrics</span>
+                                        </a>
                                     </li>
                                     <li>
                                         <a
                                             href="/debug/pprof/"
                                             class="button is-info is-light"
-                                            >Debug</a
                                         >
+                                            <span class="icon"
+                                                ><i class="fas fa-bug"></i
+                                            ></span>
+                                            <span>Debug</span>
+                                        </a>
                                     </li>
                                     <li>
                                         <a
                                             href="/connections/?conn_type=active"
                                             class="button is-info is-light"
-                                            >Connections</a
                                         >
+                                            <span class="icon"
+                                                ><i class="fas fa-link"></i
+                                            ></span>
+                                            <span>Connections</span>
+                                        </a>
                                     </li>
                                     <li>
                                         <a
                                             href="/rules/"
                                             class="button is-info is-light"
-                                            >Rule List</a
                                         >
+                                            <span class="icon"
+                                                ><i class="fas fa-list"></i
+                                            ></span>
+                                            <span>Rule List</span>
+                                        </a>
                                     </li>
                                     <li>
                                         <a
                                             href="/api/v1/config/"
                                             class="button is-info is-light"
-                                            >Config</a
                                         >
+                                            <span class="icon"
+                                                ><i class="fas fa-cog"></i
+                                            ></span>
+                                            <span>Config</span>
+                                        </a>
                                     </li>
                                 </ul>
                             </div>
                         </div>
                     </div>
-                    <!-- Clash Providers card -->
-                    {{ if .SubConfigs }}
-                    <div class="card">
-                        <header class="card-header">
-                            <p class="card-header-title has-text-centered">
-                                Clash Providers
-                            </p>
-                        </header>
-                        <div class="card-content">
-                            <div class="content">
-                                <ul>
-                                    {{ range .SubConfigs }}
-                                    <li>
-                                        <a
-                                            class="button is-info is-light"
-                                            href="/clash_proxy_provider/?sub_name={{.Name}}"
-                                            >{{.Name}}</a
-                                        >
-                                    </li>
-                                    <li>
-                                        <a
-                                            class="button is-info is-light"
-                                            href="/clash_proxy_provider/?sub_name={{.Name}}&grouped=true"
-                                            >{{.Name}}-lb</a
-                                        >
-                                    </li>
-                                </ul>
-                                {{ end }}
-                            </div>
-                        </div>
-                    </div>
-                    {{ end }}
                     <!-- Reload Config Button -->
                     <div class="has-text-centered">
                         <button
                             class="button is-danger is-outlined"
                             id="reloadButton"
                         >
-                            Reload Config
+                            <span class="icon"
+                                ><i class="fas fa-sync-alt"></i
+                            ></span>
+                            <span>Reload Config</span>
                         </button>
                     </div>
                 </div>
             </div>
+
             <!-- Footer -->
             <div class="hero-foot">
                 <footer class="footer">
                     <div class="content has-text-centered">
                         <a href="https://github.com/Ehco1996/ehco"
-                            >Source code</a
+                            ><i class="fab fa-github"></i> Source code</a
                         >
                     </div>
                 </footer>
