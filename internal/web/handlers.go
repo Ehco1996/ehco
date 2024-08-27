@@ -124,14 +124,15 @@ func (s *Server) ListRules(c echo.Context) error {
 
 func (s *Server) GetNodeMetrics(c echo.Context) error {
 	req := &cmgr.QueryNodeMetricsReq{TimeRange: c.QueryParam("time_range")}
-	num := c.QueryParam("num")
-	if num != "" {
-		n, err := strconv.Atoi(num)
+	latest := c.QueryParam("latest")
+	if latest != "" {
+		r, err := strconv.ParseBool(latest)
 		if err != nil {
 			return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 		}
-		req.Num = n
+		req.Latest = r
 	}
+
 	metrics, err := s.connMgr.QueryNodeMetrics(c.Request().Context(), req)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())

@@ -11,7 +11,6 @@ import (
 
 func generateRetirableClient() *retryablehttp.Client {
 	retryClient := retryablehttp.NewClient()
-	retryClient.RetryMax = 3
 	retryClient.Logger = log.NewZapLeveledLogger("http")
 	return retryClient
 }
@@ -29,6 +28,9 @@ func PostJSONWithRetry(url string, dataStruct interface{}) error {
 	}
 	defer r.Body.Close()
 	_, err = io.ReadAll(r.Body)
+	if err != nil {
+		return err
+	}
 	return err
 }
 
