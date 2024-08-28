@@ -9,15 +9,18 @@
             "listen_type": "raw",
             "transport_type": "raw",
             "label": "relay1",
-            "tcp_remotes": [
+            "remotes": [
                 "0.0.0.0:5201"
-            ]
+            ],
+            "options": {
+                "enable_udp": true
+            }
         },
         {
             "listen": "127.0.0.1:1235",
             "listen_type": "raw",
             "transport_type": "ws",
-            "tcp_remotes": [
+            "remotes": [
                 "ws://0.0.0.0:2443"
             ]
         },
@@ -25,7 +28,7 @@
             "listen": "127.0.0.1:1236",
             "listen_type": "raw",
             "transport_type": "wss",
-            "tcp_remotes": [
+            "remotes": [
                 "wss://0.0.0.0:3443"
             ]
         },
@@ -33,7 +36,7 @@
             "listen": "127.0.0.1:2443",
             "listen_type": "ws",
             "transport_type": "raw",
-            "tcp_remotes": [
+            "remotes": [
                 "0.0.0.0:5201"
             ]
         },
@@ -41,7 +44,7 @@
             "listen": "127.0.0.1:3443",
             "listen_type": "wss",
             "transport_type": "raw",
-            "tcp_remotes": [
+            "remotes": [
                 "0.0.0.0:5201"
             ]
         }
