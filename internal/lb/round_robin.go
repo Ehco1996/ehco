@@ -28,8 +28,7 @@ type RoundRobin interface {
 type roundrobin struct {
 	nodeList []*Node
 	next     *atomic.Int64
-
-	len int
+	len      int
 }
 
 func NewRoundRobin(nodeList []*Node) RoundRobin {

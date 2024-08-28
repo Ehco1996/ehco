@@ -33,8 +33,8 @@ type RelayServer interface {
 	ListenAndServe(ctx context.Context) error
 	Close() error
 
-	RelayTCPConn(ctx context.Context, c net.Conn) error
-	RelayUDPConn(ctx context.Context, c net.Conn) error
+	RelayTCPConn(ctx context.Context, c net.Conn, remote *lb.Node) error
+	RelayUDPConn(ctx context.Context, c net.Conn, remote *lb.Node) error
 	HealthCheck(ctx context.Context) (int64, error) // latency in ms
 }
 

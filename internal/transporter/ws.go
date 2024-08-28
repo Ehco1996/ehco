@@ -97,15 +97,21 @@ func (s *WsServer) handleRequest(w http.ResponseWriter, req *http.Request) {
 	if err != nil {
 		return
 	}
+
+	var remote *lb.Node
+	if addr := req.URL.Query().Get(conf.WS_QUERY_REMOTE_ADDR); addr != "" {
+		remote = &lb.Node{Address: addr, Label: addr}
+	}
+
 	if req.URL.Query().Get("type") == "udp" {
 		if !s.cfg.Options.EnableUDP {
 			s.l.Error("udp not support but request with udp type")
 			wsc.Close()
 			return
 		}
-		err = s.RelayUDPConn(req.Context(), conn.NewWSConn(wsc, true))
+		err = s.RelayUDPConn(req.Context(), conn.NewWSConn(wsc, true), remote)
 	} else {
-		err = s.RelayTCPConn(req.Context(), conn.NewWSConn(wsc, true))
+		err = s.RelayTCPConn(req.Context(), conn.NewWSConn(wsc, true), remote)
 	}
 	if err != nil {
 		s.l.Errorf("handleRequest meet error:%s", err)
