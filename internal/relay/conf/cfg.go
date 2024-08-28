@@ -114,10 +114,10 @@ func (r *Config) Adjust() error {
 	if r.Options == nil {
 		r.Options = newDefaultOptions()
 	} else {
-		r.Options.DialTimeout = getDuration(r.Options.DialTimeoutSec, r.Options.DialTimeout)
-		r.Options.IdleTimeout = getDuration(r.Options.IdleTimeoutSec, r.Options.IdleTimeout)
-		r.Options.ReadTimeout = getDuration(r.Options.ReadTimeoutSec, r.Options.ReadTimeout)
-		r.Options.SniffTimeout = getDuration(r.Options.SniffTimeoutSec, r.Options.SniffTimeout)
+		r.Options.DialTimeout = getDuration(r.Options.DialTimeoutSec, constant.DefaultDialTimeOut)
+		r.Options.IdleTimeout = getDuration(r.Options.IdleTimeoutSec, constant.DefaultIdleTimeOut)
+		r.Options.ReadTimeout = getDuration(r.Options.ReadTimeoutSec, constant.DefaultReadTimeOut)
+		r.Options.SniffTimeout = getDuration(r.Options.SniffTimeoutSec, constant.DefaultSniffTimeOut)
 	}
 	return nil
 }
