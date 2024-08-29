@@ -50,7 +50,7 @@ func (cm *cmgrImpl) syncOnce(ctx context.Context) error {
 			cm.l.Errorf("read metrics failed: %v", err)
 		} else {
 			req.Node = *metrics
-			if err := cm.ms.Add(metrics); err != nil {
+			if err := cm.ms.AddNodeMetric(metrics); err != nil {
 				cm.l.Errorf("add metrics to store failed: %v", err)
 			}
 		}

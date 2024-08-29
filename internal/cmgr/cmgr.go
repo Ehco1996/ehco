@@ -208,14 +208,14 @@ func (cm *cmgrImpl) QueryNodeMetrics(ctx context.Context, req *ms.QueryNodeMetri
 		if err != nil {
 			return nil, err
 		}
-		if err := cm.ms.Add(m); err != nil {
+		if err := cm.ms.AddNodeMetric(m); err != nil {
 			return nil, err
 		}
 		num = 1
 	}
 
 	startTime := time.Now().Add(-getTimeRangeDuration(req.TimeRange))
-	return cm.ms.Query(startTime, time.Now(), num)
+	return cm.ms.QueryNodeMetric(startTime, time.Now(), num)
 }
 
 func getTimeRangeDuration(timeRange string) time.Duration {

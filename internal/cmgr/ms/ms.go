@@ -82,7 +82,7 @@ func (ms *MetricsStore) initDB() error {
 	return err
 }
 
-func (ms *MetricsStore) Add(m *metric_reader.NodeMetrics) error {
+func (ms *MetricsStore) AddNodeMetric(m *metric_reader.NodeMetrics) error {
 	_, err := ms.db.Exec(`
     INSERT OR REPLACE INTO node_metrics (timestamp, cpu_usage, memory_usage, disk_usage, network_in, network_out)
     VALUES (?, ?, ?, ?, ?, ?)
@@ -90,7 +90,7 @@ func (ms *MetricsStore) Add(m *metric_reader.NodeMetrics) error {
 	return err
 }
 
-func (ms *MetricsStore) Query(startTime, endTime time.Time, num int) (*QueryNodeMetricsResp, error) {
+func (ms *MetricsStore) QueryNodeMetric(startTime, endTime time.Time, num int) (*QueryNodeMetricsResp, error) {
 	rows, err := ms.db.Query(`
 	SELECT timestamp, cpu_usage, memory_usage, disk_usage, network_in, network_out
 	FROM node_metrics
