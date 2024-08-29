@@ -2,10 +2,13 @@ package cmgr
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"sort"
 	"sync"
 	"time"
 
+	"github.com/Ehco1996/ehco/internal/cmgr/ms"
 	"github.com/Ehco1996/ehco/internal/conn"
 	"github.com/Ehco1996/ehco/pkg/metric_reader"
 	"go.uber.org/zap"
@@ -35,7 +38,8 @@ type Cmgr interface {
 	// Start starts the connection manager.
 	Start(ctx context.Context, errCH chan error)
 
-	QueryNodeMetrics(ctx context.Context, req *QueryNodeMetricsReq) ([]metric_reader.NodeMetrics, error)
+	// Metrics related
+	QueryNodeMetrics(ctx context.Context, req *ms.QueryNodeMetricsReq) (*ms.QueryNodeMetricsResp, error)
 }
 
 type cmgrImpl struct {
@@ -47,11 +51,11 @@ type cmgrImpl struct {
 	activeConnectionsMap map[string][]conn.RelayConn
 	closedConnectionsMap map[string][]conn.RelayConn
 
+	ms *ms.MetricsStore
 	mr metric_reader.Reader
-	ms *MetricsStore
 }
 
-func NewCmgr(cfg *Config) Cmgr {
+func NewCmgr(cfg *Config) (Cmgr, error) {
 	cmgr := &cmgrImpl{
 		cfg:                  cfg,
 		l:                    zap.S().Named("cmgr"),
@@ -60,12 +64,16 @@ func NewCmgr(cfg *Config) Cmgr {
 	}
 	if cfg.NeedMetrics() {
 		cmgr.mr = metric_reader.NewReader(cfg.MetricsURL)
-		// 当前只能存储 24h 的 metrics，之后再优化
-		bufSize := 60 * 60 * 24 / cfg.SyncInterval
-		cmgr.l.Infof("metrics buffer size: %d", bufSize)
-		cmgr.ms = NewMetricsStore(bufSize, time.Hour*24)
+
+		homeDir, _ := os.UserHomeDir()
+		dbPath := filepath.Join(homeDir, ".ehco", "metrics.db")
+		ms, err := ms.NewMetricsStore(dbPath)
+		if err != nil {
+			return nil, err
+		}
+		cmgr.ms = ms
 	}
-	return cmgr
+	return cmgr, nil
 }
 
 func (cm *cmgrImpl) ListConnections(connType string, page, pageSize int) []conn.RelayConn {
@@ -190,5 +198,41 @@ func (cm *cmgrImpl) Start(ctx context.Context, errCH chan error) {
 				errCH <- err
 			}
 		}
+	}
+}
+
+func (cm *cmgrImpl) QueryNodeMetrics(ctx context.Context, req *ms.QueryNodeMetricsReq) (*ms.QueryNodeMetricsResp, error) {
+	num := -1 // default to return all metrics
+	if req.Latest {
+		m, err := cm.mr.ReadOnce(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if err := cm.ms.Add(m); err != nil {
+			return nil, err
+		}
+		num = 1
+	}
+
+	startTime := time.Now().Add(-getTimeRangeDuration(req.TimeRange))
+	return cm.ms.Query(startTime, time.Now(), num)
+}
+
+func getTimeRangeDuration(timeRange string) time.Duration {
+	switch timeRange {
+	case "15min":
+		return 15 * time.Minute
+	case "30min":
+		return 30 * time.Minute
+	case "1h":
+		return 1 * time.Hour
+	case "6h":
+		return 6 * time.Hour
+	case "12h":
+		return 12 * time.Hour
+	case "24h":
+		return 24 * time.Hour
+	default:
+		return 15 * time.Minute
 	}
 }

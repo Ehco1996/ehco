@@ -89,6 +89,9 @@ func (b *BaseRelayServer) RelayUDPConn(ctx context.Context, c net.Conn, remote *
 }
 
 func (b *BaseRelayServer) checkConnectionLimit() error {
+	if b.cmgr == nil {
+		return nil
+	}
 	if b.cfg.Options.MaxConnection > 0 && b.cmgr.CountConnection(cmgr.ConnectionTypeActive) >= b.cfg.Options.MaxConnection {
 		return fmt.Errorf("relay:%s active connection count exceed limit %d", b.cfg.Label, b.cfg.Options.MaxConnection)
 	}
@@ -144,8 +147,11 @@ func (b *BaseRelayServer) handleRelayConn(c, rc net.Conn, remote *lb.Node, connT
 		conn.WithHandshakeDuration(remote.HandShakeDuration),
 	}
 	relayConn := conn.NewRelayConn(c, rc, opts...)
-	b.cmgr.AddConnection(relayConn)
-	defer b.cmgr.RemoveConnection(relayConn)
+	if b.cmgr != nil {
+		b.cmgr.AddConnection(relayConn)
+		defer b.cmgr.RemoveConnection(relayConn)
+	}
+
 	return relayConn.Transport()
 }
 
