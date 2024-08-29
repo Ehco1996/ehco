@@ -37,25 +37,17 @@
         <div class="content">
             <div class="columns is-multiline">
                 <div class="column is-4">
-                    <h2 class="subtitle is-5">CPU</h2>
                     <canvas id="cpuChart"></canvas>
                 </div>
                 <div class="column is-4">
-                    <h2 class="subtitle is-5">Memory</h2>
                     <canvas id="memoryChart"></canvas>
                 </div>
                 <div class="column is-4">
-                    <h2 class="subtitle is-5">Disk</h2>
                     <canvas id="diskChart"></canvas>
                 </div>
 
-                <div class="column is-6">
-                    <h2 class="subtitle is-5">Network</h2>
+                <div class="column is-12">
                     <canvas id="networkChart"></canvas>
-                </div>
-                <div class="column is-6">
-                    <h2 class="subtitle is-5">Ping</h2>
-                    <canvas id="pingChart"></canvas>
                 </div>
             </div>
         </div>
@@ -73,8 +65,8 @@
             // You can add user notifications here
         };
 
-        const formatDate = (dateString) => {
-            const date = new Date(dateString);
+        const formatDate = (timeStamp) => {
+            const date = dateFns.parseISO(timeStamp);
             return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
         };
 
@@ -83,7 +75,7 @@
         };
 
         // Chart functions
-        const initChart = (canvasId, type, datasets, legendPosition = '', yDisplayText = '', additionalInfo = '', unit = '') => {
+        const initChart = (canvasId, type, datasets, legendPosition = '', yDisplayText = '', title = '', unit = '') => {
             const ctx = document.getElementById(canvasId).getContext('2d');
             const data = {
                 labels: [],
@@ -97,8 +89,8 @@
                     plugins: {
                         legend: { position: legendPosition },
                         title: {
-                            display: !!additionalInfo,
-                            text: additionalInfo,
+                            display: title,
+                            text: title,
                             position: 'bottom',
                             font: { size: 12 },
                         },
@@ -161,7 +153,7 @@
                 const response = await fetch(`${API_BASE_URL}?latest=true`);
                 if (!response.ok) throw new Error('Network response was not ok');
                 const data = await response.json();
-                return data[0];
+                return data['data'][0];
             } catch (error) {
                 handleError(error);
             }
@@ -171,7 +163,7 @@
             try {
                 const response = await fetch(`${API_BASE_URL}?time_range=${timeRange}`);
                 if (!response.ok) throw new Error('Network response was not ok');
-                return await response.json();
+                return await response.json()['data'];
             } catch (error) {
                 handleError(error);
             }
@@ -181,129 +173,67 @@
         const initializeCharts = async () => {
             const metric = await fetchLatestMetric();
             if (!metric) return null;
-
-            const pingTargets = metric.ping_metrics.map((ping) => ping.target);
             return {
-                cpu: initChart(
-                    'cpuChart',
+                cpu: initChart('cpuChart', 'line', { label: 'CPU' }, 'top', 'Usage (%)', `CPU`, '%'),
+                memory: initChart('memoryChart', 'line', { label: 'Memory' }, 'top', 'Usage (%)', `Memeory`, '%'),
+                disk: initChart('diskChart', 'line', { label: 'Disk' }, 'top', 'Usage (%)', `Disk`, '%'),
+                network: initChart(
+                    'networkChart',
                     'line',
-                    { label: 'CPU' },
+                    [{ label: 'Receive' }, { label: 'Transmit' }],
                     'top',
-                    'Usage (%)',
-                    `Load: ${metric.cpu_load_info} | Cores: ${metric.cpu_core_count}`,
-                    '%',
-                ),
-                memory: initChart(
-                    'memoryChart',
-                    'line',
-                    { label: 'Memory' },
-                    'top',
-                    'Usage (%)',
-                    `Total: ${formatBytes(metric.memory_total_bytes)} GB`,
-                    '%',
-                ),
-                disk: initChart(
-                    'diskChart',
-                    'line',
-                    { label: 'Disk' },
-                    'top',
-                    'Usage (%)',
-                    `Total: ${formatBytes(metric.disk_total_bytes)} GB`,
-                    '%',
-                ),
-                network: initChart('networkChart', 'line', [{ label: 'Receive' }, { label: 'Transmit' }], 'top', 'Rate (MB/s)', '', 'MB/s'),
-                ping: initChart(
-                    'pingChart',
-                    'line',
-                    pingTargets.map((target) => ({ label: target })),
-                    'right',
-                    'Latency (ms)',
-                    '',
-                    'ms',
+                    'Rate (MB/s)',
+                    'Network Rate',
+                    'MB/s',
                 ),
             };
         };
 
         // Update functions
         const updateCharts = (charts, metrics) => {
-            const timestamps = metrics.map((data) => data.SyncTime);
+            const timestamps = metrics.map((data) => data.TimaStamp);
+            console.log(timestamps);
+            console.log(metrics.map((data) => data.cpu_usage));
 
             updateChart(
                 charts.cpu,
-                metrics.map((data) => data.cpu_usage_percent),
+                metrics.map((data) => data.cpu_usage),
                 timestamps,
             );
             updateChart(
                 charts.memory,
-                metrics.map((data) => data.memory_usage_percent),
+                metrics.map((data) => data.memory_usage),
                 timestamps,
             );
             updateChart(
                 charts.disk,
-                metrics.map((data) => data.disk_usage_percent),
+                metrics.map((data) => data.disk_usage),
                 timestamps,
             );
             updateChart(
                 charts.network,
-                [
-                    metrics.map((data) => data.network_receive_bytes_rate / BYTE_TO_MB),
-                    metrics.map((data) => data.network_transmit_bytes_rate / BYTE_TO_MB),
-                ],
+                [metrics.map((data) => data.network_in / BYTE_TO_MB), metrics.map((data) => data.network_out / BYTE_TO_MB)],
                 timestamps,
             );
 
-            const pingTargets = [...new Set(metrics.flatMap((data) => data.ping_metrics.map((ping) => ping.target)))];
-            const pingData = pingTargets.map((target) =>
-                metrics.map((data) => {
-                    const pingMetric = data.ping_metrics.find((ping) => ping.target === target);
-                    return pingMetric ? pingMetric.latency : null;
-                }),
-            );
-            updateChart(charts.ping, pingData, timestamps);
-
             const latestMetric = metrics[metrics.length - 1];
-            updateAdditionalInfo(charts, latestMetric);
-        };
-
-        const updateAdditionalInfo = (charts, metric) => {
-            charts.cpu.options.plugins.title.text = `Load: ${metric.cpu_load_info} | Cores: ${metric.cpu_core_count}`;
-            charts.memory.options.plugins.title.text = `Total: ${formatBytes(metric.memory_total_bytes)} GB`;
-            charts.disk.options.plugins.title.text = `Total: ${formatBytes(metric.disk_total_bytes)} GB`;
-
-            // 更新图表
-            for (const chart of Object.values(charts)) {
-                chart.update();
-            }
         };
 
         const addLatestDataToCharts = (charts, latestMetric) => {
-            const timestamp = formatDate(latestMetric.SyncTime);
-
+            const timestamp = formatDate(latestMetric.TimaStamp);
             // 更新 CPU 图表
             charts.cpu.data.labels.push(timestamp);
-            charts.cpu.data.datasets[0].data.push(latestMetric.cpu_usage_percent);
-
+            charts.cpu.data.datasets[0].data.push(latestMetric.cpu_usage);
             // 更新内存图表
             charts.memory.data.labels.push(timestamp);
-            charts.memory.data.datasets[0].data.push(latestMetric.memory_usage_percent);
-
+            charts.memory.data.datasets[0].data.push(latestMetric.memory_usage);
             // 更新磁盘图表
             charts.disk.data.labels.push(timestamp);
-            charts.disk.data.datasets[0].data.push(latestMetric.disk_usage_percent);
-
+            charts.disk.data.datasets[0].data.push(latestMetric.disk_usage);
             // 更新网络图表
             charts.network.data.labels.push(timestamp);
-            charts.network.data.datasets[0].data.push(latestMetric.network_receive_bytes_rate / BYTE_TO_MB);
-            charts.network.data.datasets[1].data.push(latestMetric.network_transmit_bytes_rate / BYTE_TO_MB);
-
-            // 更新 ping 图表
-            charts.ping.data.labels.push(timestamp);
-            charts.ping.data.datasets.forEach((dataset) => {
-                const pingMetric = latestMetric.ping_metrics.find((ping) => ping.target === dataset.label);
-                dataset.data.push(pingMetric ? pingMetric.latency : null);
-            });
-            // 更新额外信息
-            updateAdditionalInfo(charts, latestMetric);
+            charts.network.data.datasets[0].data.push(latestMetric.network_in / BYTE_TO_MB);
+            charts.network.data.datasets[1].data.push(latestMetric.network_out / BYTE_TO_MB);
         };
 
         // Main execution
