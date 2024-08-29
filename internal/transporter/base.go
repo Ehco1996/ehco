@@ -108,7 +108,6 @@ func (b *BaseRelayServer) sniffAndBlockProtocol(c net.Conn) (net.Conn, error) {
 	sniffMetadata, err := sniff.PeekStream(ctx, c, buffer, b.cfg.Options.SniffTimeout, sniff.TLSClientHello, sniff.HTTPHost)
 	if err != nil {
 		b.l.Debugf("sniff error: %s", err)
-		return c, nil
 	}
 
 	if sniffMetadata != nil {
