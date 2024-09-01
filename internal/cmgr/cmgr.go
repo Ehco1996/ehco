@@ -214,25 +214,7 @@ func (cm *cmgrImpl) QueryNodeMetrics(ctx context.Context, req *ms.QueryNodeMetri
 		num = 1
 	}
 
-	startTime := time.Now().Add(-getTimeRangeDuration(req.TimeRange))
-	return cm.ms.QueryNodeMetric(startTime, time.Now(), num)
-}
-
-func getTimeRangeDuration(timeRange string) time.Duration {
-	switch timeRange {
-	case "15min":
-		return 15 * time.Minute
-	case "30min":
-		return 30 * time.Minute
-	case "1h":
-		return 1 * time.Hour
-	case "6h":
-		return 6 * time.Hour
-	case "12h":
-		return 12 * time.Hour
-	case "24h":
-		return 24 * time.Hour
-	default:
-		return 15 * time.Minute
-	}
+	startTime := time.Unix(req.StartTimestamp, 0)
+	endTime := time.Unix(req.EndTimestamp, 0)
+	return cm.ms.QueryNodeMetric(startTime, endTime, num)
 }

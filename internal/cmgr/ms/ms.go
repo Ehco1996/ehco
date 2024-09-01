@@ -23,8 +23,10 @@ type NodeMetrics struct {
 }
 
 type QueryNodeMetricsReq struct {
-	TimeRange string `json:"time_range"` // 15min/30min/1h/6h/12h/24h
-	Latest    bool   `json:"latest"`     // whether to refresh the cache and get the latest data
+	StartTimestamp int64 `json:"start_ts"`
+	EndTimestamp   int64 `json:"end_ts"`
+
+	Latest bool `json:"latest"` // whether to refresh the cache and get the latest data
 }
 type QueryNodeMetricsResp struct {
 	TOTAL int           `json:"total"`

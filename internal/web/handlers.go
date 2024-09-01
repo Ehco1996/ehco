@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/Ehco1996/ehco/internal/cmgr/ms"
 	"github.com/Ehco1996/ehco/internal/config"
@@ -126,7 +127,23 @@ func (s *Server) ListRules(c echo.Context) error {
 }
 
 func (s *Server) GetNodeMetrics(c echo.Context) error {
-	req := &ms.QueryNodeMetricsReq{TimeRange: c.QueryParam("time_range")}
+	startTS := time.Now().Unix() - 60
+	if c.QueryParam("start_ts") != "" {
+		star, err := strconv.ParseInt(c.QueryParam("start_ts"), 10, 64)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+		}
+		startTS = star
+	}
+	endTS := time.Now().Unix()
+	if c.QueryParam("end_ts") != "" {
+		end, err := strconv.ParseInt(c.QueryParam("end_ts"), 10, 64)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+		}
+		endTS = end
+	}
+	req := &ms.QueryNodeMetricsReq{StartTimestamp: startTS, EndTimestamp: endTS}
 	latest := c.QueryParam("latest")
 	if latest != "" {
 		r, err := strconv.ParseBool(latest)
