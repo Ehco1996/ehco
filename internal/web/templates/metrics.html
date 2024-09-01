@@ -1,6 +1,6 @@
 <div class="card" id="metrics-card">
     <header class="card-header is-flex is-flex-wrap-wrap">
-        <p class="card-header-title has-text-centered">Node Metrics For: {{ .Cfg.NodeLabel }}</p>
+        <p class="card-header-title has-text-centered">Node({{ .Cfg.NodeLabel }}) Metrics</p>
         <div class="card-header-icon is-flex-grow-1 is-flex is-justify-content-flex-end">
             <div class="dropdown is-hoverable">
                 <div class="dropdown-trigger">
@@ -66,7 +66,7 @@
         };
 
         const formatDate = (timeStamp) => {
-            const date = dateFns.parseISO(timeStamp);
+            const date = new Date(timeStamp * 1000); // 转换为毫秒
             return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
         };
 
@@ -163,9 +163,11 @@
             try {
                 const response = await fetch(`${API_BASE_URL}?time_range=${timeRange}`);
                 if (!response.ok) throw new Error('Network response was not ok');
-                return await response.json()['data'];
+                const data = await response.json();
+                return data.data;
             } catch (error) {
                 handleError(error);
+                return null;
             }
         };
 
@@ -191,10 +193,8 @@
 
         // Update functions
         const updateCharts = (charts, metrics) => {
-            const timestamps = metrics.map((data) => data.TimaStamp);
-            console.log(timestamps);
-            console.log(metrics.map((data) => data.cpu_usage));
-
+            console.log('Raw metrics data:', metrics);
+            const timestamps = metrics.map((data) => data.timestamp);
             updateChart(
                 charts.cpu,
                 metrics.map((data) => data.cpu_usage),
@@ -215,12 +215,11 @@
                 [metrics.map((data) => data.network_in / BYTE_TO_MB), metrics.map((data) => data.network_out / BYTE_TO_MB)],
                 timestamps,
             );
-
-            const latestMetric = metrics[metrics.length - 1];
         };
 
         const addLatestDataToCharts = (charts, latestMetric) => {
-            const timestamp = formatDate(latestMetric.TimaStamp);
+            console.log('Raw latestMetric data:', latestMetric);
+            const timestamp = formatDate(latestMetric.timestamp);
             // 更新 CPU 图表
             charts.cpu.data.labels.push(timestamp);
             charts.cpu.data.datasets[0].data.push(latestMetric.cpu_usage);
@@ -234,16 +233,25 @@
             charts.network.data.labels.push(timestamp);
             charts.network.data.datasets[0].data.push(latestMetric.network_in / BYTE_TO_MB);
             charts.network.data.datasets[1].data.push(latestMetric.network_out / BYTE_TO_MB);
+
+            for (const chart of Object.values(charts)) {
+                chart.update();
+            }
         };
 
         // Main execution
         $(document).ready(async function () {
             let charts = await initializeCharts();
             if (!charts) return;
-            $('.dropdown-item').click(async function () {
+
+            $('.dropdown-item').click(async function (e) {
+                e.preventDefault();
                 const timeRange = $(this).data('time');
                 const metrics = await fetchMetrics(timeRange);
-                if (metrics) updateCharts(charts, metrics);
+                if (metrics) {
+                    console.log('Raw metrics data:', metrics); // 这行应该会输出
+                    updateCharts(charts, metrics);
+                }
             });
 
             let autoRefreshInterval;

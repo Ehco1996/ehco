@@ -31,7 +31,7 @@ var RootFlags = []cli.Flag{
 	&cli.StringFlag{
 		Name:        "lt,listen_type",
 		Value:       "raw",
-		Usage:       "监听类型，可选项有 raw,ws,wss,mwss",
+		Usage:       "监听类型，可选项有 raw,ws,wss",
 		EnvVars:     []string{"EHCO_LISTEN_TYPE"},
 		Destination: (*string)(&ListenType),
 		Required:    false,
@@ -45,7 +45,7 @@ var RootFlags = []cli.Flag{
 	&cli.StringFlag{
 		Name:        "tt,transport_type",
 		Value:       "raw",
-		Usage:       "传输类型，可选选有 raw,ws,wss,mwss",
+		Usage:       "传输类型，可选选有 raw,ws,wss",
 		EnvVars:     []string{"EHCO_TRANSPORT_TYPE"},
 		Destination: (*string)(&TransportType),
 	},
