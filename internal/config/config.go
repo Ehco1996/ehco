@@ -16,7 +16,7 @@ import (
 )
 
 type Config struct {
-	PATH string
+	PATH string `json:"-"`
 
 	NodeLabel   string `json:"node_label,omitempty"`
 	WebHost     string `json:"web_host,omitempty"`
