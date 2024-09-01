@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"time"
 
-	"github.com/Ehco1996/ehco/internal/cmgr"
+	"github.com/Ehco1996/ehco/internal/cmgr/ms"
+	"github.com/Ehco1996/ehco/internal/config"
 	"github.com/Ehco1996/ehco/internal/constant"
 	"github.com/labstack/echo/v4"
 	"go.uber.org/zap"
@@ -28,12 +30,14 @@ func (s *Server) index(c echo.Context) error {
 		GitRevision string
 		BuildTime   string
 		StartTime   string
+		Cfg         config.Config
 	}{
 		Version:     constant.Version,
 		GitBranch:   constant.GitBranch,
 		GitRevision: constant.GitRevision,
 		BuildTime:   constant.BuildTime,
 		StartTime:   constant.StartTime.Format("2006-01-02 15:04:05"),
+		Cfg:         *s.cfg,
 	}
 	return c.Render(http.StatusOK, "index.html", data)
 }
@@ -123,7 +127,23 @@ func (s *Server) ListRules(c echo.Context) error {
 }
 
 func (s *Server) GetNodeMetrics(c echo.Context) error {
-	req := &cmgr.QueryNodeMetricsReq{TimeRange: c.QueryParam("time_range")}
+	startTS := time.Now().Unix() - 60
+	if c.QueryParam("start_ts") != "" {
+		star, err := strconv.ParseInt(c.QueryParam("start_ts"), 10, 64)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+		}
+		startTS = star
+	}
+	endTS := time.Now().Unix()
+	if c.QueryParam("end_ts") != "" {
+		end, err := strconv.ParseInt(c.QueryParam("end_ts"), 10, 64)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+		}
+		endTS = end
+	}
+	req := &ms.QueryNodeMetricsReq{StartTimestamp: startTS, EndTimestamp: endTS}
 	latest := c.QueryParam("latest")
 	if latest != "" {
 		r, err := strconv.ParseBool(latest)

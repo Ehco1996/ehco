@@ -35,13 +35,17 @@ func NewServer(cfg *config.Config) (*Server, error) {
 		MetricsURL:   cfg.GetMetricURL(),
 	}
 	cmgrCfg.Adjust()
+	cmgr, err := cmgr.NewCmgr(cmgrCfg)
+	if err != nil {
+		return nil, err
+	}
 	s := &Server{
 		cfg:      cfg,
 		l:        l,
 		relayM:   &sync.Map{},
 		errCH:    make(chan error, 1),
 		reloadCH: make(chan struct{}, 1),
-		Cmgr:     cmgr.NewCmgr(cmgrCfg),
+		Cmgr:     cmgr,
 	}
 	return s, nil
 }

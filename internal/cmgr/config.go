@@ -1,7 +1,5 @@
 package cmgr
 
-var DummyConfig = &Config{}
-
 type Config struct {
 	SyncURL      string
 	MetricsURL   string

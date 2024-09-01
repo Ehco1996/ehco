@@ -190,10 +190,10 @@ func (s *Stats) Record(up, down int64) {
 }
 
 func (s *Stats) String() string {
-	return fmt.Sprintf("up: %s, down: %s, handshake latency: %s",
+	return fmt.Sprintf("up: %s, down: %s, latency: %s",
 		bytes.PrettyByteSize(float64(s.Up)),
 		bytes.PrettyByteSize(float64(s.Down)),
-		s.HandShakeLatency.String(),
+		fmt.Sprintf("%d ms", s.HandShakeLatency.Milliseconds()),
 	)
 }
 

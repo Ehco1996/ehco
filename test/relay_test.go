@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Ehco1996/ehco/internal/cmgr"
 	"github.com/Ehco1996/ehco/internal/config"
 
 	"github.com/Ehco1996/ehco/internal/constant"
@@ -121,7 +120,7 @@ func startRelayServers() []*relay.Relay {
 	var servers []*relay.Relay
 	for _, c := range cfg.RelayConfigs {
 		c.Adjust()
-		r, err := relay.NewRelay(c, cmgr.NewCmgr(cmgr.DummyConfig))
+		r, err := relay.NewRelay(c, nil)
 		if err != nil {
 			zap.S().Fatal(err)
 		}

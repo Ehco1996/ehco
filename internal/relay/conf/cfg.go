@@ -49,10 +49,10 @@ type Options struct {
 	SniffTimeoutSec int `json:"sniff_timeout_sec,omitempty"`
 
 	// timeout in duration
-	DialTimeout  time.Duration
-	IdleTimeout  time.Duration
-	ReadTimeout  time.Duration
-	SniffTimeout time.Duration
+	DialTimeout  time.Duration `json:"-"`
+	IdleTimeout  time.Duration `json:"-"`
+	ReadTimeout  time.Duration `json:"-"`
+	SniffTimeout time.Duration `json:"-"`
 }
 
 func (o *Options) Clone() *Options {
@@ -78,9 +78,6 @@ type Config struct {
 	Remotes       []string           `json:"remotes"`
 
 	Options *Options `json:"options,omitempty"`
-
-	// deprecated
-	TCPRemotes []string `json:"tcp_remotes"`
 }
 
 func (r *Config) GetWSHandShakePath() string {
@@ -106,10 +103,6 @@ func (r *Config) Adjust() error {
 		r.Label = r.DefaultLabel()
 		zap.S().Debugf("label is empty, set default label:%s", r.Label)
 	}
-	if len(r.Remotes) == 0 && len(r.TCPRemotes) != 0 {
-		zap.S().Warnf("tcp remotes is deprecated, please use remotes instead")
-		r.Remotes = r.TCPRemotes
-	}
 
 	if r.Options == nil {
 		r.Options = newDefaultOptions()
@@ -126,21 +119,17 @@ func (r *Config) Validate() error {
 	if err := r.Adjust(); err != nil {
 		return errors.New("adjust config failed")
 	}
-
 	if err := r.validateType(); err != nil {
 		return err
 	}
-
 	if r.Listen == "" {
 		return fmt.Errorf("invalid listen: %s", r.Listen)
 	}
-
 	for _, addr := range r.Remotes {
 		if addr == "" {
 			return fmt.Errorf("invalid remote addr: %s", addr)
 		}
 	}
-
 	for _, protocol := range r.Options.BlockedProtocols {
 		if protocol != ProtocolHTTP && protocol != ProtocolTLS {
 			return fmt.Errorf("invalid blocked protocol: %s", protocol)
@@ -227,10 +216,17 @@ func getDuration(seconds int, defaultDuration time.Duration) time.Duration {
 func newDefaultOptions() *Options {
 	return &Options{
 		EnableMultipathTCP: true,
-		WSConfig:           &WSConfig{},
-		DialTimeout:        constant.DefaultDialTimeOut,
-		IdleTimeout:        constant.DefaultIdleTimeOut,
-		ReadTimeout:        constant.DefaultReadTimeOut,
-		SniffTimeout:       constant.DefaultSniffTimeOut,
+
+		DialTimeout:    constant.DefaultDialTimeOut,
+		DialTimeoutSec: int(constant.DefaultDialTimeOut.Seconds()),
+
+		IdleTimeout:    constant.DefaultIdleTimeOut,
+		IdleTimeoutSec: int(constant.DefaultIdleTimeOut.Seconds()),
+
+		ReadTimeout:    constant.DefaultReadTimeOut,
+		ReadTimeoutSec: int(constant.DefaultReadTimeOut.Seconds()),
+
+		SniffTimeout:    constant.DefaultSniffTimeOut,
+		SniffTimeoutSec: int(constant.DefaultSniffTimeOut.Seconds()),
 	}
 }
