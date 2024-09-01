@@ -1,6 +1,6 @@
 <div class="card" id="metrics-card">
     <header class="card-header is-flex is-flex-wrap-wrap">
-        <p class="card-header-title has-text-centered">Node({{ .Cfg.NodeLabel }}) Metrics</p>
+        <p class="card-header-title has-text-centered">Node Metrics</p>
         <div class="card-header-icon is-flex-grow-1 is-flex is-justify-content-flex-end">
             <div class="dropdown is-hoverable">
                 <div class="dropdown-trigger">
@@ -55,7 +55,8 @@
 
     <script>
         // Constants
-        const API_BASE_URL = '/api/v1/node_metrics/';
+        const API_BASE_URL = '/api/v1';
+        const NODE_METRICS_PATH = '/node_metrics/';
         const BYTE_TO_MB = 1024 * 1024;
         const BYTE_TO_GB = BYTE_TO_MB * 1024;
 
@@ -66,7 +67,7 @@
         };
 
         const formatDate = (timeStamp) => {
-            const date = new Date(timeStamp * 1000); // 转换为毫秒
+            const date = new Date(timeStamp * 1000);
             return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
         };
 
@@ -74,13 +75,73 @@
             return (bytes / BYTE_TO_GB).toFixed(decimals);
         };
 
+        // API functions
+        const fetchData = async (path, params = {}) => {
+            const url = new URL(API_BASE_URL + path, window.location.origin);
+            Object.keys(params).forEach((key) => url.searchParams.append(key, params[key]));
+            try {
+                const response = await fetch(url);
+                if (!response.ok) throw new Error('Network response was not ok');
+                return await response.json();
+            } catch (error) {
+                handleError(error);
+                return null;
+            }
+        };
+
+        const fetchLatestMetric = () => fetchData(NODE_METRICS_PATH, { latest: true }).then((data) => data?.data[0]);
+        const fetchMetrics = (timeRange) => fetchData(NODE_METRICS_PATH, { time_range: timeRange }).then((data) => data?.data);
+
         // Chart functions
         const initChart = (canvasId, type, datasets, legendPosition = '', yDisplayText = '', title = '', unit = '') => {
             const ctx = document.getElementById(canvasId).getContext('2d');
+            const colors = {
+                cpu: 'rgba(255, 99, 132, 1)', // 红色
+                memory: 'rgba(54, 162, 235, 1)', // 蓝色
+                disk: 'rgba(255, 206, 86, 1)', // 黄色
+                networkIn: 'rgba(75, 192, 192, 1)', // 青色
+                networkOut: 'rgba(153, 102, 255, 1)', // 紫色
+            };
+
+            const getDatasetConfig = (label) => {
+                let color;
+                switch (label.toLowerCase()) {
+                    case 'cpu':
+                        color = colors.cpu;
+                        break;
+                    case 'memory':
+                        color = colors.memory;
+                        break;
+                    case 'disk':
+                        color = colors.disk;
+                        break;
+                    case 'receive':
+                        color = colors.networkIn;
+                        break;
+                    case 'transmit':
+                        color = colors.networkOut;
+                        break;
+                    default:
+                        color = 'rgba(0, 0, 0, 1)';
+                }
+
+                return {
+                    label,
+                    borderColor: color,
+                    backgroundColor: color.replace('1)', '0.2)'),
+                    borderWidth: 2,
+                    pointRadius: 0,
+                    fill: true,
+                };
+            };
+
             const data = {
                 labels: [],
-                datasets: Array.isArray(datasets) ? datasets.map((dataset) => ({ ...dataset, data: [] })) : [{ ...datasets, data: [] }],
+                datasets: Array.isArray(datasets)
+                    ? datasets.map((dataset) => ({ ...getDatasetConfig(dataset.label), data: [] }))
+                    : [{ ...getDatasetConfig(datasets.label), data: [] }],
             };
+
             return new Chart(ctx, {
                 type,
                 data,
@@ -89,10 +150,10 @@
                     plugins: {
                         legend: { position: legendPosition },
                         title: {
-                            display: title,
+                            display: !!title,
                             text: title,
                             position: 'bottom',
-                            font: { size: 12 },
+                            font: { size: 14, weight: 'bold' },
                         },
                         tooltip: {
                             callbacks: {
@@ -112,14 +173,16 @@
                     scales: {
                         y: {
                             beginAtZero: true,
-                            title: { display: true, text: yDisplayText },
+                            title: { display: true, text: yDisplayText, font: { weight: 'bold' } },
+                        },
+                        x: {
+                            ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 10 },
                         },
                     },
-                    elements: { line: { tension: 0.2 } },
+                    elements: { line: { tension: 0.4 } },
                     downsample: {
                         enabled: true,
-                        samples: 100,
-                        threshold: 50,
+                        threshold: 200,
                     },
                 },
             });
@@ -147,51 +210,6 @@
             chart.update();
         };
 
-        // Data fetching functions
-        const fetchLatestMetric = async () => {
-            try {
-                const response = await fetch(`${API_BASE_URL}?latest=true`);
-                if (!response.ok) throw new Error('Network response was not ok');
-                const data = await response.json();
-                return data['data'][0];
-            } catch (error) {
-                handleError(error);
-            }
-        };
-
-        const fetchMetrics = async (timeRange) => {
-            try {
-                const response = await fetch(`${API_BASE_URL}?time_range=${timeRange}`);
-                if (!response.ok) throw new Error('Network response was not ok');
-                const data = await response.json();
-                return data.data;
-            } catch (error) {
-                handleError(error);
-                return null;
-            }
-        };
-
-        // Chart initialization
-        const initializeCharts = async () => {
-            const metric = await fetchLatestMetric();
-            if (!metric) return null;
-            return {
-                cpu: initChart('cpuChart', 'line', { label: 'CPU' }, 'top', 'Usage (%)', `CPU`, '%'),
-                memory: initChart('memoryChart', 'line', { label: 'Memory' }, 'top', 'Usage (%)', `Memeory`, '%'),
-                disk: initChart('diskChart', 'line', { label: 'Disk' }, 'top', 'Usage (%)', `Disk`, '%'),
-                network: initChart(
-                    'networkChart',
-                    'line',
-                    [{ label: 'Receive' }, { label: 'Transmit' }],
-                    'top',
-                    'Rate (MB/s)',
-                    'Network Rate',
-                    'MB/s',
-                ),
-            };
-        };
-
-        // Update functions
         const updateCharts = (charts, metrics) => {
             console.log('Raw metrics data:', metrics);
             const timestamps = metrics.map((data) => data.timestamp);
@@ -220,23 +238,36 @@
         const addLatestDataToCharts = (charts, latestMetric) => {
             console.log('Raw latestMetric data:', latestMetric);
             const timestamp = formatDate(latestMetric.timestamp);
-            // 更新 CPU 图表
-            charts.cpu.data.labels.push(timestamp);
-            charts.cpu.data.datasets[0].data.push(latestMetric.cpu_usage);
-            // 更新内存图表
-            charts.memory.data.labels.push(timestamp);
-            charts.memory.data.datasets[0].data.push(latestMetric.memory_usage);
-            // 更新磁盘图表
-            charts.disk.data.labels.push(timestamp);
-            charts.disk.data.datasets[0].data.push(latestMetric.disk_usage);
-            // 更新网络图表
-            charts.network.data.labels.push(timestamp);
-            charts.network.data.datasets[0].data.push(latestMetric.network_in / BYTE_TO_MB);
-            charts.network.data.datasets[1].data.push(latestMetric.network_out / BYTE_TO_MB);
-
-            for (const chart of Object.values(charts)) {
+            Object.entries(charts).forEach(([key, chart]) => {
+                chart.data.labels.push(timestamp);
+                if (key === 'network') {
+                    chart.data.datasets[0].data.push(latestMetric.network_in / BYTE_TO_MB);
+                    chart.data.datasets[1].data.push(latestMetric.network_out / BYTE_TO_MB);
+                } else {
+                    chart.data.datasets[0].data.push(latestMetric[`${key}_usage`]);
+                }
                 chart.update();
-            }
+            });
+        };
+
+        // Chart initialization
+        const initializeCharts = async () => {
+            const metric = await fetchLatestMetric();
+            if (!metric) return null;
+            return {
+                cpu: initChart('cpuChart', 'line', { label: 'CPU' }, 'top', 'Usage (%)', `CPU`, '%'),
+                memory: initChart('memoryChart', 'line', { label: 'Memory' }, 'top', 'Usage (%)', `Memory`, '%'),
+                disk: initChart('diskChart', 'line', { label: 'Disk' }, 'top', 'Usage (%)', `Disk`, '%'),
+                network: initChart(
+                    'networkChart',
+                    'line',
+                    [{ label: 'Receive' }, { label: 'Transmit' }],
+                    'top',
+                    'Rate (MB/s)',
+                    'Network Rate',
+                    'MB/s',
+                ),
+            };
         };
 
         // Main execution
