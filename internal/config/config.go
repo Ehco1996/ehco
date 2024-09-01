@@ -105,7 +105,7 @@ func (c *Config) Adjust() error {
 	}
 	// init tls when need
 	for _, r := range c.RelayConfigs {
-		if r.ListenType == constant.RelayTypeWSS {
+		if r.ListenType == constant.RelayTypeWSS || r.TransportType == constant.RelayTypeWSS {
 			if err := tls.InitTlsCfg(); err != nil {
 				return err
 			}

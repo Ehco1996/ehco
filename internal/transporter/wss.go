@@ -24,6 +24,7 @@ func newWssClient(cfg *conf.Config) (*WssClient, error) {
 	}
 	// insert tls config
 	wc.dialer.TLSConfig = mytls.DefaultTLSConfig
+	wc.dialer.TLSConfig.InsecureSkipVerify = true
 	return &WssClient{WsClient: wc}, nil
 }
 
@@ -44,6 +45,8 @@ func (s *WssServer) ListenAndServe(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	tlsCfg := mytls.DefaultTLSConfig
+	tlsCfg.InsecureSkipVerify = true
 	tlsListener := tls.NewListener(listener, mytls.DefaultTLSConfig)
 	return s.httpServer.Serve(tlsListener)
 }

@@ -24,21 +24,19 @@ var (
 )
 
 type WsClient struct {
-	dialer    *ws.Dialer
-	cfg       *conf.Config
-	netDialer *net.Dialer
-	l         *zap.SugaredLogger
+	dialer *ws.Dialer
+	cfg    *conf.Config
+	l      *zap.SugaredLogger
 }
 
 func newWsClient(cfg *conf.Config) (*WsClient, error) {
 	s := &WsClient{
-		cfg:       cfg,
-		netDialer: NewNetDialer(cfg),
-		l:         zap.S().Named(string(cfg.TransportType)),
-		dialer:    &ws.DefaultDialer, // todo config buffer size
-	}
-	s.dialer.NetDial = func(ctx context.Context, network, addr string) (net.Conn, error) {
-		return s.netDialer.Dial(network, addr)
+		cfg: cfg,
+		l:   zap.S().Named(string(cfg.TransportType)),
+		// todo config buffer size
+		dialer: &ws.Dialer{
+			Timeout: cfg.Options.DialTimeout,
+		},
 	}
 	return s, nil
 }
@@ -64,7 +62,6 @@ func (s *WsClient) HandShake(ctx context.Context, remote *lb.Node, isTCP bool) (
 	if !isTCP {
 		addr = s.addUDPQueryParam(addr)
 	}
-
 	wsc, _, _, err := s.dialer.Dial(ctx, addr)
 	if err != nil {
 		return nil, err
