@@ -12,6 +12,7 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
+	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.uber.org/zap"
 
@@ -23,6 +24,14 @@ import (
 
 //go:embed templates/*.html
 var templatesFS embed.FS
+
+const (
+	metricsPath     = "/metrics/"
+	indexPath       = "/"
+	connectionsPath = "/connections/"
+	rulesPath       = "/rules/"
+	apiPrefix       = "/api/v1"
+)
 
 type Server struct {
 	glue.Reloader
@@ -50,41 +59,25 @@ func NewServer(
 	healthChecker glue.HealthChecker,
 	connMgr cmgr.Cmgr,
 ) (*Server, error) {
+	if err := validateConfig(cfg); err != nil {
+		return nil, errors.Wrap(err, "invalid configuration")
+	}
+
 	l := zap.S().Named("web")
 
-	templates := template.Must(template.ParseFS(templatesFS, "templates/*.html"))
-	for _, temp := range templates.Templates() {
-		l.Debug("template name: ", temp.Name())
-	}
 	e := NewEchoServer()
-	e.Use(NginxLogMiddleware(l))
-	e.Renderer = &echoTemplate{templates: templates}
-	if cfg.WebToken != "" {
-		e.Use(middleware.KeyAuthWithConfig(middleware.KeyAuthConfig{
-			KeyLookup: "query:token",
-			Validator: func(key string, c echo.Context) (bool, error) {
-				return key == cfg.WebToken, nil
-			},
-		}))
+	if err := setupMiddleware(e, cfg, l); err != nil {
+		return nil, errors.Wrap(err, "failed to setup middleware")
 	}
 
-	if cfg.WebAuthUser != "" && cfg.WebAuthPass != "" {
-		e.Use(middleware.BasicAuth(func(username, password string, c echo.Context) (bool, error) {
-			// Be careful to use constant time comparison to prevent timing attacks
-			if subtle.ConstantTimeCompare([]byte(username), []byte(cfg.WebAuthUser)) == 1 &&
-				subtle.ConstantTimeCompare([]byte(password), []byte(cfg.WebAuthPass)) == 1 {
-				return true, nil
-			}
-			return false, nil
-		}))
+	if err := setupTemplates(e, l); err != nil {
+		return nil, errors.Wrap(err, "failed to setup templates")
 	}
 
-	if err := metrics.RegisterEhcoMetrics(cfg); err != nil {
-		return nil, err
+	if err := setupMetrics(cfg); err != nil {
+		return nil, errors.Wrap(err, "failed to setup metrics")
 	}
-	if err := metrics.RegisterNodeExporterMetrics(cfg); err != nil {
-		return nil, err
-	}
+
 	s := &Server{
 		Reloader:      relayReloader,
 		HealthChecker: healthChecker,
@@ -96,21 +89,87 @@ func NewServer(
 		addr:    net.JoinHostPort(cfg.WebHost, fmt.Sprintf("%d", cfg.WebPort)),
 	}
 
-	// register handler
-	e.GET("/metrics/", echo.WrapHandler(promhttp.Handler()))
+	setupRoutes(s)
+
+	return s, nil
+}
+
+func validateConfig(cfg *config.Config) error {
+	// Add validation logic here
+	if cfg.WebPort <= 0 || cfg.WebPort > 65535 {
+		return errors.New("invalid web port")
+	}
+	// Add more validations as needed
+	return nil
+}
+
+func setupMiddleware(e *echo.Echo, cfg *config.Config, l *zap.SugaredLogger) error {
+	e.Use(NginxLogMiddleware(l))
+
+	if cfg.WebToken != "" {
+		e.Use(middleware.KeyAuthWithConfig(middleware.KeyAuthConfig{
+			KeyLookup: "query:token",
+			Validator: func(key string, c echo.Context) (bool, error) {
+				return key == cfg.WebToken, nil
+			},
+		}))
+	}
+
+	if cfg.WebAuthUser != "" && cfg.WebAuthPass != "" {
+		e.Use(middleware.BasicAuth(func(username, password string, c echo.Context) (bool, error) {
+			if subtle.ConstantTimeCompare([]byte(username), []byte(cfg.WebAuthUser)) == 1 &&
+				subtle.ConstantTimeCompare([]byte(password), []byte(cfg.WebAuthPass)) == 1 {
+				return true, nil
+			}
+			return false, nil
+		}))
+	}
+
+	return nil
+}
+
+func setupTemplates(e *echo.Echo, l *zap.SugaredLogger) error {
+	funcMap := template.FuncMap{
+		"sub": func(a, b int) int { return a - b },
+		"add": func(a, b int) int { return a + b },
+	}
+	tmpl, err := template.New("").Funcs(funcMap).ParseFS(templatesFS, "templates/*.html")
+	if err != nil {
+		return errors.Wrap(err, "failed to parse templates")
+	}
+	templates := template.Must(tmpl, nil)
+	for _, temp := range templates.Templates() {
+		l.Debug("template name: ", temp.Name())
+	}
+	e.Renderer = &echoTemplate{templates: templates}
+	return nil
+}
+
+func setupMetrics(cfg *config.Config) error {
+	if err := metrics.RegisterEhcoMetrics(cfg); err != nil {
+		return errors.Wrap(err, "failed to register Ehco metrics")
+	}
+	if err := metrics.RegisterNodeExporterMetrics(cfg); err != nil {
+		return errors.Wrap(err, "failed to register Node Exporter metrics")
+	}
+	return nil
+}
+
+func setupRoutes(s *Server) {
+	e := s.e
+
+	e.GET(metricsPath, echo.WrapHandler(promhttp.Handler()))
 	e.GET("/debug/pprof/*", echo.WrapHandler(http.DefaultServeMux))
 
-	e.GET("/", s.index)
-	e.GET("/connections/", s.ListConnections)
-	e.GET("/rules/", s.ListRules)
+	e.GET(indexPath, s.index)
+	e.GET(connectionsPath, s.ListConnections)
+	e.GET(rulesPath, s.ListRules)
 
-	// api group
-	api := e.Group("/api/v1")
+	api := e.Group(apiPrefix)
 	api.GET("/config/", s.CurrentConfig)
 	api.POST("/config/reload/", s.HandleReload)
 	api.GET("/health_check/", s.HandleHealthCheck)
 	api.GET("/node_metrics/", s.GetNodeMetrics)
-	return s, nil
 }
 
 func (s *Server) Start() error {
