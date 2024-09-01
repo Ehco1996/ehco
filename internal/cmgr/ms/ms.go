@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 	"time"
 
-	_ "github.com/mattn/go-sqlite3"
 	"go.uber.org/zap"
+	_ "modernc.org/sqlite"
 
 	"github.com/Ehco1996/ehco/pkg/metric_reader"
 )
@@ -57,7 +57,7 @@ func NewMetricsStore(dbPath string) (*MetricsStore, error) {
 		}
 	}
 
-	db, err := sql.Open("sqlite3", dbPath)
+	db, err := sql.Open("sqlite", dbPath)
 	if err != nil {
 		return nil, err
 	}
