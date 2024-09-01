@@ -1,127 +1,65 @@
 <!doctype html>
 <html lang="en">
-    <head>
-        <title>Ehco Web</title>
-        <meta charset="UTF-8" />
-        <meta name="description" content="ehco web" />
-        <meta name="keywords" content="ehco-relay" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bulma/1.0.1/css/bulma.min.css" />
-        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css" />
-        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/flatpickr/4.6.13/flatpickr.min.css" />
-        <script src="https://cdnjs.cloudflare.com/ajax/libs/flatpickr/4.6.13/flatpickr.min.js"></script>
-        <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
-        <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
-    </head>
+  {{template "_head.html" .}}
+  <body>
+    {{ template "_navbar.html" . }}
 
-    <body>
-        <section class="hero is-fullheight is-light">
-            <div class="hero-body">
-                <div class="container">
-                    <h1 class="title has-text-centered">Ehco Relay</h1>
-                    <div class="columns is-variable is-8 is-flex-grow">
-                        <div class="column is-flex">
-                            <!-- Build Info Card -->
-                            <div class="card is-flex is-flex-direction-column is-flex-grow-1">
-                                <header class="card-header">
-                                    <p class="card-header-title has-text-centered">Build Info</p>
-                                </header>
-                                <div class="card-content is-flex-grow-1">
-                                    <div class="content">
-                                        <ul>
-                                            <li>Version: {{.Version}}</li>
-                                            <li>GitBranch: {{.GitBranch}}</li>
-                                            <li>GitRevision: {{.GitRevision}}</li>
-                                            <li>BuildTime: {{.BuildTime}}</li>
-                                            <li>StartTime: {{.StartTime}}</li>
-                                        </ul>
-                                    </div>
-                                </div>
-                                <footer class="card-footer">
-                                    <button class="button is-danger is-outlined card-footer-item" id="reloadButton">
-                                        <span class="icon"><i class="fas fa-sync-alt"></i></span>
-                                        <span>Reload Config</span>
-                                    </button>
-                                </footer>
-                            </div>
-                        </div>
-
-                        <div class="column is-flex">
-                            <!-- Stylish Links Card -->
-                            <div class="card is-flex is-flex-direction-column is-flex-grow-1">
-                                <header class="card-header">
-                                    <p class="card-header-title has-text-centered">Quick Links({{ .Cfg.NodeLabel }})</p>
-                                </header>
-                                <div class="card-content is-flex-grow-1">
-                                    <div class="content">
-                                        <ul>
-                                            <li>
-                                                <a href="/metrics/" class="button is-info is-light">
-                                                    <span class="icon"><i class="fas fa-chart-bar"></i></span>
-                                                    <span>Metrics</span>
-                                                </a>
-                                            </li>
-                                            <li>
-                                                <a href="/debug/pprof/" class="button is-info is-light">
-                                                    <span class="icon"><i class="fas fa-bug"></i></span>
-                                                    <span>Debug</span>
-                                                </a>
-                                            </li>
-                                            <li>
-                                                <a href="/connections/?conn_type=active" class="button is-info is-light">
-                                                    <span class="icon"><i class="fas fa-link"></i></span>
-                                                    <span>Connections</span>
-                                                </a>
-                                            </li>
-                                            <li>
-                                                <a href="/rules/" class="button is-info is-light">
-                                                    <span class="icon"><i class="fas fa-list"></i></span>
-                                                    <span>Rule List</span>
-                                                </a>
-                                            </li>
-                                            <li>
-                                                <a href="/api/v1/config/" class="button is-info is-light">
-                                                    <span class="icon"><i class="fas fa-cog"></i></span>
-                                                    <span>Config</span>
-                                                </a>
-                                            </li>
-                                        </ul>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <!-- metrics -->
-                    {{template "metrics.html" .}}
-                </div>
+    <div class="container">
+      <div class="columns is-variable is-8 is-flex-grow">
+        <div class="column is-flex">
+          <div class="card is-flex is-flex-direction-column is-flex-grow-1">
+            <header class="card-header">
+              <p class="card-header-title has-text-centered">Build Info</p>
+            </header>
+            <div class="card-content is-flex-grow-1">
+              <div class="content">
+                <ul>
+                  <li>Version: {{.Version}}</li>
+                  <li>GitBranch: {{.GitBranch}}</li>
+                  <li>GitRevision: {{.GitRevision}}</li>
+                  <li>BuildTime: {{.BuildTime}}</li>
+                  <li>StartTime: {{.StartTime}}</li>
+                </ul>
+              </div>
             </div>
+            <footer class="card-footer">
+              <button class="button is-danger is-outlined card-footer-item" id="reloadButton">
+                <span class="icon"><i class="fas fa-sync-alt"></i></span>
+                <span>Reload Config</span>
+              </button>
+            </footer>
+          </div>
+        </div>
+      </div>
+      <!-- metrics -->
+      {{template "_metrics.html" .}}
+    </div>
 
-            <!-- Footer -->
-            <div class="hero-foot">
-                <footer class="footer">
-                    <div class="content has-text-centered">
-                        <a href="https://github.com/Ehco1996/ehco"><i class="fab fa-github"></i> Source code</a>
-                    </div>
-                </footer>
-            </div>
-        </section>
+    <!-- Footer -->
+    <div class="hero-foot">
+      <footer class="footer">
+        <div class="content has-text-centered">
+          <a href="https://github.com/Ehco1996/ehco"><i class="fab fa-github"></i> Source code</a>
+        </div>
+      </footer>
+    </div>
 
-        <script>
-            $(document).ready(function () {
-                // Reload config button click event
-                $('#reloadButton').click(function () {
-                    $.ajax({
-                        type: 'POST',
-                        url: '/api/v1/config/reload/',
-                        success: function (response) {
-                            alert('Reload config success. Response: ' + response);
-                        },
-                        error: function (response) {
-                            alert('Failed to reload config. Response: ' + response.responseText);
-                        },
-                    });
-                });
-            });
-        </script>
-    </body>
+    <script>
+      $(document).ready(function () {
+        // Reload config button click event
+        $('#reloadButton').click(function () {
+          $.ajax({
+            type: 'POST',
+            url: '/api/v1/config/reload/',
+            success: function (response) {
+              alert('Reload config success. Response: ' + response);
+            },
+            error: function (response) {
+              alert('Failed to reload config. Response: ' + response.responseText);
+            },
+          });
+        });
+      });
+    </script>
+  </body>
 </html>

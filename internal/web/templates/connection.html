@@ -1,30 +1,27 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="ehco web">
-    <meta name="keywords" content="ehco-relay">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bulma/1.0.1/css/bulma.min.css">
-    <title>Connections</title>
-</head>
+    {{template "_head.html" .}}
 <body>
+    {{ template "_navbar.html" . }}
     <section class="section">
         <div class="container">
-            <h1 class="title">ALL Connections: {{.AllCount}}</h1>
+            <h1 class="title">Connections</h1>
+            <h2 class="subtitle">Total: {{.AllCount}}</h2>
+
             <div class="tabs is-boxed is-centered">
                 <ul>
                     <li class="{{if eq .ConnType "active"}}is-active{{end}}">
-                        <a href="?conn_type=active&page=1&page_size={{.PageSize}}">Active({{.ActiveCount}})</a>
+                        <a href="?conn_type=active&page=1&page_size={{.PageSize}}">Active ({{.ActiveCount}})</a>
                     </li>
                     <li class="{{if eq .ConnType "closed"}}is-active{{end}}">
-                        <a href="?conn_type=closed&page=1&page_size={{.PageSize}}">Closed({{.ClosedCount}})</a>
+                        <a href="?conn_type=closed&page=1&page_size={{.PageSize}}">Closed ({{.ClosedCount}})</a>
                     </li>
                 </ul>
             </div>
+
             {{if gt (len .ConnectionList) 0}}
                 <div class="table-container">
-                    <table class="table is-striped is-hoverable is-fullwidth">
+                    <table class="table is-striped is-hoverable is-fullwidth is-responsive">
                         <thead>
                             <tr>
                                 <th>Label</th>
@@ -37,39 +34,70 @@
                         <tbody>
                             {{range .ConnectionList}}
                             <tr>
-                                <td>{{.RelayLabel}}</td>
-                                <td>{{.ConnType}}</td>
-                                <td>{{.GetFlow}}</td>
-                                <td>{{.Stats}}</td>
-                                <td>{{.GetTime}}</td>
+                                <td data-label="Label">{{.RelayLabel}}</td>
+                                <td data-label="Type">{{.ConnType}}</td>
+                                <td data-label="Flow">{{.GetFlow}}</td>
+                                <td data-label="Stats">{{.Stats}}</td>
+                                <td data-label="Time">{{.GetTime}}</td>
                             </tr>
                             {{end}}
                         </tbody>
                     </table>
                 </div>
             {{else}}
-                <div class="notification is-info">
-                    <p>No connections available.</p>
+                <div class="notification is-info is-light">
+                    <p class="has-text-centered">No {{.ConnType}} connections available.</p>
                 </div>
             {{end}}
+
+            {{if gt .TotalPage 1}}
             <nav class="pagination is-centered" role="navigation" aria-label="pagination" style="margin-top: 20px;">
-                <a class="pagination-previous" {{if eq .Prev 0}}disabled{{end}}
+                <a class="pagination-previous" {{if le .CurrentPage 1}}disabled{{end}}
                    href="?conn_type={{.ConnType}}&page={{.Prev}}&page_size={{.PageSize}}">Previous</a>
-                <a class="pagination-next" {{if eq .Next 0}}disabled{{end}}
+                <a class="pagination-next" {{if ge .CurrentPage .TotalPage}}disabled{{end}}
                    href="?conn_type={{.ConnType}}&page={{.Next}}&page_size={{.PageSize}}">Next page</a>
                 <ul class="pagination-list">
-                    {{if gt .CurrentPage 1}}
+                    {{if gt .CurrentPage 2}}
                         <li><a class="pagination-link" href="?conn_type={{.ConnType}}&page=1&page_size={{.PageSize}}">1</a></li>
+                        {{if gt .CurrentPage 3}}<li><span class="pagination-ellipsis">&hellip;</span></li>{{end}}
                     {{end}}
-                    <li><span class="pagination-ellipsis">…</span></li>
+                    {{if gt .CurrentPage 1}}
+                        <li><a class="pagination-link" href="?conn_type={{.ConnType}}&page={{sub .CurrentPage 1}}&page_size={{.PageSize}}">{{sub .CurrentPage 1}}</a></li>
+                    {{end}}
                     <li><a class="pagination-link is-current" aria-label="Page {{.CurrentPage}}" aria-current="page">{{.CurrentPage}}</a></li>
-                    <li><span class="pagination-ellipsis">…</span></li>
                     {{if lt .CurrentPage .TotalPage}}
-                    <li><a class="pagination-link" href="?conn_type={{.ConnType}}&page={{.TotalPage}}&page_size={{.PageSize}}">{{.TotalPage}}</a></li>
+                        <li><a class="pagination-link" href="?conn_type={{.ConnType}}&page={{add .CurrentPage 1}}&page_size={{.PageSize}}">{{add .CurrentPage 1}}</a></li>
+                        {{if lt .CurrentPage (sub .TotalPage 1)}}<li><span class="pagination-ellipsis">&hellip;</span></li>{{end}}
+                    {{end}}
+                    {{if lt .CurrentPage (sub .TotalPage 1)}}
+                        <li><a class="pagination-link" href="?conn_type={{.ConnType}}&page={{.TotalPage}}&page_size={{.PageSize}}">{{.TotalPage}}</a></li>
                     {{end}}
                 </ul>
             </nav>
+            {{end}}
         </div>
     </section>
+
+    <div id="loading" class="modal">
+        <div class="modal-background"></div>
+        <div class="modal-content">
+            <div class="loader is-loading"></div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const links = document.querySelectorAll('a:not([target="_blank"])');
+            const loading = document.getElementById('loading');
+
+            links.forEach(link => {
+                link.addEventListener('click', (e) => {
+                    if (!link.classList.contains('disabled')) {
+                        loading.classList.add('is-active');
+                    }
+                });
+            });
+        });
+    </script>
 </body>
 </html>

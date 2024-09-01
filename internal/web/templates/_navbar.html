@@ -1,0 +1,58 @@
+<nav class="navbar" role="navigation" aria-label="main navigation">
+  <div class="container">
+    <div class="navbar-brand">
+      <a class="navbar-item" href="/">
+        <h1 class="title is-4">Ehco Relay</h1>
+      </a>
+      <a role="button" class="navbar-burger" aria-label="menu" aria-expanded="false">
+        <span aria-hidden="true"></span>
+        <span aria-hidden="true"></span>
+        <span aria-hidden="true"></span>
+        <span aria-hidden="true"></span>
+      </a>
+    </div>
+
+    <div class="navbar-menu">
+      <div class="navbar-start">
+        <a href="/rules/" class="navbar-item">
+          <span class="icon"><i class="fas fa-list"></i></span>
+          <span>Rule List</span>
+        </a>
+        <div class="navbar-item has-dropdown is-hoverable">
+          <a class="navbar-link">
+            <span class="icon"><i class="fas fa-link"></i></span>
+            <span>Connections</span>
+          </a>
+          <div class="navbar-dropdown">
+            <a href="/connections/?conn_type=active" class="navbar-item">Active</a>
+            <a href="/connections/?conn_type=closed" class="navbar-item">Closed</a>
+          </div>
+        </div>
+      </div>
+
+      <div class="navbar-end">
+        <div class="navbar-item has-dropdown is-hoverable">
+          <a class="navbar-link">
+            <span class="icon"><i class="fas fa-external-link-alt"></i></span>
+            <span>Quick Links</span>
+          </a>
+          <div class="navbar-dropdown">
+            <a href="/metrics/" class="navbar-item">
+              <span class="icon"><i class="fas fa-chart-line"></i></span>
+              <span>Metrics</span>
+            </a>
+            <a href="/debug/pprof/" class="navbar-item">
+              <span class="icon"><i class="fas fa-bug"></i></span>
+              <span>Debug</span>
+            </a>
+            <a href="/api/v1/config/" class="navbar-item">
+              <span class="icon"><i class="fas fa-cog"></i></span>
+              <span>Config</span>
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</nav>
+<hr />

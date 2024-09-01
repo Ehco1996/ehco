@@ -12,6 +12,7 @@ require (
 	github.com/hashicorp/go-retryablehttp v0.7.7
 	github.com/juju/ratelimit v1.0.2
 	github.com/labstack/echo/v4 v4.12.0
+	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.20.0
 	github.com/prometheus/client_model v0.6.1
 	github.com/prometheus/common v0.55.0
