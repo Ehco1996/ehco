@@ -64,23 +64,16 @@ type relayConnImpl struct {
 	EndTime   time.Time `json:"end_time,omitempty"`
 
 	// options set those fields
-	l                 *zap.SugaredLogger
-	remote            *lb.Node
-	HandshakeDuration time.Duration
-	RelayLabel        string `json:"relay_label"`
-	ConnType          string `json:"conn_type"`
-	Options           *conf.Options
+	l          *zap.SugaredLogger
+	remote     *lb.Node
+	RelayLabel string `json:"relay_label"`
+	ConnType   string `json:"conn_type"`
+	Options    *conf.Options
 }
 
 func WithRelayLabel(relayLabel string) RelayConnOption {
 	return func(rci *relayConnImpl) {
 		rci.RelayLabel = relayLabel
-	}
-}
-
-func WithHandshakeDuration(duration time.Duration) RelayConnOption {
-	return func(rci *relayConnImpl) {
-		rci.HandshakeDuration = duration
 	}
 }
 
@@ -93,6 +86,7 @@ func WithConnType(connType string) RelayConnOption {
 func WithRemote(remote *lb.Node) RelayConnOption {
 	return func(rci *relayConnImpl) {
 		rci.remote = remote
+		rci.Stats.HandShakeLatency = remote.HandShakeDuration
 	}
 }
 
