@@ -4,7 +4,7 @@
       <a class="navbar-item" href="/">
         <h1 class="title is-4">Ehco Relay</h1>
       </a>
-      <a role="button" class="navbar-burger" aria-label="menu" aria-expanded="false">
+      <a role="button" class="navbar-burger" aria-label="menu" aria-expanded="false" data-target="navbarMenu">
         <span aria-hidden="true"></span>
         <span aria-hidden="true"></span>
         <span aria-hidden="true"></span>
@@ -12,7 +12,7 @@
       </a>
     </div>
 
-    <div class="navbar-menu">
+    <div id="navbarMenu" class="navbar-menu">
       <div class="navbar-start">
         <a href="/rules/" class="navbar-item">
           <span class="icon"><i class="fas fa-list"></i></span>
@@ -56,3 +56,28 @@
   </div>
 </nav>
 <hr />
+
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    // Get all "navbar-burger" elements
+    const $navbarBurgers = Array.prototype.slice.call(document.querySelectorAll('.navbar-burger'), 0);
+
+    // Add a click event on each of them
+    $navbarBurgers.forEach((el) => {
+      el.addEventListener('click', () => {
+        // Get the target from the "data-target" attribute
+        const target = el.dataset.target;
+        const $target = document.getElementById(target);
+
+        // Check if the target element exists
+        if ($target) {
+          // Toggle the "is-active" class on both the "navbar-burger" and the "navbar-menu"
+          el.classList.toggle('is-active');
+          $target.classList.toggle('is-active');
+        } else {
+          console.error(`Target element with id "${target}" not found`);
+        }
+      });
+    });
+  });
+</script>

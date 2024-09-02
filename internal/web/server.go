@@ -22,7 +22,7 @@ import (
 	"github.com/Ehco1996/ehco/internal/metrics"
 )
 
-//go:embed templates/*.html
+//go:embed templates/*.html js/*.js
 var templatesFS embed.FS
 
 const (
@@ -161,6 +161,7 @@ func setupMetrics(cfg *config.Config) error {
 func setupRoutes(s *Server) {
 	e := s.e
 
+	e.StaticFS("/js", echo.MustSubFS(templatesFS, "js"))
 	e.GET(metricsPath, echo.WrapHandler(promhttp.Handler()))
 	e.GET("/debug/pprof/*", echo.WrapHandler(http.DefaultServeMux))
 
