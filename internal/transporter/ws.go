@@ -98,6 +98,8 @@ func (s *WsServer) handleRequest(w http.ResponseWriter, req *http.Request) {
 	var remote *lb.Node
 	if addr := req.URL.Query().Get(conf.WS_QUERY_REMOTE_ADDR); addr != "" {
 		remote = &lb.Node{Address: addr, Label: addr}
+	} else {
+		remote = s.remotes.Next()
 	}
 
 	if req.URL.Query().Get("type") == "udp" {
