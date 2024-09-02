@@ -72,7 +72,7 @@ func (s *WsClient) HandShake(ctx context.Context, remote *lb.Node, isTCP bool) (
 		connType = metrics.METRIC_CONN_TYPE_UDP
 	}
 	labels := []string{s.cfg.Label, connType, remote.Address}
-	metrics.HandShakeDuration.WithLabelValues(labels...).Observe(float64(latency.Milliseconds()))
+	metrics.HandShakeDurationMilliseconds.WithLabelValues(labels...).Observe(float64(latency.Milliseconds()))
 	remote.HandShakeDuration = latency
 	c := conn.NewWSConn(wsc, false)
 	return c, nil

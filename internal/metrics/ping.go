@@ -8,7 +8,6 @@ import (
 
 	"github.com/Ehco1996/ehco/internal/config"
 	"github.com/go-ping/ping"
-	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
 )
 
@@ -73,8 +72,8 @@ func NewPingGroup(cfg *config.Config) *PingGroup {
 		pinger.OnRecv = func(pkt *ping.Packet) {
 			label := pg.PingerLabels[addr]
 			ip := pkt.IPAddr.String()
-			PingResponseDurationSeconds.WithLabelValues(
-				label, ip).Observe(pkt.Rtt.Seconds())
+			PingResponseDurationMilliseconds.WithLabelValues(
+				label, ip).Observe(float64(pkt.Rtt.Milliseconds()))
 			pg.logger.Sugar().Infof("%d bytes from %s icmp_seq=%d time=%v ttl=%v",
 				pkt.Nbytes, pkt.Addr, pkt.Seq, pkt.Rtt, pkt.Ttl)
 		}
@@ -84,25 +83,6 @@ func NewPingGroup(cfg *config.Config) *PingGroup {
 		}
 	}
 	return pg
-}
-
-func (pg *PingGroup) Describe(ch chan<- *prometheus.Desc) {
-	ch <- PingRequestTotal
-}
-
-func (pg *PingGroup) Collect(ch chan<- prometheus.Metric) {
-	for addr, pinger := range pg.Pingers {
-		stats := pinger.Statistics()
-		label := pg.PingerLabels[addr]
-		ip := stats.IPAddr.String()
-
-		ch <- prometheus.MustNewConstMetric(
-			PingRequestTotal,
-			prometheus.CounterValue,
-			float64(stats.PacketsSent),
-			label, ip,
-		)
-	}
 }
 
 func (pg *PingGroup) Run() {

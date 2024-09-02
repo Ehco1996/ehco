@@ -52,7 +52,7 @@ func (raw *RawClient) HandShake(ctx context.Context, remote *lb.Node, isTCP bool
 		connType = metrics.METRIC_CONN_TYPE_UDP
 	}
 	labels := []string{raw.cfg.Label, connType, remote.Address}
-	metrics.HandShakeDuration.WithLabelValues(labels...).Observe(float64(latency.Milliseconds()))
+	metrics.HandShakeDurationMilliseconds.WithLabelValues(labels...).Observe(float64(latency.Milliseconds()))
 	remote.HandShakeDuration = latency
 	return rc, nil
 }
