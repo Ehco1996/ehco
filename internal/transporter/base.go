@@ -44,9 +44,6 @@ func newBaseRelayServer(cfg *conf.Config, cmgr cmgr.Cmgr) (*BaseRelayServer, err
 }
 
 func (b *BaseRelayServer) RelayTCPConn(ctx context.Context, c net.Conn, remote *lb.Node) error {
-	if remote == nil {
-		remote = b.remotes.Next().Clone()
-	}
 	metrics.CurConnectionCount.WithLabelValues(remote.Label, metrics.METRIC_CONN_TYPE_TCP).Inc()
 	defer metrics.CurConnectionCount.WithLabelValues(remote.Label, metrics.METRIC_CONN_TYPE_TCP).Dec()
 
@@ -66,15 +63,11 @@ func (b *BaseRelayServer) RelayTCPConn(ctx context.Context, c net.Conn, remote *
 		return fmt.Errorf("handshake error: %w", err)
 	}
 	defer rc.Close()
-
 	b.l.Infof("RelayTCPConn from %s to %s", c.LocalAddr(), remote.Address)
 	return b.handleRelayConn(c, rc, remote, metrics.METRIC_CONN_TYPE_TCP)
 }
 
 func (b *BaseRelayServer) RelayUDPConn(ctx context.Context, c net.Conn, remote *lb.Node) error {
-	if remote == nil {
-		remote = b.remotes.Next().Clone()
-	}
 	metrics.CurConnectionCount.WithLabelValues(remote.Label, metrics.METRIC_CONN_TYPE_UDP).Inc()
 	defer metrics.CurConnectionCount.WithLabelValues(remote.Label, metrics.METRIC_CONN_TYPE_UDP).Dec()
 
@@ -144,7 +137,6 @@ func (b *BaseRelayServer) handleRelayConn(c, rc net.Conn, remote *lb.Node, connT
 		conn.WithConnType(connType),
 		conn.WithRelayLabel(b.cfg.Label),
 		conn.WithRelayOptions(b.cfg.Options),
-		conn.WithHandshakeDuration(remote.HandShakeDuration),
 	}
 	relayConn := conn.NewRelayConn(c, rc, opts...)
 	if b.cmgr != nil {

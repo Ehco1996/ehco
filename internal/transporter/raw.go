@@ -99,7 +99,7 @@ func (s *RawServer) ListenAndServe(ctx context.Context) error {
 		}
 		go func(c net.Conn) {
 			defer c.Close()
-			if err := s.RelayTCPConn(ctx, c, nil); err != nil {
+			if err := s.RelayTCPConn(ctx, c, s.remotes.Next()); err != nil {
 				s.l.Errorf("RelayTCPConn meet error: %s", err.Error())
 			}
 		}(c)
@@ -118,7 +118,7 @@ func (s *RawServer) listenUDP(ctx context.Context) error {
 			return err
 		}
 		go func() {
-			if err := s.RelayUDPConn(ctx, c, nil); err != nil {
+			if err := s.RelayUDPConn(ctx, c, s.remotes.Next()); err != nil {
 				s.l.Errorf("RelayUDPConn meet error: %s", err.Error())
 			}
 		}()
