@@ -204,11 +204,11 @@ func (cm *cmgrImpl) Start(ctx context.Context, errCH chan error) {
 func (cm *cmgrImpl) QueryNodeMetrics(ctx context.Context, req *ms.QueryNodeMetricsReq) (*ms.QueryNodeMetricsResp, error) {
 	num := -1 // default to return all metrics
 	if req.Latest {
-		m, err := cm.mr.ReadOnce(ctx)
+		nm, _, err := cm.mr.ReadOnce(ctx)
 		if err != nil {
 			return nil, err
 		}
-		if err := cm.ms.AddNodeMetric(m); err != nil {
+		if err := cm.ms.AddNodeMetric(nm); err != nil {
 			return nil, err
 		}
 		num = 1

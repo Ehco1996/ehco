@@ -2,6 +2,8 @@ package metric_reader
 
 import (
 	"time"
+
+	dto "github.com/prometheus/client_model/go"
 )
 
 type NodeMetrics struct {
@@ -26,13 +28,18 @@ type NodeMetrics struct {
 	NetworkReceiveBytesRate   float64 `json:"network_receive_bytes_rate"`
 	NetworkTransmitBytesRate  float64 `json:"network_transmit_bytes_rate"`
 
-	// ping
-	PingMetrics []PingMetric `json:"ping_metrics"`
-
 	SyncTime time.Time
 }
 
 type PingMetric struct {
 	Latency float64 `json:"latency"` // in ms
 	Target  string  `json:"target"`
+}
+
+type RuleMetrics struct {
+	Label                string
+	PingMetrics          []PingMetric
+	CurConnectionCount   map[string]float64        // key: conn_type:remote
+	HandShakeDuration    map[string]*dto.Histogram // key: conn_type:remote
+	NetWorkTransmitBytes map[string]float64        // key: conn_type:flow:remote
 }

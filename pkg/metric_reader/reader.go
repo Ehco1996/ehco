@@ -10,17 +10,18 @@ import (
 
 	dto "github.com/prometheus/client_model/go"
 	"github.com/prometheus/common/expfmt"
-	"go.uber.org/zap"
 )
 
 type Reader interface {
-	ReadOnce(ctx context.Context) (*NodeMetrics, error)
+	ReadOnce(ctx context.Context) (*NodeMetrics, map[string]*RuleMetrics, error)
 }
 
 type readerImpl struct {
-	metricsURL  string
-	httpClient  *http.Client
-	lastMetrics *NodeMetrics
+	metricsURL string
+	httpClient *http.Client
+
+	lastMetrics     *NodeMetrics
+	lastRuleMetrics map[string]*RuleMetrics
 }
 
 func NewReader(metricsURL string) *readerImpl {
@@ -31,23 +32,72 @@ func NewReader(metricsURL string) *readerImpl {
 	}
 }
 
-func (b *readerImpl) parsePingInfo(metricMap map[string]*dto.MetricFamily, nm *NodeMetrics) error {
-	metric, ok := metricMap["ehco_ping_response_duration_seconds"]
-	if !ok {
-		// this metric is optional when enable_ping = false
-		zap.S().Debug("ping metric not found")
-		return nil
+func (b *readerImpl) ReadOnce(ctx context.Context) (*NodeMetrics, map[string]*RuleMetrics, error) {
+	response, err := b.httpClient.Get(b.metricsURL)
+	if err != nil {
+		return nil, nil, err
 	}
-	for _, m := range metric.Metric {
-		g := m.GetHistogram()
-		ip := ""
-		val := float64(g.GetSampleSum()) / float64(g.GetSampleCount()) * 1000 // to ms
-		for _, label := range m.GetLabel() {
-			if label.GetName() == "ip" {
-				ip = label.GetValue()
-			}
-		}
-		nm.PingMetrics = append(nm.PingMetrics, PingMetric{Latency: val, Target: ip})
+	defer response.Body.Close()
+
+	body, err := io.ReadAll(response.Body)
+	if err != nil {
+		return nil, nil, err
+	}
+	var parser expfmt.TextParser
+	parsed, err := parser.TextToMetricFamilies(strings.NewReader(string(body)))
+	if err != nil {
+		return nil, nil, err
+	}
+
+	nm := &NodeMetrics{SyncTime: time.Now()}
+	rm := make(map[string]*RuleMetrics)
+
+	if err := b.ParseNodeMetrics(parsed, nm); err != nil {
+		return nil, nil, err
+	}
+	if err := b.ParseRuleMetrics(parsed, rm); err != nil {
+		return nil, nil, err
+	}
+
+	b.lastMetrics = nm
+	b.lastRuleMetrics = rm
+	return nm, rm, nil
+}
+
+func (b *readerImpl) ParseNodeMetrics(metricMap map[string]*dto.MetricFamily, nm *NodeMetrics) error {
+	if err := b.parseCpuInfo(metricMap, nm); err != nil {
+		return err
+	}
+	if err := b.parseMemoryInfo(metricMap, nm); err != nil {
+		return err
+	}
+	if err := b.parseDiskInfo(metricMap, nm); err != nil {
+		return err
+	}
+	if err := b.parseNetworkInfo(metricMap, nm); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (b *readerImpl) ParseRuleMetrics(metricMap map[string]*dto.MetricFamily, rm map[string]*RuleMetrics) error {
+	// Parse CurConnectionCount
+	if err := b.parseCurConnectionCount(metricMap, rm); err != nil {
+		return err
+	}
+
+	// Parse HandShakeDuration
+	if err := b.parseHandShakeDuration(metricMap, rm); err != nil {
+		return err
+	}
+
+	// Parse NetWorkTransmitBytes
+	if err := b.parseNetWorkTransmitBytes(metricMap, rm); err != nil {
+		return err
+	}
+	// Parse PingMetrics
+	if err := b.parsePingInfo(metricMap, rm); err != nil {
+		return err
 	}
 	return nil
 }
@@ -256,39 +306,147 @@ func (b *readerImpl) parseNetworkInfo(metricMap map[string]*dto.MetricFamily, nm
 	return nil
 }
 
-func (b *readerImpl) ReadOnce(ctx context.Context) (*NodeMetrics, error) {
-	response, err := b.httpClient.Get(b.metricsURL)
-	if err != nil {
-		return nil, err
-	}
-	defer response.Body.Close()
-
-	body, err := io.ReadAll(response.Body)
-	if err != nil {
-		return nil, err
-	}
-	var parser expfmt.TextParser
-	parsed, err := parser.TextToMetricFamilies(strings.NewReader(string(body)))
-	if err != nil {
-		return nil, err
-	}
-	nm := &NodeMetrics{SyncTime: time.Now(), PingMetrics: []PingMetric{}}
-	if err := b.parseCpuInfo(parsed, nm); err != nil {
-		return nil, err
-	}
-	if err := b.parseMemoryInfo(parsed, nm); err != nil {
-		return nil, err
-	}
-	if err := b.parseDiskInfo(parsed, nm); err != nil {
-		return nil, err
-	}
-	if err := b.parseNetworkInfo(parsed, nm); err != nil {
-		return nil, err
-	}
-	if err := b.parsePingInfo(parsed, nm); err != nil {
-		return nil, err
+func (b *readerImpl) parseCurConnectionCount(metricMap map[string]*dto.MetricFamily, rm map[string]*RuleMetrics) error {
+	metric, ok := metricMap["ehco_traffic_current_connection_count"]
+	if !ok {
+		return nil
 	}
 
-	b.lastMetrics = nm
-	return nm, nil
+	for _, m := range metric.Metric {
+		label := ""
+		connType := ""
+		remote := ""
+		for _, l := range m.Label {
+			switch l.GetName() {
+			case "label":
+				label = l.GetValue()
+			case "conn_type":
+				connType = l.GetValue()
+			case "remote":
+				remote = l.GetValue()
+			}
+		}
+
+		if _, ok := rm[label]; !ok {
+			rm[label] = &RuleMetrics{
+				Label:                label,
+				CurConnectionCount:   make(map[string]float64),
+				HandShakeDuration:    make(map[string]*dto.Histogram),
+				NetWorkTransmitBytes: make(map[string]float64),
+			}
+		}
+
+		key := fmt.Sprintf("%s:%s", connType, remote)
+		rm[label].CurConnectionCount[key] = m.Gauge.GetValue()
+	}
+
+	return nil
+}
+
+func (b *readerImpl) parseHandShakeDuration(metricMap map[string]*dto.MetricFamily, rm map[string]*RuleMetrics) error {
+	metric, ok := metricMap["ehco_traffic_handshake_duration"]
+	if !ok {
+		return nil
+	}
+
+	for _, m := range metric.Metric {
+		label := ""
+		connType := ""
+		remote := ""
+		for _, l := range m.Label {
+			switch l.GetName() {
+			case "label":
+				label = l.GetValue()
+			case "conn_type":
+				connType = l.GetValue()
+			case "remote":
+				remote = l.GetValue()
+			}
+		}
+
+		if _, ok := rm[label]; !ok {
+			rm[label] = &RuleMetrics{
+				Label:                label,
+				CurConnectionCount:   make(map[string]float64),
+				HandShakeDuration:    make(map[string]*dto.Histogram),
+				NetWorkTransmitBytes: make(map[string]float64),
+			}
+		}
+
+		key := fmt.Sprintf("%s:%s", connType, remote)
+		rm[label].HandShakeDuration[key] = m.Histogram
+	}
+
+	return nil
+}
+
+func (b *readerImpl) parseNetWorkTransmitBytes(metricMap map[string]*dto.MetricFamily, rm map[string]*RuleMetrics) error {
+	metric, ok := metricMap["ehco_traffic_network_transmit_bytes"]
+	if !ok {
+		return nil
+	}
+
+	for _, m := range metric.Metric {
+		label := ""
+		connType := ""
+		flow := ""
+		remote := ""
+		for _, l := range m.Label {
+			switch l.GetName() {
+			case "label":
+				label = l.GetValue()
+			case "conn_type":
+				connType = l.GetValue()
+			case "flow":
+				flow = l.GetValue()
+			case "remote":
+				remote = l.GetValue()
+			}
+		}
+
+		if _, ok := rm[label]; !ok {
+			rm[label] = &RuleMetrics{
+				Label:                label,
+				CurConnectionCount:   make(map[string]float64),
+				HandShakeDuration:    make(map[string]*dto.Histogram),
+				NetWorkTransmitBytes: make(map[string]float64),
+			}
+		}
+
+		key := fmt.Sprintf("%s:%s:%s", connType, flow, remote)
+		rm[label].NetWorkTransmitBytes[key] = m.Counter.GetValue()
+	}
+
+	return nil
+}
+
+func (b *readerImpl) parsePingInfo(metricMap map[string]*dto.MetricFamily, rm map[string]*RuleMetrics) error {
+	metric, ok := metricMap["ehco_ping_response_duration_seconds"]
+	if !ok {
+		return nil
+	}
+	for _, m := range metric.Metric {
+		g := m.GetHistogram()
+		ruleLabel := ""
+		ip := ""
+		val := float64(g.GetSampleSum()) / float64(g.GetSampleCount()) * 1000 // to ms
+		for _, label := range m.GetLabel() {
+			if label.GetName() == "ip" {
+				ip = label.GetValue()
+			} else if label.GetName() == "label" {
+				ruleLabel = label.GetValue()
+			}
+		}
+
+		if _, ok := rm[ruleLabel]; !ok {
+			rm[ruleLabel] = &RuleMetrics{
+				Label:                ruleLabel,
+				CurConnectionCount:   make(map[string]float64),
+				HandShakeDuration:    make(map[string]*dto.Histogram),
+				NetWorkTransmitBytes: make(map[string]float64),
+			}
+		}
+		rm[ruleLabel].PingMetrics = append(rm[ruleLabel].PingMetrics, PingMetric{Latency: val, Target: ip})
+	}
+	return nil
 }
