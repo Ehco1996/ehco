@@ -70,7 +70,7 @@ func NewServer(
 		return nil, errors.Wrap(err, "failed to setup middleware")
 	}
 
-	if err := setupTemplates(e, l); err != nil {
+	if err := setupTemplates(e, l, cfg); err != nil {
 		return nil, errors.Wrap(err, "failed to setup templates")
 	}
 
@@ -128,10 +128,13 @@ func setupMiddleware(e *echo.Echo, cfg *config.Config, l *zap.SugaredLogger) err
 	return nil
 }
 
-func setupTemplates(e *echo.Echo, l *zap.SugaredLogger) error {
+func setupTemplates(e *echo.Echo, l *zap.SugaredLogger, cfg *config.Config) error {
 	funcMap := template.FuncMap{
 		"sub": func(a, b int) int { return a - b },
 		"add": func(a, b int) int { return a + b },
+		"CurrentCfg": func() *config.Config {
+			return cfg
+		},
 	}
 	tmpl, err := template.New("").Funcs(funcMap).ParseFS(templatesFS, "templates/*.html")
 	if err != nil {
