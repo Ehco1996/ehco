@@ -13,25 +13,26 @@ const (
 	METRIC_SUBSYSTEM_TRAFFIC = "traffic"
 	METRIC_SUBSYSTEM_PING    = "ping"
 
-	METRIC_LABEL_REMOTE = "remote"
-
-	METRIC_LABEL_CONN_FLOW = "flow"
-	METRIC_CONN_FLOW_WRITE = "write"
-	METRIC_CONN_FLOW_READ  = "read"
-
-	METRIC_LABEL_CONN_TYPE = "type"
-	METRIC_CONN_TYPE_TCP   = "tcp"
-	METRIC_CONN_TYPE_UDP   = "udp"
+	METRIC_CONN_TYPE_TCP = "tcp"
+	METRIC_CONN_TYPE_UDP = "udp"
+	METRIC_FLOW_READ     = "read"
+	METRIC_FLOW_WRITE    = "write"
 
 	EhcoAliveStateInit    = 0
 	EhcoAliveStateRunning = 1
 )
 
+var (
+	Hostname, _ = os.Hostname()
+	ConstLabels = map[string]string{
+		"ehco_runner_hostname": Hostname,
+	}
+)
+
 // ping metrics
 var (
-	pingLabelNames = []string{"ip", "host", "label"}
-	pingBuckets    = prometheus.ExponentialBuckets(0.001, 2, 12) // 1ms ~ 4s
-	pingInterval   = time.Second * 30
+	pingBuckets  = prometheus.ExponentialBuckets(0.001, 2, 12) // 1ms ~ 4s
+	pingInterval = time.Second * 30
 
 	PingResponseDurationSeconds = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
@@ -42,24 +43,18 @@ var (
 			Buckets:     pingBuckets,
 			ConstLabels: ConstLabels,
 		},
-		pingLabelNames,
+		[]string{"label", "ip"},
 	)
 	PingRequestTotal = prometheus.NewDesc(
 		prometheus.BuildFQName(METRIC_NS, METRIC_SUBSYSTEM_PING, "requests_total"),
 		"Number of ping requests sent",
-		pingLabelNames,
+		[]string{"label", "ip"},
 		ConstLabels,
 	)
 )
 
 // traffic metrics
 var (
-	Hostname, _ = os.Hostname()
-
-	ConstLabels = map[string]string{
-		"ehco_runner_hostname": Hostname,
-	}
-
 	EhcoAlive = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace:   METRIC_NS,
 		Subsystem:   "",
@@ -74,7 +69,14 @@ var (
 		Name:        "current_connection_count",
 		Help:        "当前链接数",
 		ConstLabels: ConstLabels,
-	}, []string{METRIC_LABEL_REMOTE, METRIC_LABEL_CONN_TYPE})
+	}, []string{"label", "conn_type", "remote"})
+	HandShakeDuration = prometheus.NewHistogramVec(prometheus.HistogramOpts{
+		Subsystem:   METRIC_SUBSYSTEM_TRAFFIC,
+		Namespace:   METRIC_NS,
+		Name:        "handshake_duration",
+		Help:        "握手时间ms",
+		ConstLabels: ConstLabels,
+	}, []string{"label", "conn_type", "remote"})
 
 	NetWorkTransmitBytes = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Namespace:   METRIC_NS,
@@ -82,15 +84,7 @@ var (
 		Name:        "network_transmit_bytes",
 		Help:        "传输流量总量bytes",
 		ConstLabels: ConstLabels,
-	}, []string{METRIC_LABEL_REMOTE, METRIC_LABEL_CONN_TYPE, METRIC_LABEL_CONN_FLOW})
-
-	HandShakeDuration = prometheus.NewHistogramVec(prometheus.HistogramOpts{
-		Subsystem:   METRIC_SUBSYSTEM_TRAFFIC,
-		Namespace:   METRIC_NS,
-		Name:        "handshake_duration",
-		Help:        "握手时间ms",
-		ConstLabels: ConstLabels,
-	}, []string{METRIC_LABEL_REMOTE})
+	}, []string{"label", "conn_type", "flow", "remote"})
 )
 
 func RegisterEhcoMetrics(cfg *config.Config) error {

@@ -2,6 +2,7 @@
 package echo
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -118,6 +119,10 @@ func (s *EchoServer) handleTCPConn(conn net.Conn) {
 	}
 }
 
+func isClosedConnError(err error) bool {
+	return errors.Is(err, net.ErrClosed)
+}
+
 func (s *EchoServer) serveUDP() {
 	defer s.wg.Done()
 	buf := make([]byte, 1024)
@@ -128,6 +133,9 @@ func (s *EchoServer) serveUDP() {
 		default:
 			n, remoteAddr, err := s.udpConn.ReadFromUDP(buf)
 			if err != nil {
+				if isClosedConnError(err) {
+					break
+				}
 				s.logger.Errorf("Error reading UDP: %v", err)
 				continue
 			}

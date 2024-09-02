@@ -3,9 +3,7 @@ package metrics
 import (
 	"fmt"
 	"math"
-	"net/url"
 	"runtime"
-	"strings"
 	"time"
 
 	"github.com/Ehco1996/ehco/internal/config"
@@ -39,19 +37,6 @@ type PingGroup struct {
 	PingerLabels map[string]string
 }
 
-func extractHost(input string) (string, error) {
-	// Check if the input string has a scheme, if not, add "http://"
-	if !strings.Contains(input, "://") {
-		input = "http://" + input
-	}
-	// Parse the URL
-	u, err := url.Parse(input)
-	if err != nil {
-		return "", err
-	}
-	return u.Hostname(), nil
-}
-
 func NewPingGroup(cfg *config.Config) *PingGroup {
 	logger := zap.L().Named("pinger")
 
@@ -64,8 +49,8 @@ func NewPingGroup(cfg *config.Config) *PingGroup {
 	// parse addr from rule
 	for _, relayCfg := range cfg.RelayConfigs {
 		// NOTE for (https/ws/wss)://xxx.com -> xxx.com
-		for _, remote := range relayCfg.Remotes {
-			addr, err := extractHost(remote)
+		for _, remote := range relayCfg.GetAllRemotes() {
+			addr, err := remote.ToString()
 			if err != nil {
 				pg.logger.Error("try parse host error", zap.Error(err))
 			}
@@ -86,8 +71,10 @@ func NewPingGroup(cfg *config.Config) *PingGroup {
 	// update metrics
 	for addr, pinger := range pg.Pingers {
 		pinger.OnRecv = func(pkt *ping.Packet) {
+			label := pg.PingerLabels[addr]
+			ip := pkt.IPAddr.String()
 			PingResponseDurationSeconds.WithLabelValues(
-				pkt.IPAddr.String(), pkt.Addr, pg.PingerLabels[addr]).Observe(pkt.Rtt.Seconds())
+				label, ip).Observe(pkt.Rtt.Seconds())
 			pg.logger.Sugar().Infof("%d bytes from %s icmp_seq=%d time=%v ttl=%v",
 				pkt.Nbytes, pkt.Addr, pkt.Seq, pkt.Rtt, pkt.Ttl)
 		}
@@ -106,13 +93,14 @@ func (pg *PingGroup) Describe(ch chan<- *prometheus.Desc) {
 func (pg *PingGroup) Collect(ch chan<- prometheus.Metric) {
 	for addr, pinger := range pg.Pingers {
 		stats := pinger.Statistics()
+		label := pg.PingerLabels[addr]
+		ip := stats.IPAddr.String()
+
 		ch <- prometheus.MustNewConstMetric(
 			PingRequestTotal,
 			prometheus.CounterValue,
 			float64(stats.PacketsSent),
-			stats.IPAddr.String(),
-			stats.Addr,
-			pg.PingerLabels[addr],
+			label, ip,
 		)
 	}
 }

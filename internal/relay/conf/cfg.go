@@ -179,12 +179,14 @@ func (r *Config) DefaultLabel() string {
 func (r *Config) ToRemotesLB() lb.RoundRobin {
 	tcpNodeList := make([]*lb.Node, len(r.Remotes))
 	for idx, addr := range r.Remotes {
-		tcpNodeList[idx] = &lb.Node{
-			Address: addr,
-			Label:   fmt.Sprintf("%s-%s", r.Label, addr),
-		}
+		tcpNodeList[idx] = &lb.Node{Address: addr}
 	}
 	return lb.NewRoundRobin(tcpNodeList)
+}
+
+func (r *Config) GetAllRemotes() []*lb.Node {
+	lb := r.ToRemotesLB()
+	return lb.GetAll()
 }
 
 func (r *Config) GetLoggerName() string {
