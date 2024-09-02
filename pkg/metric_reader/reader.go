@@ -60,139 +60,150 @@ func (b *readerImpl) ReadOnce(ctx context.Context) (*NodeMetrics, map[string]*Ru
 func (b *readerImpl) ParseNodeMetrics(metricMap map[string]*dto.MetricFamily, nm *NodeMetrics) error {
 	var totalIdleTime, totalCpuTime float64
 	cpuCores := 0
-
 	isMac := false
 	if _, ok := metricMap["node_memory_total_bytes"]; ok {
 		isMac = true
 	}
-	err := b.parseMetrics(metricMap, func(metricName string, value float64, labels map[string]string) {
-		switch metricName {
-		case "node_cpu_seconds_total":
-			totalCpuTime += value
-			if labels["mode"] == "idle" {
-				totalIdleTime += value
-				cpuCores++
-			}
-		case "node_load1", "node_load5", "node_load15":
-			nm.CpuLoadInfo += fmt.Sprintf("%.2f|", value)
-		case "node_memory_total_bytes":
-			if isMac {
-				nm.MemoryTotalBytes = value
-			}
-		case "node_memory_active_bytes":
-			if isMac {
-				nm.MemoryUsageBytes += value
-			}
-		case "node_memory_wired_bytes":
-			if isMac {
-				nm.MemoryUsageBytes += value
-			}
-		case "node_memory_MemTotal_bytes":
-			if !isMac {
-				nm.MemoryTotalBytes = value
-			}
-		case "node_memory_MemAvailable_bytes":
-			if !isMac {
-				nm.MemoryUsageBytes = nm.MemoryTotalBytes - value
-			}
-		case "node_filesystem_size_bytes":
-			nm.DiskTotalBytes += value
-		case "node_filesystem_avail_bytes":
-			nm.DiskUsageBytes += (nm.DiskTotalBytes - value)
-		case "node_network_receive_bytes_total":
-			nm.NetworkReceiveBytesTotal += value
-		case "node_network_transmit_bytes_total":
-			nm.NetworkTransmitBytesTotal += value
-		}
-		// calculate usage
-		nm.CpuCoreCount = cpuCores
-		nm.CpuUsagePercent = 100 * (totalCpuTime - totalIdleTime) / totalCpuTime
-		nm.CpuLoadInfo = strings.TrimRight(nm.CpuLoadInfo, "|")
-		nm.MemoryUsagePercent = 100 * nm.MemoryUsageBytes / nm.MemoryTotalBytes
-		nm.DiskUsagePercent = 100 * nm.DiskUsageBytes / nm.DiskTotalBytes
-		if b.lastMetrics != nil {
-			nm.NetworkReceiveBytesRate = (nm.NetworkReceiveBytesTotal - b.lastMetrics.NetworkReceiveBytesTotal) / time.Since(b.lastMetrics.SyncTime).Seconds()
-			nm.NetworkTransmitBytesRate = (nm.NetworkTransmitBytesTotal - b.lastMetrics.NetworkTransmitBytesTotal) / time.Since(b.lastMetrics.SyncTime).Seconds()
-		}
-	})
-	return err
-}
+	requiredMetrics := []string{
+		"node_cpu_seconds_total",
+		"node_load1", "node_load5", "node_load15",
+		"node_memory_total_bytes", "node_memory_active_bytes", "node_memory_wired_bytes",
+		"node_memory_MemTotal_bytes", "node_memory_MemAvailable_bytes",
+		"node_filesystem_size_bytes", "node_filesystem_avail_bytes",
+		"node_network_receive_bytes_total", "node_network_transmit_bytes_total",
+	}
 
-func (b *readerImpl) ParseRuleMetrics(metricMap map[string]*dto.MetricFamily, rm map[string]*RuleMetrics) error {
-	return b.parseMetrics(metricMap, func(metricName string, value float64, labels map[string]string) {
-		label, ok := labels["label"]
-		if !ok || label == "" {
-			return
-		}
-		if _, ok := rm[label]; !ok {
-			rm[label] = &RuleMetrics{
-				Label:                   label,
-				PingMetrics:             make(map[string]*PingMetric),
-				TCPConnectionCount:      make(map[string]float64),
-				TCPHandShakeDuration:    make(map[string]float64),
-				TCPNetworkTransmitBytes: make(map[string]float64),
-				UDPConnectionCount:      make(map[string]float64),
-				UDPHandShakeDuration:    make(map[string]float64),
-				UDPNetworkTransmitBytes: make(map[string]float64),
-			}
+	for _, metricName := range requiredMetrics {
+		metricFamily, ok := metricMap[metricName]
+		if !ok {
+			continue
 		}
 
-		switch metricName {
-		case "ehco_traffic_current_connection_count":
-			key := labels["remote"]
-			if labels["conn_type"] == "tcp" {
-				rm[label].TCPConnectionCount[key] = value
-			} else {
-				rm[label].UDPConnectionCount[key] = value
-			}
-		case "ehco_traffic_network_transmit_bytes":
-			key := labels["remote"]
-			if labels["flow"] == "read" {
-				if labels["conn_type"] == "tcp" {
-					rm[label].TCPNetworkTransmitBytes[key] += value
-				} else {
-					rm[label].UDPNetworkTransmitBytes[key] += value
-				}
-			}
-		case "ehco_ping_response_duration_milliseconds":
-			target := labels["ip"]
-			rm[label].PingMetrics[target] = &PingMetric{
-				Latency: value,
-				Target:  labels["ip"],
-			}
-		case "ehco_traffic_handshake_duration_milliseconds":
-			key := labels["remote"]
-			if labels["conn_type"] == "tcp" {
-				rm[label].TCPHandShakeDuration[key] = value
-			} else {
-				rm[label].UDPHandShakeDuration[key] = value
-			}
-		}
-	})
-}
-
-func (b *readerImpl) parseMetrics(metricMap map[string]*dto.MetricFamily, handler func(string, float64, map[string]string)) error {
-	for metricName, metricFamily := range metricMap {
 		for _, metric := range metricFamily.Metric {
 			labels := make(map[string]string)
 			for _, label := range metric.Label {
 				labels[label.GetName()] = label.GetValue()
 			}
-			var value float64
-			switch metricFamily.GetType() {
-			case dto.MetricType_COUNTER:
-				value = metric.Counter.GetValue()
-			case dto.MetricType_GAUGE:
-				value = metric.Gauge.GetValue()
-			case dto.MetricType_HISTOGRAM:
-				histogram := metric.Histogram
-				if histogram != nil {
-					value = calculatePercentile(histogram, 0.9)
+			value := getMetricValue(metric, metricFamily.GetType())
+
+			switch metricName {
+			case "node_cpu_seconds_total":
+				totalCpuTime += value
+				if labels["mode"] == "idle" {
+					totalIdleTime += value
+					cpuCores++
 				}
-			default:
+			case "node_load1", "node_load5", "node_load15":
+				nm.CpuLoadInfo += fmt.Sprintf("%.2f|", value)
+			case "node_memory_total_bytes":
+				if isMac {
+					nm.MemoryTotalBytes = value
+				}
+			case "node_memory_active_bytes", "node_memory_wired_bytes":
+				if isMac {
+					nm.MemoryUsageBytes += value
+				}
+			case "node_memory_MemTotal_bytes":
+				if !isMac {
+					nm.MemoryTotalBytes = value
+				}
+			case "node_memory_MemAvailable_bytes":
+				if !isMac {
+					nm.MemoryUsageBytes = nm.MemoryTotalBytes - value
+				}
+			case "node_filesystem_size_bytes":
+				nm.DiskTotalBytes += value
+			case "node_filesystem_avail_bytes":
+				nm.DiskUsageBytes += (nm.DiskTotalBytes - value)
+			case "node_network_receive_bytes_total":
+				nm.NetworkReceiveBytesTotal += value
+			case "node_network_transmit_bytes_total":
+				nm.NetworkTransmitBytesTotal += value
+			}
+		}
+	}
+
+	// calculate usage
+	nm.CpuCoreCount = cpuCores
+	nm.CpuUsagePercent = 100 * (totalCpuTime - totalIdleTime) / totalCpuTime
+	nm.CpuLoadInfo = strings.TrimRight(nm.CpuLoadInfo, "|")
+	nm.MemoryUsagePercent = 100 * nm.MemoryUsageBytes / nm.MemoryTotalBytes
+	nm.DiskUsagePercent = 100 * nm.DiskUsageBytes / nm.DiskTotalBytes
+	if b.lastMetrics != nil {
+		nm.NetworkReceiveBytesRate = (nm.NetworkReceiveBytesTotal - b.lastMetrics.NetworkReceiveBytesTotal) / time.Since(b.lastMetrics.SyncTime).Seconds()
+		nm.NetworkTransmitBytesRate = (nm.NetworkTransmitBytesTotal - b.lastMetrics.NetworkTransmitBytesTotal) / time.Since(b.lastMetrics.SyncTime).Seconds()
+	}
+
+	return nil
+}
+
+func (b *readerImpl) ParseRuleMetrics(metricMap map[string]*dto.MetricFamily, rm map[string]*RuleMetrics) error {
+	requiredMetrics := []string{
+		"ehco_traffic_current_connection_count",
+		"ehco_traffic_network_transmit_bytes",
+		"ehco_ping_response_duration_milliseconds",
+		"ehco_traffic_handshake_duration_milliseconds",
+	}
+	for _, metricName := range requiredMetrics {
+		metricFamily, ok := metricMap[metricName]
+		if !ok {
+			continue
+		}
+		for _, metric := range metricFamily.Metric {
+			labels := make(map[string]string)
+			for _, label := range metric.Label {
+				labels[label.GetName()] = label.GetValue()
+			}
+			value := getMetricValue(metric, metricFamily.GetType())
+			label, ok := labels["label"]
+			if !ok || label == "" {
 				continue
 			}
-			handler(metricName, value, labels)
+
+			if _, ok := rm[label]; !ok {
+				rm[label] = &RuleMetrics{
+					Label:                   label,
+					PingMetrics:             make(map[string]*PingMetric),
+					TCPConnectionCount:      make(map[string]float64),
+					TCPHandShakeDuration:    make(map[string]float64),
+					TCPNetworkTransmitBytes: make(map[string]float64),
+					UDPConnectionCount:      make(map[string]float64),
+					UDPHandShakeDuration:    make(map[string]float64),
+					UDPNetworkTransmitBytes: make(map[string]float64),
+				}
+			}
+
+			switch metricName {
+			case "ehco_traffic_current_connection_count":
+				key := labels["remote"]
+				if labels["conn_type"] == "tcp" {
+					rm[label].TCPConnectionCount[key] = value
+				} else {
+					rm[label].UDPConnectionCount[key] = value
+				}
+			case "ehco_traffic_network_transmit_bytes":
+				key := labels["remote"]
+				if labels["flow"] == "read" {
+					if labels["conn_type"] == "tcp" {
+						rm[label].TCPNetworkTransmitBytes[key] += value
+					} else {
+						rm[label].UDPNetworkTransmitBytes[key] += value
+					}
+				}
+			case "ehco_ping_response_duration_milliseconds":
+				target := labels["ip"]
+				rm[label].PingMetrics[target] = &PingMetric{
+					Latency: value,
+					Target:  labels["ip"],
+				}
+			case "ehco_traffic_handshake_duration_milliseconds":
+				key := labels["remote"]
+				if labels["conn_type"] == "tcp" {
+					rm[label].TCPHandShakeDuration[key] = value
+				} else {
+					rm[label].UDPHandShakeDuration[key] = value
+				}
+			}
 		}
 	}
 	return nil
@@ -241,4 +252,19 @@ func calculatePercentile(histogram *dto.Histogram, percentile float64) float64 {
 		lastBucketBound = bucket.GetUpperBound()
 	}
 	return math.NaN()
+}
+
+func getMetricValue(metric *dto.Metric, metricType dto.MetricType) float64 {
+	switch metricType {
+	case dto.MetricType_COUNTER:
+		return metric.Counter.GetValue()
+	case dto.MetricType_GAUGE:
+		return metric.Gauge.GetValue()
+	case dto.MetricType_HISTOGRAM:
+		histogram := metric.Histogram
+		if histogram != nil {
+			return calculatePercentile(histogram, 0.9)
+		}
+	}
+	return 0
 }
