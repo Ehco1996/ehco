@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/pkg/errors"
 	dto "github.com/prometheus/client_model/go"
 	"github.com/prometheus/common/expfmt"
 )
@@ -33,29 +34,17 @@ func NewReader(metricsURL string) *readerImpl {
 }
 
 func (b *readerImpl) ReadOnce(ctx context.Context) (*NodeMetrics, map[string]*RuleMetrics, error) {
-	response, err := b.httpClient.Get(b.metricsURL)
+	metricMap, err := b.fetchMetrics(ctx)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, errors.Wrap(err, "failed to fetch metrics")
 	}
-	defer response.Body.Close()
-
-	body, err := io.ReadAll(response.Body)
-	if err != nil {
-		return nil, nil, err
-	}
-	var parser expfmt.TextParser
-	parsed, err := parser.TextToMetricFamilies(strings.NewReader(string(body)))
-	if err != nil {
-		return nil, nil, err
-	}
-
 	nm := &NodeMetrics{SyncTime: time.Now()}
 	rm := make(map[string]*RuleMetrics)
 
-	if err := b.ParseNodeMetrics(parsed, nm); err != nil {
+	if err := b.ParseNodeMetrics(metricMap, nm); err != nil {
 		return nil, nil, err
 	}
-	if err := b.ParseRuleMetrics(parsed, rm); err != nil {
+	if err := b.ParseRuleMetrics(metricMap, rm); err != nil {
 		return nil, nil, err
 	}
 
@@ -65,245 +54,148 @@ func (b *readerImpl) ReadOnce(ctx context.Context) (*NodeMetrics, map[string]*Ru
 }
 
 func (b *readerImpl) ParseNodeMetrics(metricMap map[string]*dto.MetricFamily, nm *NodeMetrics) error {
-	if err := b.parseCpuInfo(metricMap, nm); err != nil {
-		return err
-	}
-	if err := b.parseMemoryInfo(metricMap, nm); err != nil {
-		return err
-	}
-	if err := b.parseDiskInfo(metricMap, nm); err != nil {
-		return err
-	}
-	if err := b.parseNetworkInfo(metricMap, nm); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (b *readerImpl) ParseRuleMetrics(metricMap map[string]*dto.MetricFamily, rm map[string]*RuleMetrics) error {
-	// Parse CurConnectionCount
-	if err := b.parseCurConnectionCount(metricMap, rm); err != nil {
-		return err
-	}
-
-	// Parse HandShakeDuration
-	if err := b.parseHandShakeDuration(metricMap, rm); err != nil {
-		return err
-	}
-
-	// Parse NetWorkTransmitBytes
-	if err := b.parseNetWorkTransmitBytes(metricMap, rm); err != nil {
-		return err
-	}
-	// Parse PingMetrics
-	if err := b.parsePingInfo(metricMap, rm); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (b *readerImpl) parseCpuInfo(metricMap map[string]*dto.MetricFamily, nm *NodeMetrics) error {
-	handleMetric := func(metricName string, handleValue func(float64, string)) error {
-		metric, ok := metricMap[metricName]
-		if !ok {
-			return fmt.Errorf("%s not found", metricName)
-		}
-
-		for _, m := range metric.Metric {
-			g := m.GetCounter()
-			mode := ""
-			for _, label := range m.GetLabel() {
-				if label.GetName() == "mode" {
-					mode = label.GetValue()
-				}
-			}
-			handleValue(g.GetValue(), mode)
-		}
-		return nil
-	}
-
-	var (
-		totalIdleTime float64
-		totalCpuTime  float64
-		cpuCores      int
-	)
-
-	err := handleMetric("node_cpu_seconds_total", func(val float64, mode string) {
-		totalCpuTime += val
-		if mode == "idle" {
-			totalIdleTime += val
-			cpuCores++
-		}
-	})
-	if err != nil {
-		return err
-	}
-
-	nm.CpuCoreCount = cpuCores
-	nm.CpuUsagePercent = 100 * (totalCpuTime - totalIdleTime) / totalCpuTime
-	for _, load := range []string{"1", "5", "15"} {
-		loadMetricName := fmt.Sprintf("node_load%s", load)
-		loadMetric, ok := metricMap[loadMetricName]
-		if !ok {
-			return fmt.Errorf("%s not found", loadMetricName)
-		}
-		for _, m := range loadMetric.Metric {
-			g := m.GetGauge()
-			nm.CpuLoadInfo += fmt.Sprintf("%.2f|", g.GetValue())
-		}
-	}
-	nm.CpuLoadInfo = strings.TrimRight(nm.CpuLoadInfo, "|")
-	return nil
-}
-
-func (b *readerImpl) parseMemoryInfo(metricMap map[string]*dto.MetricFamily, nm *NodeMetrics) error {
-	handleMetric := func(metricName string, handleValue func(float64)) error {
-		metric, ok := metricMap[metricName]
-		if !ok {
-			return fmt.Errorf("%s not found", metricName)
-		}
-		for _, m := range metric.Metric {
-			g := m.GetGauge()
-			handleValue(g.GetValue())
-		}
-		return nil
-	}
+	var totalIdleTime, totalCpuTime float64
+	cpuCores := 0
 
 	isMac := false
 	if _, ok := metricMap["node_memory_total_bytes"]; ok {
 		isMac = true
 	}
-
-	if isMac {
-		err := handleMetric("node_memory_total_bytes", func(val float64) {
-			nm.MemoryTotalBytes = val
-		})
-		if err != nil {
-			return err
+	err := b.parseMetrics(metricMap, func(metricName string, value float64, labels map[string]string) {
+		switch metricName {
+		case "node_cpu_seconds_total":
+			totalCpuTime += value
+			if labels["mode"] == "idle" {
+				totalIdleTime += value
+				cpuCores++
+			}
+		case "node_load1", "node_load5", "node_load15":
+			nm.CpuLoadInfo += fmt.Sprintf("%.2f|", value)
+		case "node_memory_total_bytes":
+			if isMac {
+				nm.MemoryTotalBytes = value
+			}
+		case "node_memory_active_bytes":
+			if isMac {
+				nm.MemoryUsageBytes += value
+			}
+		case "node_memory_wired_bytes":
+			if isMac {
+				nm.MemoryUsageBytes += value
+			}
+		case "node_memory_MemTotal_bytes":
+			if !isMac {
+				nm.MemoryTotalBytes = value
+			}
+		case "node_memory_MemAvailable_bytes":
+			if !isMac {
+				nm.MemoryUsageBytes = nm.MemoryTotalBytes - value
+			}
+		case "node_filesystem_size_bytes":
+			nm.DiskTotalBytes += value
+		case "node_filesystem_avail_bytes":
+			nm.DiskUsageBytes += (nm.DiskTotalBytes - value)
+		case "node_network_receive_bytes_total":
+			nm.NetworkReceiveBytesTotal += value
+		case "node_network_transmit_bytes_total":
+			nm.NetworkTransmitBytesTotal += value
 		}
-
-		err = handleMetric("node_memory_active_bytes", func(val float64) {
-			nm.MemoryUsageBytes += val
-		})
-		if err != nil {
-			return err
-		}
-
-		err = handleMetric("node_memory_wired_bytes", func(val float64) {
-			nm.MemoryUsageBytes += val
-		})
-		if err != nil {
-			return err
-		}
-	} else {
-		err := handleMetric("node_memory_MemTotal_bytes", func(val float64) {
-			nm.MemoryTotalBytes = val
-		})
-		if err != nil {
-			return err
-		}
-
-		err = handleMetric("node_memory_MemAvailable_bytes", func(val float64) {
-			nm.MemoryUsageBytes = nm.MemoryTotalBytes - val
-		})
-		if err != nil {
-			return err
-		}
-	}
-	if nm.MemoryTotalBytes != 0 {
+		// calculate usage
+		nm.CpuCoreCount = cpuCores
+		nm.CpuUsagePercent = 100 * (totalCpuTime - totalIdleTime) / totalCpuTime
+		nm.CpuLoadInfo = strings.TrimRight(nm.CpuLoadInfo, "|")
 		nm.MemoryUsagePercent = 100 * nm.MemoryUsageBytes / nm.MemoryTotalBytes
-	}
-	return nil
-}
-
-func (b *readerImpl) parseDiskInfo(metricMap map[string]*dto.MetricFamily, nm *NodeMetrics) error {
-	handleMetric := func(metricName string, handleValue func(float64)) error {
-		forMac := false
-		diskMap := make(map[string]float64)
-		metric, ok := metricMap[metricName]
-		if !ok {
-			return fmt.Errorf("%s not found", metricName)
-		}
-		for _, m := range metric.Metric {
-			g := m.GetGauge()
-			disk := ""
-			for _, label := range m.GetLabel() {
-				if label.GetName() == "device" {
-					disk = getDiskName(label.GetValue())
-				}
-				if label.GetName() == "fstype" && label.GetValue() == "apfs" {
-					forMac = true
-				}
-			}
-			diskMap[disk] = g.GetValue()
-		}
-		// 对于 macos 的 apfs 文件系统，可能会有多个相同大小的磁盘，这是因为 apfs 磁盘（卷）会共享物理磁盘
-		seenVal := map[float64]bool{}
-		for _, val := range diskMap {
-			if seenVal[val] && forMac {
-				continue
-			}
-			handleValue(val)
-			seenVal[val] = true
-		}
-		return nil
-	}
-
-	err := handleMetric("node_filesystem_size_bytes", func(val float64) {
-		nm.DiskTotalBytes += val
-	})
-	if err != nil {
-		return err
-	}
-
-	var availBytes float64
-	err = handleMetric("node_filesystem_avail_bytes", func(val float64) {
-		availBytes += val
-	})
-	if err != nil {
-		return err
-	}
-	nm.DiskUsageBytes = nm.DiskTotalBytes - availBytes
-	if nm.DiskTotalBytes != 0 {
 		nm.DiskUsagePercent = 100 * nm.DiskUsageBytes / nm.DiskTotalBytes
+		if b.lastMetrics != nil {
+			nm.NetworkReceiveBytesRate = (nm.NetworkReceiveBytesTotal - b.lastMetrics.NetworkReceiveBytesTotal) / time.Since(b.lastMetrics.SyncTime).Seconds()
+			nm.NetworkTransmitBytesRate = (nm.NetworkTransmitBytesTotal - b.lastMetrics.NetworkTransmitBytesTotal) / time.Since(b.lastMetrics.SyncTime).Seconds()
+		}
+	})
+
+	println("after parse",
+		"cpu", nm.CpuCoreCount, nm.CpuLoadInfo, nm.CpuUsagePercent, "\n",
+		"memory", nm.MemoryUsagePercent, "\n",
+		"disk", nm.DiskUsagePercent, "\n",
+		nm.NetworkReceiveBytesTotal, nm.NetworkTransmitBytesTotal,
+		nm.NetworkReceiveBytesRate, nm.NetworkTransmitBytesRate)
+
+	return err
+}
+
+func (b *readerImpl) ParseRuleMetrics(metricMap map[string]*dto.MetricFamily, rm map[string]*RuleMetrics) error {
+	return b.parseMetrics(metricMap, func(metricName string, value float64, labels map[string]string) {
+		label := labels["label"]
+		if _, ok := rm[label]; !ok {
+			rm[label] = &RuleMetrics{
+				Label:                label,
+				CurConnectionCount:   make(map[string]float64),
+				HandShakeDuration:    make(map[string]*dto.Histogram),
+				NetWorkTransmitBytes: make(map[string]float64),
+			}
+		}
+
+		switch metricName {
+		case "ehco_traffic_current_connection_count":
+			key := fmt.Sprintf("%s:%s", labels["conn_type"], labels["remote"])
+			rm[label].CurConnectionCount[key] = value
+		case "ehco_traffic_network_transmit_bytes":
+			key := fmt.Sprintf("%s:%s:%s", labels["conn_type"], labels["flow"], labels["remote"])
+			rm[label].NetWorkTransmitBytes[key] = value
+		case "ehco_ping_response_duration_seconds":
+			rm[label].PingMetrics = append(rm[label].PingMetrics, PingMetric{
+				Latency: value * 1000, // 转换为毫秒
+				Target:  labels["ip"],
+			})
+		}
+	})
+}
+
+func (b *readerImpl) parseMetrics(metricMap map[string]*dto.MetricFamily, handler func(string, float64, map[string]string)) error {
+	for metricName, metricFamily := range metricMap {
+		for _, metric := range metricFamily.Metric {
+			labels := make(map[string]string)
+			for _, label := range metric.Label {
+				labels[label.GetName()] = label.GetValue()
+			}
+
+			var value float64
+			switch metricFamily.GetType() {
+			case dto.MetricType_COUNTER:
+				value = metric.Counter.GetValue()
+			case dto.MetricType_GAUGE:
+				value = metric.Gauge.GetValue()
+			case dto.MetricType_HISTOGRAM:
+				// TODO 对于 Histogram，我们可能需要特殊处理
+				handler(metricName, 0, labels)
+				continue
+			default:
+				continue // 跳过不支持的类型
+			}
+			handler(metricName, value, labels)
+		}
 	}
 	return nil
 }
 
-func (b *readerImpl) parseNetworkInfo(metricMap map[string]*dto.MetricFamily, nm *NodeMetrics) error {
-	now := time.Now()
-	handleMetric := func(metricName string, handleValue func(float64)) error {
-		metric, ok := metricMap[metricName]
-		if !ok {
-			return fmt.Errorf("%s not found", metricName)
-		}
-		for _, m := range metric.Metric {
-			g := m.GetCounter()
-			handleValue(g.GetValue())
-		}
-		return nil
-	}
-
-	err := handleMetric("node_network_receive_bytes_total", func(val float64) {
-		nm.NetworkReceiveBytesTotal += val
-	})
+func (r *readerImpl) fetchMetrics(ctx context.Context) (map[string]*dto.MetricFamily, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", r.metricsURL, nil)
 	if err != nil {
-		return err
+		return nil, errors.Wrap(err, "failed to create request")
 	}
 
-	err = handleMetric("node_network_transmit_bytes_total", func(val float64) {
-		nm.NetworkTransmitBytesTotal += val
-	})
+	resp, err := r.httpClient.Do(req)
 	if err != nil {
-		return err
+		return nil, errors.Wrap(err, "failed to send request")
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to read response body")
 	}
 
-	if b.lastMetrics != nil {
-		passedTime := now.Sub(b.lastMetrics.SyncTime).Seconds()
-		nm.NetworkReceiveBytesRate = (nm.NetworkReceiveBytesTotal - b.lastMetrics.NetworkReceiveBytesTotal) / passedTime
-		nm.NetworkTransmitBytesRate = (nm.NetworkTransmitBytesTotal - b.lastMetrics.NetworkTransmitBytesTotal) / passedTime
-	}
-	return nil
+	var parser expfmt.TextParser
+	return parser.TextToMetricFamilies(strings.NewReader(string(body)))
 }
 
 func (b *readerImpl) parseCurConnectionCount(metricMap map[string]*dto.MetricFamily, rm map[string]*RuleMetrics) error {
