@@ -34,7 +34,7 @@ func extractHost(input string) (string, error) {
 }
 
 // NOTE for (https/ws/wss)://xxx.com -> xxx.com
-func (n *Node) ToString() (string, error) {
+func (n *Node) GetAddrHost() (string, error) {
 	return extractHost(n.Address)
 }
 

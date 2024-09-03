@@ -18,8 +18,8 @@ type NodeMetrics struct {
 	CPUUsage    float64 `json:"cpu_usage"`
 	MemoryUsage float64 `json:"memory_usage"`
 	DiskUsage   float64 `json:"disk_usage"`
-	NetworkIn   float64 `json:"network_in"`
-	NetworkOut  float64 `json:"network_out"`
+	NetworkIn   float64 `json:"network_in"`  // bytes per second
+	NetworkOut  float64 `json:"network_out"` // bytes per second
 }
 
 type QueryNodeMetricsReq struct {
