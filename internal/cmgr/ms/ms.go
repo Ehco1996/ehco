@@ -1,10 +1,10 @@
 package ms
 
 import (
+	"context"
 	"database/sql"
 	"os"
 	"path/filepath"
-	"time"
 
 	"go.uber.org/zap"
 	_ "modernc.org/sqlite"
@@ -23,14 +23,40 @@ type NodeMetrics struct {
 }
 
 type QueryNodeMetricsReq struct {
-	StartTimestamp int64 `json:"start_ts"`
-	EndTimestamp   int64 `json:"end_ts"`
-
-	Latest bool `json:"latest"` // whether to refresh the cache and get the latest data
+	StartTimestamp int64
+	EndTimestamp   int64
+	Num            int64
 }
+
 type QueryNodeMetricsResp struct {
 	TOTAL int           `json:"total"`
 	Data  []NodeMetrics `json:"data"`
+}
+
+type RuleMetricsData struct {
+	Timestamp               int64  `json:"timestamp"`
+	Label                   string `json:"label"`
+	Remote                  string `json:"remote"`
+	PingLatency             int64  `json:"ping_latency"`
+	TCPConnectionCount      int64  `json:"tcp_connection_count"`
+	TCPHandshakeDuration    int64  `json:"tcp_handshake_duration"`
+	TCPNetworkTransmitBytes int64  `json:"tcp_network_transmit_bytes"`
+	UDPConnectionCount      int64  `json:"udp_connection_count"`
+	UDPHandshakeDuration    int64  `json:"udp_handshake_duration"`
+	UDPNetworkTransmitBytes int64  `json:"udp_network_transmit_bytes"`
+}
+
+type QueryRuleMetricsReq struct {
+	RuleLabel string
+
+	StartTimestamp int64
+	EndTimestamp   int64
+	Num            int64
+}
+
+type QueryRuleMetricsResp struct {
+	TOTAL int               `json:"total"`
+	Data  []RuleMetricsData `json:"data"`
 }
 
 type MetricsStore struct {
@@ -70,7 +96,7 @@ func NewMetricsStore(dbPath string) (*MetricsStore, error) {
 
 func (ms *MetricsStore) initDB() error {
 	// init NodeMetrics table
-	_, err := ms.db.Exec(`
+	if _, err := ms.db.Exec(`
         CREATE TABLE IF NOT EXISTS node_metrics (
             timestamp INTEGER,
             cpu_usage REAL,
@@ -80,8 +106,29 @@ func (ms *MetricsStore) initDB() error {
             network_out REAL,
             PRIMARY KEY (timestamp)
         )
-    `)
-	return err
+    `); err != nil {
+		return err
+	}
+
+	// init rule_metrics
+	if _, err := ms.db.Exec(`
+        CREATE TABLE IF NOT EXISTS rule_metrics (
+            timestamp INTEGER,
+            label TEXT,
+            remote TEXT,
+            ping_latency INTEGER,
+            tcp_connection_count INTEGER,
+            tcp_handshake_duration INTEGER,
+            tcp_network_transmit_bytes INTEGER,
+            udp_connection_count INTEGER,
+            udp_handshake_duration INTEGER,
+            udp_network_transmit_bytes INTEGER,
+            PRIMARY KEY (timestamp, label, remote)
+        )
+    `); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (ms *MetricsStore) AddNodeMetric(m *metric_reader.NodeMetrics) error {
@@ -92,14 +139,31 @@ func (ms *MetricsStore) AddNodeMetric(m *metric_reader.NodeMetrics) error {
 	return err
 }
 
-func (ms *MetricsStore) QueryNodeMetric(startTime, endTime time.Time, num int) (*QueryNodeMetricsResp, error) {
-	rows, err := ms.db.Query(`
+func (ms *MetricsStore) AddRuleMetric(rm *metric_reader.RuleMetrics) error {
+	for remote, pingMetric := range rm.PingMetrics {
+		if _, err := ms.db.Exec(`
+            INSERT OR REPLACE INTO rule_metrics
+            (timestamp, label, remote, ping_latency,
+             tcp_connection_count, tcp_handshake_duration, tcp_network_transmit_bytes,
+             udp_connection_count, udp_handshake_duration, udp_network_transmit_bytes)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `, rm.SyncTime.Unix(), rm.Label, remote, pingMetric.Latency,
+			rm.TCPConnectionCount[remote], rm.TCPHandShakeDuration[remote], rm.TCPNetworkTransmitBytes[remote],
+			rm.UDPConnectionCount[remote], rm.UDPHandShakeDuration[remote], rm.UDPNetworkTransmitBytes[remote]); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (ms *MetricsStore) QueryNodeMetric(ctx context.Context, req *QueryNodeMetricsReq) (*QueryNodeMetricsResp, error) {
+	rows, err := ms.db.QueryContext(ctx, `
 	SELECT timestamp, cpu_usage, memory_usage, disk_usage, network_in, network_out
 	FROM node_metrics
 	WHERE timestamp >= ? AND timestamp <= ?
 	ORDER BY timestamp DESC
 	LIMIT ?
-`, startTime.Unix(), endTime.Unix(), num)
+`, req.StartTimestamp, req.EndTimestamp, req.Num)
 	if err != nil {
 		return nil, err
 	}
@@ -109,6 +173,35 @@ func (ms *MetricsStore) QueryNodeMetric(startTime, endTime time.Time, num int) (
 	for rows.Next() {
 		var m NodeMetrics
 		if err := rows.Scan(&m.Timestamp, &m.CPUUsage, &m.MemoryUsage, &m.DiskUsage, &m.NetworkIn, &m.NetworkOut); err != nil {
+			return nil, err
+		}
+		resp.Data = append(resp.Data, m)
+	}
+	resp.TOTAL = len(resp.Data)
+	return &resp, nil
+}
+
+func (ms *MetricsStore) QueryRuleMetric(ctx context.Context, req *QueryRuleMetricsReq) (*QueryRuleMetricsResp, error) {
+	rows, err := ms.db.Query(`
+        SELECT timestamp, label, remote, ping_latency,
+               tcp_connection_count, tcp_handshake_duration, tcp_network_transmit_bytes,
+               udp_connection_count, udp_handshake_duration, udp_network_transmit_bytes
+        FROM rule_metrics
+        WHERE timestamp >= ? AND timestamp <= ? AND label = ?
+        ORDER BY timestamp DESC
+        LIMIT ?
+    `, req.StartTimestamp, req.EndTimestamp, req.RuleLabel, req.Num)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close() //nolint:errcheck
+
+	var resp QueryRuleMetricsResp
+	for rows.Next() {
+		var m RuleMetricsData
+		if err := rows.Scan(&m.Timestamp, &m.Label, &m.Remote, &m.PingLatency,
+			&m.TCPConnectionCount, &m.TCPHandshakeDuration, &m.TCPNetworkTransmitBytes,
+			&m.UDPConnectionCount, &m.UDPHandshakeDuration, &m.UDPNetworkTransmitBytes); err != nil {
 			return nil, err
 		}
 		resp.Data = append(resp.Data, m)

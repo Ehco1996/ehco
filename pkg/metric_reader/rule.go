@@ -1,6 +1,10 @@
 package metric_reader
 
-import dto "github.com/prometheus/client_model/go"
+import (
+	"time"
+
+	dto "github.com/prometheus/client_model/go"
+)
 
 const (
 	metricConnectionCount   = "ehco_traffic_current_connection_count"
@@ -32,6 +36,8 @@ type RuleMetrics struct {
 	UDPConnectionCount      map[string]int64 // key: remote
 	UDPHandShakeDuration    map[string]int64 // key: remote in ms
 	UDPNetworkTransmitBytes map[string]int64 // key: remote
+
+	SyncTime time.Time
 }
 
 func (b *readerImpl) ParseRuleMetrics(metricMap map[string]*dto.MetricFamily, rm map[string]*RuleMetrics) error {
@@ -84,6 +90,8 @@ func (b *readerImpl) ensureRuleMetric(rm map[string]*RuleMetrics, label string) 
 			UDPConnectionCount:      make(map[string]int64),
 			UDPHandShakeDuration:    make(map[string]int64),
 			UDPNetworkTransmitBytes: make(map[string]int64),
+
+			SyncTime: time.Now(),
 		}
 	}
 	return rm[label]
