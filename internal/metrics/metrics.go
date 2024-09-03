@@ -44,7 +44,7 @@ var (
 			Buckets:     msBuckets,
 			ConstLabels: ConstLabels,
 		},
-		[]string{"label", "ip"},
+		[]string{"label", "remote", "ip"},
 	)
 )
 

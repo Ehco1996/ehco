@@ -222,7 +222,7 @@ func (cm *cmgrImpl) QueryRuleMetrics(ctx context.Context, req *ms.QueryRuleMetri
 			return nil, err
 		}
 		for _, m := range rm {
-			if err := cm.ms.AddRuleMetric(m); err != nil {
+			if err := cm.ms.AddRuleMetric(ctx, m); err != nil {
 				return nil, err
 			}
 		}

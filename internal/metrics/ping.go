@@ -1,7 +1,6 @@
 package metrics
 
 import (
-	"fmt"
 	"math"
 	"runtime"
 	"time"
@@ -11,7 +10,7 @@ import (
 	"go.uber.org/zap"
 )
 
-func (pg *PingGroup) newPinger(addr string) (*ping.Pinger, error) {
+func (pg *PingGroup) newPinger(ruleLabel string, remote string, addr string) (*ping.Pinger, error) {
 	pinger := ping.New(addr)
 	if err := pinger.Resolve(); err != nil {
 		pg.logger.Error("failed to resolve pinger", zap.String("addr", addr), zap.Error(err))
@@ -23,6 +22,13 @@ func (pg *PingGroup) newPinger(addr string) (*ping.Pinger, error) {
 	if runtime.GOOS != "darwin" {
 		pinger.SetPrivileged(true)
 	}
+	pinger.OnRecv = func(pkt *ping.Packet) {
+		ip := pkt.IPAddr.String()
+		PingResponseDurationMilliseconds.WithLabelValues(
+			ruleLabel, remote, ip).Observe(float64(pkt.Rtt.Milliseconds()))
+		pg.logger.Sugar().Infof("%d bytes from %s icmp_seq=%d time=%v ttl=%v",
+			pkt.Nbytes, pkt.Addr, pkt.Seq, pkt.Rtt, pkt.Ttl)
+	}
 	return pinger, nil
 }
 
@@ -31,55 +37,24 @@ type PingGroup struct {
 
 	// k: addr
 	Pingers map[string]*ping.Pinger
-
-	// k: addr v:relay rule label joined by ","
-	PingerLabels map[string]string
 }
 
 func NewPingGroup(cfg *config.Config) *PingGroup {
-	logger := zap.L().Named("pinger")
-
 	pg := &PingGroup{
-		logger:       logger,
-		Pingers:      make(map[string]*ping.Pinger),
-		PingerLabels: map[string]string{},
+		logger:  zap.L().Named("pinger"),
+		Pingers: make(map[string]*ping.Pinger),
 	}
-
-	// parse addr from rule
 	for _, relayCfg := range cfg.RelayConfigs {
-		// NOTE for (https/ws/wss)://xxx.com -> xxx.com
 		for _, remote := range relayCfg.GetAllRemotes() {
 			addr, err := remote.GetAddrHost()
 			if err != nil {
 				pg.logger.Error("try parse host error", zap.Error(err))
 			}
-			if _, ok := pg.Pingers[addr]; ok {
-				// append rule label when remote host is same
-				pg.PingerLabels[addr] += fmt.Sprintf(",%s", relayCfg.Label)
-				continue
-			}
-			if pinger, err := pg.newPinger(addr); err != nil {
+			if pinger, err := pg.newPinger(relayCfg.Label, remote.Address, addr); err != nil {
 				pg.logger.Error("new pinger meet error", zap.Error(err))
 			} else {
-				pg.Pingers[pinger.Addr()] = pinger
-				pg.PingerLabels[addr] = relayCfg.Label
+				pg.Pingers[addr] = pinger
 			}
-		}
-	}
-
-	// update metrics
-	for addr, pinger := range pg.Pingers {
-		pinger.OnRecv = func(pkt *ping.Packet) {
-			label := pg.PingerLabels[addr]
-			ip := pkt.IPAddr.String()
-			PingResponseDurationMilliseconds.WithLabelValues(
-				label, ip).Observe(float64(pkt.Rtt.Milliseconds()))
-			pg.logger.Sugar().Infof("%d bytes from %s icmp_seq=%d time=%v ttl=%v",
-				pkt.Nbytes, pkt.Addr, pkt.Seq, pkt.Rtt, pkt.Ttl)
-		}
-		pinger.OnDuplicateRecv = func(pkt *ping.Packet) {
-			pg.logger.Sugar().Infof("%d bytes from %s icmp_seq=%d time=%v ttl=%v (DUP!)",
-				pkt.Nbytes, pkt.IPAddr, pkt.Seq, pkt.Rtt, pkt.Ttl)
 		}
 	}
 	return pg

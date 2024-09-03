@@ -139,21 +139,35 @@ func (ms *MetricsStore) AddNodeMetric(m *metric_reader.NodeMetrics) error {
 	return err
 }
 
-func (ms *MetricsStore) AddRuleMetric(rm *metric_reader.RuleMetrics) error {
+func (ms *MetricsStore) AddRuleMetric(ctx context.Context, rm *metric_reader.RuleMetrics) error {
+	tx, err := ms.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback() //nolint:errcheck
+
+	stmt, err := tx.PrepareContext(ctx, `
+        INSERT OR REPLACE INTO rule_metrics
+        (timestamp, label, remote, ping_latency,
+         tcp_connection_count, tcp_handshake_duration, tcp_network_transmit_bytes,
+         udp_connection_count, udp_handshake_duration, udp_network_transmit_bytes)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `)
+	if err != nil {
+		return err
+	}
+	defer stmt.Close() //nolint:errcheck
+
 	for remote, pingMetric := range rm.PingMetrics {
-		if _, err := ms.db.Exec(`
-            INSERT OR REPLACE INTO rule_metrics
-            (timestamp, label, remote, ping_latency,
-             tcp_connection_count, tcp_handshake_duration, tcp_network_transmit_bytes,
-             udp_connection_count, udp_handshake_duration, udp_network_transmit_bytes)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `, rm.SyncTime.Unix(), rm.Label, remote, pingMetric.Latency,
+		_, err := stmt.ExecContext(ctx, rm.SyncTime.Unix(), rm.Label, remote, pingMetric.Latency,
 			rm.TCPConnectionCount[remote], rm.TCPHandShakeDuration[remote], rm.TCPNetworkTransmitBytes[remote],
-			rm.UDPConnectionCount[remote], rm.UDPHandShakeDuration[remote], rm.UDPNetworkTransmitBytes[remote]); err != nil {
+			rm.UDPConnectionCount[remote], rm.UDPHandShakeDuration[remote], rm.UDPNetworkTransmitBytes[remote])
+		if err != nil {
 			return err
 		}
 	}
-	return nil
+
+	return tx.Commit()
 }
 
 func (ms *MetricsStore) QueryNodeMetric(ctx context.Context, req *QueryNodeMetricsReq) (*QueryNodeMetricsResp, error) {

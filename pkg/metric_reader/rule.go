@@ -120,8 +120,8 @@ func (b *readerImpl) updateNetworkTransmit(rm *RuleMetrics, labels map[string]st
 }
 
 func (b *readerImpl) updatePingMetrics(rm *RuleMetrics, labels map[string]string, value int64) {
-	target := labels[ipKey]
-	rm.PingMetrics[target] = &PingMetric{
+	remote := labels[remoteKey]
+	rm.PingMetrics[remote] = &PingMetric{
 		Latency: value,
 		Target:  labels[ipKey],
 	}
