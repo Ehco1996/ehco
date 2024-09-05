@@ -123,3 +123,9 @@ func (s *Server) ListRules(c echo.Context) error {
 		"Configs": s.cfg.RelayConfigs,
 	})
 }
+
+func (s *Server) RuleMetrics(c echo.Context) error {
+	return c.Render(http.StatusOK, "rule_metrics.html", map[string]interface{}{
+		"Configs": s.cfg.RelayConfigs,
+	})
+}

@@ -79,8 +79,9 @@ func (s *Server) GetRuleMetrics(c echo.Context) error {
 	req := &ms.QueryRuleMetricsReq{
 		StartTimestamp: params.startTS,
 		EndTimestamp:   params.endTS,
-		RuleLabel:      c.QueryParam("label"),
 		Num:            -1,
+		RuleLabel:      c.QueryParam("label"),
+		Remote:         c.QueryParam("remote"),
 	}
 	if params.refresh {
 		req.Num = 1

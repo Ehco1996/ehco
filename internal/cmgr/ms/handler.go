@@ -42,6 +42,7 @@ type RuleMetricsData struct {
 
 type QueryRuleMetricsReq struct {
 	RuleLabel string
+	Remote    string
 
 	StartTimestamp int64
 	EndTimestamp   int64
@@ -130,6 +131,10 @@ func (ms *MetricsStore) QueryRuleMetric(ctx context.Context, req *QueryRuleMetri
 	if req.RuleLabel != "" {
 		query += " AND label = ?"
 		args = append(args, req.RuleLabel)
+	}
+	if req.Remote != "" {
+		query += " AND remote = ?"
+		args = append(args, req.Remote)
 	}
 
 	query += `

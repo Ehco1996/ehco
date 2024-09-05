@@ -168,6 +168,7 @@ func setupRoutes(s *Server) {
 	e.GET(indexPath, s.index)
 	e.GET(connectionsPath, s.ListConnections)
 	e.GET(rulesPath, s.ListRules)
+	e.GET("/rule_metrics/", s.RuleMetrics)
 
 	api := e.Group(apiPrefix)
 	api.GET("/config/", s.CurrentConfig)

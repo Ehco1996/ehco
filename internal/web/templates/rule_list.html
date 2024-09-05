@@ -1,4 +1,4 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
   {{template "_head.html" .}}
   <body>
@@ -53,7 +53,7 @@
                   response.msg + // Use 'msg' as per Go struct
                   ' (Latency: ' +
                   response.latency + // Ensure this matches the Go struct field name
-                  'ms)',
+                  'ms)'
               );
             } else {
               // If error code is not 0, show error message
