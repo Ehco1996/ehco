@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+  {{template "_head.html" .}}
+  <body>
+    {{ template "_navbar.html" . }}
+    <section class="section">
+      <div class="container">
+        <h1 class="title">Real-time Logs</h1>
+        <div class="field has-addons mb-3">
+          <div class="control is-expanded">
+            <input class="input" type="text" id="searchInput" placeholder="Search logs..." />
+          </div>
+          <div class="control">
+            <button class="button is-info" id="searchButton">Search</button>
+          </div>
+          <div class="control">
+            <button class="button is-warning" id="pauseButton">Pause</button>
+          </div>
+          <div class="control">
+            <button class="button is-danger" id="clearButton">Clear</button>
+          </div>
+        </div>
+        <div id="logsContainer" class="box" style="height: 500px; overflow-y: scroll; font-family: monospace"></div>
+      </div>
+    </section>
+
+    <script>
+      const logsContainer = document.getElementById('logsContainer');
+      const searchInput = document.getElementById('searchInput');
+      const searchButton = document.getElementById('searchButton');
+      const pauseButton = document.getElementById('pauseButton');
+      const clearButton = document.getElementById('clearButton');
+      let isPaused = false;
+      let ws;
+
+      function connectWebSocket() {
+        ws = new WebSocket('ws://' + window.location.host + '/ws/logs');
+        ws.onopen = function (event) {
+          console.log('WebSocket connection established');
+        };
+
+        ws.onerror = function (event) {
+          console.error('WebSocket error observed:', event);
+        };
+
+        ws.onmessage = function (event) {
+          if (!isPaused) {
+            const logEntry = document.createElement('div');
+            logEntry.innerHTML = formatLogMessage(event.data);
+            logsContainer.appendChild(logEntry);
+            logsContainer.scrollTop = logsContainer.scrollHeight;
+          }
+        };
+
+        ws.onclose = function (event) {
+          console.log('WebSocket connection closed. Reconnecting...');
+          setTimeout(connectWebSocket, 1000);
+        };
+      }
+
+      function formatLogMessage(message) {
+        try {
+          const logEntry = JSON.parse(message);
+          const timestamp = logEntry.ts;
+          const level = logEntry.level;
+          const msg = logEntry.msg;
+          const logger = logEntry.logger;
+          console.log('Log entry:', logEntry);
+          const levelClass = getLevelClass(level);
+
+          return `
+            <div class="columns is-mobile is-gapless">
+              <div class="column is-2"><span class="has-text-grey-light">${timestamp}</span></div>
+              <div class="column is-1"><span class="tag ${levelClass}">${level.toUpperCase()}</span></div>
+              <div class="column is-2"><span class="tag is-info is-light">${logger}</span></div>
+              <div class="column is-7"><span>${msg}</span></div>
+            </div>
+          `;
+        } catch (e) {
+          console.error('Error parsing log message:', e);
+          return `<div class="has-text-danger">${message}</div>`;
+        }
+      }
+
+      function getLevelClass(level) {
+        switch (level) {
+          case 'debug':
+            return 'is-light';
+          case 'info':
+            return 'is-info';
+          case 'warn':
+            return 'is-warning';
+          case 'error':
+            return 'is-danger';
+          case 'fatal':
+            return 'is-dark';
+          default:
+            return 'is-light';
+        }
+      }
+
+      connectWebSocket();
+
+      searchButton.addEventListener('click', function () {
+        const searchTerm = searchInput.value.toLowerCase();
+        const logEntries = logsContainer.getElementsByTagName('div');
+        for (let entry of logEntries) {
+          if (entry.textContent.toLowerCase().includes(searchTerm)) {
+            entry.classList.add('has-background-warning-light');
+            entry.scrollIntoView();
+          } else {
+            entry.classList.remove('has-background-warning-light');
+          }
+        }
+      });
+
+      pauseButton.addEventListener('click', function () {
+        isPaused = !isPaused;
+        pauseButton.textContent = isPaused ? 'Resume' : 'Pause';
+        pauseButton.classList.toggle('is-warning');
+        pauseButton.classList.toggle('is-success');
+      });
+
+      clearButton.addEventListener('click', function () {
+        logsContainer.innerHTML = '';
+      });
+    </script>
+  </body>
+</html>

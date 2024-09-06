@@ -165,10 +165,12 @@ func setupRoutes(s *Server) {
 	e.GET(metricsPath, echo.WrapHandler(promhttp.Handler()))
 	e.GET("/debug/pprof/*", echo.WrapHandler(http.DefaultServeMux))
 
+	// web pages
 	e.GET(indexPath, s.index)
 	e.GET(connectionsPath, s.ListConnections)
 	e.GET(rulesPath, s.ListRules)
 	e.GET("/rule_metrics/", s.RuleMetrics)
+	e.GET("/logs/", s.LogsPage)
 
 	api := e.Group(apiPrefix)
 	api.GET("/config/", s.CurrentConfig)
@@ -176,6 +178,9 @@ func setupRoutes(s *Server) {
 	api.GET("/health_check/", s.HandleHealthCheck)
 	api.GET("/node_metrics/", s.GetNodeMetrics)
 	api.GET("/rule_metrics/", s.GetRuleMetrics)
+
+	// ws
+	e.GET("/ws/logs", s.handleWebSocketLogs)
 }
 
 func (s *Server) Start() error {
