@@ -208,7 +208,7 @@ func (cm *cmgrImpl) QueryNodeMetrics(ctx context.Context, req *ms.QueryNodeMetri
 		if err != nil {
 			return nil, err
 		}
-		if err := cm.ms.AddNodeMetric(nm); err != nil {
+		if err := cm.ms.AddNodeMetric(ctx, nm); err != nil {
 			return nil, err
 		}
 	}

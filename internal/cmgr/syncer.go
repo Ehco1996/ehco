@@ -45,13 +45,18 @@ func (cm *cmgrImpl) syncOnce(ctx context.Context) error {
 	}
 
 	if cm.cfg.NeedMetrics() {
-		nm, _, err := cm.mr.ReadOnce(ctx)
+		nm, rmm, err := cm.mr.ReadOnce(ctx)
 		if err != nil {
 			cm.l.Errorf("read metrics failed: %v", err)
 		} else {
 			req.Node = *nm
-			if err := cm.ms.AddNodeMetric(nm); err != nil {
+			if err := cm.ms.AddNodeMetric(ctx, nm); err != nil {
 				cm.l.Errorf("add metrics to store failed: %v", err)
+			}
+			for _, rm := range rmm {
+				if err := cm.ms.AddRuleMetric(ctx, rm); err != nil {
+					cm.l.Errorf("add rule metrics to store failed: %v", err)
+				}
 			}
 		}
 	}

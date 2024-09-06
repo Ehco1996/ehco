@@ -54,8 +54,8 @@ type QueryRuleMetricsResp struct {
 	Data  []RuleMetricsData `json:"data"`
 }
 
-func (ms *MetricsStore) AddNodeMetric(m *metric_reader.NodeMetrics) error {
-	_, err := ms.db.Exec(`
+func (ms *MetricsStore) AddNodeMetric(ctx context.Context, m *metric_reader.NodeMetrics) error {
+	_, err := ms.db.ExecContext(ctx, `
     INSERT OR REPLACE INTO node_metrics (timestamp, cpu_usage, memory_usage, disk_usage, network_in, network_out)
     VALUES (?, ?, ?, ?, ?, ?)
 `, m.SyncTime.Unix(), m.CpuUsagePercent, m.MemoryUsagePercent, m.DiskUsagePercent, m.NetworkReceiveBytesRate, m.NetworkTransmitBytesRate)
