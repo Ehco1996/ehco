@@ -18,19 +18,6 @@
       border-radius: 4px;
       transition: background-color 0.3s ease;
     }
-
-    .log-entry-highlight {
-      animation: highlight 1s ease-in-out;
-    }
-
-    @keyframes highlight {
-      0% {
-        background-color: #fffacd;
-      }
-      100% {
-        background-color: transparent;
-      }
-    }
   </style>
 
   <body>
@@ -120,11 +107,11 @@
           const levelClass = getLevelClass(level);
 
           return `
-            <div class="columns is-mobile is-gapless">
-              <div class="column is-2"><span class="has-text-grey-light">${timestamp}</span></div>
+            <div class="columns is-mobile">
+              <div class="column is-3"><span class="has-text-grey-light is-small">${timestamp}</span></div>
               <div class="column is-1"><span class="tag ${levelClass}">${level.toUpperCase()}</span></div>
               <div class="column is-2"><span class="tag is-info is-light">${logger}</span></div>
-              <div class="column is-7"><span>${msg}</span></div>
+              <div class="column"><span>${msg}</span></div>
             </div>
           `;
         } catch (e) {
@@ -156,7 +143,7 @@
 
       function applyFilter() {
         filterTerm = filterInput.value;
-        const logEntries = logsContainer.getElementsByTagName('div');
+        const logEntries = logsContainer.getElementsByClassName('log-entry');
         for (let entry of logEntries) {
           if (shouldDisplayLog(entry.textContent)) {
             entry.style.display = '';
@@ -165,7 +152,6 @@
           }
         }
       }
-
       connectWebSocket();
 
       filterButton.addEventListener('click', applyFilter);
