@@ -5,9 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
-	"time"
 
-	"github.com/Ehco1996/ehco/internal/cmgr/ms"
 	"github.com/Ehco1996/ehco/internal/config"
 	"github.com/Ehco1996/ehco/internal/constant"
 	"github.com/labstack/echo/v4"
@@ -126,36 +124,8 @@ func (s *Server) ListRules(c echo.Context) error {
 	})
 }
 
-func (s *Server) GetNodeMetrics(c echo.Context) error {
-	startTS := time.Now().Unix() - 60
-	if c.QueryParam("start_ts") != "" {
-		star, err := strconv.ParseInt(c.QueryParam("start_ts"), 10, 64)
-		if err != nil {
-			return echo.NewHTTPError(http.StatusBadRequest, err.Error())
-		}
-		startTS = star
-	}
-	endTS := time.Now().Unix()
-	if c.QueryParam("end_ts") != "" {
-		end, err := strconv.ParseInt(c.QueryParam("end_ts"), 10, 64)
-		if err != nil {
-			return echo.NewHTTPError(http.StatusBadRequest, err.Error())
-		}
-		endTS = end
-	}
-	req := &ms.QueryNodeMetricsReq{StartTimestamp: startTS, EndTimestamp: endTS}
-	latest := c.QueryParam("latest")
-	if latest != "" {
-		r, err := strconv.ParseBool(latest)
-		if err != nil {
-			return echo.NewHTTPError(http.StatusBadRequest, err.Error())
-		}
-		req.Latest = r
-	}
-
-	metrics, err := s.connMgr.QueryNodeMetrics(c.Request().Context(), req)
-	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
-	}
-	return c.JSON(http.StatusOK, metrics)
+func (s *Server) RuleMetrics(c echo.Context) error {
+	return c.Render(http.StatusOK, "rule_metrics.html", map[string]interface{}{
+		"Configs": s.cfg.RelayConfigs,
+	})
 }

@@ -39,7 +39,8 @@ type Cmgr interface {
 	Start(ctx context.Context, errCH chan error)
 
 	// Metrics related
-	QueryNodeMetrics(ctx context.Context, req *ms.QueryNodeMetricsReq) (*ms.QueryNodeMetricsResp, error)
+	QueryNodeMetrics(ctx context.Context, req *ms.QueryNodeMetricsReq, refresh bool) (*ms.QueryNodeMetricsResp, error)
+	QueryRuleMetrics(ctx context.Context, req *ms.QueryRuleMetricsReq, refresh bool) (*ms.QueryRuleMetricsResp, error)
 }
 
 type cmgrImpl struct {
@@ -201,20 +202,30 @@ func (cm *cmgrImpl) Start(ctx context.Context, errCH chan error) {
 	}
 }
 
-func (cm *cmgrImpl) QueryNodeMetrics(ctx context.Context, req *ms.QueryNodeMetricsReq) (*ms.QueryNodeMetricsResp, error) {
-	num := -1 // default to return all metrics
-	if req.Latest {
-		m, err := cm.mr.ReadOnce(ctx)
+func (cm *cmgrImpl) QueryNodeMetrics(ctx context.Context, req *ms.QueryNodeMetricsReq, refresh bool) (*ms.QueryNodeMetricsResp, error) {
+	if refresh {
+		nm, _, err := cm.mr.ReadOnce(ctx)
 		if err != nil {
 			return nil, err
 		}
-		if err := cm.ms.AddNodeMetric(m); err != nil {
+		if err := cm.ms.AddNodeMetric(ctx, nm); err != nil {
 			return nil, err
 		}
-		num = 1
 	}
+	return cm.ms.QueryNodeMetric(ctx, req)
+}
 
-	startTime := time.Unix(req.StartTimestamp, 0)
-	endTime := time.Unix(req.EndTimestamp, 0)
-	return cm.ms.QueryNodeMetric(startTime, endTime, num)
+func (cm *cmgrImpl) QueryRuleMetrics(ctx context.Context, req *ms.QueryRuleMetricsReq, refresh bool) (*ms.QueryRuleMetricsResp, error) {
+	if refresh {
+		_, rm, err := cm.mr.ReadOnce(ctx)
+		if err != nil {
+			return nil, err
+		}
+		for _, m := range rm {
+			if err := cm.ms.AddRuleMetric(ctx, m); err != nil {
+				return nil, err
+			}
+		}
+	}
+	return cm.ms.QueryRuleMetric(ctx, req)
 }

@@ -67,7 +67,12 @@ func (s *WsClient) HandShake(ctx context.Context, remote *lb.Node, isTCP bool) (
 		return nil, err
 	}
 	latency := time.Since(t1)
-	metrics.HandShakeDuration.WithLabelValues(remote.Label).Observe(float64(latency.Milliseconds()))
+	connType := metrics.METRIC_CONN_TYPE_TCP
+	if !isTCP {
+		connType = metrics.METRIC_CONN_TYPE_UDP
+	}
+	labels := []string{s.cfg.Label, connType, remote.Address}
+	metrics.HandShakeDurationMilliseconds.WithLabelValues(labels...).Observe(float64(latency.Milliseconds()))
 	remote.HandShakeDuration = latency
 	c := conn.NewWSConn(wsc, false)
 	return c, nil
@@ -97,7 +102,7 @@ func (s *WsServer) handleRequest(w http.ResponseWriter, req *http.Request) {
 
 	var remote *lb.Node
 	if addr := req.URL.Query().Get(conf.WS_QUERY_REMOTE_ADDR); addr != "" {
-		remote = &lb.Node{Address: addr, Label: addr}
+		remote = &lb.Node{Address: addr}
 	} else {
 		remote = s.remotes.Next()
 	}

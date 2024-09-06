@@ -168,12 +168,14 @@ func setupRoutes(s *Server) {
 	e.GET(indexPath, s.index)
 	e.GET(connectionsPath, s.ListConnections)
 	e.GET(rulesPath, s.ListRules)
+	e.GET("/rule_metrics/", s.RuleMetrics)
 
 	api := e.Group(apiPrefix)
 	api.GET("/config/", s.CurrentConfig)
 	api.POST("/config/reload/", s.HandleReload)
 	api.GET("/health_check/", s.HandleHealthCheck)
 	api.GET("/node_metrics/", s.GetNodeMetrics)
+	api.GET("/rule_metrics/", s.GetRuleMetrics)
 }
 
 func (s *Server) Start() error {

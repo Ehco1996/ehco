@@ -1,0 +1,82 @@
+<div class="card" id="rule-metrics-card">
+  <header class="card-header is-flex is-flex-wrap-wrap">
+    <p class="card-header-title has-text-centered">Rule Metrics</p>
+    <div class="card-header-icon is-flex-grow-1 is-flex is-justify-content-space-between">
+      <div class="field is-horizontal mr-2">
+        <div class="field-label is-small mr-2">
+          <label class="label" for="labelFilter">Label:</label>
+        </div>
+        <div class="field-body">
+          <div class="field">
+            <div class="control">
+              <div class="select is-small">
+                <select id="labelFilter" aria-label="Filter by label">
+                  <option value="">All Labels</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="field is-horizontal mr-2">
+        <div class="field-label is-small mr-2">
+          <label class="label" for="remoteFilter">Remote:</label>
+        </div>
+        <div class="field-body">
+          <div class="field">
+            <div class="control">
+              <div class="select is-small">
+                <select id="remoteFilter" aria-label="Filter by remote">
+                  <option value="">All Remotes</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="dropdown" id="dateRangeDropdown">
+        <div class="dropdown-trigger">
+          <button class="button is-small" aria-haspopup="true" aria-controls="dropdown-menu" id="dateRangeButton">
+            <span id="dateRangeText">Select date range</span>
+            <span class="icon is-small">
+              <i class="fas fa-angle-down" aria-hidden="true"></i>
+            </span>
+          </button>
+        </div>
+        <div class="dropdown-menu" id="dropdown-menu" role="menu">
+          <div class="dropdown-content">
+            <a href="#" class="dropdown-item" data-range="30m">Last 30 minutes</a>
+            <a href="#" class="dropdown-item" data-range="1h">Last 1 hour</a>
+            <a href="#" class="dropdown-item" data-range="3h">Last 3 hours</a>
+            <a href="#" class="dropdown-item" data-range="6h">Last 6 hours</a>
+            <a href="#" class="dropdown-item" data-range="12h">Last 12 hours</a>
+            <a href="#" class="dropdown-item" data-range="24h">Last 24 hours</a>
+            <a href="#" class="dropdown-item" data-range="7d">Last 7 days</a>
+            <hr class="dropdown-divider" />
+            <a href="#" class="dropdown-item" id="dateRangeInput">Custom range</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+  <div class="card-content">
+    <div class="content">
+      <div class="columns is-multiline">
+        <div class="column is-6">
+          <canvas id="connectionCountChart"></canvas>
+        </div>
+        <div class="column is-6">
+          <canvas id="handshakeDurationChart"></canvas>
+        </div>
+        <div class="column is-12">
+          <canvas id="pingLatencyChart"></canvas>
+        </div>
+        <div class="column is-12">
+          <canvas id="networkTransmitBytesChart"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="/js/rule_metrics.js"></script>

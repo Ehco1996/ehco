@@ -8,30 +8,7 @@ import (
 
 	"go.uber.org/zap"
 	_ "modernc.org/sqlite"
-
-	"github.com/Ehco1996/ehco/pkg/metric_reader"
 )
-
-type NodeMetrics struct {
-	Timestamp int64 `json:"timestamp"`
-
-	CPUUsage    float64 `json:"cpu_usage"`
-	MemoryUsage float64 `json:"memory_usage"`
-	DiskUsage   float64 `json:"disk_usage"`
-	NetworkIn   float64 `json:"network_in"`
-	NetworkOut  float64 `json:"network_out"`
-}
-
-type QueryNodeMetricsReq struct {
-	StartTimestamp int64 `json:"start_ts"`
-	EndTimestamp   int64 `json:"end_ts"`
-
-	Latest bool `json:"latest"` // whether to refresh the cache and get the latest data
-}
-type QueryNodeMetricsResp struct {
-	TOTAL int           `json:"total"`
-	Data  []NodeMetrics `json:"data"`
-}
 
 type MetricsStore struct {
 	db     *sql.DB
@@ -65,12 +42,34 @@ func NewMetricsStore(dbPath string) (*MetricsStore, error) {
 	if err := ms.initDB(); err != nil {
 		return nil, err
 	}
+	if err := ms.cleanOldData(); err != nil {
+		return nil, err
+	}
 	return ms, nil
+}
+
+func (ms *MetricsStore) cleanOldData() error {
+	thirtyDaysAgo := time.Now().AddDate(0, 0, -30).Unix()
+
+	// 清理 node_metrics 表
+	_, err := ms.db.Exec("DELETE FROM node_metrics WHERE timestamp < ?", thirtyDaysAgo)
+	if err != nil {
+		return err
+	}
+
+	// 清理 rule_metrics 表
+	_, err = ms.db.Exec("DELETE FROM rule_metrics WHERE timestamp < ?", thirtyDaysAgo)
+	if err != nil {
+		return err
+	}
+
+	ms.l.Infof("Cleaned data older than 30 days")
+	return nil
 }
 
 func (ms *MetricsStore) initDB() error {
 	// init NodeMetrics table
-	_, err := ms.db.Exec(`
+	if _, err := ms.db.Exec(`
         CREATE TABLE IF NOT EXISTS node_metrics (
             timestamp INTEGER,
             cpu_usage REAL,
@@ -80,39 +79,27 @@ func (ms *MetricsStore) initDB() error {
             network_out REAL,
             PRIMARY KEY (timestamp)
         )
-    `)
-	return err
-}
-
-func (ms *MetricsStore) AddNodeMetric(m *metric_reader.NodeMetrics) error {
-	_, err := ms.db.Exec(`
-    INSERT OR REPLACE INTO node_metrics (timestamp, cpu_usage, memory_usage, disk_usage, network_in, network_out)
-    VALUES (?, ?, ?, ?, ?, ?)
-`, m.SyncTime.Unix(), m.CpuUsagePercent, m.MemoryUsagePercent, m.DiskUsagePercent, m.NetworkReceiveBytesRate, m.NetworkTransmitBytesRate)
-	return err
-}
-
-func (ms *MetricsStore) QueryNodeMetric(startTime, endTime time.Time, num int) (*QueryNodeMetricsResp, error) {
-	rows, err := ms.db.Query(`
-	SELECT timestamp, cpu_usage, memory_usage, disk_usage, network_in, network_out
-	FROM node_metrics
-	WHERE timestamp >= ? AND timestamp <= ?
-	ORDER BY timestamp DESC
-	LIMIT ?
-`, startTime.Unix(), endTime.Unix(), num)
-	if err != nil {
-		return nil, err
+    `); err != nil {
+		return err
 	}
-	defer rows.Close() //nolint:errcheck
 
-	var resp QueryNodeMetricsResp
-	for rows.Next() {
-		var m NodeMetrics
-		if err := rows.Scan(&m.Timestamp, &m.CPUUsage, &m.MemoryUsage, &m.DiskUsage, &m.NetworkIn, &m.NetworkOut); err != nil {
-			return nil, err
-		}
-		resp.Data = append(resp.Data, m)
+	// init rule_metrics
+	if _, err := ms.db.Exec(`
+        CREATE TABLE IF NOT EXISTS rule_metrics (
+            timestamp INTEGER,
+            label TEXT,
+            remote TEXT,
+            ping_latency INTEGER,
+            tcp_connection_count INTEGER,
+            tcp_handshake_duration INTEGER,
+            tcp_network_transmit_bytes INTEGER,
+            udp_connection_count INTEGER,
+            udp_handshake_duration INTEGER,
+            udp_network_transmit_bytes INTEGER,
+            PRIMARY KEY (timestamp, label, remote)
+        )
+    `); err != nil {
+		return err
 	}
-	resp.TOTAL = len(resp.Data)
-	return &resp, nil
+	return nil
 }

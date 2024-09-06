@@ -209,14 +209,12 @@ func (c *innerConn) recordStats(n int, isRead bool) {
 		return
 	}
 	if isRead {
-		metrics.NetWorkTransmitBytes.WithLabelValues(
-			c.rc.remote.Label, metrics.METRIC_CONN_TYPE_TCP, metrics.METRIC_CONN_FLOW_READ,
-		).Add(float64(n))
+		labels := []string{c.rc.RelayLabel, c.rc.ConnType, metrics.METRIC_FLOW_READ, c.rc.remote.Address}
+		metrics.NetWorkTransmitBytes.WithLabelValues(labels...).Add(float64(n))
 		c.rc.Stats.Record(0, int64(n))
 	} else {
-		metrics.NetWorkTransmitBytes.WithLabelValues(
-			c.rc.remote.Label, metrics.METRIC_CONN_TYPE_TCP, metrics.METRIC_CONN_FLOW_WRITE,
-		).Add(float64(n))
+		labels := []string{c.rc.RelayLabel, c.rc.ConnType, metrics.METRIC_FLOW_WRITE, c.rc.remote.Address}
+		metrics.NetWorkTransmitBytes.WithLabelValues(labels...).Add(float64(n))
 		c.rc.Stats.Record(int64(n), 0)
 	}
 }
@@ -236,7 +234,7 @@ func (c *innerConn) Read(p []byte) (n int, err error) {
 			if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
 				since := time.Since(c.lastActive)
 				if since > c.rc.Options.IdleTimeout {
-					c.l.Debugf("Read idle, close remote: %s", c.rc.remote.Label)
+					c.l.Debugf("Read idle, close remote: %s", c.rc.remote.Address)
 					return 0, ErrIdleTimeout
 				}
 				continue
