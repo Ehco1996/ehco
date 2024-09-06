@@ -128,13 +128,13 @@ class ChartManager {
 
   fillMissingDataPoints(data, startTime, endTime) {
     const filledData = [];
-    let currentTime = startTime;
-    let dataIndex = 0;
+    let currentTime = new Date(startTime);
+    const endTimeDate = new Date(endTime);
 
-    while (currentTime <= endTime) {
-      if (dataIndex < data.length && data[dataIndex].x.getTime() === currentTime.getTime()) {
-        filledData.push(data[dataIndex]);
-        dataIndex++;
+    while (currentTime <= endTimeDate) {
+      const existingPoint = data.find((point) => Math.abs(point.x.getTime() - currentTime.getTime()) < 60000);
+      if (existingPoint) {
+        filledData.push(existingPoint);
       } else {
         filledData.push({ x: new Date(currentTime), y: null });
       }
@@ -145,44 +145,88 @@ class ChartManager {
   }
 
   updateCharts(metrics, startTime, endTime) {
-    Object.entries(this.charts).forEach(([key, chart]) => {
-      const data = metrics.map((m) => {
-        let value;
-        switch (key) {
-          case 'connectionCount':
-            value = m.tcp_connection_count + m.udp_connection_count;
-            break;
-          case 'handshakeDuration':
-            value = Math.max(m.tcp_handshake_duration, m.udp_handshake_duration);
-            break;
-          case 'pingLatency':
-            value = m.ping_latency;
-            break;
-          case 'networkTransmitBytes':
-            value = (m.tcp_network_transmit_bytes + m.udp_network_transmit_bytes) / Config.BYTE_TO_MB;
-            break;
-          default:
-            value = 0;
-        }
-        return {
+    // 首先按时间正序排列数据
+    metrics.sort((a, b) => a.timestamp - b.timestamp);
+    // 按 label-remote 分组
+    const groupedMetrics = this.groupMetricsByLabelRemote(metrics);
+    console.log('groupedMetrics', groupedMetrics);
+
+    // 预处理所有指标的数据
+    const processedData = {};
+
+    Object.keys(this.charts).forEach((key) => {
+      processedData[key] = groupedMetrics.map((group, index) => {
+        const data = group.metrics.map((m) => ({
           x: new Date(m.timestamp * 1000),
-          y: value,
+          y: this.getMetricValue(key, m),
+        }));
+        const filledData = this.fillMissingDataPoints(data, startTime, endTime);
+        return {
+          label: `${group.label} - ${group.remote}`,
+          borderColor: this.getColor(index),
+          backgroundColor: this.getColor(index, 0.2),
+          borderWidth: 2,
+          data: filledData,
         };
       });
+    });
 
-      const filledData = this.fillMissingDataPoints(data, startTime, endTime);
-      chart.data.datasets[0].data = filledData;
+    // 更新每个图表
+    Object.entries(this.charts).forEach(([key, chart]) => {
+      chart.data.datasets = processedData[key];
       chart.update();
     });
+  }
+
+  groupMetricsByLabelRemote(metrics) {
+    const groups = {};
+    metrics.forEach((metric) => {
+      const key = `${metric.label}-${metric.remote}`;
+      if (!groups[key]) {
+        groups[key] = { label: metric.label, remote: metric.remote, metrics: [] };
+      }
+      groups[key].metrics.push(metric);
+    });
+    return Object.values(groups);
+  }
+
+  getMetricValue(metricType, metric) {
+    switch (metricType) {
+      case 'connectionCount':
+        return metric.tcp_connection_count + metric.udp_connection_count;
+      case 'handshakeDuration':
+        return Math.max(metric.tcp_handshake_duration, metric.udp_handshake_duration);
+      case 'pingLatency':
+        return metric.ping_latency;
+      case 'networkTransmitBytes':
+        return (metric.tcp_network_transmit_bytes + metric.udp_network_transmit_bytes) / Config.BYTE_TO_MB;
+      default:
+        return 0;
+    }
+  }
+
+  getColor(index, alpha = 1) {
+    const colors = [
+      `rgba(255, 99, 132, ${alpha})`,
+      `rgba(54, 162, 235, ${alpha})`,
+      `rgba(255, 206, 86, ${alpha})`,
+      `rgba(75, 192, 192, ${alpha})`,
+      `rgba(153, 102, 255, ${alpha})`,
+      `rgba(255, 159, 64, ${alpha})`,
+    ];
+    return colors[index % colors.length];
   }
 }
 
 class FilterManager {
-  constructor(chartManager) {
+  constructor(chartManager, dateRangeManager) {
     this.chartManager = chartManager;
+    this.dateRangeManager = dateRangeManager;
     this.$labelFilter = $('#labelFilter');
     this.$remoteFilter = $('#remoteFilter');
     this.relayConfigs = [];
+    this.currentStartDate = null;
+    this.currentEndDate = null;
     this.setupEventListeners();
     this.loadFilters();
   }
@@ -228,8 +272,10 @@ class FilterManager {
   async applyFilters() {
     const label = this.$labelFilter.val();
     const remote = this.$remoteFilter.val();
-    const endDate = new Date();
-    const startDate = new Date(endDate - Config.TIME_WINDOW * 60 * 1000);
+
+    // 使用当前保存的日期范围，如果没有则使用默认的30分钟
+    const endDate = this.currentEndDate || new Date();
+    const startDate = this.currentStartDate || new Date(endDate - Config.TIME_WINDOW * 60 * 1000);
 
     const metrics = await ApiService.fetchRuleMetrics(
       Math.floor(startDate.getTime() / 1000),
@@ -239,8 +285,13 @@ class FilterManager {
     );
 
     if (metrics && metrics.data) {
-      this.chartManager.updateCharts(metrics.data);
+      this.chartManager.updateCharts(metrics.data, startDate, endDate);
     }
+  }
+
+  setDateRange(start, end) {
+    this.currentStartDate = start;
+    this.currentEndDate = end;
   }
 }
 
@@ -313,16 +364,8 @@ class DateRangeManager {
   }
 
   async fetchAndUpdateCharts(start, end) {
-    const metrics = await ApiService.fetchRuleMetrics(
-      Math.floor(start.getTime() / 1000),
-      Math.floor(end.getTime() / 1000),
-      this.filterManager.$labelFilter.val(),
-      this.filterManager.$remoteFilter.val()
-    );
-
-    if (metrics && metrics.data) {
-      this.chartManager.updateCharts(metrics.data, start, end);
-    }
+    this.filterManager.setDateRange(start, end);
+    await this.filterManager.applyFilters();
   }
 }
 
@@ -331,6 +374,7 @@ class RuleMetricsModule {
     this.chartManager = new ChartManager();
     this.filterManager = new FilterManager(this.chartManager);
     this.dateRangeManager = new DateRangeManager(this.chartManager, this.filterManager);
+    this.filterManager.dateRangeManager = this.dateRangeManager;
   }
 
   init() {
