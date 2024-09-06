@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+  {{template "_head.html" .}}
+  <style>
+    .logs-container {
+      height: 700px;
+      overflow-y: auto;
+      font-family: 'Fira Code', monospace;
+      border-radius: 6px;
+      background-color: #f5f5f5;
+      padding: 1rem;
+      transition: background-color 0.3s ease;
+    }
+
+    .log-entry {
+      margin-bottom: 0.5rem;
+      padding: 0.5rem;
+      border-radius: 4px;
+      transition: background-color 0.3s ease;
+    }
+  </style>
+
+  <body>
+    {{ template "_navbar.html" . }}
+    <section class="section">
+      <div class="container-fluid">
+        <h1 class="title is-2 mb-6">Real-time Logs</h1>
+        <div class="card">
+          <div class="card-content">
+            <div class="field has-addons mb-4">
+              <div class="control is-expanded">
+                <input class="input is-medium" type="text" id="filterInput" placeholder="Filter logs..." />
+              </div>
+              <div class="control">
+                <button class="button is-info is-medium" id="filterButton">
+                  <span class="icon">
+                    <i class="fas fa-filter"></i>
+                  </span>
+                </button>
+              </div>
+            </div>
+            <div class="buttons mb-4">
+              <button class="button is-warning is-medium" id="pauseButton">
+                <span class="icon">
+                  <i class="fas fa-pause"></i>
+                </span>
+                <span>Pause</span>
+              </button>
+              <button class="button is-danger is-medium" id="clearButton">
+                <span class="icon">
+                  <i class="fas fa-trash"></i>
+                </span>
+                <span>Clear</span>
+              </button>
+            </div>
+            <div id="logsContainer" class="logs-container"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <script>
+      const logsContainer = document.getElementById('logsContainer');
+      const filterInput = document.getElementById('filterInput');
+      const filterButton = document.getElementById('filterButton');
+      const pauseButton = document.getElementById('pauseButton');
+      const clearButton = document.getElementById('clearButton');
+      let isPaused = false;
+      let ws;
+      let filterTerm = '';
+
+      function connectWebSocket() {
+        ws = new WebSocket('ws://' + window.location.host + '/ws/logs');
+        ws.onopen = function (event) {
+          console.log('WebSocket connection established');
+        };
+
+        ws.onerror = function (event) {
+          console.error('WebSocket error observed:', event);
+        };
+
+        ws.onmessage = function (event) {
+          if (!isPaused) {
+            const logEntry = document.createElement('div');
+            logEntry.innerHTML = formatLogMessage(event.data);
+            if (shouldDisplayLog(logEntry.textContent)) {
+              logsContainer.appendChild(logEntry);
+              logsContainer.scrollTop = logsContainer.scrollHeight;
+            }
+          }
+        };
+
+        ws.onclose = function (event) {
+          console.log('WebSocket connection closed. Reconnecting...');
+          setTimeout(connectWebSocket, 1000);
+        };
+      }
+
+      function formatLogMessage(message) {
+        try {
+          const logEntry = JSON.parse(message);
+          const timestamp = logEntry.ts;
+          const level = logEntry.level;
+          const msg = logEntry.msg;
+          const logger = logEntry.logger;
+          console.log('Log entry:', logEntry);
+          const levelClass = getLevelClass(level);
+
+          return `
+            <div class="columns is-mobile">
+              <div class="column is-3"><span class="has-text-grey-light is-small">${timestamp}</span></div>
+              <div class="column is-1"><span class="tag ${levelClass} is-small">${level.toUpperCase()}</span></div>
+              <div class="column is-2"><span class="is-info is-light is-small">${logger}</span></div>
+              <div class="column"><span>${msg}</span></div>
+            </div>
+          `;
+        } catch (e) {
+          console.error('Error parsing log message:', e);
+          return `<div class="has-text-danger">${message}</div>`;
+        }
+      }
+
+      function getLevelClass(level) {
+        switch (level) {
+          case 'debug':
+            return 'is-light';
+          case 'info':
+            return 'is-info';
+          case 'warn':
+            return 'is-warning';
+          case 'error':
+            return 'is-danger';
+          case 'fatal':
+            return 'is-dark';
+          default:
+            return 'is-light';
+        }
+      }
+
+      function shouldDisplayLog(logText) {
+        return filterTerm === '' || logText.toLowerCase().includes(filterTerm.toLowerCase());
+      }
+
+      function applyFilter() {
+        filterTerm = filterInput.value;
+        const logEntries = logsContainer.getElementsByClassName('log-entry');
+        for (let entry of logEntries) {
+          if (shouldDisplayLog(entry.textContent)) {
+            entry.style.display = '';
+          } else {
+            entry.style.display = 'none';
+          }
+        }
+      }
+      connectWebSocket();
+
+      filterButton.addEventListener('click', applyFilter);
+      filterInput.addEventListener('keyup', function (event) {
+        if (event.key === 'Enter') {
+          applyFilter();
+        }
+      });
+
+      pauseButton.addEventListener('click', function () {
+        isPaused = !isPaused;
+        pauseButton.textContent = isPaused ? 'Resume' : 'Pause';
+        pauseButton.classList.toggle('is-warning');
+        pauseButton.classList.toggle('is-success');
+      });
+
+      clearButton.addEventListener('click', function () {
+        logsContainer.innerHTML = '';
+      });
+    </script>
+  </body>
+</html>

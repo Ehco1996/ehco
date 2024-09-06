@@ -1,6 +1,7 @@
 package web
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -92,4 +93,42 @@ func (s *Server) GetRuleMetrics(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
 	return c.JSON(http.StatusOK, metrics)
+}
+
+func (s *Server) CurrentConfig(c echo.Context) error {
+	ret, err := json.Marshal(s.cfg)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
+
+	return c.JSONBlob(http.StatusOK, ret)
+}
+
+func (s *Server) HandleReload(c echo.Context) error {
+	if s.Reloader == nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "reload not support")
+	}
+	err := s.Reloader.Reload(true)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
+
+	if _, err := c.Response().Write([]byte("reload success")); err != nil {
+		s.l.Errorf("write response meet err=%v", err)
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
+	return nil
+}
+
+func (s *Server) HandleHealthCheck(c echo.Context) error {
+	relayLabel := c.QueryParam("relay_label")
+	if relayLabel == "" {
+		return echo.NewHTTPError(http.StatusBadRequest, "relay_label is required")
+	}
+	latency, err := s.HealthCheck(c.Request().Context(), relayLabel)
+	if err != nil {
+		res := HealthCheckResp{Message: err.Error(), ErrorCode: -1}
+		return c.JSON(http.StatusBadRequest, res)
+	}
+	return c.JSON(http.StatusOK, HealthCheckResp{Message: "connect success", Latency: latency})
 }
