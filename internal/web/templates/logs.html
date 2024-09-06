@@ -109,8 +109,8 @@
           return `
             <div class="columns is-mobile">
               <div class="column is-3"><span class="has-text-grey-light is-small">${timestamp}</span></div>
-              <div class="column is-1"><span class="tag ${levelClass}">${level.toUpperCase()}</span></div>
-              <div class="column is-2"><span class="tag is-info is-light">${logger}</span></div>
+              <div class="column is-1"><span class="tag ${levelClass} is-small">${level.toUpperCase()}</span></div>
+              <div class="column is-2"><span class="is-info is-light is-small">${logger}</span></div>
               <div class="column"><span>${msg}</span></div>
             </div>
           `;

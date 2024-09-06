@@ -145,6 +145,20 @@ class ChartManager {
   }
 
   updateCharts(metrics, startTime, endTime) {
+    // 检查metrics是否为null或undefined
+    if (!metrics) {
+      // 如果为null，则更新所有图表为空
+      Object.values(this.charts).forEach((chart) => {
+        chart.data.datasets = [
+          {
+            label: 'No Data',
+            data: [],
+          },
+        ];
+        chart.update();
+      });
+      return;
+    }
     // 首先按时间正序排列数据
     metrics.sort((a, b) => a.timestamp - b.timestamp);
     // 按 label-remote 分组
@@ -284,9 +298,7 @@ class FilterManager {
       remote
     );
 
-    if (metrics && metrics.data) {
-      this.chartManager.updateCharts(metrics.data, startDate, endDate);
-    }
+    this.chartManager.updateCharts(metrics.data, startDate, endDate);
   }
 
   setDateRange(start, end) {
