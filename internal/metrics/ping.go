@@ -2,7 +2,6 @@ package metrics
 
 import (
 	"math"
-	"runtime"
 	"time"
 
 	"github.com/Ehco1996/ehco/internal/config"
@@ -19,9 +18,6 @@ func (pg *PingGroup) newPinger(ruleLabel string, remote string, addr string) (*p
 	pinger.Interval = pingInterval
 	pinger.Timeout = time.Duration(math.MaxInt64)
 	pinger.RecordRtts = false
-	if runtime.GOOS != "darwin" {
-		pinger.SetPrivileged(true)
-	}
 	pinger.OnRecv = func(pkt *ping.Packet) {
 		ip := pkt.IPAddr.String()
 		PingResponseDurationMilliseconds.WithLabelValues(
@@ -35,25 +31,23 @@ func (pg *PingGroup) newPinger(ruleLabel string, remote string, addr string) (*p
 type PingGroup struct {
 	logger *zap.Logger
 
-	// k: addr
-	Pingers map[string]*ping.Pinger
+	Pingers []*ping.Pinger
 }
 
 func NewPingGroup(cfg *config.Config) *PingGroup {
-	pg := &PingGroup{
-		logger:  zap.L().Named("pinger"),
-		Pingers: make(map[string]*ping.Pinger),
-	}
+	pg := &PingGroup{logger: zap.L().Named("pinger"), Pingers: make([]*ping.Pinger, 0)}
+
 	for _, relayCfg := range cfg.RelayConfigs {
 		for _, remote := range relayCfg.GetAllRemotes() {
 			addr, err := remote.GetAddrHost()
 			if err != nil {
 				pg.logger.Error("try parse host error", zap.Error(err))
+				continue
 			}
 			if pinger, err := pg.newPinger(relayCfg.Label, remote.Address, addr); err != nil {
 				pg.logger.Error("new pinger meet error", zap.Error(err))
 			} else {
-				pg.Pingers[addr] = pinger
+				pg.Pingers = append(pg.Pingers, pinger)
 			}
 		}
 	}
@@ -66,10 +60,10 @@ func (pg *PingGroup) Run() {
 	}
 	pg.logger.Sugar().Infof("Start Ping Group now total pinger: %d", len(pg.Pingers))
 	splay := time.Duration(pingInterval.Nanoseconds() / int64(len(pg.Pingers)))
-	for addr, pinger := range pg.Pingers {
+	for _, pinger := range pg.Pingers {
 		go func() {
 			if err := pinger.Run(); err != nil {
-				pg.logger.Error("Starting pinger meet err", zap.String("addr", addr), zap.Error(err))
+				pg.logger.Error("Starting pinger meet err", zap.Error(err), zap.String("addr", pinger.Addr()))
 			}
 		}()
 		time.Sleep(splay)
