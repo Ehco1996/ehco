@@ -152,7 +152,7 @@ func sumFloat64Metric(metricMap map[string]*dto.MetricFamily, metricName string)
 			ret += getMetricValue(m, metric.GetType())
 		}
 	}
-	return 0
+	return ret
 }
 
 func getLabel(metric *dto.Metric, name string) string {

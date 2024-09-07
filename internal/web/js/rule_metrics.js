@@ -71,13 +71,14 @@ class ChartManager {
       connectionCount: this.initChart('connectionCountChart', 'line', 'Connection Count', 'Count'),
       handshakeDuration: this.initChart('handshakeDurationChart', 'line', 'Handshake Duration', 'ms'),
       pingLatency: this.initChart('pingLatencyChart', 'line', 'Ping Latency', 'ms'),
-      networkTransmitBytes: this.initChart('networkTransmitBytesChart', 'line', 'Network Transmit', 'MB'),
+      networkTransmitBytes: this.initStackedAreaChart('networkTransmitBytesChart', 'Network Transmit', 'MB'),
     };
   }
 
   initChart(canvasId, type, title, unit) {
     const ctx = $(`#${canvasId}`)[0].getContext('2d');
     const color = Config.CHART_COLORS[canvasId.replace('Chart', '')];
+    const metricType = canvasId.replace('Chart', '');
 
     return new Chart(ctx, {
       type: type,
@@ -90,15 +91,29 @@ class ChartManager {
             backgroundColor: color.replace('1)', '0.2)'),
             borderWidth: 2,
             data: [],
+            pointRadius: 0, // Hide individual points
+            tension: 0.1, // Add slight curve to lines
           },
         ],
       },
-      options: this.getChartOptions(title, unit),
+      options: this.getChartOptions(title, unit, metricType),
     });
   }
 
-  getChartOptions(title, unit) {
-    return {
+  initStackedAreaChart(canvasId, title, unit) {
+    const ctx = $(`#${canvasId}`)[0].getContext('2d');
+    return new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: [],
+        datasets: [],
+      },
+      options: this.getStackedAreaChartOptions(title, unit),
+    });
+  }
+
+  getChartOptions(title, unit, metricType) {
+    const baseOptions = {
       responsive: true,
       plugins: {
         title: {
@@ -124,6 +139,87 @@ class ChartManager {
         },
       },
     };
+
+    // We'll update suggestedMin and suggestedMax dynamically in updateCharts method
+    switch (metricType) {
+      case 'connectionCount':
+        baseOptions.scales.y.ticks = { stepSize: 1 };
+        baseOptions.scales.y.title.text = 'Number of Connections';
+        break;
+      case 'handshakeDuration':
+        baseOptions.scales.y.title.text = 'Duration (ms)';
+        break;
+      case 'pingLatency':
+        baseOptions.scales.y.title.text = 'Latency (ms)';
+        break;
+      case 'networkTransmitBytes':
+        baseOptions.scales.y = {
+          beginAtZero: true,
+          title: { display: true, text: 'Data Transmitted (MB)' },
+          ticks: {
+            callback: (value) => value.toFixed(2) + ' MB',
+          },
+        };
+        baseOptions.plugins.tooltip = {
+          callbacks: {
+            label: (context) => `${context.dataset.label}: ${context.parsed.y.toFixed(2)} MB`,
+          },
+        };
+        break;
+    }
+
+    return baseOptions;
+  }
+
+  getStackedAreaChartOptions(title, unit) {
+    return {
+      responsive: true,
+      plugins: {
+        title: {
+          display: true,
+          text: title,
+          font: { size: 16, weight: 'bold' },
+        },
+        tooltip: {
+          mode: 'index',
+          intersect: false,
+          callbacks: {
+            label: (context) => `${context.dataset.label}: ${(context.parsed.y / Config.BYTE_TO_MB).toFixed(2)} MB`,
+          },
+        },
+      },
+      scales: {
+        x: {
+          type: 'time',
+          time: { unit: 'minute', displayFormats: { minute: 'HH:mm' } },
+          title: { display: true, text: 'Time' },
+        },
+        y: {
+          stacked: true,
+          beginAtZero: true,
+          title: { display: true, text: 'Data Transmitted (MB)' },
+          ticks: {
+            callback: (value) => (value / Config.BYTE_TO_MB).toFixed(2) + ' MB',
+          },
+        },
+      },
+      interaction: {
+        mode: 'nearest',
+        axis: 'x',
+        intersect: false,
+      },
+    };
+  }
+
+  adjustColor(color, amount) {
+    return color.replace(
+      /rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*(\d+(?:\.\d+)?))?\)/,
+      (match, r, g, b, a) =>
+        `rgba(${Math.min(255, Math.max(0, parseInt(r) + amount))}, ${Math.min(255, Math.max(0, parseInt(g) + amount))}, ${Math.min(
+          255,
+          Math.max(0, parseInt(b) + amount)
+        )}, ${a || 1})`
+    );
   }
 
   fillMissingDataPoints(data, startTime, endTime) {
@@ -145,51 +241,115 @@ class ChartManager {
   }
 
   updateCharts(metrics, startTime, endTime) {
-    // 检查metrics是否为null或undefined
     if (!metrics) {
-      // 如果为null，则更新所有图表为空
       Object.values(this.charts).forEach((chart) => {
-        chart.data.datasets = [
-          {
-            label: 'No Data',
-            data: [],
-          },
-        ];
+        chart.data.datasets = [];
         chart.update();
       });
       return;
     }
-    // 首先按时间正序排列数据
+
     metrics.sort((a, b) => a.timestamp - b.timestamp);
-    // 按 label-remote 分组
     const groupedMetrics = this.groupMetricsByLabelRemote(metrics);
-    console.log('groupedMetrics', groupedMetrics);
 
-    // 预处理所有指标的数据
-    const processedData = {};
+    // Calculate min and max values for each metric type
+    const ranges = this.calculateMetricRanges(groupedMetrics);
 
-    Object.keys(this.charts).forEach((key) => {
-      processedData[key] = groupedMetrics.map((group, index) => {
-        const data = group.metrics.map((m) => ({
-          x: new Date(m.timestamp * 1000),
-          y: this.getMetricValue(key, m),
-        }));
-        const filledData = this.fillMissingDataPoints(data, startTime, endTime);
-        return {
-          label: `${group.label} - ${group.remote}`,
-          borderColor: this.getColor(index),
-          backgroundColor: this.getColor(index, 0.2),
-          borderWidth: 2,
-          data: filledData,
-        };
+    Object.entries(this.charts).forEach(([key, chart]) => {
+      if (key === 'networkTransmitBytes') {
+        chart.data.datasets = [];
+        groupedMetrics.forEach((group, groupIndex) => {
+          const tcpData = [];
+          const udpData = [];
+          group.metrics.forEach((m) => {
+            const timestamp = new Date(m.timestamp * 1000);
+            tcpData.push({ x: timestamp, y: m.tcp_network_transmit_bytes });
+            udpData.push({ x: timestamp, y: m.udp_network_transmit_bytes });
+          });
+          const baseColor = this.getColor(groupIndex);
+          chart.data.datasets.push(
+            {
+              label: `${group.label} - ${group.remote} (TCP)`,
+              borderColor: baseColor,
+              backgroundColor: baseColor.replace('1)', '0.5)'),
+              borderWidth: 1,
+              data: this.fillMissingDataPoints(tcpData, startTime, endTime),
+              fill: true,
+            },
+            {
+              label: `${group.label} - ${group.remote} (UDP)`,
+              borderColor: this.adjustColor(baseColor, -40),
+              backgroundColor: this.adjustColor(baseColor, -40).replace('1)', '0.5)'),
+              borderWidth: 1,
+              data: this.fillMissingDataPoints(udpData, startTime, endTime),
+              fill: true,
+            }
+          );
+        });
+      } else {
+        chart.data.datasets = groupedMetrics.map((group, index) => {
+          const data = group.metrics.map((m) => ({
+            x: new Date(m.timestamp * 1000),
+            y: this.getMetricValue(key, m),
+          }));
+          const filledData = this.fillMissingDataPoints(data, startTime, endTime);
+          return {
+            label: `${group.label} - ${group.remote}`,
+            borderColor: this.getColor(index),
+            backgroundColor: this.getColor(index, 0.2),
+            borderWidth: 2,
+            data: filledData,
+          };
+        });
+      }
+
+      // Update chart options with calculated ranges
+      chart.options.scales.y.suggestedMin = ranges[key].min;
+      chart.options.scales.y.suggestedMax = ranges[key].max;
+
+      chart.update();
+    });
+  }
+
+  calculateMetricRanges(groupedMetrics) {
+    const ranges = {
+      connectionCount: { min: Infinity, max: -Infinity },
+      handshakeDuration: { min: Infinity, max: -Infinity },
+      pingLatency: { min: Infinity, max: -Infinity },
+      networkTransmitBytes: { min: Infinity, max: -Infinity },
+    };
+
+    groupedMetrics.forEach((group) => {
+      group.metrics.forEach((metric) => {
+        // Connection Count
+        const connectionCount = metric.tcp_connection_count + metric.udp_connection_count;
+        ranges.connectionCount.min = Math.min(ranges.connectionCount.min, connectionCount);
+        ranges.connectionCount.max = Math.max(ranges.connectionCount.max, connectionCount);
+
+        // Handshake Duration
+        const handshakeDuration = Math.max(metric.tcp_handshake_duration, metric.udp_handshake_duration);
+        ranges.handshakeDuration.min = Math.min(ranges.handshakeDuration.min, handshakeDuration);
+        ranges.handshakeDuration.max = Math.max(ranges.handshakeDuration.max, handshakeDuration);
+
+        // Ping Latency
+        ranges.pingLatency.min = Math.min(ranges.pingLatency.min, metric.ping_latency);
+        ranges.pingLatency.max = Math.max(ranges.pingLatency.max, metric.ping_latency);
+
+        // Network Transmit Bytes
+        const networkTransmitBytes = (metric.tcp_network_transmit_bytes + metric.udp_network_transmit_bytes) / Config.BYTE_TO_MB;
+        ranges.networkTransmitBytes.min = Math.min(ranges.networkTransmitBytes.min, networkTransmitBytes);
+        ranges.networkTransmitBytes.max = Math.max(ranges.networkTransmitBytes.max, networkTransmitBytes);
       });
     });
 
-    // 更新每个图表
-    Object.entries(this.charts).forEach(([key, chart]) => {
-      chart.data.datasets = processedData[key];
-      chart.update();
+    // Add some padding to the ranges
+    Object.keys(ranges).forEach((key) => {
+      const range = ranges[key].max - ranges[key].min;
+      ranges[key].min = Math.max(0, ranges[key].min - range * 0.1);
+      ranges[key].max += range * 0.1;
     });
+
+    return ranges;
   }
 
   groupMetricsByLabelRemote(metrics) {

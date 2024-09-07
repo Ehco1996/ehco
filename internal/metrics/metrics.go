@@ -67,6 +67,7 @@ var (
 	}, []string{"label", "conn_type", "remote"})
 
 	HandShakeDurationMilliseconds = prometheus.NewHistogramVec(prometheus.HistogramOpts{
+		Buckets:     msBuckets,
 		Subsystem:   METRIC_SUBSYSTEM_TRAFFIC,
 		Namespace:   METRIC_NS,
 		Name:        "handshake_duration_milliseconds",
