@@ -2,6 +2,7 @@ package metrics
 
 import (
 	"math"
+	"runtime"
 	"time"
 
 	"github.com/Ehco1996/ehco/internal/config"
@@ -18,6 +19,16 @@ func (pg *PingGroup) newPinger(ruleLabel string, remote string, addr string) (*p
 	pinger.Interval = pingInterval
 	pinger.Timeout = time.Duration(math.MaxInt64)
 	pinger.RecordRtts = false
+
+	switch runtime.GOOS {
+	case "darwin":
+	case "linux":
+		pinger.SetPrivileged(true)
+	default:
+		pinger.SetPrivileged(true)
+		pg.logger.Warn("Attempting to set privileged mode for unknown OS", zap.String("OS", runtime.GOOS))
+	}
+
 	pinger.OnRecv = func(pkt *ping.Packet) {
 		ip := pkt.IPAddr.String()
 		PingResponseDurationMilliseconds.WithLabelValues(

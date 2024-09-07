@@ -91,11 +91,11 @@ func (ms *MetricsStore) initDB() error {
             remote TEXT,
             ping_latency INTEGER,
             tcp_connection_count INTEGER,
-            tcp_handshake_duration INTEGER,
-            tcp_network_transmit_bytes INTEGER,
+            tcp_handshake_duration BIGINT,
+            tcp_network_transmit_bytes BIGINT,
             udp_connection_count INTEGER,
-            udp_handshake_duration INTEGER,
-            udp_network_transmit_bytes INTEGER,
+            udp_handshake_duration BIGINT,
+            udp_network_transmit_bytes BIGINT,
             PRIMARY KEY (timestamp, label, remote)
         )
     `); err != nil {

@@ -106,22 +106,28 @@ func (rc *relayConnImpl) Transport() error {
 	defer func() {
 		err := rc.Close()
 		if err != nil {
-			rc.l.Errorf("error closing relay connection: %s", err.Error())
+			rc.l.Errorf("Error closing Transport connection: %s", err)
 		}
 	}()
+
 	rc.l = rc.l.Named(shortHashSHA256(rc.GetFlow()))
-	rc.l.Debugf("transport start")
-	c1 := newInnerConn(rc.clientConn, rc)
-	c1.l = rc.l.Named("client")
-	c2 := newInnerConn(rc.remoteConn, rc)
-	c2.l = rc.l.Named("remote")
+	rc.l.Debugf("Starting transport: %s <-> %s", rc.clientConn.RemoteAddr(), rc.remoteConn.RemoteAddr())
+
+	clientConn := newInnerConn(rc.clientConn, rc)
+	clientConn.l = rc.l.Named("client")
+	remoteConn := newInnerConn(rc.remoteConn, rc)
+	remoteConn.l = rc.l.Named("remote")
+
 	rc.StartTime = time.Now().Local()
-	err := copyConn(c1, c2)
-	if err != nil {
-		rc.l.Errorf("transport error: %s", err.Error())
-	}
-	rc.l.Debugf("transport end: stats: %s", rc.Stats.String())
+	err := copyConn(clientConn, remoteConn, rc.l)
 	rc.EndTime = time.Now().Local()
+
+	if err != nil {
+		// wrap error with client and remote address
+		err = fmt.Errorf("(client: %s, remote: %s) %w", clientConn.RemoteAddr(), remoteConn.RemoteAddr(), err)
+	}
+	rc.l.Debugf("Transport ended Connection details: client=%s, remote=%s, duration=%v, stats=%s",
+		clientConn.RemoteAddr(), remoteConn.RemoteAddr(), rc.EndTime.Sub(rc.StartTime), rc.Stats)
 	return err
 }
 
@@ -156,22 +162,6 @@ func (rc *relayConnImpl) GetConnType() string {
 	return rc.ConnType
 }
 
-func combineErrorsAndMuteIDLE(err1, err2 error) error {
-	if err1 == ErrIdleTimeout {
-		err1 = nil
-	}
-	if err2 == ErrIdleTimeout {
-		return nil
-	}
-	if err1 != nil && err2 != nil {
-		return errors.Join(err1, err2)
-	}
-	if err1 != nil {
-		return err1
-	}
-	return err2
-}
-
 type Stats struct {
 	Up               int64
 	Down             int64
@@ -184,10 +174,10 @@ func (s *Stats) Record(up, down int64) {
 }
 
 func (s *Stats) String() string {
-	return fmt.Sprintf("up: %s, down: %s, latency: %s",
+	return fmt.Sprintf("↑%s ↓%s ⏱%dms",
 		bytes.PrettyByteSize(float64(s.Up)),
 		bytes.PrettyByteSize(float64(s.Down)),
-		fmt.Sprintf("%d ms", s.HandShakeLatency.Milliseconds()),
+		s.HandShakeLatency.Milliseconds(),
 	)
 }
 
@@ -201,7 +191,7 @@ type innerConn struct {
 }
 
 func newInnerConn(conn net.Conn, rc *relayConnImpl) *innerConn {
-	return &innerConn{Conn: conn, rc: rc, lastActive: time.Now().Local()}
+	return &innerConn{Conn: conn, rc: rc, lastActive: time.Now().Local(), l: zap.S()}
 }
 
 func (c *innerConn) recordStats(n int, isRead bool) {
@@ -279,26 +269,47 @@ func shortHashSHA256(input string) string {
 	return hex.EncodeToString(hash)[:shortHashLength]
 }
 
-func copyConn(conn1, conn2 *innerConn) error {
+func copyConn(conn1, conn2 *innerConn, l *zap.SugaredLogger) error {
 	buf1 := buffer.BufferPool.Get()
 	defer buffer.BufferPool.Put(buf1)
 	buf2 := buffer.BufferPool.Get()
 	defer buffer.BufferPool.Put(buf2)
 
 	errCH := make(chan error, 1)
-	// copy conn1 to conn2,read from conn1 and write to conn2
+	// copy conn1 to conn2, read from conn1 and write to conn2
 	go func() {
 		_, err := io.CopyBuffer(conn2, conn1, buf1)
 		_ = conn2.CloseWrite() // all data is written to conn2 now, so close the write side of conn2 to send eof
+		if err != nil {
+			conn1.l.Debugf("Error in conn1 -> conn2 direction: read from %s, write to %s, error: %v", conn1.RemoteAddr(), conn2.RemoteAddr(), err)
+		}
 		errCH <- err
 	}()
 
-	// reverse copy conn2 to conn1,read from conn2 and write to conn1
+	// reverse copy conn2 to conn1, read from conn2 and write to conn1
 	_, err := io.CopyBuffer(conn1, conn2, buf2)
+	if err != nil {
+		l.Debugf("Error in conn2 -> conn1 direction: read from %s, write to %s, error: %v", conn2.RemoteAddr(), conn1.RemoteAddr(), err)
+	}
 	_ = conn1.CloseWrite()
-
 	err2 := <-errCH
 	_ = conn1.CloseRead()
 	_ = conn2.CloseRead()
 	return combineErrorsAndMuteIDLE(err, err2)
+}
+
+func combineErrorsAndMuteIDLE(err1, err2 error) error {
+	if err1 == ErrIdleTimeout {
+		err1 = nil
+	}
+	if err2 == ErrIdleTimeout {
+		return nil
+	}
+	if err1 != nil && err2 != nil {
+		return errors.Join(err1, err2)
+	}
+	if err1 != nil {
+		return err1
+	}
+	return err2
 }

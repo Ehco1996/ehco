@@ -10,6 +10,7 @@ import (
 	"github.com/Ehco1996/ehco/internal/lb"
 	"github.com/Ehco1996/ehco/internal/relay/conf"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/zap"
 )
 
 func TestInnerConn_ReadWrite(t *testing.T) {
@@ -106,7 +107,7 @@ func TestCopyTCPConn(t *testing.T) {
 
 	done := make(chan struct{})
 	go func() {
-		if err := copyConn(c1, c2); err != nil {
+		if err := copyConn(c1, c2, zap.S()); err != nil {
 			t.Log(err)
 		}
 		done <- struct{}{}
@@ -167,7 +168,7 @@ func TestCopyUDPConn(t *testing.T) {
 
 	done := make(chan struct{})
 	go func() {
-		if err := copyConn(c1, c2); err != nil {
+		if err := copyConn(c1, c2, zap.S()); err != nil {
 			t.Log(err)
 		}
 		done <- struct{}{}
