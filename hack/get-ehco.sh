@@ -61,21 +61,46 @@ WantedBy=multi-user.target
 EOF
 }
 
+function _detect_package_manager() {
+    if command -v apt-get &>/dev/null; then
+        echo "apt-get"
+    elif command -v yum &>/dev/null; then
+        echo "yum"
+    elif command -v dnf &>/dev/null; then
+        echo "dnf"
+    else
+        echo "未知"
+    fi
+}
+
+function _install_dependencies() {
+    local pkg_manager=$(_detect_package_manager)
+    
+    case $pkg_manager in
+        apt-get)
+            sudo apt-get update
+            sudo apt-get install -y jq curl
+            ;;
+        yum|dnf)
+            sudo $pkg_manager install -y jq curl
+            ;;
+        *)
+            _print_error_msg "无法检测到支持的包管理器。请手动安装 jq 和 curl。"
+            exit 1
+            ;;
+    esac
+}
+
 function _check_install_required() {
     if [[ -z "$API_OR_CONFIG_PATH" ]]; then
-        _print_error_msg "Flag for config is required. please use --config to specify the configuration file path or api endpoint."
+        _print_error_msg "需要配置标志。请使用 --config 指定配置文件路径或 API 端点。"
         exit 1
     fi
 
-    # check jq and curl
-    if ! command -v jq &>/dev/null; then
-        _print_error_msg "jq is required to parse JSON data. please use apt/yum to install jq."
-        exit 1
-    fi
-
-    if ! command -v curl &>/dev/null; then
-        _print_error_msg "curl is required to download files. please use apt/yum to install curl."
-        exit 1
+    # 检查并安装 jq 和 curl
+    if ! command -v jq &>/dev/null || ! command -v curl &>/dev/null; then
+        _print_warning_msg "正在安装必要的依赖项 (jq 和 curl)..."
+        _install_dependencies
     fi
 }
 
@@ -248,7 +273,7 @@ function perform_install() {
 
     _download_bin
     _install_systemd_service
-    _print_warning_msg "Ehco has been installed."
+    _print_warning_msg "Ehco 已安装完成。"
 }
 
 function perform_remove() {

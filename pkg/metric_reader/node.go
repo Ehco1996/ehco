@@ -66,7 +66,6 @@ func (b *readerImpl) ParseNodeMetrics(metricMap map[string]*dto.MetricFamily, nm
 	b.processLoadMetrics(metricMap, nm)
 
 	b.calculateFinalMetrics(nm, cpu)
-
 	return nil
 }
 
@@ -95,9 +94,24 @@ func (b *readerImpl) processMemoryMetrics(metricMap map[string]*dto.MetricFamily
 }
 
 func (b *readerImpl) processDiskMetrics(metricMap map[string]*dto.MetricFamily, nm *NodeMetrics) {
-	nm.DiskTotalBytes = sumInt64Metric(metricMap, metricFilesystemSizeBytes)
-	availableDisk := sumInt64Metric(metricMap, metricFilesystemAvailBytes)
-	nm.DiskUsageBytes = nm.DiskTotalBytes - availableDisk
+	if metric, ok := metricMap[metricFilesystemSizeBytes]; ok {
+		for _, m := range metric.Metric {
+			if getLabel(m, "mountpoint") == "/" {
+				nm.DiskTotalBytes = int64(getMetricValue(m, metric.GetType()))
+				break
+			}
+		}
+	}
+
+	if metric, ok := metricMap[metricFilesystemAvailBytes]; ok {
+		for _, m := range metric.Metric {
+			if getLabel(m, "mountpoint") == "/" {
+				availableDisk := int64(getMetricValue(m, metric.GetType()))
+				nm.DiskUsageBytes = nm.DiskTotalBytes - availableDisk
+				break
+			}
+		}
+	}
 }
 
 func (b *readerImpl) processNetworkMetrics(metricMap map[string]*dto.MetricFamily, nm *NodeMetrics) {
