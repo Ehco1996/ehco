@@ -21,11 +21,19 @@
                   <li>StartTime: {{.StartTime}}</li>
                 </ul>
               </div>
+              <div class="mt-4">
+                <p>Latest Version: <span id="latestVersion">Checking...</span></p>
+                <p id="updateMessage" style="display: none;"></p>
+              </div>
             </div>
             <footer class="card-footer">
               <button class="button is-danger is-outlined card-footer-item" id="reloadButton">
                 <span class="icon"><i class="fas fa-sync-alt"></i></span>
-                <span>Reload Config</span>
+                <span>Reload Configuration</span>
+              </button>
+              <button class="button is-info is-outlined card-footer-item" id="checkUpdateButton">
+                <span class="icon"><i class="fas fa-download"></i></span>
+                <span>Check for Updates</span>
               </button>
             </footer>
           </div>
@@ -46,7 +54,20 @@
 
     <script>
       $(document).ready(function () {
-        // Reload config button click event
+        // Add this function to compare version strings
+        function compareVersions(v1, v2) {
+          const v1Parts = v1.replace('v', '').split('.');
+          const v2Parts = v2.replace('v', '').split('.');
+          for (let i = 0; i < Math.max(v1Parts.length, v2Parts.length); i++) {
+            const v1Part = parseInt(v1Parts[i] || 0);
+            const v2Part = parseInt(v2Parts[i] || 0);
+            if (v1Part > v2Part) return 1;
+            if (v1Part < v2Part) return -1;
+          }
+          return 0;
+        }
+
+        // Reload configuration button click event
         $('#reloadButton').click(function () {
           $.ajax({
             type: 'POST',
@@ -56,6 +77,33 @@
             },
             error: function (response) {
               alert('Failed to reload config. Response: ' + response.responseText);
+            },
+          });
+        });
+
+        // Check for updates button click event
+        $('#checkUpdateButton').click(function () {
+          $.ajax({
+            url: 'https://api.github.com/repos/Ehco1996/ehco/releases/latest',
+            type: 'GET',
+            dataType: 'json',
+            success: function (data) {
+              var latestVersion = data.tag_name;
+              $('#latestVersion').text(latestVersion);
+              var currentVersion = '{{.Version}}';
+              if (compareVersions(latestVersion, currentVersion) > 0) {
+                var releaseUrl = data.html_url;
+                var updateMessage = 'New version available: ' + latestVersion + 
+                  '. Please update manually from: <a href="' + releaseUrl + '" target="_blank">' + releaseUrl + '</a>';
+                $('#updateMessage').html(updateMessage).show();
+                alert('New version available: ' + latestVersion + '. Please check the update message for details.');
+              } else {
+                $('#updateMessage').hide();
+                alert('You have the latest version');
+              }
+            },
+            error: function () {
+              alert('Failed to check for updates. Please try again later.');
             },
           });
         });

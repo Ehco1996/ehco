@@ -5,7 +5,7 @@ import "time"
 type RelayType string
 
 var (
-	Version     = "1.1.5-dev"
+	Version     = "1.1.5"
 	GitBranch   string
 	GitRevision string
 	BuildTime   string
