@@ -12,60 +12,6 @@ import (
 	"go.uber.org/zap"
 )
 
-const (
-	ProtocolHTTP = "http"
-	ProtocolTLS  = "tls"
-)
-
-type Options struct {
-	EnableUDP          bool `json:"enable_udp,omitempty"`
-	EnableMultipathTCP bool `json:"enable_multipath_tcp,omitempty"`
-
-	// connection limit
-	MaxConnection    int      `json:"max_connection,omitempty"`
-	BlockedProtocols []string `json:"blocked_protocols,omitempty"`
-	MaxReadRateKbps  int64    `json:"max_read_rate_kbps,omitempty"`
-
-	DialTimeoutSec  int `json:"dial_timeout_sec,omitempty"`
-	IdleTimeoutSec  int `json:"idle_timeout_sec,omitempty"`
-	ReadTimeoutSec  int `json:"read_timeout_sec,omitempty"`
-	SniffTimeoutSec int `json:"sniff_timeout_sec,omitempty"`
-
-	// timeout in duration
-	DialTimeout  time.Duration `json:"-"`
-	IdleTimeout  time.Duration `json:"-"`
-	ReadTimeout  time.Duration `json:"-"`
-	SniffTimeout time.Duration `json:"-"`
-}
-
-func (o *Options) Clone() *Options {
-	opt := &Options{
-		EnableUDP:          o.EnableUDP,
-		EnableMultipathTCP: o.EnableMultipathTCP,
-		MaxConnection:      o.MaxConnection,
-		MaxReadRateKbps:    o.MaxReadRateKbps,
-		BlockedProtocols:   make([]string, len(o.BlockedProtocols)),
-	}
-	copy(opt.BlockedProtocols, o.BlockedProtocols)
-	return opt
-}
-
-type ChianRemote struct {
-	Addr          string             `json:"addr"`
-	NodeLabel     string             `json:"node_label"`
-	TransportType constant.RelayType `json:"transport_type"`
-}
-
-func (c *ChianRemote) Validate() error {
-	if c.Addr == "" {
-		return fmt.Errorf("invalid remote addr: %s", c.Addr)
-	}
-	if !isValidRelayType(c.TransportType) {
-		return fmt.Errorf("invalid transport type: %s", c.TransportType)
-	}
-	return nil
-}
-
 type Config struct {
 	Label string `json:"label,omitempty"`
 
@@ -75,8 +21,6 @@ type Config struct {
 
 	Remotes []string `json:"remotes"`
 	Options *Options `json:"options,omitempty"`
-
-	RemoteChains []ChianRemote `json:"remote_chains"`
 }
 
 func (r *Config) Adjust() error {
@@ -100,40 +44,13 @@ func (r *Config) Validate() error {
 	if err := r.Adjust(); err != nil {
 		return errors.New("adjust config failed")
 	}
-	if err := r.validateType(); err != nil {
-		return err
-	}
 	if r.Listen == "" {
 		return fmt.Errorf("invalid listen: %s", r.Listen)
 	}
-	for _, addr := range r.Remotes {
-		if addr == "" {
-			return fmt.Errorf("invalid remote addr: %s", addr)
-		}
+	if err := r.validateType(); err != nil {
+		return err
 	}
-
-	for _, chain := range r.RemoteChains {
-		if err := chain.Validate(); err != nil {
-			return err
-		}
-	}
-	if len(r.RemoteChains) > 0 {
-		first := r.RemoteChains[0]
-		if first.TransportType == constant.RelayTypeRaw {
-			return fmt.Errorf("invalid remote chain on node: %s, raw transport type not support remote chain", first.NodeLabel)
-		}
-		last := r.RemoteChains[len(r.RemoteChains)-1]
-		if last.TransportType != constant.RelayTypeRaw {
-			return fmt.Errorf("invalid remote chain on node: %s, last node must be raw transport type", last.NodeLabel)
-		}
-	}
-
-	for _, protocol := range r.Options.BlockedProtocols {
-		if protocol != ProtocolHTTP && protocol != ProtocolTLS {
-			return fmt.Errorf("invalid blocked protocol: %s", protocol)
-		}
-	}
-	return nil
+	return r.Options.Validate()
 }
 
 func (r *Config) Clone() *Config {
@@ -171,10 +88,6 @@ func (r *Config) ToRemotesLB() lb.RoundRobin {
 func (r *Config) GetAllRemotes() []*lb.Node {
 	lb := r.ToRemotesLB()
 	return lb.GetAll()
-}
-
-func (r *Config) GetLoggerName() string {
-	return fmt.Sprintf("%s(%s<->%s)", r.Label, r.ListenType, r.TransportType)
 }
 
 func (r *Config) validateType() error {

@@ -32,3 +32,8 @@ const (
 	RelayTypeWS  RelayType = "ws"
 	RelayTypeWSS RelayType = "wss"
 )
+
+const (
+	RelayTCP = "tcp"
+	RelayUDP = "udp"
+)

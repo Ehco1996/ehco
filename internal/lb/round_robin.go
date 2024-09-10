@@ -57,6 +57,9 @@ func NewRoundRobin(nodeList []*Node) RoundRobin {
 }
 
 func (r *roundrobin) Next() *Node {
+	if r.len == 0 {
+		return nil
+	}
 	n := r.next.Add(1)
 	next := r.nodeList[(int(n)-1)%r.len]
 	return next

@@ -39,7 +39,7 @@ func newBaseRelayServer(cfg *conf.Config, cmgr cmgr.Cmgr) (*BaseRelayServer, err
 		cfg:     cfg,
 		cmgr:    cmgr,
 		remotes: cfg.ToRemotesLB(),
-		l:       zap.S().Named(cfg.GetLoggerName()),
+		l:       zap.S().Named(cfg.Label),
 	}, nil
 }
 
