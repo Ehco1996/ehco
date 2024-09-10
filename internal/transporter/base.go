@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"sync"
 
 	"github.com/sagernet/sing-box/common/sniff"
 	"github.com/sagernet/sing/common/buf"
@@ -26,24 +27,31 @@ type BaseRelayServer struct {
 	l    *zap.SugaredLogger
 
 	remotes lb.RoundRobin
-	relayer RelayClient
+
+	relayerM     map[constant.RelayType]RelayClient
+	relayerMutex sync.RWMutex
 }
 
 func newBaseRelayServer(cfg *conf.Config, cmgr cmgr.Cmgr) (*BaseRelayServer, error) {
-	relayer, err := newRelayClient(cfg)
+	server := &BaseRelayServer{
+		relayerM:     make(map[constant.RelayType]RelayClient),
+		relayerMutex: sync.RWMutex{},
+		cfg:          cfg,
+		cmgr:         cmgr,
+		remotes:      cfg.ToRemotesLB(),
+		l:            zap.S().Named(cfg.Label),
+	}
+
+	// Initialize the default relayer
+	_, err := server.getRelayer(cfg.TransportType)
 	if err != nil {
 		return nil, err
 	}
-	return &BaseRelayServer{
-		relayer: relayer,
-		cfg:     cfg,
-		cmgr:    cmgr,
-		remotes: cfg.ToRemotesLB(),
-		l:       zap.S().Named(cfg.Label),
-	}, nil
+
+	return server, nil
 }
 
-func (b *BaseRelayServer) RelayTCPConn(ctx context.Context, c net.Conn, remote *lb.Node) error {
+func (b *BaseRelayServer) RelayTCPConn(ctx context.Context, c net.Conn, remote *lb.Node, relayType constant.RelayType) error {
 	labels := []string{b.cfg.Label, metrics.METRIC_CONN_TYPE_TCP, remote.Address}
 	metrics.CurConnectionCount.WithLabelValues(labels...).Inc()
 	defer metrics.CurConnectionCount.WithLabelValues(labels...).Dec()
@@ -59,7 +67,11 @@ func (b *BaseRelayServer) RelayTCPConn(ctx context.Context, c net.Conn, remote *
 	}
 	c = b.applyRateLimit(c)
 
-	rc, err := b.relayer.HandShake(ctx, remote, true)
+	relayer, err := b.getRelayer(relayType)
+	if err != nil {
+		return err
+	}
+	rc, err := relayer.HandShake(ctx, remote, true)
 	if err != nil {
 		return fmt.Errorf("handshake error: %w", err)
 	}
@@ -68,12 +80,17 @@ func (b *BaseRelayServer) RelayTCPConn(ctx context.Context, c net.Conn, remote *
 	return b.handleRelayConn(c, rc, remote, metrics.METRIC_CONN_TYPE_TCP)
 }
 
-func (b *BaseRelayServer) RelayUDPConn(ctx context.Context, c net.Conn, remote *lb.Node) error {
+func (b *BaseRelayServer) RelayUDPConn(ctx context.Context, c net.Conn, remote *lb.Node, relayType constant.RelayType) error {
 	labels := []string{b.cfg.Label, metrics.METRIC_CONN_TYPE_UDP, remote.Address}
 	metrics.CurConnectionCount.WithLabelValues(labels...).Inc()
 	defer metrics.CurConnectionCount.WithLabelValues(labels...).Dec()
 
-	rc, err := b.relayer.HandShake(ctx, remote, false)
+	relayer, err := b.getRelayer(relayType)
+	if err != nil {
+		return err
+	}
+
+	rc, err := relayer.HandShake(ctx, remote, false)
 	if err != nil {
 		return fmt.Errorf("handshake error: %w", err)
 	}
@@ -81,6 +98,51 @@ func (b *BaseRelayServer) RelayUDPConn(ctx context.Context, c net.Conn, remote *
 
 	b.l.Infof("RelayUDPConn from %s to %s", c.LocalAddr(), remote.Address)
 	return b.handleRelayConn(c, rc, remote, metrics.METRIC_CONN_TYPE_UDP)
+}
+
+func (b *BaseRelayServer) getRelayer(relayType constant.RelayType) (RelayClient, error) {
+	b.relayerMutex.RLock()
+	relayer, ok := b.relayerM[relayType]
+	b.relayerMutex.RUnlock()
+
+	if ok {
+		return relayer, nil
+	}
+
+	b.relayerMutex.Lock()
+	defer b.relayerMutex.Unlock()
+
+	// Double-check after acquiring the write lock
+	if relayer, ok = b.relayerM[relayType]; ok {
+		return relayer, nil
+	}
+
+	newRelayer, err := newRelayClient(b.cfg, relayType)
+	if err != nil {
+		return nil, err
+	}
+
+	b.relayerM[relayType] = newRelayer
+	return newRelayer, nil
+}
+
+func (b *BaseRelayServer) HealthCheck(ctx context.Context) (int64, error) {
+	remote := b.remotes.Next().Clone()
+	// us tcp handshake to check health
+	relayer, err := b.getRelayer(b.cfg.TransportType)
+	if err != nil {
+		return 0, err
+	}
+	_, err = relayer.HandShake(ctx, remote, true)
+	return int64(remote.HandShakeDuration.Milliseconds()), err
+}
+
+func (b *BaseRelayServer) Close() error {
+	return fmt.Errorf("not implemented")
+}
+
+func (b *BaseRelayServer) ListenAndServe(ctx context.Context) error {
+	return fmt.Errorf("not implemented")
 }
 
 func (b *BaseRelayServer) checkConnectionLimit() error {
@@ -147,21 +209,6 @@ func (b *BaseRelayServer) handleRelayConn(c, rc net.Conn, remote *lb.Node, connT
 	}
 
 	return relayConn.Transport()
-}
-
-func (b *BaseRelayServer) HealthCheck(ctx context.Context) (int64, error) {
-	remote := b.remotes.Next().Clone()
-	// us tcp handshake to check health
-	_, err := b.relayer.HandShake(ctx, remote, true)
-	return int64(remote.HandShakeDuration.Milliseconds()), err
-}
-
-func (b *BaseRelayServer) Close() error {
-	return fmt.Errorf("not implemented")
-}
-
-func (b *BaseRelayServer) ListenAndServe(ctx context.Context) error {
-	return fmt.Errorf("not implemented")
 }
 
 func NewNetDialer(cfg *conf.Config) *net.Dialer {

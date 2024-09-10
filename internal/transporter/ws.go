@@ -137,7 +137,7 @@ func newWsServer(bs *BaseRelayServer) (*WsServer, error) {
 	return s, nil
 }
 
-type relayFunc func(context.Context, net.Conn, *lb.Node) error
+type relayFunc func(context.Context, net.Conn, *lb.Node, constant.RelayType) error
 
 func (s *WsServer) handleHandshake(e echo.Context) error {
 	wsc, _, _, err := ws.UpgradeHTTP(e.Request(), e.Response())
@@ -162,7 +162,7 @@ func (s *WsServer) handleHandshake(e echo.Context) error {
 	} else {
 		f = s.RelayTCPConn
 	}
-	if err := f(ctx, conn.NewWSConn(wsc, true), remote); err != nil {
+	if err := f(ctx, conn.NewWSConn(wsc, true), remote, s.cfg.TransportType); err != nil {
 		s.l.Errorf("relay error: %v", err)
 	}
 	return nil
@@ -210,7 +210,7 @@ func (s *WsServer) handleDynamicHandshake(e echo.Context) error {
 		} else {
 			f = s.RelayTCPConn
 		}
-		return f(ctx, conn.NewWSConn(wsc, true), remote)
+		return f(ctx, conn.NewWSConn(wsc, true), remote, s.cfg.TransportType)
 	} else {
 		// todo
 	}

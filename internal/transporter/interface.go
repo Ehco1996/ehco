@@ -16,8 +16,8 @@ type RelayClient interface {
 	HandShake(ctx context.Context, remote *lb.Node, isTCP bool) (net.Conn, error)
 }
 
-func newRelayClient(cfg *conf.Config) (RelayClient, error) {
-	switch cfg.TransportType {
+func newRelayClient(cfg *conf.Config, relayType constant.RelayType) (RelayClient, error) {
+	switch relayType {
 	case constant.RelayTypeRaw:
 		return newRawClient(cfg)
 	case constant.RelayTypeWS:
@@ -33,8 +33,8 @@ type RelayServer interface {
 	ListenAndServe(ctx context.Context) error
 	Close() error
 
-	RelayTCPConn(ctx context.Context, c net.Conn, remote *lb.Node) error
-	RelayUDPConn(ctx context.Context, c net.Conn, remote *lb.Node) error
+	RelayTCPConn(ctx context.Context, c net.Conn, remote *lb.Node, relayType constant.RelayType) error
+	RelayUDPConn(ctx context.Context, c net.Conn, remote *lb.Node, relayType constant.RelayType) error
 	HealthCheck(ctx context.Context) (int64, error) // latency in ms
 }
 

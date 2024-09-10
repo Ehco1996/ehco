@@ -2,8 +2,6 @@ package constant
 
 import "time"
 
-type RelayType string
-
 var (
 	Version     = "1.1.5"
 	GitBranch   string
@@ -24,7 +22,8 @@ const (
 	UDPBufSize       = 1500      // use default max mtu 1500
 )
 
-// relay type
+type RelayType string
+
 const (
 	// direct relay
 	RelayTypeRaw RelayType = "raw"
