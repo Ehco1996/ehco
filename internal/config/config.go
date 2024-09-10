@@ -124,10 +124,6 @@ func (c *Config) NeedStartXrayServer() bool {
 	return c.XRayConfig != nil
 }
 
-func (c *Config) NeedStartRelayServer() bool {
-	return len(c.RelayConfigs) > 0
-}
-
 func (c *Config) GetMetricURL() string {
 	if !c.NeedStartWebServer() {
 		return ""

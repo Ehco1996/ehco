@@ -3,7 +3,6 @@ package conf
 import (
 	"errors"
 	"fmt"
-	"net/url"
 	"time"
 
 	"github.com/Ehco1996/ehco/internal/constant"
@@ -13,23 +12,9 @@ import (
 )
 
 const (
-	ProtocolHTTP         = "http"
-	ProtocolTLS          = "tls"
-	WS_HANDSHAKE_PATH    = "handshake"
-	WS_QUERY_REMOTE_ADDR = "remote_addr"
+	ProtocolHTTP = "http"
+	ProtocolTLS  = "tls"
 )
-
-type WSConfig struct {
-	Path       string `json:"path,omitempty"`
-	RemoteAddr string `json:"remote_addr,omitempty"`
-}
-
-func (w *WSConfig) Clone() *WSConfig {
-	return &WSConfig{
-		Path:       w.Path,
-		RemoteAddr: w.RemoteAddr,
-	}
-}
 
 type Options struct {
 	EnableUDP          bool `json:"enable_udp,omitempty"`
@@ -39,9 +24,6 @@ type Options struct {
 	MaxConnection    int      `json:"max_connection,omitempty"`
 	BlockedProtocols []string `json:"blocked_protocols,omitempty"`
 	MaxReadRateKbps  int64    `json:"max_read_rate_kbps,omitempty"`
-
-	// ws related
-	WSConfig *WSConfig `json:"ws_config,omitempty"`
 
 	DialTimeoutSec  int `json:"dial_timeout_sec,omitempty"`
 	IdleTimeoutSec  int `json:"idle_timeout_sec,omitempty"`
@@ -64,9 +46,6 @@ func (o *Options) Clone() *Options {
 		BlockedProtocols:   make([]string, len(o.BlockedProtocols)),
 	}
 	copy(opt.BlockedProtocols, o.BlockedProtocols)
-	if o.WSConfig != nil {
-		opt.WSConfig = o.WSConfig.Clone()
-	}
 	return opt
 }
 
@@ -78,24 +57,6 @@ type Config struct {
 	Remotes       []string           `json:"remotes"`
 
 	Options *Options `json:"options,omitempty"`
-}
-
-func (r *Config) GetWSHandShakePath() string {
-	if r.Options != nil && r.Options.WSConfig != nil && r.Options.WSConfig.Path != "" {
-		return r.Options.WSConfig.Path
-	}
-	return WS_HANDSHAKE_PATH
-}
-
-func (r *Config) GetWSRemoteAddr(baseAddr string) (string, error) {
-	addr, err := url.JoinPath(baseAddr, r.GetWSHandShakePath())
-	if err != nil {
-		return "", err
-	}
-	if r.Options != nil && r.Options.WSConfig != nil && r.Options.WSConfig.RemoteAddr != "" {
-		addr += fmt.Sprintf("?%s=%s", WS_QUERY_REMOTE_ADDR, r.Options.WSConfig.RemoteAddr)
-	}
-	return addr, nil
 }
 
 func (r *Config) Adjust() error {

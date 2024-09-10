@@ -2,6 +2,7 @@ package transporter
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"net/http"
 	"net/url"
@@ -31,12 +32,9 @@ type WsClient struct {
 
 func newWsClient(cfg *conf.Config) (*WsClient, error) {
 	s := &WsClient{
-		cfg: cfg,
-		l:   zap.S().Named(string(cfg.TransportType)),
-		// todo config buffer size
-		dialer: &ws.Dialer{
-			Timeout: cfg.Options.DialTimeout,
-		},
+		cfg:    cfg,
+		l:      zap.S().Named(string(cfg.TransportType)),
+		dialer: &ws.Dialer{Timeout: cfg.Options.DialTimeout},
 	}
 	return s, nil
 }
@@ -55,10 +53,7 @@ func (s *WsClient) addUDPQueryParam(addr string) string {
 
 func (s *WsClient) HandShake(ctx context.Context, remote *lb.Node, isTCP bool) (net.Conn, error) {
 	t1 := time.Now()
-	addr, err := s.cfg.GetWSRemoteAddr(remote.Address)
-	if err != nil {
-		return nil, err
-	}
+	addr := fmt.Sprintf("%s/handshake", remote.Address)
 	if !isTCP {
 		addr = s.addUDPQueryParam(addr)
 	}
@@ -88,7 +83,7 @@ func newWsServer(bs *BaseRelayServer) (*WsServer, error) {
 	e := web.NewEchoServer()
 	e.Use(web.NginxLogMiddleware(zap.S().Named("ws-server")))
 	e.GET("/", echo.WrapHandler(web.MakeIndexF()))
-	e.GET(bs.cfg.GetWSHandShakePath(), echo.WrapHandler(http.HandlerFunc(s.handleRequest)))
+	e.GET("handshake", echo.WrapHandler(http.HandlerFunc(s.handleRequest)))
 	s.httpServer = &http.Server{Handler: e}
 	return s, nil
 }
@@ -100,13 +95,7 @@ func (s *WsServer) handleRequest(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	var remote *lb.Node
-	if addr := req.URL.Query().Get(conf.WS_QUERY_REMOTE_ADDR); addr != "" {
-		remote = &lb.Node{Address: addr}
-	} else {
-		remote = s.remotes.Next()
-	}
-
+	remote := s.remotes.Next()
 	if req.URL.Query().Get("type") == "udp" {
 		if !s.cfg.Options.EnableUDP {
 			s.l.Error("udp not support but request with udp type")
