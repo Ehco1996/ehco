@@ -137,8 +137,6 @@ func newWsServer(bs *BaseRelayServer) (*WsServer, error) {
 	return s, nil
 }
 
-type relayFunc func(context.Context, net.Conn, *lb.Node, constant.RelayType) error
-
 func (s *WsServer) handleHandshake(e echo.Context) error {
 	wsc, _, _, err := ws.UpgradeHTTP(e.Request(), e.Response())
 	if err != nil {
@@ -152,17 +150,12 @@ func (s *WsServer) handleHandshake(e echo.Context) error {
 		return fmt.Errorf("no remote node available")
 	}
 	ctx := e.Request().Context()
-	relayType := e.QueryParam(QueryRelayType)
-	var f relayFunc
-	if relayType == constant.RelayUDP {
-		if !s.cfg.Options.EnableUDP {
-			return fmt.Errorf("UDP not supported but requested")
-		}
-		f = s.RelayUDPConn
-	} else {
-		f = s.RelayTCPConn
+	relayF, err := s.getRelayFunc(e.QueryParam(QueryRelayType))
+	if err != nil {
+		s.l.Errorf("Failed to get relay func: %v", err)
+		return err
 	}
-	if err := f(ctx, conn.NewWSConn(wsc, true), remote, s.cfg.TransportType); err != nil {
+	if err := relayF(ctx, conn.NewWSConn(wsc, true), remote, s.cfg.TransportType); err != nil {
 		s.l.Errorf("relay error: %v", err)
 	}
 	return nil
@@ -176,46 +169,31 @@ func (s *WsServer) handleDynamicHandshake(e echo.Context) error {
 	}
 	defer wsc.Close()
 
-	// read payload
-	payloadBytes, err := wsutil.ReadClientText(wsc)
+	relayF, err := s.getRelayFunc(e.QueryParam(QueryRelayType))
 	if err != nil {
-		s.l.Errorf("Failed to read client message: %v", err)
-		return nil
+		s.l.Errorf("Failed to get relay func: %v", err)
+		return err
 	}
-	payload := &conf.HandshakePayload{}
-	if err := json.Unmarshal(payloadBytes, payload); err != nil {
-		s.l.Errorf("Failed to unmarshal payload: %v", err)
-		return nil
-	}
-	s.l.Debugw("received handshake payload", "payload", payload)
+	ctx := e.Request().Context()
 
+	// read payload
+	payload, err := s.readAndParseHandshakePayload(wsc)
+	if err != nil {
+		s.l.Errorf("Failed to read and parse handshake payload: %v", err)
+		return err
+	}
 	next, err := payload.RemoveLocalChainAndGetNext(s.cfg.Label)
 	if err != nil {
 		s.l.Errorf("Failed to remove local chain: %v", err)
 		return nil
 	}
-
 	if next == nil {
 		// no chain available, so relay conn to final addr
 		remote := &lb.Node{Address: payload.FinalAddr}
-		ctx := e.Request().Context()
-		relayType := e.QueryParam(QueryRelayType)
-		var f relayFunc
-		if relayType == constant.RelayUDP {
-			if !s.cfg.Options.EnableUDP {
-				s.l.Errorf("UDP not supported but requested")
-				return nil
-			}
-			f = s.RelayUDPConn
-		} else {
-			f = s.RelayTCPConn
-		}
-		return f(ctx, conn.NewWSConn(wsc, true), remote, s.cfg.TransportType)
-	} else {
-		// todo
+		return relayF(ctx, conn.NewWSConn(wsc, true), remote, s.cfg.TransportType)
 	}
-
-	return nil
+	remote := &lb.Node{Address: next.Addr}
+	return relayF(ctx, conn.NewWSConn(wsc, true), remote, next.TransportType)
 }
 
 func (s *WsServer) ListenAndServe(ctx context.Context) error {
@@ -228,4 +206,30 @@ func (s *WsServer) ListenAndServe(ctx context.Context) error {
 
 func (s *WsServer) Close() error {
 	return s.httpServer.Close()
+}
+
+func (s *WsServer) readAndParseHandshakePayload(wsc net.Conn) (*conf.HandshakePayload, error) {
+	msg, _, err := wsutil.ReadClientData(wsc)
+	if err != nil {
+		return nil, fmt.Errorf("read client data failed: %w", err)
+	}
+
+	var payload conf.HandshakePayload
+	if err := json.Unmarshal(msg, &payload); err != nil {
+		return nil, fmt.Errorf("unmarshal payload failed: %w", err)
+	}
+
+	return &payload, nil
+}
+
+type relayFunc func(context.Context, net.Conn, *lb.Node, constant.RelayType) error
+
+func (s *WsServer) getRelayFunc(relayType string) (relayFunc, error) {
+	if relayType == constant.RelayUDP {
+		if !s.cfg.Options.EnableUDP {
+			return nil, fmt.Errorf("UDP not supported but requested")
+		}
+		return s.RelayUDPConn, nil
+	}
+	return s.RelayTCPConn, nil
 }

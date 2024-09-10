@@ -66,7 +66,6 @@ func (o *Options) Clone() *Options {
 }
 
 func (o *Options) Validate() error {
-
 	for _, protocol := range o.BlockedProtocols {
 		if protocol != ProtocolHTTP && protocol != ProtocolTLS {
 			return fmt.Errorf("invalid blocked protocol: %s", protocol)
