@@ -3,6 +3,7 @@ package conf
 import (
 	"errors"
 	"fmt"
+	"reflect"
 	"time"
 
 	"github.com/Ehco1996/ehco/internal/constant"
@@ -49,14 +50,33 @@ func (o *Options) Clone() *Options {
 	return opt
 }
 
+type ChianRemote struct {
+	Addr          string             `json:"addr"`
+	NodeLabel     string             `json:"node_label"`
+	TransportType constant.RelayType `json:"transport_type"`
+}
+
+func (c *ChianRemote) Validate() error {
+	if c.Addr == "" {
+		return fmt.Errorf("invalid remote addr: %s", c.Addr)
+	}
+	if !isValidRelayType(c.TransportType) {
+		return fmt.Errorf("invalid transport type: %s", c.TransportType)
+	}
+	return nil
+}
+
 type Config struct {
-	Label         string             `json:"label,omitempty"`
+	Label string `json:"label,omitempty"`
+
 	Listen        string             `json:"listen"`
 	ListenType    constant.RelayType `json:"listen_type"`
 	TransportType constant.RelayType `json:"transport_type"`
-	Remotes       []string           `json:"remotes"`
 
+	Remotes []string `json:"remotes"`
 	Options *Options `json:"options,omitempty"`
+
+	RemoteChains []ChianRemote `json:"remote_chains"`
 }
 
 func (r *Config) Adjust() error {
@@ -91,6 +111,23 @@ func (r *Config) Validate() error {
 			return fmt.Errorf("invalid remote addr: %s", addr)
 		}
 	}
+
+	for _, chain := range r.RemoteChains {
+		if err := chain.Validate(); err != nil {
+			return err
+		}
+	}
+	if len(r.RemoteChains) > 0 {
+		first := r.RemoteChains[0]
+		if first.TransportType == constant.RelayTypeRaw {
+			return fmt.Errorf("invalid remote chain on node: %s, raw transport type not support remote chain", first.NodeLabel)
+		}
+		last := r.RemoteChains[len(r.RemoteChains)-1]
+		if last.TransportType != constant.RelayTypeRaw {
+			return fmt.Errorf("invalid remote chain on node: %s, last node must be raw transport type", last.NodeLabel)
+		}
+	}
+
 	for _, protocol := range r.Options.BlockedProtocols {
 		if protocol != ProtocolHTTP && protocol != ProtocolTLS {
 			return fmt.Errorf("invalid blocked protocol: %s", protocol)
@@ -113,21 +150,7 @@ func (r *Config) Clone() *Config {
 }
 
 func (r *Config) Different(new *Config) bool {
-	if r.Listen != new.Listen ||
-		r.ListenType != new.ListenType ||
-		r.TransportType != new.TransportType ||
-		r.Label != new.Label {
-		return true
-	}
-	if len(r.Remotes) != len(new.Remotes) {
-		return true
-	}
-	for i, addr := range r.Remotes {
-		if addr != new.Remotes[i] {
-			return true
-		}
-	}
-	return false
+	return !reflect.DeepEqual(r, new)
 }
 
 // todo make this shorter and more readable
@@ -155,16 +178,12 @@ func (r *Config) GetLoggerName() string {
 }
 
 func (r *Config) validateType() error {
-	if r.ListenType != constant.RelayTypeRaw &&
-		r.ListenType != constant.RelayTypeWS &&
-		r.ListenType != constant.RelayTypeWSS {
-		return fmt.Errorf("invalid listen type:%s", r.ListenType)
+	if !isValidRelayType(r.ListenType) {
+		return fmt.Errorf("invalid listen type: %s", r.ListenType)
 	}
 
-	if r.TransportType != constant.RelayTypeRaw &&
-		r.TransportType != constant.RelayTypeWS &&
-		r.TransportType != constant.RelayTypeWSS {
-		return fmt.Errorf("invalid transport type:%s", r.TransportType)
+	if !isValidRelayType(r.TransportType) {
+		return fmt.Errorf("invalid transport type: %s", r.TransportType)
 	}
 	return nil
 }
@@ -192,4 +211,10 @@ func newDefaultOptions() *Options {
 		SniffTimeout:    constant.DefaultSniffTimeOut,
 		SniffTimeoutSec: int(constant.DefaultSniffTimeOut.Seconds()),
 	}
+}
+
+func isValidRelayType(rt constant.RelayType) bool {
+	return rt == constant.RelayTypeRaw ||
+		rt == constant.RelayTypeWS ||
+		rt == constant.RelayTypeWSS
 }
