@@ -20,38 +20,42 @@ jobs:
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
 
-      - name: Update 'v0.0.0-nightly' tag
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Get latest version and create nightly tag
+        id: get_version
         run: |
-          # 删除本地和远程的 'v0.0.0-nightly' 标签（如果存在）
-          git tag -d v0.0.0-nightly || true
-          git push origin :refs/tags/v0.0.0-nightly || true
-          # 创建新的 'v0.0.0-nightly' 标签并推送
-          git tag v0.0.0-nightly
-          git push origin refs/tags/v0.0.0-nightly
+          # 获取最新的非 nightly 版本标签
+          latest_version=$(git describe --tags --abbrev=0 --exclude="*-next")
 
-      - name: Delete previous nightly release
+          # 增加补丁版本号
+          nightly_version=$(echo $latest_version | awk -F. '{$NF = $NF + 1;} 1' | sed 's/ /./g')
+
+          # 创建 nightly 标签
+          nightly_tag="${nightly_version}-next"
+          echo "NIGHTLY_TAG=${nightly_tag}" >> $GITHUB_OUTPUT
+
+          # 删除远程的旧 nightly tag（如果存在）
+          git push origin :refs/tags/*-next || true
+
+          # 删除本地的旧 nightly tag（如果存在）
+          git tag -d $(git tag -l '*-next') || true
+
+          # 创建新的 nightly tag
+          git tag $nightly_tag
+
+          # 强制推送新的 nightly tag
+          git push origin $nightly_tag --force
+
+      - name: Delete Old GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          ISSUE: ${{ github.event.issue.html_url }}
+          NIGHTLY_TAG: ${{ steps.get_version.outputs.NIGHTLY_TAG }}
         run: |
-          if gh release view v0.0.0-nightly; then
-            gh release delete v0.0.0-nightly -y
-          else
-            echo "Release v0.0.0-nightly not found, skipping delete."
-          fi
+          gh release delete $NIGHTLY_TAG --yes || true
 
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
           go-version: "1.21"
-        id: go
-
-      - name: Check out code into the Go module directory
-        uses: actions/checkout@v4
-        with:
-          ref: v0.0.0-nightly
 
       - name: Get dependencies
         run: go mod download
@@ -63,3 +67,5 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GORELEASER_GITHUB_TOKEN }}
+          GORELEASER_CURRENT_TAG: ${{ steps.get_version.outputs.NIGHTLY_TAG }}
+

@@ -15,6 +15,7 @@ builds:
       - -X github.com/Ehco1996/ehco/internal/constant.GitBranch={{.Branch}}
       - -X github.com/Ehco1996/ehco/internal/constant.GitRevision={{.ShortCommit}}
       - -X github.com/Ehco1996/ehco/internal/constant.BuildTime={{.Date}}
+      - -X github.com/Ehco1996/ehco/internal/constant.Version={{.Version}}
     goarch:
       - amd64
       - arm64
