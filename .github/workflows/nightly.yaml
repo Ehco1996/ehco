@@ -49,9 +49,11 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          previous_nightly=$(gh release list --limit 1 | grep -i 'next' | awk '{print $1}')
+          previous_nightly=$(gh release list --limit 1 | grep -i 'next' | awk '{print $3}')
           if [ ! -z "$previous_nightly" ]; then
             gh release delete $previous_nightly --yes
+          else
+            echo "No previous nightly release found"
           fi
 
       - name: Set up Go
