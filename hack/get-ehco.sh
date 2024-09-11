@@ -74,8 +74,8 @@ function _detect_package_manager() {
 }
 
 function _install_dependencies() {
-    local pkg_manager=$(_detect_package_manager)
-    
+    local pkg_manager
+    pkg_manager=$(_detect_package_manager)
     case $pkg_manager in
         apt-get)
             sudo apt-get update
@@ -169,7 +169,7 @@ function _download_bin() {
     fi
 
     # replace host to `release.ehco-relay.cc` to use cf-proxy to download
-    if (( "$USE_CF_PROXY" == "true" )); then
+    if [ "$USE_CF_PROXY" = "true" ]; then
         download_url=$(echo "$download_url" | sed 's|https://github.com|https://release.ehco-relay.cc|')
     fi
 

@@ -69,15 +69,3 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GORELEASER_GITHUB_TOKEN }}
           GORELEASER_CURRENT_TAG: ${{ steps.get_version.outputs.NIGHTLY_TAG }}
 
-      # - name: Recreate GitHub Release
-      #   env:
-      #     GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      #     NIGHTLY_TAG: ${{ steps.get_version.outputs.NIGHTLY_TAG }}
-      #   run: |
-      #     gh release delete $NIGHTLY_TAG --yes || true
-      #     gh release create $NIGHTLY_TAG --prerelease --title "Nightly Release $NIGHTLY_TAG" --notes "This is an automated nightly release."
-      #     for file in dist/*; do
-      #       if [ -f "$file" ]; then
-      #         gh release upload $NIGHTLY_TAG "$file" --clobber
-      #       fi
-      #     done
