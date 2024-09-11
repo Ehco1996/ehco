@@ -109,7 +109,7 @@ func (s *RawServer) ListenAndServe(ctx context.Context) error {
 				s.l.Errorf("no remote node available")
 				return
 			}
-			if err := s.RelayTCPConn(ctx, c, remote, s.cfg.TransportType); err != nil {
+			if err := s.RelayTCPConn(ctx, c, remote); err != nil {
 				s.l.Errorf("RelayTCPConn meet error: %s", err.Error())
 			}
 		}(c)
@@ -133,7 +133,7 @@ func (s *RawServer) listenUDP(ctx context.Context) error {
 				s.l.Errorf("no remote node available")
 				return
 			}
-			if err := s.RelayUDPConn(ctx, c, remote, s.cfg.TransportType); err != nil {
+			if err := s.RelayUDPConn(ctx, c, remote); err != nil {
 				s.l.Errorf("RelayUDPConn meet error: %s", err.Error())
 			}
 		}()

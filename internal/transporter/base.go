@@ -51,7 +51,7 @@ func newBaseRelayServer(cfg *conf.Config, cmgr cmgr.Cmgr) (*BaseRelayServer, err
 	return server, nil
 }
 
-func (b *BaseRelayServer) RelayTCPConn(ctx context.Context, c net.Conn, remote *lb.Node, relayType constant.RelayType) error {
+func (b *BaseRelayServer) RelayTCPConn(ctx context.Context, c net.Conn, remote *lb.Node) error {
 	labels := []string{b.cfg.Label, metrics.METRIC_CONN_TYPE_TCP, remote.Address}
 	metrics.CurConnectionCount.WithLabelValues(labels...).Inc()
 	defer metrics.CurConnectionCount.WithLabelValues(labels...).Dec()
@@ -67,7 +67,7 @@ func (b *BaseRelayServer) RelayTCPConn(ctx context.Context, c net.Conn, remote *
 	}
 	c = b.applyRateLimit(c)
 
-	relayer, err := b.getRelayer(relayType)
+	relayer, err := b.getRelayer(remote.TransportType)
 	if err != nil {
 		return err
 	}
@@ -80,12 +80,12 @@ func (b *BaseRelayServer) RelayTCPConn(ctx context.Context, c net.Conn, remote *
 	return b.handleRelayConn(c, rc, remote, metrics.METRIC_CONN_TYPE_TCP)
 }
 
-func (b *BaseRelayServer) RelayUDPConn(ctx context.Context, c net.Conn, remote *lb.Node, relayType constant.RelayType) error {
+func (b *BaseRelayServer) RelayUDPConn(ctx context.Context, c net.Conn, remote *lb.Node) error {
 	labels := []string{b.cfg.Label, metrics.METRIC_CONN_TYPE_UDP, remote.Address}
 	metrics.CurConnectionCount.WithLabelValues(labels...).Inc()
 	defer metrics.CurConnectionCount.WithLabelValues(labels...).Dec()
 
-	relayer, err := b.getRelayer(relayType)
+	relayer, err := b.getRelayer(remote.TransportType)
 	if err != nil {
 		return err
 	}

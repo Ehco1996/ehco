@@ -155,7 +155,7 @@ func (s *WsServer) handleHandshake(e echo.Context) error {
 		s.l.Errorf("Failed to get relay func: %v", err)
 		return err
 	}
-	if err := relayF(ctx, conn.NewWSConn(wsc, true), remote, s.cfg.TransportType); err != nil {
+	if err := relayF(ctx, conn.NewWSConn(wsc, true), remote); err != nil {
 		s.l.Errorf("relay error: %v", err)
 	}
 	return nil
@@ -190,10 +190,10 @@ func (s *WsServer) handleDynamicHandshake(e echo.Context) error {
 	if next == nil {
 		// no chain available, so relay conn to final addr
 		remote := &lb.Node{Address: payload.FinalAddr}
-		return relayF(ctx, conn.NewWSConn(wsc, true), remote, s.cfg.TransportType)
+		return relayF(ctx, conn.NewWSConn(wsc, true), remote)
 	}
 	remote := &lb.Node{Address: next.Addr}
-	return relayF(ctx, conn.NewWSConn(wsc, true), remote, next.TransportType)
+	return relayF(ctx, conn.NewWSConn(wsc, true), remote)
 }
 
 func (s *WsServer) ListenAndServe(ctx context.Context) error {
@@ -222,9 +222,7 @@ func (s *WsServer) readAndParseHandshakePayload(wsc net.Conn) (*conf.HandshakePa
 	return &payload, nil
 }
 
-type relayFunc func(context.Context, net.Conn, *lb.Node, constant.RelayType) error
-
-func (s *WsServer) getRelayFunc(relayType string) (relayFunc, error) {
+func (s *WsServer) getRelayFunc(relayType string) (func(context.Context, net.Conn, *lb.Node) error, error) {
 	if relayType == constant.RelayUDP {
 		if !s.cfg.Options.EnableUDP {
 			return nil, fmt.Errorf("UDP not supported but requested")
