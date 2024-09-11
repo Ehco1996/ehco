@@ -41,7 +41,9 @@ jobs:
 
           # 创建新的 nightly tag
           git tag $nightly_tag
-          git push origin $nightly_tag
+
+          # 强制推送新的 nightly tag
+          git push origin $nightly_tag --force
 
       - name: Delete previous nightly release
         env:

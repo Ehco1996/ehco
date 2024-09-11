@@ -139,10 +139,18 @@ function _print_warning_msg() {
 }
 
 function _set_default_version() {
-    # if version is not specified, set it to latest
     if [[ -z "$VERSION" ]]; then
-        _print_warning_msg "Version not specified. Using **nightly** as the default version."
-        VERSION="v0.0.0-nightly"
+        _print_warning_msg "Version not specified. Fetching the latest nightly version."
+        local api_url="https://api.github.com/repos/Ehco1996/ehco/releases"
+        local latest_nightly
+        latest_nightly=$(curl "${CURL_FLAGS[@]}" "$api_url" | jq -r '.[] | select(.prerelease == true) | .tag_name' | head -n 1)
+        if [[ -z "$latest_nightly" ]]; then
+            _print_error_msg "Failed to fetch the latest nightly version. Using a fallback version."
+            VERSION="nightly"
+        else
+            VERSION="$latest_nightly"
+        fi
+        _print_warning_msg "Using version: $VERSION"
     fi
 }
 
@@ -154,7 +162,7 @@ function _download_bin() {
     _assets_json=$(curl "${CURL_FLAGS[@]}" "$api_url")
 
     # Extract the download URL for the target architecture using jq
-    download_url=$(echo "$_assets_json" | jq -r --arg TARGET_ARCH "$TARGET_ARCH" '.assets[] | select(.name | contains("ehco_" + $TARGET_ARCH)) | .browser_download_url')
+    download_url=$(echo "$_assets_json" | jq -r --arg TARGET_ARCH "$TARGET_ARCH" '.assets[] | select(.name | contains($TARGET_ARCH)) | .browser_download_url')
     if [ -z "$download_url" ]; then
         echo "Download URL for architecture $TARGET_ARCH not found."
         return 1
