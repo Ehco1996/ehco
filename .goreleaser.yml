@@ -37,8 +37,5 @@ upx:
   - enabled: true
     compress: 9
 
-snapshot:
-  name_template: "{{ .Tag }}"
-
 release:
   prerelease: auto

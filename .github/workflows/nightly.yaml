@@ -64,7 +64,7 @@ jobs:
         uses: goreleaser/goreleaser-action@v5
         with:
           version: v1.26.2
-          args: release --clean --snapshot
+          args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GORELEASER_GITHUB_TOKEN }}
           GORELEASER_CURRENT_TAG: ${{ steps.get_version.outputs.NIGHTLY_TAG }}
