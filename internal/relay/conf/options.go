@@ -83,3 +83,14 @@ func (p *HandshakePayload) PopNextRemote() *lb.Remote {
 	p.RemotesChain = p.RemotesChain[1:]
 	return next
 }
+
+func (p *HandshakePayload) Clone() *HandshakePayload {
+	if p == nil {
+		return nil
+	}
+	newPayload := &HandshakePayload{
+		RemotesChain: make([]lb.Remote, len(p.RemotesChain)),
+	}
+	copy(newPayload.RemotesChain, p.RemotesChain)
+	return newPayload
+}

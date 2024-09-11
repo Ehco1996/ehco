@@ -250,3 +250,79 @@ func TestRelayIdleTimeout(t *testing.T) {
 	err := echo.EchoTcpMsgLong([]byte("hello"), time.Second*2, RAW_LISTEN)
 	require.Error(t, err, "Connection should be rejected")
 }
+
+// func TestRelayChain(t *testing.T) {
+// 	chainListen := "0.0.0.0:1237"
+// 	chainRemote1 := "ws://0.0.0.0:2002"
+// 	chainServer1 := "0.0.0.0:2002"
+// 	chainRemote2 := "wss://0.0.0.0:2003"
+// 	chainServer2 := "0.0.0.0:2003"
+
+// 	options := conf.Options{
+// 		EnableUDP:      true,
+// 		IdleTimeoutSec: 1,
+// 		ReadTimeoutSec: 1,
+// 		RemotesChain: []lb.Remote{
+// 			{Address: chainRemote1, TransportType: constant.RelayTypeWS},
+// 			{Address: chainRemote2, TransportType: constant.RelayTypeWSS},
+// 		},
+// 	}
+
+// 	chainConfig := config.Config{
+// 		RelayConfigs: []*conf.Config{
+// 			{
+// 				Label:         "chain-in",
+// 				Listen:        chainListen,
+// 				ListenType:    constant.RelayTypeRaw,
+// 				Remotes:       []string{chainRemote1},
+// 				TransportType: constant.RelayTypeWS,
+// 				Options:       &options,
+// 			},
+// 			{
+// 				Label:         "chain-mid",
+// 				Listen:        chainServer1,
+// 				ListenType:    constant.RelayTypeWS,
+// 				Remotes:       []string{chainRemote2},
+// 				TransportType: constant.RelayTypeWSS,
+// 				Options:       &options,
+// 			},
+// 			{
+// 				Label:         "chain-out",
+// 				Listen:        chainServer2,
+// 				ListenType:    constant.RelayTypeWSS,
+// 				Remotes:       []string{ECHO_SERVER},
+// 				TransportType: constant.RelayTypeRaw,
+// 				Options:       &options,
+// 			},
+// 		},
+// 	}
+
+// 	chainConfig.Adjust()
+
+// 	var chainServers []*relay.Relay
+// 	for _, c := range chainConfig.RelayConfigs {
+// 		c.Adjust()
+// 		r, err := relay.NewRelay(c, nil)
+// 		require.NoError(t, err)
+// 		go r.ListenAndServe(context.TODO())
+// 		chainServers = append(chainServers, r)
+// 	}
+
+// 	// Wait for init
+// 	time.Sleep(time.Second)
+
+// 	t.Run("ChainRelay", func(t *testing.T) {
+// 		testTCPRelay(t, chainListen, "chain", false)
+// 		testUDPRelay(t, chainListen, false)
+// 	})
+
+// 	t.Run("ChainRelayConcurrent", func(t *testing.T) {
+// 		testTCPRelay(t, chainListen, "chain", true, 10)
+// 		testUDPRelay(t, chainListen, true, 10)
+// 	})
+
+// 	// Cleanup
+// 	for _, server := range chainServers {
+// 		server.Stop()
+// 	}
+// }

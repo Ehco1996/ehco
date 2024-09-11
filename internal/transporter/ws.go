@@ -15,7 +15,6 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/Ehco1996/ehco/internal/conn"
-	"github.com/Ehco1996/ehco/internal/constant"
 	"github.com/Ehco1996/ehco/internal/lb"
 	"github.com/Ehco1996/ehco/internal/metrics"
 	"github.com/Ehco1996/ehco/internal/relay/conf"
@@ -33,6 +32,13 @@ const (
 	DynamicHandShakePath = "/dynamic_handshake"
 
 	QueryRelayType = "relay_type"
+	RelayTypeUDP   = "udp"
+)
+
+type contextKey string
+
+const (
+	contextKeyHandshakePayload contextKey = "handshake_payload"
 )
 
 type WsClient struct {
@@ -42,12 +48,11 @@ type WsClient struct {
 }
 
 func newWsClient(cfg *conf.Config) (*WsClient, error) {
-	s := &WsClient{
+	return &WsClient{
 		cfg:    cfg,
 		l:      zap.S().Named(string(cfg.TransportType)),
 		dialer: &ws.Dialer{Timeout: cfg.Options.DialTimeout},
-	}
-	return s, nil
+	}, nil
 }
 
 func (s *WsClient) getDialAddr(remote *lb.Remote, isTCP bool) string {
@@ -70,7 +75,7 @@ func (s *WsClient) addUDPQueryParam(addr string) string {
 		return addr
 	}
 	q := u.Query()
-	q.Set(QueryRelayType, constant.RelayUDP)
+	q.Set(QueryRelayType, RelayTypeUDP)
 	u.RawQuery = q.Encode()
 	return u.String()
 }
@@ -82,22 +87,26 @@ func (s *WsClient) HandShake(ctx context.Context, remote *lb.Remote, isTCP bool)
 		return nil, fmt.Errorf("dial failed: %w", err)
 	}
 
-	if err := s.sendHandshakePayloadIfNeeded(wsc, remote.Address); err != nil {
+	if err := s.sendHandshakePayloadIfNeeded(ctx, wsc, remote.Address); err != nil {
 		wsc.Close()
 		return nil, err
 	}
 
-	latency := time.Since(startTime)
-	s.recordMetrics(latency, isTCP, remote)
+	s.recordMetrics(time.Since(startTime), isTCP, remote)
 	return conn.NewWSConn(wsc, false), nil
 }
 
-func (s *WsClient) sendHandshakePayloadIfNeeded(wsc net.Conn, remoteAddr string) error {
-	if !s.cfg.Options.NeedSendHandshakePayload() {
+func (s *WsClient) sendHandshakePayloadIfNeeded(ctx context.Context, wsc net.Conn, remoteAddr string) error {
+	var payload *conf.HandshakePayload
+
+	if ctxPayload, ok := ctx.Value(contextKeyHandshakePayload).(*conf.HandshakePayload); ok && ctxPayload != nil {
+		payload = ctxPayload
+	} else if s.cfg.Options.NeedSendHandshakePayload() {
+		payload = conf.BuildHandshakePayload(s.cfg.Options)
+	} else {
 		return nil
 	}
 
-	payload := conf.BuildHandshakePayload(s.cfg.Options)
 	payloadBytes, err := json.Marshal(payload)
 	if err != nil {
 		return fmt.Errorf("marshal payload failed: %w", err)
@@ -138,10 +147,9 @@ func newWsServer(bs *BaseRelayServer) (*WsServer, error) {
 }
 
 func (s *WsServer) handleHandshake(e echo.Context) error {
-	wsc, _, _, err := ws.UpgradeHTTP(e.Request(), e.Response())
+	wsc, err := s.upgradeToWebSocket(e)
 	if err != nil {
-		s.l.Errorf("Failed to upgrade HTTP connection: %v", err)
-		return echo.NewHTTPError(http.StatusInternalServerError, "Failed to establish WebSocket connection")
+		return err
 	}
 	defer wsc.Close()
 
@@ -149,45 +157,56 @@ func (s *WsServer) handleHandshake(e echo.Context) error {
 	if remote == nil {
 		return fmt.Errorf("no remote node available")
 	}
-	ctx := e.Request().Context()
-	relayF, err := s.getRelayFunc(e.QueryParam(QueryRelayType))
-	if err != nil {
-		s.l.Errorf("Failed to get relay func: %v", err)
-		return err
-	}
-	if err := relayF(ctx, conn.NewWSConn(wsc, true), remote); err != nil {
-		s.l.Errorf("relay error: %v", err)
-	}
-	return nil
+	return s.handleRelay(e.Request().Context(), wsc, remote, e.QueryParam(QueryRelayType) == RelayTypeUDP)
 }
 
 func (s *WsServer) handleDynamicHandshake(e echo.Context) error {
-	wsc, _, _, err := ws.UpgradeHTTP(e.Request(), e.Response())
+	wsc, err := s.upgradeToWebSocket(e)
 	if err != nil {
-		s.l.Errorf("Failed to upgrade HTTP connection: %v", err)
-		return echo.NewHTTPError(http.StatusInternalServerError, "Failed to establish WebSocket connection")
+		return err
 	}
 	defer wsc.Close()
 
-	relayF, err := s.getRelayFunc(e.QueryParam(QueryRelayType))
-	if err != nil {
-		s.l.Errorf("Failed to get relay func: %v", err)
-		return err
-	}
-	ctx := e.Request().Context()
-
-	// read payload
 	payload, err := s.readAndParseHandshakePayload(wsc)
 	if err != nil {
 		s.l.Errorf("Failed to read and parse handshake payload: %v", err)
 		return err
 	}
+
 	remote := payload.PopNextRemote()
 	if remote == nil {
-		// should not happen
 		return fmt.Errorf("no remote node available")
 	}
-	return relayF(ctx, conn.NewWSConn(wsc, true), remote)
+
+	ctx := e.Request().Context()
+	if len(payload.RemotesChain) > 0 {
+		ctx = context.WithValue(ctx, contextKeyHandshakePayload, payload.Clone())
+	}
+
+	return s.handleRelay(ctx, wsc, remote, e.QueryParam(QueryRelayType) == RelayTypeUDP)
+}
+
+func (s *WsServer) upgradeToWebSocket(e echo.Context) (net.Conn, error) {
+	wsc, _, _, err := ws.UpgradeHTTP(e.Request(), e.Response())
+	if err != nil {
+		s.l.Errorf("Failed to upgrade HTTP connection: %v", err)
+		return nil, echo.NewHTTPError(http.StatusInternalServerError, "Failed to establish WebSocket connection")
+	}
+	return wsc, nil
+}
+
+func (s *WsServer) handleRelay(ctx context.Context, wsc net.Conn, remote *lb.Remote, isUDP bool) error {
+	relayF := s.RelayTCPConn
+	if isUDP {
+		if !s.cfg.Options.EnableUDP {
+			return fmt.Errorf("UDP not supported but requested")
+		}
+		relayF = s.RelayUDPConn
+	}
+	if err := relayF(ctx, conn.NewWSConn(wsc, true), remote); err != nil {
+		s.l.Errorf("relay error: %v", err)
+	}
+	return nil
 }
 
 func (s *WsServer) ListenAndServe(ctx context.Context) error {
@@ -214,14 +233,4 @@ func (s *WsServer) readAndParseHandshakePayload(wsc net.Conn) (*conf.HandshakePa
 	}
 
 	return &payload, nil
-}
-
-func (s *WsServer) getRelayFunc(relayType string) (func(context.Context, net.Conn, *lb.Remote) error, error) {
-	if relayType == constant.RelayUDP {
-		if !s.cfg.Options.EnableUDP {
-			return nil, fmt.Errorf("UDP not supported but requested")
-		}
-		return s.RelayUDPConn, nil
-	}
-	return s.RelayTCPConn, nil
 }
