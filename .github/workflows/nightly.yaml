@@ -45,17 +45,6 @@ jobs:
           # 强制推送新的 nightly tag
           git push origin $nightly_tag --force
 
-      - name: Delete previous nightly release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          previous_nightly=$(gh release list --limit 1 | grep -i 'next' | awk '{print $3}')
-          if [ ! -z "$previous_nightly" ]; then
-            gh release delete $previous_nightly --yes
-          else
-            echo "No previous nightly release found"
-          fi
-
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
@@ -73,11 +62,12 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GORELEASER_GITHUB_TOKEN }}
           GORELEASER_CURRENT_TAG: ${{ steps.get_version.outputs.NIGHTLY_TAG }}
 
-      - name: Create GitHub Release
+      - name: Recreate GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NIGHTLY_TAG: ${{ steps.get_version.outputs.NIGHTLY_TAG }}
         run: |
+          gh release delete $NIGHTLY_TAG --yes || true
           gh release create $NIGHTLY_TAG --prerelease --title "Nightly Release $NIGHTLY_TAG" --notes "This is an automated nightly release."
           for file in dist/*; do
             if [ -f "$file" ]; then
