@@ -78,14 +78,14 @@ func (r *Config) DefaultLabel() string {
 }
 
 func (r *Config) ToRemotesLB() lb.RoundRobin {
-	nodeList := make([]*lb.Node, len(r.Remotes))
+	nodeList := make([]*lb.Remote, len(r.Remotes))
 	for idx, addr := range r.Remotes {
-		nodeList[idx] = &lb.Node{Address: addr, TransportType: r.TransportType}
+		nodeList[idx] = &lb.Remote{Address: addr, TransportType: r.TransportType}
 	}
 	return lb.NewRoundRobin(nodeList)
 }
 
-func (r *Config) GetAllRemotes() []*lb.Node {
+func (r *Config) GetAllRemotes() []*lb.Remote {
 	lb := r.ToRemotesLB()
 	return lb.GetAll()
 }

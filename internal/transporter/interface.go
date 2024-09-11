@@ -13,7 +13,7 @@ import (
 
 // TODO opt this interface
 type RelayClient interface {
-	HandShake(ctx context.Context, remote *lb.Node, isTCP bool) (net.Conn, error)
+	HandShake(ctx context.Context, remote *lb.Remote, isTCP bool) (net.Conn, error)
 }
 
 func newRelayClient(cfg *conf.Config, relayType constant.RelayType) (RelayClient, error) {
@@ -33,8 +33,8 @@ type RelayServer interface {
 	ListenAndServe(ctx context.Context) error
 	Close() error
 
-	RelayTCPConn(ctx context.Context, c net.Conn, remote *lb.Node) error
-	RelayUDPConn(ctx context.Context, c net.Conn, remote *lb.Node) error
+	RelayTCPConn(ctx context.Context, c net.Conn, remote *lb.Remote) error
+	RelayUDPConn(ctx context.Context, c net.Conn, remote *lb.Remote) error
 	HealthCheck(ctx context.Context) (int64, error) // latency in ms
 }
 

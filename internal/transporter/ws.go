@@ -50,12 +50,12 @@ func newWsClient(cfg *conf.Config) (*WsClient, error) {
 	return s, nil
 }
 
-func (s *WsClient) getDialAddr(remote *lb.Node, isTCP bool) string {
+func (s *WsClient) getDialAddr(remote *lb.Remote, isTCP bool) string {
 	var addr string
 	if !s.cfg.Options.NeedSendHandshakePayload() {
 		addr = fmt.Sprintf("%s%s", remote.Address, HandshakePath)
 	} else {
-		addr = fmt.Sprintf("%s%s", s.cfg.Options.RemoteChains[0].Addr, DynamicHandShakePath)
+		addr = fmt.Sprintf("%s%s", s.cfg.Options.RemotesChain[0].Address, DynamicHandShakePath)
 	}
 	if !isTCP {
 		addr = s.addUDPQueryParam(addr)
@@ -75,7 +75,7 @@ func (s *WsClient) addUDPQueryParam(addr string) string {
 	return u.String()
 }
 
-func (s *WsClient) HandShake(ctx context.Context, remote *lb.Node, isTCP bool) (net.Conn, error) {
+func (s *WsClient) HandShake(ctx context.Context, remote *lb.Remote, isTCP bool) (net.Conn, error) {
 	startTime := time.Now()
 	wsc, _, _, err := s.dialer.Dial(ctx, s.getDialAddr(remote, isTCP))
 	if err != nil {
@@ -97,7 +97,7 @@ func (s *WsClient) sendHandshakePayloadIfNeeded(wsc net.Conn, remoteAddr string)
 		return nil
 	}
 
-	payload := conf.BuildHandshakePayload(s.cfg.Options, remoteAddr)
+	payload := conf.BuildHandshakePayload(s.cfg.Options)
 	payloadBytes, err := json.Marshal(payload)
 	if err != nil {
 		return fmt.Errorf("marshal payload failed: %w", err)
@@ -111,7 +111,7 @@ func (s *WsClient) sendHandshakePayloadIfNeeded(wsc net.Conn, remoteAddr string)
 	return nil
 }
 
-func (s *WsClient) recordMetrics(latency time.Duration, isTCP bool, remote *lb.Node) {
+func (s *WsClient) recordMetrics(latency time.Duration, isTCP bool, remote *lb.Remote) {
 	connType := metrics.METRIC_CONN_TYPE_TCP
 	if !isTCP {
 		connType = metrics.METRIC_CONN_TYPE_UDP
@@ -182,17 +182,11 @@ func (s *WsServer) handleDynamicHandshake(e echo.Context) error {
 		s.l.Errorf("Failed to read and parse handshake payload: %v", err)
 		return err
 	}
-	next, err := payload.RemoveLocalChainAndGetNext(s.cfg.Label)
-	if err != nil {
-		s.l.Errorf("Failed to remove local chain: %v", err)
-		return nil
+	remote := payload.PopNextRemote()
+	if remote == nil {
+		// should not happen
+		return fmt.Errorf("no remote node available")
 	}
-	if next == nil {
-		// no chain available, so relay conn to final addr
-		remote := &lb.Node{Address: payload.FinalAddr}
-		return relayF(ctx, conn.NewWSConn(wsc, true), remote)
-	}
-	remote := &lb.Node{Address: next.Addr}
 	return relayF(ctx, conn.NewWSConn(wsc, true), remote)
 }
 
@@ -222,7 +216,7 @@ func (s *WsServer) readAndParseHandshakePayload(wsc net.Conn) (*conf.HandshakePa
 	return &payload, nil
 }
 
-func (s *WsServer) getRelayFunc(relayType string) (func(context.Context, net.Conn, *lb.Node) error, error) {
+func (s *WsServer) getRelayFunc(relayType string) (func(context.Context, net.Conn, *lb.Remote) error, error) {
 	if relayType == constant.RelayUDP {
 		if !s.cfg.Options.EnableUDP {
 			return nil, fmt.Errorf("UDP not supported but requested")

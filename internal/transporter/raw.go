@@ -34,7 +34,7 @@ func newRawClient(cfg *conf.Config) (*RawClient, error) {
 	return r, nil
 }
 
-func (raw *RawClient) HandShake(ctx context.Context, remote *lb.Node, isTCP bool) (net.Conn, error) {
+func (raw *RawClient) HandShake(ctx context.Context, remote *lb.Remote, isTCP bool) (net.Conn, error) {
 	t1 := time.Now()
 	var rc net.Conn
 	var err error

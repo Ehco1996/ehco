@@ -9,9 +9,9 @@ func Test_roundrobin_Next(t *testing.T) {
 		"127.0.0.1",
 		"127.0.0.2",
 	}
-	nodeList := make([]*Node, len(remotes))
+	nodeList := make([]*Remote, len(remotes))
 	for i := range remotes {
-		nodeList[i] = &Node{Address: remotes[i]}
+		nodeList[i] = &Remote{Address: remotes[i]}
 	}
 	rb := NewRoundRobin(nodeList)
 

@@ -25,7 +25,7 @@ func TestInnerConn_ReadWrite(t *testing.T) {
 	serverConn.SetDeadline(time.Now().Add(1 * time.Second))
 	defer clientConn.Close()
 	defer serverConn.Close()
-	rc := relayConnImpl{Stats: &Stats{}, remote: &lb.Node{}, Options: &testOptions}
+	rc := relayConnImpl{Stats: &Stats{}, remote: &lb.Remote{}, Options: &testOptions}
 	innerC := newInnerConn(clientConn, &rc)
 	errChan := make(chan error, 1)
 	go func() {
@@ -101,7 +101,7 @@ func TestCopyTCPConn(t *testing.T) {
 	assert.NoError(t, err)
 	defer remoteConn.Close()
 	testOptions := conf.Options{IdleTimeout: time.Second, ReadTimeout: time.Second}
-	rc := relayConnImpl{Stats: &Stats{}, remote: &lb.Node{}, Options: &testOptions}
+	rc := relayConnImpl{Stats: &Stats{}, remote: &lb.Remote{}, Options: &testOptions}
 	c1 := newInnerConn(clientConn, &rc)
 	c2 := newInnerConn(remoteConn, &rc)
 
@@ -162,7 +162,7 @@ func TestCopyUDPConn(t *testing.T) {
 	defer remoteConn.Close()
 
 	testOptions := conf.Options{IdleTimeout: time.Second, ReadTimeout: time.Second}
-	rc := relayConnImpl{Stats: &Stats{}, remote: &lb.Node{}, Options: &testOptions}
+	rc := relayConnImpl{Stats: &Stats{}, remote: &lb.Remote{}, Options: &testOptions}
 	c1 := newInnerConn(clientConn, &rc)
 	c2 := newInnerConn(remoteConn, &rc)
 

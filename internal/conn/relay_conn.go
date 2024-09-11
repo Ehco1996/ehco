@@ -65,7 +65,7 @@ type relayConnImpl struct {
 
 	// options set those fields
 	l          *zap.SugaredLogger
-	remote     *lb.Node
+	remote     *lb.Remote
 	RelayLabel string `json:"relay_label"`
 	ConnType   string `json:"conn_type"`
 	Options    *conf.Options
@@ -83,7 +83,7 @@ func WithConnType(connType string) RelayConnOption {
 	}
 }
 
-func WithRemote(remote *lb.Node) RelayConnOption {
+func WithRemote(remote *lb.Remote) RelayConnOption {
 	return func(rci *relayConnImpl) {
 		rci.remote = remote
 		rci.Stats.HandShakeLatency = remote.HandShakeDuration

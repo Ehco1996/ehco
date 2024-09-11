@@ -1,6 +1,7 @@
 package lb
 
 import (
+	"fmt"
 	"net/url"
 	"strings"
 	"time"
@@ -8,23 +9,30 @@ import (
 	"github.com/Ehco1996/ehco/internal/constant"
 )
 
-type Node struct {
+type Remote struct {
 	Address       string             `json:"address"`
 	TransportType constant.RelayType `json:"transport_type"`
 
 	HandShakeDuration time.Duration
 }
 
-func (n *Node) Clone() *Node {
-	return &Node{
+func (n *Remote) Clone() *Remote {
+	return &Remote{
 		Address:           n.Address,
 		TransportType:     n.TransportType,
 		HandShakeDuration: n.HandShakeDuration,
 	}
 }
 
+func (n *Remote) Validate() error {
+	if n.Address == "" {
+		return fmt.Errorf("invalid address: %s", n.Address)
+	}
+	return nil
+}
+
 // NOTE for (https/ws/wss)://xxx.com -> xxx.com
-func (n *Node) GetAddrHost() (string, error) {
+func (n *Remote) GetAddrHost() (string, error) {
 	return extractHost(n.Address)
 }
 
