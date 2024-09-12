@@ -57,10 +57,14 @@ func newWsClient(cfg *conf.Config) (*WsClient, error) {
 
 func (s *WsClient) getDialAddr(remote *lb.Remote, isTCP bool) string {
 	var addr string
-	if !s.cfg.Options.NeedSendHandshakePayload() {
-		addr = fmt.Sprintf("%s%s", remote.Address, HandshakePath)
-	} else {
+	if s.cfg.Options.NeedSendHandshakePayload() {
 		addr = fmt.Sprintf("%s%s", s.cfg.Options.RemotesChain[0].Address, DynamicHandShakePath)
+	} else {
+		if remote.WSPath == "" {
+			addr = fmt.Sprintf("%s%s", remote.Address, HandshakePath)
+		} else {
+			addr = fmt.Sprintf("%s%s", remote.Address, remote.WSPath)
+		}
 	}
 	if !isTCP {
 		addr = s.addUDPQueryParam(addr)
@@ -102,7 +106,7 @@ func (s *WsClient) sendHandshakePayloadIfNeeded(ctx context.Context, wsc net.Con
 	if ctxPayload, ok := ctx.Value(contextKeyHandshakePayload).(*conf.HandshakePayload); ok && ctxPayload != nil {
 		payload = ctxPayload
 	} else if s.cfg.Options.NeedSendHandshakePayload() {
-		payload = conf.BuildHandshakePayload(s.cfg.Options)
+		payload = conf.BuildHandshakePayload(s.cfg.Options, DynamicHandShakePath)
 	} else {
 		return nil
 	}

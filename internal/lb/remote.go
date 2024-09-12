@@ -12,6 +12,7 @@ import (
 type Remote struct {
 	Address       string             `json:"address"`
 	TransportType constant.RelayType `json:"transport_type"`
+	WSPath        string             `json:"ws_path"`
 
 	HandShakeDuration time.Duration
 }

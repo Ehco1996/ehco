@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/Ehco1996/ehco/internal/constant"
 	"github.com/Ehco1996/ehco/internal/lb"
 )
 
@@ -71,8 +72,15 @@ type HandshakePayload struct {
 	RemotesChain []lb.Remote `json:"remotes_chain"`
 }
 
-func BuildHandshakePayload(opt *Options) *HandshakePayload {
-	return &HandshakePayload{RemotesChain: opt.RemotesChain}
+func BuildHandshakePayload(opt *Options, wsPath string) *HandshakePayload {
+	remotes := make([]lb.Remote, len(opt.RemotesChain))
+	for i, remote := range opt.RemotesChain {
+		remotes[i] = remote
+		if remote.TransportType != constant.RelayTypeRaw {
+			remote.WSPath = wsPath
+		}
+	}
+	return &HandshakePayload{RemotesChain: remotes}
 }
 
 func (p *HandshakePayload) PopNextRemote() *lb.Remote {
