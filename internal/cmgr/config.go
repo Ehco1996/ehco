@@ -7,11 +7,11 @@ type Config struct {
 }
 
 func (c *Config) NeedSync() bool {
-	return c.SyncURL != ""
+	return c.SyncURL != "" && c.SyncInterval > 0
 }
 
 func (c *Config) NeedMetrics() bool {
-	return c.MetricsURL != ""
+	return c.MetricsURL != "" && c.SyncInterval > 0
 }
 
 func (c *Config) Adjust() {
