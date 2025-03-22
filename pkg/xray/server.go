@@ -172,7 +172,7 @@ func (xs *XrayServer) Start(ctx context.Context) error {
 							if err := xs.Reload(); err != nil {
 								xs.l.Error("Reload Xray Server meet error", zap.Error(err))
 							}
-							xs.l.Warn("Reload Xray Server success exit watcher ...")
+							xs.l.Info("Reload Xray Server Once success")
 							return
 						}
 					}
