@@ -1,176 +1,199 @@
 <!DOCTYPE html>
 <html lang="en">
-  {{template "_head.html" .}}
-  <style>
-    .logs-container {
-      height: 700px;
-      overflow-y: auto;
-      font-family: 'Fira Code', monospace;
-      border-radius: 6px;
-      background-color: #f5f5f5;
-      padding: 1rem;
-      transition: background-color 0.3s ease;
-    }
+<head>
+    {{template "_head.html" .}}
+    <style>
+        /* Minimal styling for log entries, more can be added to custom.css */
+        .log-entry {
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            margin-bottom: 0.25rem;
+        }
+        .log-entry.is-info { background-color: #eff5fb; color: #296fa8; }
+        .log-entry.is-warning { background-color: #fffbeb; color: #947600; }
+        .log-entry.is-danger { background-color: #feecf0; color: #cc0f35; }
+        .log-entry.is-light { background-color: #f5f5f5; color: #363636; }
+        .log-entry.is-dark { background-color: #363636; color: #f5f5f5; }
 
-    .log-entry {
-      margin-bottom: 0.5rem;
-      padding: 0.5rem;
-      border-radius: 4px;
-      transition: background-color 0.3s ease;
-    }
-  </style>
+        .log-timestamp { color: #7a7a7a; margin-right: 0.5em; font-size: 0.85em; }
+        .log-level { font-weight: bold; margin-right: 0.5em; font-size: 0.85em; text-transform: uppercase; }
+        .log-logger { color: #007d7e; margin-right: 0.5em; font-size: 0.85em; }
+        .log-message { /* main message styling */ }
+    </style>
+</head>
+<body>
+    {{template "_navbar.html" .}}
 
-  <body>
-    {{ template "_navbar.html" . }}
-    <section class="section">
-      <div class="container-fluid">
-        <h1 class="title is-2 mb-6">Real-time Logs</h1>
-        <div class="card">
-          <div class="card-content">
-            <div class="field has-addons mb-4">
-              <div class="control is-expanded">
-                <input class="input is-medium" type="text" id="filterInput" placeholder="Filter logs..." />
-              </div>
-              <div class="control">
-                <button class="button is-info is-medium" id="filterButton">
-                  <span class="icon">
-                    <i class="fas fa-filter"></i>
-                  </span>
-                </button>
-              </div>
+    <section class="section main-content-area">
+        <div class="container-fluid">
+            <h1 class="title is-3 has-text-centered">Real-time Logs</h1>
+
+            <div class="level">
+                <div class="level-left">
+                    <div class="level-item">
+                        <div class="field">
+                            <p class="control is-expanded">
+                                <input class="input" type="text" id="filterInput" placeholder="Filter logs...">
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                <div class="level-right">
+                    <div class="level-item">
+                        <button class="button is-warning" id="pauseButton">
+                            <span class="icon"><i class="fas fa-pause"></i></span>
+                            <span>Pause</span>
+                        </button>
+                    </div>
+                    <div class="level-item">
+                        <button class="button is-danger" id="clearButton">
+                            <span class="icon"><i class="fas fa-trash"></i></span>
+                            <span>Clear</span>
+                        </button>
+                    </div>
+                </div>
             </div>
-            <div class="buttons mb-4">
-              <button class="button is-warning is-medium" id="pauseButton">
-                <span class="icon">
-                  <i class="fas fa-pause"></i>
-                </span>
-                <span>Pause</span>
-              </button>
-              <button class="button is-danger is-medium" id="clearButton">
-                <span class="icon">
-                  <i class="fas fa-trash"></i>
-                </span>
-                <span>Clear</span>
-              </button>
+
+            <div id="logsContainer" class="logs-container box" style="height: 70vh; overflow-y: auto; font-family: 'Fira Code', monospace; white-space: pre-wrap; background-color: #fff;">
+                <!-- Logs will be appended here -->
             </div>
-            <div id="logsContainer" class="logs-container"></div>
-          </div>
         </div>
-      </div>
     </section>
 
     <script>
-      const logsContainer = document.getElementById('logsContainer');
-      const filterInput = document.getElementById('filterInput');
-      const filterButton = document.getElementById('filterButton');
-      const pauseButton = document.getElementById('pauseButton');
-      const clearButton = document.getElementById('clearButton');
-      let isPaused = false;
-      let ws;
-      let filterTerm = '';
+        const logsContainer = document.getElementById('logsContainer');
+        const filterInput = document.getElementById('filterInput');
+        const pauseButton = document.getElementById('pauseButton');
+        const clearButton = document.getElementById('clearButton');
+        let isPaused = false;
+        let ws;
+        let filterTerm = '';
 
-      function connectWebSocket() {
-        ws = new WebSocket('ws://' + window.location.host + '/ws/logs');
-        ws.onopen = function (event) {
-          console.log('WebSocket connection established');
-        };
-
-        ws.onerror = function (event) {
-          console.error('WebSocket error observed:', event);
-        };
-
-        ws.onmessage = function (event) {
-          if (!isPaused) {
-            const logEntry = document.createElement('div');
-            logEntry.innerHTML = formatLogMessage(event.data);
-            if (shouldDisplayLog(logEntry.textContent)) {
-              logsContainer.appendChild(logEntry);
-              logsContainer.scrollTop = logsContainer.scrollHeight;
+        function getLevelClass(level) {
+            switch (level.toLowerCase()) {
+                case 'debug': return 'is-light';
+                case 'info': return 'is-info';
+                case 'warn': return 'is-warning';
+                case 'error': return 'is-danger';
+                case 'fatal': return 'is-dark'; // Bulma 'is-dark' usually has light text by default
+                default: return ''; // No specific Bulma background, or a default one
             }
-          }
-        };
-
-        ws.onclose = function (event) {
-          console.log('WebSocket connection closed. Reconnecting...');
-          setTimeout(connectWebSocket, 1000);
-        };
-      }
-
-      function formatLogMessage(message) {
-        try {
-          const logEntry = JSON.parse(message);
-          const timestamp = logEntry.ts;
-          const level = logEntry.level;
-          const msg = logEntry.msg;
-          const logger = logEntry.logger;
-          console.log('Log entry:', logEntry);
-          const levelClass = getLevelClass(level);
-
-          return `
-            <div class="columns is-mobile">
-              <div class="column is-3"><span class="has-text-grey-light is-small">${timestamp}</span></div>
-              <div class="column is-1"><span class="tag ${levelClass} is-small">${level.toUpperCase()}</span></div>
-              <div class="column is-2"><span class="is-info is-light is-small">${logger}</span></div>
-              <div class="column"><span>${msg}</span></div>
-            </div>
-          `;
-        } catch (e) {
-          console.error('Error parsing log message:', e);
-          return `<div class="has-text-danger">${message}</div>`;
         }
-      }
 
-      function getLevelClass(level) {
-        switch (level) {
-          case 'debug':
-            return 'is-light';
-          case 'info':
-            return 'is-info';
-          case 'warn':
-            return 'is-warning';
-          case 'error':
-            return 'is-danger';
-          case 'fatal':
-            return 'is-dark';
-          default:
-            return 'is-light';
+        function formatLogMessage(message) {
+            try {
+                const logData = JSON.parse(message);
+                // Using template literal for cleaner HTML string construction
+                return `
+                  <div class="log-entry ${getLevelClass(logData.level)}">
+                    <span class="log-timestamp">${logData.ts || new Date().toISOString()}</span>
+                    <span class="log-level log-level-${String(logData.level || 'unknown').toLowerCase()}">${String(logData.level || 'UNKNOWN').toUpperCase()}</span>
+                    <span class="log-logger">[${logData.logger || 'default'}]</span>
+                    <span class="log-message">${logData.msg || ''}</span>
+                  </div>
+                `;
+            } catch (e) {
+                console.error('Error parsing log message:', e, message);
+                // Display raw message if parsing fails
+                return `<div class="log-entry is-danger"><span class="log-message">Error parsing log: ${message}</span></div>`;
+            }
         }
-      }
-
-      function shouldDisplayLog(logText) {
-        return filterTerm === '' || logText.toLowerCase().includes(filterTerm.toLowerCase());
-      }
-
-      function applyFilter() {
-        filterTerm = filterInput.value;
-        const logEntries = logsContainer.getElementsByClassName('log-entry');
-        for (let entry of logEntries) {
-          if (shouldDisplayLog(entry.textContent)) {
-            entry.style.display = '';
-          } else {
-            entry.style.display = 'none';
-          }
+        
+        function shouldDisplayLog(logText) {
+            if (!filterTerm) return true;
+            return logText.toLowerCase().includes(filterTerm.toLowerCase());
         }
-      }
-      connectWebSocket();
 
-      filterButton.addEventListener('click', applyFilter);
-      filterInput.addEventListener('keyup', function (event) {
-        if (event.key === 'Enter') {
-          applyFilter();
+        function connectWebSocket() {
+            ws = new WebSocket('ws://' + window.location.host + '/ws/logs');
+
+            ws.onopen = function (event) {
+                console.log('WebSocket connection established');
+                const entry = document.createElement('div');
+                entry.className = 'log-entry is-info';
+                entry.innerHTML = `<span class="log-message">Log streaming connection established.</span>`;
+                logsContainer.appendChild(entry);
+            };
+
+            ws.onerror = function (event) {
+                console.error('WebSocket error observed:', event);
+                const entry = document.createElement('div');
+                entry.className = 'log-entry is-danger';
+                entry.innerHTML = `<span class="log-message">Log streaming connection error. See console for details.</span>`;
+                logsContainer.appendChild(entry);
+                logsContainer.scrollTop = logsContainer.scrollHeight;
+            };
+
+            ws.onmessage = function (event) {
+                if (!isPaused) {
+                    const formattedMessage = formatLogMessage(event.data);
+                    // Create a temporary div to check its textContent for filtering
+                    const tempDiv = document.createElement('div');
+                    tempDiv.innerHTML = formattedMessage; 
+                    
+                    if (shouldDisplayLog(tempDiv.textContent || "")) {
+                        const entry = document.createElement('div');
+                        entry.innerHTML = formattedMessage;
+                        // Append the actual formatted message (which might be a single div itself)
+                        logsContainer.appendChild(entry.firstChild); 
+                        logsContainer.scrollTop = logsContainer.scrollHeight;
+                    }
+                }
+            };
+
+            ws.onclose = function (event) {
+                console.log('WebSocket connection closed. Reconnecting in 1 second...');
+                const entry = document.createElement('div');
+                entry.className = 'log-entry is-warning';
+                entry.innerHTML = `<span class="log-message">Log streaming connection closed. Attempting to reconnect...</span>`;
+                logsContainer.appendChild(entry);
+                logsContainer.scrollTop = logsContainer.scrollHeight;
+                setTimeout(connectWebSocket, 1000);
+            };
         }
-      });
 
-      pauseButton.addEventListener('click', function () {
-        isPaused = !isPaused;
-        pauseButton.textContent = isPaused ? 'Resume' : 'Pause';
-        pauseButton.classList.toggle('is-warning');
-        pauseButton.classList.toggle('is-success');
-      });
+        function applyFilter() {
+            filterTerm = filterInput.value.trim();
+            // This function will re-filter existing logs if needed.
+            // For real-time, filtering is mostly applied to new messages in onmessage.
+            // However, if a user types then hits enter, they might expect existing logs to filter.
+            const logEntries = logsContainer.querySelectorAll('.log-entry');
+            logEntries.forEach(entry => {
+                if (shouldDisplayLog(entry.textContent || "")) {
+                    entry.style.display = '';
+                } else {
+                    entry.style.display = 'none';
+                }
+            });
+        }
 
-      clearButton.addEventListener('click', function () {
-        logsContainer.innerHTML = '';
-      });
+        filterInput.addEventListener('keyup', function(event) {
+            if (event.key === 'Enter') {
+                applyFilter();
+            }
+            // Optional: apply filter on every keystroke for live filtering
+            // applyFilter(); 
+        });
+
+        pauseButton.addEventListener('click', function() {
+            isPaused = !isPaused;
+            if (isPaused) {
+                pauseButton.innerHTML = '<span class="icon"><i class="fas fa-play"></i></span><span>Resume</span>';
+                pauseButton.classList.remove('is-warning');
+                pauseButton.classList.add('is-success');
+            } else {
+                pauseButton.innerHTML = '<span class="icon"><i class="fas fa-pause"></i></span><span>Pause</span>';
+                pauseButton.classList.remove('is-success');
+                pauseButton.classList.add('is-warning');
+            }
+        });
+
+        clearButton.addEventListener('click', function() {
+            logsContainer.innerHTML = '';
+        });
+
+        // Initial connection
+        connectWebSocket();
     </script>
-  </body>
+</body>
 </html>

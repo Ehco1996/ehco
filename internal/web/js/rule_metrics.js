@@ -1,562 +1,536 @@
+/**
+ * @file Manages the rule metrics dashboard functionality.
+ */
+
+/**
+ * Configuration for the Rule Metrics module.
+ * @typedef {object} RuleMetricsConfig
+ * @property {string} API_BASE_URL - Base URL for the API.
+ * @property {string} RULE_METRICS_PATH - Path for rule metrics API endpoint.
+ * @property {string} CONFIG_PATH - Path for the config API endpoint.
+ * @property {number} BYTE_TO_MB - Conversion factor from bytes to megabytes.
+ * @property {number} DEFAULT_TIME_WINDOW_MINS - Default time window in minutes.
+ */
+
+/** @type {RuleMetricsConfig} */
 const Config = {
-  API_BASE_URL: '/api/v1',
-  RULE_METRICS_PATH: '/rule_metrics/',
-  BYTE_TO_MB: 1024 * 1024,
-  CHART_COLORS: {
-    connectionCount: 'rgba(255, 99, 132, 1)',
-    handshakeDuration: 'rgba(54, 162, 235, 1)',
-    pingLatency: 'rgba(255, 206, 86, 1)',
-    networkTransmitBytes: 'rgba(75, 192, 192, 1)',
-  },
-  TIME_WINDOW: 30, // minutes
-  AUTO_REFRESH_INTERVAL: 5000, // milliseconds
+    API_BASE_URL: '/api/v1',
+    RULE_METRICS_PATH: '/rule_metrics/',
+    CONFIG_PATH: '/config/',
+    BYTE_TO_MB: 1024 * 1024,
+    DEFAULT_TIME_WINDOW_MINS: 30,
 };
 
+/**
+ * Service for fetching rule metrics and configuration data from the API.
+ */
 class ApiService {
-  static async fetchData(path, params = {}) {
-    const url = new URL(Config.API_BASE_URL + path, window.location.origin);
-    Object.entries(params).forEach(([key, value]) => url.searchParams.append(key, value));
-    try {
-      const response = await fetch(url.toString());
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      return await response.json();
-    } catch (error) {
-      console.error('Error:', error);
-      return null;
-    }
-  }
-
-  static async fetchRuleMetrics(startTs, endTs, label = '', remote = '') {
-    const params = { start_ts: startTs, end_ts: endTs };
-    if (label) params.label = label;
-    if (remote) params.remote = remote;
-    return await this.fetchData(Config.RULE_METRICS_PATH, params);
-  }
-
-  static async fetchConfig() {
-    return await this.fetchData('/config/');
-  }
-  static async fetchLabelsAndRemotes() {
-    const config = await this.fetchConfig();
-    if (!config || !config.relay_configs) {
-      return { labels: [], remotes: [] };
-    }
-
-    const labels = new Set();
-    const remotes = new Set();
-
-    config.relay_configs.forEach((relayConfig) => {
-      if (relayConfig.label) labels.add(relayConfig.label);
-      if (relayConfig.remotes) {
-        relayConfig.remotes.forEach((remote) => remotes.add(remote));
-      }
-    });
-
-    return {
-      labels: Array.from(labels),
-      remotes: Array.from(remotes),
-    };
-  }
-}
-
-class ChartManager {
-  constructor() {
-    this.charts = {};
-  }
-
-  initializeCharts() {
-    this.charts = {
-      connectionCount: this.initChart('connectionCountChart', 'line', 'Connection Count', 'Count'),
-      handshakeDuration: this.initChart('handshakeDurationChart', 'line', 'Handshake Duration', 'ms'),
-      pingLatency: this.initChart('pingLatencyChart', 'line', 'Ping Latency', 'ms'),
-      networkTransmitBytes: this.initStackedAreaChart('networkTransmitBytesChart', 'Network Transmit', 'MB'),
-    };
-  }
-
-  initChart(canvasId, type, title, unit) {
-    const ctx = $(`#${canvasId}`)[0].getContext('2d');
-    const color = Config.CHART_COLORS[canvasId.replace('Chart', '')];
-    const metricType = canvasId.replace('Chart', '');
-
-    return new Chart(ctx, {
-      type: type,
-      data: {
-        labels: [],
-        datasets: [
-          {
-            label: title,
-            borderColor: color,
-            backgroundColor: color.replace('1)', '0.2)'),
-            borderWidth: 2,
-            data: [],
-            pointRadius: 0, // Hide individual points
-            tension: 0.1, // Add slight curve to lines
-          },
-        ],
-      },
-      options: this.getChartOptions(title, unit, metricType),
-    });
-  }
-
-  initStackedAreaChart(canvasId, title, unit) {
-    const ctx = $(`#${canvasId}`)[0].getContext('2d');
-    return new Chart(ctx, {
-      type: 'line',
-      data: {
-        labels: [],
-        datasets: [],
-      },
-      options: this.getStackedAreaChartOptions(title, unit),
-    });
-  }
-
-  getChartOptions(title, unit, metricType) {
-    const baseOptions = {
-      responsive: true,
-      plugins: {
-        title: {
-          display: true,
-          text: title,
-          font: { size: 16, weight: 'bold' },
-        },
-        tooltip: {
-          callbacks: {
-            label: (context) => `${context.dataset.label}: ${context.parsed.y.toFixed(2)} ${unit}`,
-          },
-        },
-      },
-      scales: {
-        x: {
-          type: 'time',
-          time: { unit: 'minute', displayFormats: { minute: 'HH:mm' } },
-          title: { display: true, text: 'Time' },
-        },
-        y: {
-          beginAtZero: true,
-          title: { display: true, text: unit },
-        },
-      },
-    };
-
-    // We'll update suggestedMin and suggestedMax dynamically in updateCharts method
-    switch (metricType) {
-      case 'connectionCount':
-        baseOptions.scales.y.ticks = { stepSize: 1 };
-        baseOptions.scales.y.title.text = 'Number of Connections';
-        break;
-      case 'handshakeDuration':
-        baseOptions.scales.y.title.text = 'Duration (ms)';
-        break;
-      case 'pingLatency':
-        baseOptions.scales.y.title.text = 'Latency (ms)';
-        break;
-      case 'networkTransmitBytes':
-        baseOptions.scales.y = {
-          beginAtZero: true,
-          title: { display: true, text: 'Data Transmitted (MB)' },
-          ticks: {
-            callback: (value) => value.toFixed(2) + ' MB',
-          },
-        };
-        baseOptions.plugins.tooltip = {
-          callbacks: {
-            label: (context) => `${context.dataset.label}: ${context.parsed.y.toFixed(2)} MB`,
-          },
-        };
-        break;
-    }
-
-    return baseOptions;
-  }
-
-  getStackedAreaChartOptions(title, unit) {
-    return {
-      responsive: true,
-      plugins: {
-        title: {
-          display: true,
-          text: title,
-          font: { size: 16, weight: 'bold' },
-        },
-        tooltip: {
-          mode: 'index',
-          intersect: false,
-          callbacks: {
-            label: (context) => `${context.dataset.label}: ${(context.parsed.y / Config.BYTE_TO_MB).toFixed(2)} MB`,
-          },
-        },
-      },
-      scales: {
-        x: {
-          type: 'time',
-          time: { unit: 'minute', displayFormats: { minute: 'HH:mm' } },
-          title: { display: true, text: 'Time' },
-        },
-        y: {
-          stacked: true,
-          beginAtZero: true,
-          title: { display: true, text: 'Data Transmitted (MB)' },
-          ticks: {
-            callback: (value) => (value / Config.BYTE_TO_MB).toFixed(2) + ' MB',
-          },
-        },
-      },
-      interaction: {
-        mode: 'nearest',
-        axis: 'x',
-        intersect: false,
-      },
-    };
-  }
-
-  adjustColor(color, amount) {
-    return color.replace(
-      /rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*(\d+(?:\.\d+)?))?\)/,
-      (match, r, g, b, a) =>
-        `rgba(${Math.min(255, Math.max(0, parseInt(r) + amount))}, ${Math.min(255, Math.max(0, parseInt(g) + amount))}, ${Math.min(
-          255,
-          Math.max(0, parseInt(b) + amount)
-        )}, ${a || 1})`
-    );
-  }
-
-  fillMissingDataPoints(data, startTime, endTime) {
-    const filledData = [];
-    let currentTime = new Date(startTime);
-    const endTimeDate = new Date(endTime);
-
-    while (currentTime <= endTimeDate) {
-      const existingPoint = data.find((point) => Math.abs(point.x.getTime() - currentTime.getTime()) < 60000);
-      if (existingPoint) {
-        filledData.push(existingPoint);
-      } else {
-        filledData.push({ x: new Date(currentTime), y: null });
-      }
-      currentTime.setMinutes(currentTime.getMinutes() + 1);
-    }
-
-    return filledData;
-  }
-
-  updateCharts(metrics, startTime, endTime) {
-    if (!metrics) {
-      Object.values(this.charts).forEach((chart) => {
-        chart.data.datasets = [];
-        chart.update();
-      });
-      return;
-    }
-
-    metrics.sort((a, b) => a.timestamp - b.timestamp);
-    const groupedMetrics = this.groupMetricsByLabelRemote(metrics);
-
-    // Calculate min and max values for each metric type
-    const ranges = this.calculateMetricRanges(groupedMetrics);
-
-    Object.entries(this.charts).forEach(([key, chart]) => {
-      if (key === 'networkTransmitBytes') {
-        chart.data.datasets = [];
-        groupedMetrics.forEach((group, groupIndex) => {
-          const tcpData = [];
-          const udpData = [];
-          group.metrics.forEach((m) => {
-            const timestamp = new Date(m.timestamp * 1000);
-            tcpData.push({ x: timestamp, y: m.tcp_network_transmit_bytes });
-            udpData.push({ x: timestamp, y: m.udp_network_transmit_bytes });
-          });
-          const baseColor = this.getColor(groupIndex);
-          chart.data.datasets.push(
-            {
-              label: `${group.label} - ${group.remote} (TCP)`,
-              borderColor: baseColor,
-              backgroundColor: baseColor.replace('1)', '0.5)'),
-              borderWidth: 1,
-              data: this.fillMissingDataPoints(tcpData, startTime, endTime),
-              fill: true,
-            },
-            {
-              label: `${group.label} - ${group.remote} (UDP)`,
-              borderColor: this.adjustColor(baseColor, -40),
-              backgroundColor: this.adjustColor(baseColor, -40).replace('1)', '0.5)'),
-              borderWidth: 1,
-              data: this.fillMissingDataPoints(udpData, startTime, endTime),
-              fill: true,
+    /**
+     * Generic method to fetch data from an API endpoint.
+     * @param {string} path - The API path.
+     * @param {object} [params={}] - Query parameters.
+     * @returns {Promise<object|null>} The JSON response or null on error.
+     */
+    async fetchData(path, params = {}) {
+        const url = new URL(Config.API_BASE_URL + path, window.location.origin);
+        Object.entries(params).forEach(([key, value]) => url.searchParams.append(key, value));
+        try {
+            const response = await fetch(url.toString());
+            if (!response.ok) {
+                console.error(`HTTP error! status: ${response.status}, path: ${path}`);
+                return null;
             }
-          );
+            return await response.json();
+        } catch (error) {
+            console.error('Error fetching data:', error);
+            return null;
+        }
+    }
+
+    /**
+     * Fetches rule metrics within a specified time range and for given filters.
+     * @param {number} startTs - Start timestamp (Unix seconds).
+     * @param {number} endTs - End timestamp (Unix seconds).
+     * @param {string} [label=''] - Label filter.
+     * @param {string} [remote=''] - Remote filter.
+     * @returns {Promise<Array<object>|null>} An array of metric data or null.
+     */
+    async fetchRuleMetrics(startTs, endTs, label = '', remote = '') {
+        const params = { start_ts: startTs, end_ts: endTs };
+        if (label) params.label = label;
+        if (remote) params.remote = remote;
+        const response = await this.fetchData(Config.RULE_METRICS_PATH, params);
+        return response ? response.data : null; // Assuming API returns { data: [...] }
+    }
+
+    /**
+     * Fetches the application configuration.
+     * @returns {Promise<object|null>} The configuration object or null.
+     */
+    async fetchConfig() {
+        const response = await this.fetchData(Config.CONFIG_PATH);
+        return response ? response.data : null; // Assuming API returns { data: { relay_configs: [...] } }
+    }
+}
+
+/**
+ * Manages Chart.js instances for displaying rule metrics.
+ */
+class ChartManager {
+    constructor() {
+        /** @type {Object.<string, Chart>} */
+        this.charts = {};
+        this.colorIndex = 0;
+        this.groupColors = new Map(); // To store colors for label-remote groups
+    }
+    
+    /**
+     * Predefined list of base colors for chart lines/areas.
+     * @returns {Array<string>}
+     * @private
+     */
+    _getBaseColors() {
+        return [
+            'rgba(255, 99, 132, 1)', 'rgba(54, 162, 235, 1)', 'rgba(255, 206, 86, 1)',
+            'rgba(75, 192, 192, 1)', 'rgba(153, 102, 255, 1)', 'rgba(255, 159, 64, 1)',
+            'rgba(199, 199, 199, 1)', 'rgba(83, 102, 255, 1)', 'rgba(100, 255, 100, 1)',
+            'rgba(255, 100, 100, 1)'
+        ];
+    }
+
+    /**
+     * Gets a color for a group, ensuring consistency for the same group.
+     * @param {string} groupKey - Unique key for the group (e.g., "label-remote").
+     * @returns {string} RGBA color string.
+     * @private
+     */
+    _getColorForGroup(groupKey) {
+        if (!this.groupColors.has(groupKey)) {
+            const baseColors = this._getBaseColors();
+            this.groupColors.set(groupKey, baseColors[this.colorIndex % baseColors.length]);
+            this.colorIndex++;
+        }
+        return this.groupColors.get(groupKey);
+    }
+    
+    /** Resets color index for new data updates to try and reuse colors from the start */
+    _resetColorAssignments() {
+        this.colorIndex = 0;
+        this.groupColors.clear();
+    }
+
+
+    /**
+     * Initializes all charts.
+     */
+    initializeCharts() {
+        this.charts.connectionCount = this._initChart('connectionCountChart', 'Connection Count', 'Count');
+        this.charts.handshakeDuration = this._initChart('handshakeDurationChart', 'Avg Handshake Duration', 'ms');
+        this.charts.pingLatency = this._initChart('pingLatencyChart', 'Avg Ping Latency', 'ms');
+        this.charts.networkTransmitBytes = this._initChart('networkTransmitBytesChart', 'Network Traffic', 'MB', true); // isStacked = true
+    }
+
+    /**
+     * Creates Chart.js options.
+     * @param {string} yLabel - Y-axis label.
+     * @param {string} titleText - Chart title.
+     * @param {string} unit - Unit for tooltips.
+     * @param {boolean} [isStacked=false] - Whether the Y-axis should be stacked.
+     * @returns {object} Chart.js options configuration.
+     * @private
+     */
+    _getChartOptions(yLabel, titleText, unit, isStacked = false) {
+        return {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                x: {
+                    type: 'time',
+                    time: { unit: 'minute', tooltipFormat: 'MMM D, YYYY HH:mm:ss', displayFormats: { minute: 'HH:mm' } },
+                    title: { display: true, text: 'Time' }
+                },
+                y: {
+                    beginAtZero: true,
+                    stacked: isStacked,
+                    title: { display: true, text: yLabel }
+                }
+            },
+            plugins: {
+                title: { display: true, text: titleText, font: { size: 16 } },
+                tooltip: {
+                    mode: 'index',
+                    intersect: false,
+                    callbacks: {
+                        label: function(context) {
+                            let label = context.dataset.label || '';
+                            if (label) label += ': ';
+                            if (context.parsed.y !== null) {
+                                label += context.parsed.y.toFixed(2) + ' ' + unit;
+                            }
+                            return label;
+                        }
+                    }
+                },
+                legend: { display: true, position: 'top' }
+            },
+            interaction: { mode: 'index', intersect: false },
+            elements: { point: { radius: 0 }, line: { tension: 0.1 } } // Hide points, slight curve
+        };
+    }
+    
+    /**
+     * Creates a dataset configuration.
+     * @param {string} label - Dataset label.
+     * @param {string} color - RGBA color string.
+     * @param {boolean} [isFilledArea=false] - Whether to fill the area under the line.
+     * @returns {object} Chart.js dataset configuration.
+     * @private
+     */
+    _getDatasetConfig(label, color, isFilledArea = false) {
+        return {
+            label: label,
+            borderColor: color,
+            backgroundColor: color.replace(/, ?1\)/, isFilledArea ? ', 0.3)' : ', 0)'), // Transparent or semi-transparent fill
+            borderWidth: isFilledArea ? 1 : 2,
+            data: [],
+            fill: isFilledArea,
+        };
+    }
+
+    /**
+     * Initializes a single chart.
+     * @param {string} canvasId - ID of the canvas element.
+     * @param {string} titleBase - Base title for the chart.
+     * @param {string} unit - Unit for tooltips and Y-axis.
+     * @param {boolean} [isStacked=false] - Whether the chart is stacked.
+     * @returns {Chart} The new Chart.js instance.
+     * @private
+     */
+    _initChart(canvasId, titleBase, unit, isStacked = false) {
+        const ctx = document.getElementById(canvasId).getContext('2d');
+        return new Chart(ctx, {
+            type: 'line',
+            data: { datasets: [] }, // Datasets are added dynamically
+            options: this._getChartOptions(unit, titleBase, unit, isStacked)
         });
-      } else {
-        chart.data.datasets = groupedMetrics.map((group, index) => {
-          const data = group.metrics.map((m) => ({
-            x: new Date(m.timestamp * 1000),
-            y: this.getMetricValue(key, m),
-          }));
-          const filledData = this.fillMissingDataPoints(data, startTime, endTime);
-          return {
-            label: `${group.label} - ${group.remote}`,
-            borderColor: this.getColor(index),
-            backgroundColor: this.getColor(index, 0.2),
-            borderWidth: 2,
-            data: filledData,
-          };
+    }
+
+    /**
+     * Generates an array of time labels (moment objects) for the X-axis.
+     * @param {number} startTs - Start timestamp (Unix seconds).
+     * @param {number} endTs - End timestamp (Unix seconds).
+     * @param {number} [intervalMinutes=1] - Interval in minutes.
+     * @returns {Array<moment>} Array of moment objects.
+     * @private
+     */
+    _generateTimeLabels(startTs, endTs, intervalMinutes = 1) {
+        const labels = [];
+        let current = moment.unix(startTs);
+        const end = moment.unix(endTs);
+        while (current.isSameOrBefore(end)) {
+            labels.push(current.clone());
+            current.add(intervalMinutes, 'minutes');
+        }
+        return labels;
+    }
+
+    /**
+     * Fills missing data points in a time series with nulls.
+     * @param {Array<{x: number, y: number}>} data - Sorted array of data points (x is timestamp in ms).
+     * @param {Array<moment>} timeLabels - Array of moment objects representing the complete time scale.
+     * @returns {Array<{x: number, y: number|null}>} Data series with nulls for missing points.
+     */
+    fillMissingDataPoints(data, timeLabels) {
+        if (!data || data.length === 0) {
+            return timeLabels.map(label => ({ x: label.valueOf(), y: null }));
+        }
+        const filledData = [];
+        let dataIndex = 0;
+        timeLabels.forEach(labelMoment => {
+            const labelTs = labelMoment.valueOf();
+            if (dataIndex < data.length && data[dataIndex].x === labelTs) {
+                filledData.push(data[dataIndex]);
+                dataIndex++;
+            } else {
+                filledData.push({ x: labelTs, y: null });
+            }
         });
-      }
-
-      // Update chart options with calculated ranges
-      chart.options.scales.y.suggestedMin = ranges[key].min;
-      chart.options.scales.y.suggestedMax = ranges[key].max;
-
-      chart.update();
-    });
-  }
-
-  calculateMetricRanges(groupedMetrics) {
-    const ranges = {
-      connectionCount: { min: Infinity, max: -Infinity },
-      handshakeDuration: { min: Infinity, max: -Infinity },
-      pingLatency: { min: Infinity, max: -Infinity },
-      networkTransmitBytes: { min: Infinity, max: -Infinity },
-    };
-
-    groupedMetrics.forEach((group) => {
-      group.metrics.forEach((metric) => {
-        // Connection Count
-        const connectionCount = metric.tcp_connection_count + metric.udp_connection_count;
-        ranges.connectionCount.min = Math.min(ranges.connectionCount.min, connectionCount);
-        ranges.connectionCount.max = Math.max(ranges.connectionCount.max, connectionCount);
-
-        // Handshake Duration
-        const handshakeDuration = Math.max(metric.tcp_handshake_duration, metric.udp_handshake_duration);
-        ranges.handshakeDuration.min = Math.min(ranges.handshakeDuration.min, handshakeDuration);
-        ranges.handshakeDuration.max = Math.max(ranges.handshakeDuration.max, handshakeDuration);
-
-        // Ping Latency
-        ranges.pingLatency.min = Math.min(ranges.pingLatency.min, metric.ping_latency);
-        ranges.pingLatency.max = Math.max(ranges.pingLatency.max, metric.ping_latency);
-
-        // Network Transmit Bytes
-        const networkTransmitBytes = (metric.tcp_network_transmit_bytes + metric.udp_network_transmit_bytes) / Config.BYTE_TO_MB;
-        ranges.networkTransmitBytes.min = Math.min(ranges.networkTransmitBytes.min, networkTransmitBytes);
-        ranges.networkTransmitBytes.max = Math.max(ranges.networkTransmitBytes.max, networkTransmitBytes);
-      });
-    });
-
-    // Add some padding to the ranges
-    Object.keys(ranges).forEach((key) => {
-      const range = ranges[key].max - ranges[key].min;
-      ranges[key].min = Math.max(0, ranges[key].min - range * 0.1);
-      ranges[key].max += range * 0.1;
-    });
-
-    return ranges;
-  }
-
-  groupMetricsByLabelRemote(metrics) {
-    const groups = {};
-    metrics.forEach((metric) => {
-      const key = `${metric.label}-${metric.remote}`;
-      if (!groups[key]) {
-        groups[key] = { label: metric.label, remote: metric.remote, metrics: [] };
-      }
-      groups[key].metrics.push(metric);
-    });
-    return Object.values(groups);
-  }
-
-  getMetricValue(metricType, metric) {
-    switch (metricType) {
-      case 'connectionCount':
-        return metric.tcp_connection_count + metric.udp_connection_count;
-      case 'handshakeDuration':
-        return Math.max(metric.tcp_handshake_duration, metric.udp_handshake_duration);
-      case 'pingLatency':
-        return metric.ping_latency;
-      case 'networkTransmitBytes':
-        return (metric.tcp_network_transmit_bytes + metric.udp_network_transmit_bytes) / Config.BYTE_TO_MB;
-      default:
-        return 0;
+        return filledData;
     }
-  }
+    
+    /**
+     * Updates all charts with new metrics data.
+     * @param {Array<object>|null} metricsData - Array of metric objects from the API.
+     * @param {number} startTs - Start timestamp of the metrics range (Unix seconds).
+     * @param {number} endTs - End timestamp of the metrics range (Unix seconds).
+     */
+    updateAllCharts(metricsData, startTs, endTs) {
+        this._resetColorAssignments(); // Reset colors for a new update
+        if (!metricsData) metricsData = [];
 
-  getColor(index, alpha = 1) {
-    const colors = [
-      `rgba(255, 99, 132, ${alpha})`,
-      `rgba(54, 162, 235, ${alpha})`,
-      `rgba(255, 206, 86, ${alpha})`,
-      `rgba(75, 192, 192, ${alpha})`,
-      `rgba(153, 102, 255, ${alpha})`,
-      `rgba(255, 159, 64, ${alpha})`,
-    ];
-    return colors[index % colors.length];
-  }
+        const timeLabels = this._generateTimeLabels(startTs, endTs);
+
+        // Group metrics by label and remote
+        const groupedMetrics = metricsData.reduce((acc, m) => {
+            const key = `${m.label}-${m.remote}`;
+            if (!acc[key]) acc[key] = [];
+            acc[key].push(m);
+            return acc;
+        }, {});
+
+        // Clear existing datasets from all charts
+        Object.values(this.charts).forEach(chart => chart.data.datasets = []);
+        
+        // Populate datasets for each group
+        for (const groupKey in groupedMetrics) {
+            const groupData = groupedMetrics[groupKey].sort((a,b) => a.timestamp - b.timestamp); // Sort by time
+            const [label, remote] = groupKey.split('-');
+            const color = this._getColorForGroup(groupKey);
+
+            // Connection Count
+            const connCountData = groupData.map(m => ({ x: m.timestamp * 1000, y: (m.tcp_connection_count || 0) + (m.udp_connection_count || 0) }));
+            this.charts.connectionCount.data.datasets.push(this._getDatasetConfig(`${label} (${remote})`, color, false));
+            this.charts.connectionCount.data.datasets.slice(-1)[0].data = this.fillMissingDataPoints(connCountData, timeLabels);
+            
+            // Handshake Duration
+            const handshakeData = groupData.map(m => ({ x: m.timestamp * 1000, y: Math.max(m.tcp_handshake_duration || 0, m.udp_handshake_duration || 0) }));
+            this.charts.handshakeDuration.data.datasets.push(this._getDatasetConfig(`${label} (${remote})`, color, false));
+            this.charts.handshakeDuration.data.datasets.slice(-1)[0].data = this.fillMissingDataPoints(handshakeData, timeLabels);
+
+            // Ping Latency
+            const pingData = groupData.map(m => ({ x: m.timestamp * 1000, y: m.ping_latency || 0 }));
+            this.charts.pingLatency.data.datasets.push(this._getDatasetConfig(`${label} (${remote})`, color, false));
+            this.charts.pingLatency.data.datasets.slice(-1)[0].data = this.fillMissingDataPoints(pingData, timeLabels);
+            
+            // Network Transmit Bytes (Stacked Area)
+            const tcpNetData = groupData.map(m => ({ x: m.timestamp * 1000, y: (m.tcp_network_transmit_bytes || 0) / Config.BYTE_TO_MB }));
+            const udpNetData = groupData.map(m => ({ x: m.timestamp * 1000, y: (m.udp_network_transmit_bytes || 0) / Config.BYTE_TO_MB }));
+            
+            const tcpDataset = this._getDatasetConfig(`${label} (${remote}) TCP`, color, true); // isFilledArea = true
+            tcpDataset.data = this.fillMissingDataPoints(tcpNetData, timeLabels);
+            this.charts.networkTransmitBytes.data.datasets.push(tcpDataset);
+            
+            // Slightly different color for UDP of the same group
+            const udpColor = color.replace(/, ?1\)/, ', 0.7)').replace('rgba', 'rgb'); // Make it a bit different and less opaque
+            const udpDataset = this._getDatasetConfig(`${label} (${remote}) UDP`, udpColor, true);
+            udpDataset.data = this.fillMissingDataPoints(udpNetData, timeLabels);
+            this.charts.networkTransmitBytes.data.datasets.push(udpDataset);
+        }
+
+        // Update all charts
+        Object.values(this.charts).forEach(chart => {
+            chart.data.labels = timeLabels.map(m => m.valueOf()); // Pass timestamps for X-axis
+            chart.options.scales.x.min = startTs * 1000;
+            chart.options.scales.x.max = endTs * 1000;
+            chart.update('quiet');
+        });
+    }
 }
 
-class FilterManager {
-  constructor(chartManager, dateRangeManager) {
-    this.chartManager = chartManager;
-    this.dateRangeManager = dateRangeManager;
-    this.$labelFilter = $('#labelFilter');
-    this.$remoteFilter = $('#remoteFilter');
-    this.relayConfigs = [];
-    this.currentStartDate = null;
-    this.currentEndDate = null;
-    this.setupEventListeners();
-    this.loadFilters();
-  }
 
-  setupEventListeners() {
-    this.$labelFilter.on('change', () => this.onLabelChange());
-    this.$remoteFilter.on('change', () => this.applyFilters());
-  }
-
-  async loadFilters() {
-    const config = await ApiService.fetchConfig();
-    if (config && config.relay_configs) {
-      this.relayConfigs = config.relay_configs;
-      this.populateLabelFilter();
-      this.onLabelChange(); // Initialize remotes for the first label
+/**
+ * Manages filter selection for rule metrics.
+ */
+class FilterManagerRule {
+    /**
+     * @param {ApiService} apiService
+     * @param {ChartManager} chartManager
+     * @param {DateRangeManagerRule} dateRangeManager
+     */
+    constructor(apiService, chartManager, dateRangeManager) {
+        this.apiService = apiService;
+        this.chartManager = chartManager;
+        this.dateRangeManager = dateRangeManager;
+        this.$labelFilter = document.getElementById('labelFilter');
+        this.$remoteFilter = document.getElementById('remoteFilter');
+        this.configData = null; // To store fetched config
     }
-  }
 
-  populateLabelFilter() {
-    const labels = [...new Set(this.relayConfigs.map((config) => config.label))];
-    this.populateFilter(this.$labelFilter, labels);
-  }
+    async init() {
+        await this._populateLabelFilter();
+        this.$labelFilter.addEventListener('change', () => this._onLabelChange());
+        this.$remoteFilter.addEventListener('change', () => this._triggerDataRefresh());
+        // Initial data refresh will be triggered by DateRangeManager after it's ready
+    }
 
-  onLabelChange() {
-    const selectedLabel = this.$labelFilter.val();
-    const remotes = this.getRemotesForLabel(selectedLabel);
-    this.populateFilter(this.$remoteFilter, remotes);
-    this.applyFilters();
-  }
+    async _populateLabelFilter() {
+        this.configData = await this.apiService.fetchConfig();
+        if (!this.configData || !this.configData.relay_configs) {
+            console.error('Failed to fetch or parse config for filters.');
+            return;
+        }
+        const labels = [...new Set(this.configData.relay_configs.map(rc => rc.label))].sort();
+        this.$labelFilter.innerHTML = '<option value="">All</option>'; // Reset
+        labels.forEach(label => {
+            const option = document.createElement('option');
+            option.value = label;
+            option.textContent = label;
+            this.$labelFilter.appendChild(option);
+        });
+        this._updateRemoteFilter(); // Populate remotes for "All" or first label
+    }
 
-  getRemotesForLabel(label) {
-    const config = this.relayConfigs.find((c) => c.label === label);
-    return config ? config.remotes : [];
-  }
+    _updateRemoteFilter() {
+        const selectedLabel = this.$labelFilter.value;
+        let remotes = new Set();
+        if (this.configData && this.configData.relay_configs) {
+            this.configData.relay_configs.forEach(rc => {
+                if (!selectedLabel || rc.label === selectedLabel) {
+                    (rc.remotes || []).forEach(remote => remotes.add(remote.address || remote)); // Assuming remote can be obj or string
+                }
+            });
+        }
+        this.$remoteFilter.innerHTML = '<option value="">All</option>'; // Reset
+        Array.from(remotes).sort().forEach(remote => {
+            const option = document.createElement('option');
+            option.value = remote;
+            option.textContent = remote;
+            this.$remoteFilter.appendChild(option);
+        });
+    }
 
-  populateFilter($select, options) {
-    $select.empty().append($('<option>', { value: '', text: 'All' }));
-    options.forEach((option) => {
-      $select.append($('<option>', { value: option, text: option }));
-    });
-  }
+    _onLabelChange() {
+        this._updateRemoteFilter();
+        this._triggerDataRefresh();
+    }
 
-  async applyFilters() {
-    const label = this.$labelFilter.val();
-    const remote = this.$remoteFilter.val();
+    async _triggerDataRefresh() {
+        const filters = this.getCurrentFilters();
+        const range = this.dateRangeManager.getCurrentDateRange();
+        if (!range.start || !range.end) {
+            console.warn("Date range not yet available for data refresh.");
+            return;
+        }
+        const startTs = Math.floor(range.start.getTime() / 1000);
+        const endTs = Math.floor(range.end.getTime() / 1000);
+        
+        const metricsData = await this.apiService.fetchRuleMetrics(startTs, endTs, filters.label, filters.remote);
+        this.chartManager.updateAllCharts(metricsData, startTs, endTs);
+    }
 
-    // 使用当前保存的日期范围，如果没有则使用默认的30分钟
-    const endDate = this.currentEndDate || new Date();
-    const startDate = this.currentStartDate || new Date(endDate - Config.TIME_WINDOW * 60 * 1000);
-
-    const metrics = await ApiService.fetchRuleMetrics(
-      Math.floor(startDate.getTime() / 1000),
-      Math.floor(endDate.getTime() / 1000),
-      label,
-      remote
-    );
-
-    this.chartManager.updateCharts(metrics.data, startDate, endDate);
-  }
-
-  setDateRange(start, end) {
-    this.currentStartDate = start;
-    this.currentEndDate = end;
-  }
+    getCurrentFilters() {
+        return {
+            label: this.$labelFilter.value,
+            remote: this.$remoteFilter.value
+        };
+    }
 }
 
-class DateRangeManager {
-  constructor(chartManager, filterManager) {
-    this.chartManager = chartManager;
-    this.filterManager = filterManager;
-    this.$dateRangeDropdown = $('#dateRangeDropdown');
-    this.$dateRangeButton = $('#dateRangeButton');
-    this.$dateRangeText = $('#dateRangeText');
-    this.$dateRangeInput = $('#dateRangeInput');
-    this.setupEventListeners();
-  }
-
-  setupEventListeners() {
-    this.$dateRangeDropdown.find('.dropdown-item[data-range]').on('click', (e) => this.handlePresetDateRange(e));
-    this.$dateRangeButton.on('click', () => this.$dateRangeDropdown.toggleClass('is-active'));
-    $(document).on('click', (e) => {
-      if (!this.$dateRangeDropdown.has(e.target).length) {
-        this.$dateRangeDropdown.removeClass('is-active');
-      }
-    });
-    this.initializeDatePicker();
-  }
-
-  handlePresetDateRange(e) {
-    e.preventDefault();
-    const range = $(e.currentTarget).data('range');
-    const [start, end] = this.calculateDateRange(range);
-    this.fetchAndUpdateCharts(start, end);
-    this.$dateRangeText.text($(e.currentTarget).text());
-    this.$dateRangeDropdown.removeClass('is-active');
-  }
-
-  calculateDateRange(range) {
-    const now = new Date();
-    const start = new Date(now - this.getMillisecondsFromRange(range));
-    return [start, now];
-  }
-
-  getMillisecondsFromRange(range) {
-    const rangeMap = {
-      '30m': 30 * 60 * 1000,
-      '1h': 60 * 60 * 1000,
-      '3h': 3 * 60 * 60 * 1000,
-      '6h': 6 * 60 * 60 * 1000,
-      '12h': 12 * 60 * 60 * 1000,
-      '24h': 24 * 60 * 60 * 1000,
-      '7d': 7 * 24 * 60 * 60 * 1000,
-    };
-    return rangeMap[range] || 30 * 60 * 1000; // Default to 30 minutes
-  }
-
-  initializeDatePicker() {
-    flatpickr(this.$dateRangeInput[0], {
-      mode: 'range',
-      enableTime: true,
-      dateFormat: 'Y-m-d H:i',
-      onChange: (selectedDates) => this.handleDatePickerChange(selectedDates),
-    });
-  }
-
-  handleDatePickerChange(selectedDates) {
-    if (selectedDates.length === 2) {
-      const [start, end] = selectedDates;
-      this.fetchAndUpdateCharts(start, end);
-      this.$dateRangeText.text(`${start.toLocaleString()} - ${end.toLocaleString()}`);
-      this.$dateRangeDropdown.removeClass('is-active');
+/**
+ * Manages date range selection for rule metrics.
+ */
+class DateRangeManagerRule {
+    constructor(apiService, chartManager, filterManager) { // FilterManager needed to trigger refresh
+        this.apiService = apiService; // May not be used directly if FilterManager handles API calls
+        this.chartManager = chartManager; // May not be used directly
+        this.filterManager = filterManager;
+        this.$dateRangeDropdown = document.getElementById('dateRangeDropdownRule');
+        this.$dateRangeText = document.getElementById('dateRangeTextRule');
+        this.$dateRangeInput = document.getElementById('dateRangeInputRule');
+        this.flatpickrInstance = null;
+        this.currentRange = this._calculateDateRange(Config.DEFAULT_TIME_WINDOW_MINS + 'm'); // Initial default
     }
-  }
 
-  async fetchAndUpdateCharts(start, end) {
-    this.filterManager.setDateRange(start, end);
-    await this.filterManager.applyFilters();
-  }
+    init() {
+        const presetLinks = this.$dateRangeDropdown.querySelectorAll('.dropdown-item[data-range]');
+        presetLinks.forEach(link => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                const rangeKey = e.currentTarget.dataset.range;
+                this.$dateRangeText.textContent = e.currentTarget.textContent;
+                this.handlePresetRange(rangeKey);
+                this.$dateRangeDropdown.classList.remove('is-active');
+            });
+        });
+
+        const triggerButton = this.$dateRangeDropdown.querySelector('.button');
+        triggerButton.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.$dateRangeDropdown.classList.toggle('is-active');
+        });
+         document.addEventListener('click', (e) => {
+            if (!this.$dateRangeDropdown.contains(e.target)) {
+                this.$dateRangeDropdown.classList.remove('is-active');
+            }
+        });
+
+        this.flatpickrInstance = flatpickr(this.$dateRangeInput, {
+            mode: 'range', enableTime: true, dateFormat: 'Y-m-d H:i',
+            onChange: (selectedDates) => {
+                if (selectedDates.length === 2) {
+                    this.handleCustomRange(selectedDates);
+                    this.$dateRangeText.textContent = `${moment(selectedDates[0]).format('MMM D, HH:mm')} - ${moment(selectedDates[1]).format('MMM D, HH:mm')}`;
+                    this.$dateRangeDropdown.classList.remove('is-active');
+                }
+            },
+        });
+        this.$dateRangeInput.addEventListener('click', e => e.stopPropagation());
+        
+        // Set initial text for default range
+        const defaultRangeKey = Config.DEFAULT_TIME_WINDOW_MINS === 30 ? '30m' : (Config.DEFAULT_TIME_WINDOW_MINS + 'm');
+        const defaultRangeLink = this.$dateRangeDropdown.querySelector(`.dropdown-item[data-range="${defaultRangeKey}"]`);
+        if (defaultRangeLink) this.$dateRangeText.textContent = defaultRangeLink.textContent;
+
+    }
+
+    handlePresetRange(rangeKey) {
+        this.currentRange = this._calculateDateRange(rangeKey);
+        this.filterManager._triggerDataRefresh();
+    }
+
+    handleCustomRange(selectedDates) {
+        this.currentRange = { start: selectedDates[0], end: selectedDates[1] };
+        this.filterManager._triggerDataRefresh();
+    }
+
+    _calculateDateRange(rangeKey) {
+        const end = new Date();
+        let start = new Date();
+        const durationMatch = rangeKey.match(/^(\d+)([mhd])$/); // 30m, 1h, 7d
+        if (durationMatch) {
+            const value = parseInt(durationMatch[1]);
+            const unit = durationMatch[2];
+            if (unit === 'm') start.setMinutes(end.getMinutes() - value);
+            else if (unit === 'h') start.setHours(end.getHours() - value);
+            else if (unit === 'd') start.setDate(end.getDate() - value);
+        } else { // Default if parse fails
+            start.setMinutes(end.getMinutes() - Config.DEFAULT_TIME_WINDOW_MINS);
+        }
+        return { start, end };
+    }
+    
+    getCurrentDateRange() {
+        return this.currentRange;
+    }
 }
 
+/**
+ * Main module for the Rule Metrics dashboard.
+ */
 class RuleMetricsModule {
-  constructor() {
-    this.chartManager = new ChartManager();
-    this.filterManager = new FilterManager(this.chartManager);
-    this.dateRangeManager = new DateRangeManager(this.chartManager, this.filterManager);
-    this.filterManager.dateRangeManager = this.dateRangeManager;
-  }
+    constructor() {
+        this.apiService = new ApiService();
+        this.chartManager = new ChartManager();
+        // Order of instantiation matters for dependencies
+        this.dateRangeManager = new DateRangeManagerRule(this.apiService, this.chartManager, null); // filterManager is set later
+        this.filterManager = new FilterManagerRule(this.apiService, this.chartManager, this.dateRangeManager);
+        this.dateRangeManager.filterManager = this.filterManager; // Circular dependency resolution
+    }
 
-  init() {
-    this.chartManager.initializeCharts();
-    this.filterManager.applyFilters();
-  }
+    async init() {
+        this.chartManager.initializeCharts();
+        this.dateRangeManager.init(); // Sets up UI and default range
+        await this.filterManager.init(); // Populates filters
+        
+        // Initial data load after everything is set up
+        await this.filterManager._triggerDataRefresh(); 
+    }
 }
 
-// Initialize when the DOM is ready
-$(document).ready(() => {
-  const ruleMetricsModule = new RuleMetricsModule();
-  ruleMetricsModule.init();
+// Initialize the module when the DOM is fully loaded.
+document.addEventListener('DOMContentLoaded', () => {
+    const ruleMetricsModule = new RuleMetricsModule();
+    ruleMetricsModule.init().catch(error => {
+        console.error("Failed to initialize Rule Metrics module:", error);
+    });
 });

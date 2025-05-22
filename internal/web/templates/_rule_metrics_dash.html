@@ -1,82 +1,85 @@
-<div class="card" id="rule-metrics-card">
-  <header class="card-header is-flex is-flex-wrap-wrap">
-    <p class="card-header-title has-text-centered">Rule Metrics</p>
-    <div class="card-header-icon is-flex-grow-1 is-flex is-justify-content-space-between">
-      <div class="field is-horizontal mr-2">
-        <div class="field-label is-small mr-2">
-          <label class="label" for="labelFilter">Label:</label>
-        </div>
-        <div class="field-body">
-          <div class="field">
+<div class="columns is-vcentered is-variable is-2 mb-4">
+    <div class="column is-narrow">
+        <div class="field">
+            <label class="label">Label:</label>
             <div class="control">
-              <div class="select is-small">
-                <select id="labelFilter" aria-label="Filter by label">
-                  <option value="">All Labels</option>
-                </select>
-              </div>
+                <div class="select is-small">
+                    <select id="labelFilter">
+                        <option value="">All</option>
+                        <!-- Options will be populated by JS -->
+                    </select>
+                </div>
             </div>
-          </div>
         </div>
-      </div>
-      <div class="field is-horizontal mr-2">
-        <div class="field-label is-small mr-2">
-          <label class="label" for="remoteFilter">Remote:</label>
-        </div>
-        <div class="field-body">
-          <div class="field">
+    </div>
+    <div class="column is-narrow">
+        <div class="field">
+            <label class="label">Remote:</label>
             <div class="control">
-              <div class="select is-small">
-                <select id="remoteFilter" aria-label="Filter by remote">
-                  <option value="">All Remotes</option>
-                </select>
-              </div>
+                <div class="select is-small">
+                    <select id="remoteFilter">
+                        <option value="">All</option>
+                        <!-- Options will be populated by JS -->
+                    </select>
+                </div>
             </div>
-          </div>
         </div>
-      </div>
-      <div class="dropdown" id="dateRangeDropdown">
-        <div class="dropdown-trigger">
-          <button class="button is-small" aria-haspopup="true" aria-controls="dropdown-menu" id="dateRangeButton">
-            <span id="dateRangeText">Select date range</span>
-            <span class="icon is-small">
-              <i class="fas fa-angle-down" aria-hidden="true"></i>
-            </span>
-          </button>
-        </div>
-        <div class="dropdown-menu" id="dropdown-menu" role="menu">
-          <div class="dropdown-content">
-            <a href="#" class="dropdown-item" data-range="30m">Last 30 minutes</a>
-            <a href="#" class="dropdown-item" data-range="1h">Last 1 hour</a>
-            <a href="#" class="dropdown-item" data-range="3h">Last 3 hours</a>
-            <a href="#" class="dropdown-item" data-range="6h">Last 6 hours</a>
-            <a href="#" class="dropdown-item" data-range="12h">Last 12 hours</a>
-            <a href="#" class="dropdown-item" data-range="24h">Last 24 hours</a>
-            <a href="#" class="dropdown-item" data-range="7d">Last 7 days</a>
-            <hr class="dropdown-divider" />
-            <a href="#" class="dropdown-item" id="dateRangeInput">Custom range</a>
-          </div>
-        </div>
-      </div>
     </div>
-  </header>
-  <div class="card-content">
-    <div class="content">
-      <div class="columns is-multiline">
-        <div class="column is-6">
-          <canvas id="connectionCountChart"></canvas>
+    <div class="column">
+        <div class="field">
+            <label class="label">Date Range:</label>
+            <div class="control">
+                <div class="dropdown" id="dateRangeDropdownRule">
+                    <div class="dropdown-trigger">
+                        <button class="button is-small" aria-haspopup="true" aria-controls="dropdown-menu-rule">
+                            <span id="dateRangeTextRule">Last 30 Minutes</span>
+                            <span class="icon is-small"><i class="fas fa-angle-down" aria-hidden="true"></i></span>
+                        </button>
+                    </div>
+                    <div class="dropdown-menu" id="dropdown-menu-rule" role="menu">
+                        <div class="dropdown-content">
+                            <a href="#" class="dropdown-item" data-range="30m">Last 30 Minutes</a>
+                            <a href="#" class="dropdown-item" data-range="1h">Last 1 Hour</a>
+                            <a href="#" class="dropdown-item" data-range="3h">Last 3 Hours</a>
+                            <a href="#" class="dropdown-item" data-range="6h">Last 6 Hours</a>
+                            <a href="#" class="dropdown-item" data-range="12h">Last 12 Hours</a>
+                            <a href="#" class="dropdown-item" data-range="24h">Last 24 Hours</a>
+                            <a href="#" class="dropdown-item" data-range="7d">Last 7 Days</a>
+                            <hr class="dropdown-divider">
+                            <div class="dropdown-item">
+                                <input class="input is-small" type="text" id="dateRangeInputRule" placeholder="Custom range">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
-        <div class="column is-6">
-          <canvas id="handshakeDurationChart"></canvas>
-        </div>
-        <div class="column is-6">
-          <canvas id="pingLatencyChart"></canvas>
-        </div>
-        <div class="column is-6">
-          <canvas id="networkTransmitBytesChart"></canvas>
-        </div>
-      </div>
     </div>
-  </div>
 </div>
 
-<script src="/js/rule_metrics.js"></script>
+<div class="columns is-multiline mt-4">
+    <div class="column is-half">
+        <div class="box">
+            <h3 class="title is-5 has-text-centered">Connection Count</h3>
+            <canvas id="connectionCountChart"></canvas>
+        </div>
+    </div>
+    <div class="column is-half">
+        <div class="box">
+            <h3 class="title is-5 has-text-centered">Handshake Duration (ms)</h3>
+            <canvas id="handshakeDurationChart"></canvas>
+        </div>
+    </div>
+    <div class="column is-half">
+        <div class="box">
+            <h3 class="title is-5 has-text-centered">Ping Latency (ms)</h3>
+            <canvas id="pingLatencyChart"></canvas>
+        </div>
+    </div>
+    <div class="column is-half">
+        <div class="box">
+            <h3 class="title is-5 has-text-centered">Network Transmit (MB)</h3>
+            <canvas id="networkTransmitBytesChart"></canvas>
+        </div>
+    </div>
+</div>

@@ -1,113 +1,138 @@
 <!DOCTYPE html>
 <html lang="en">
-  {{template "_head.html" .}}
-  <body>
-    {{ template "_navbar.html" . }}
+<head>
+    {{template "_head.html" .}}
+</head>
+<body>
+    {{template "_navbar.html" .}}
 
-    <div class="container">
-      <div class="columns is-variable is-8 is-flex-grow">
-        <div class="column is-flex">
-          <div class="card is-flex is-flex-direction-column is-flex-grow-1">
-            <header class="card-header">
-              <p class="card-header-title has-text-centered">Build Info</p>
-            </header>
-            <div class="card-content is-flex-grow-1">
-              <div class="content">
-                <ul>
-                  <li>Version: {{.Version}}</li>
-                  <li>GitBranch: {{.GitBranch}}</li>
-                  <li>GitRevision: {{.GitRevision}}</li>
-                  <li>BuildTime: {{.BuildTime}}</li>
-                  <li>StartTime: {{.StartTime}}</li>
-                </ul>
-              </div>
-              <div class="mt-4">
-                <p>Latest Version: <span id="latestVersion">Checking...</span></p>
-                <p id="updateMessage" style="display: none;"></p>
-              </div>
+    <section class="section main-content-area">
+        <div class="container">
+            <div class="columns">
+                <div class="column is-one-third">
+                    <div class="card">
+                        <header class="card-header">
+                            <p class="card-header-title">Build Information</p>
+                        </header>
+                        <div class="card-content">
+                            <div class="content">
+                                <ul>
+                                    <li>Version: {{.Version}}</li>
+                                    <li>GitBranch: {{.GitBranch}}</li>
+                                    <li>GitRevision: {{.GitRevision}}</li>
+                                    <li>BuildTime: {{.BuildTime}}</li>
+                                    <li>StartTime: {{.StartTime}}</li>
+                                </ul>
+                                <hr>
+                                <p>Latest Version: <span id="latestVersion">Checking...</span></p>
+                                <p id="updateMessage" class="has-text-info" style="display: none;"></p>
+                            </div>
+                        </div>
+                        <footer class="card-footer">
+                            <button class="button is-primary card-footer-item" id="reloadButton">
+                                <span class="icon"><i class="fas fa-sync-alt"></i></span>
+                                <span>Reload Configuration</span>
+                            </button>
+                            <button class="button is-info card-footer-item" id="checkUpdateButton">
+                                <span class="icon"><i class="fas fa-cloud-download-alt"></i></span>
+                                <span>Check for Updates</span>
+                            </button>
+                        </footer>
+                    </div>
+                </div>
+                <div class="column is-two-thirds">
+                    <h2 class="title is-4 has-text-centered">Node Metrics</h2>
+                    {{template "_node_metrics_dash.html" .}}
+                </div>
             </div>
-            <footer class="card-footer">
-              <button class="button is-danger is-outlined card-footer-item" id="reloadButton">
-                <span class="icon"><i class="fas fa-sync-alt"></i></span>
-                <span>Reload Configuration</span>
-              </button>
-              <button class="button is-info is-outlined card-footer-item" id="checkUpdateButton">
-                <span class="icon"><i class="fas fa-download"></i></span>
-                <span>Check for Updates</span>
-              </button>
-            </footer>
-          </div>
         </div>
-      </div>
-      <!-- metrics -->
-      {{template "_node_metrics_dash.html" .}}
-    </div>
+    </section>
 
-    <!-- Footer -->
-    <div class="hero-foot">
-      <footer class="footer">
+    <footer class="footer">
         <div class="content has-text-centered">
-          <a href="https://github.com/Ehco1996/ehco"><i class="fab fa-github"></i> Source code</a>
+            <p>
+                <a href="https://github.com/Ehco1996/ehco" target="_blank">
+                    <span class="icon"><i class="fab fa-github"></i></span>
+                    <span>Ehco Source Code</span>
+                </a>
+            </p>
+            <p>&copy; 2024 Ehco Relay. All rights reserved.</p>
         </div>
-      </footer>
-    </div>
+    </footer>
 
     <script>
-      $(document).ready(function () {
-        // Add this function to compare version strings
-        function compareVersions(v1, v2) {
-          const v1Parts = v1.replace('v', '').split('.');
-          const v2Parts = v2.replace('v', '').split('.');
-          for (let i = 0; i < Math.max(v1Parts.length, v2Parts.length); i++) {
-            const v1Part = parseInt(v1Parts[i] || 0);
-            const v2Part = parseInt(v2Parts[i] || 0);
-            if (v1Part > v2Part) return 1;
-            if (v1Part < v2Part) return -1;
-          }
-          return 0;
-        }
+        $(document).ready(function () {
+            // Function to compare version strings (handles 'v' prefix)
+            function compareVersions(v1, v2) {
+                const v1Parts = v1.replace(/^v/, '').split('.');
+                const v2Parts = v2.replace(/^v/, '').split('.');
+                for (let i = 0; i < Math.max(v1Parts.length, v2Parts.length); i++) {
+                    const v1Part = parseInt(v1Parts[i] || 0, 10);
+                    const v2Part = parseInt(v2Parts[i] || 0, 10);
+                    if (v1Part > v2Part) return 1;
+                    if (v1Part < v2Part) return -1;
+                }
+                return 0;
+            }
 
-        // Reload configuration button click event
-        $('#reloadButton').click(function () {
-          $.ajax({
-            type: 'POST',
-            url: '/api/v1/config/reload/',
-            success: function (response) {
-              alert('Reload config success. Response: ' + response);
-            },
-            error: function (response) {
-              alert('Failed to reload config. Response: ' + response.responseText);
-            },
-          });
-        });
+            // Reload configuration button click event
+            $('#reloadButton').click(function () {
+                $(this).addClass('is-loading');
+                $.ajax({
+                    type: 'POST',
+                    url: '/api/v1/config/reload/',
+                    success: function (response) {
+                        alert('Configuration reloaded successfully!');
+                        // Optionally, refresh parts of the page or show more detailed success
+                    },
+                    error: function (xhr) {
+                        alert('Failed to reload configuration: ' + (xhr.responseJSON && xhr.responseJSON.error ? xhr.responseJSON.error : xhr.responseText));
+                    },
+                    complete: function () {
+                        $('#reloadButton').removeClass('is-loading');
+                    }
+                });
+            });
 
-        // Check for updates button click event
-        $('#checkUpdateButton').click(function () {
-          $.ajax({
-            url: 'https://api.github.com/repos/Ehco1996/ehco/releases/latest',
-            type: 'GET',
-            dataType: 'json',
-            success: function (data) {
-              var latestVersion = data.tag_name;
-              $('#latestVersion').text(latestVersion);
-              var currentVersion = '{{.Version}}';
-              if (compareVersions(latestVersion, currentVersion) > 0) {
-                var releaseUrl = data.html_url;
-                var updateMessage = 'New version available: ' + latestVersion + 
-                  '. Please update manually from: <a href="' + releaseUrl + '" target="_blank">' + releaseUrl + '</a>';
-                $('#updateMessage').html(updateMessage).show();
-                alert('New version available: ' + latestVersion + '. Please check the update message for details.');
-              } else {
-                $('#updateMessage').hide();
-                alert('You have the latest version');
-              }
-            },
-            error: function () {
-              alert('Failed to check for updates. Please try again later.');
-            },
-          });
+            // Check for updates button click event
+            $('#checkUpdateButton').click(function () {
+                $(this).addClass('is-loading');
+                $('#latestVersion').text('Checking...');
+                $('#updateMessage').hide().removeClass('is-success is-danger').empty();
+
+                $.ajax({
+                    url: 'https://api.github.com/repos/Ehco1996/ehco/releases/latest',
+                    type: 'GET',
+                    dataType: 'json',
+                    success: function (data) {
+                        var latestVersion = data.tag_name;
+                        $('#latestVersion').text(latestVersion);
+                        var currentVersion = '{{.Version}}'; 
+
+                        if (compareVersions(latestVersion, currentVersion) > 0) {
+                            var releaseUrl = data.html_url;
+                            var updateText = 'New version ' + latestVersion + ' available. Please update from: <a href="' + releaseUrl + '" target="_blank">' + releaseUrl + '</a>';
+                            $('#updateMessage').html(updateText).addClass('is-info').show();
+                            // Consider a more noticeable alert like a Bulma notification if desired
+                            // alert('New version available: ' + latestVersion + '. Please check the update message for details.');
+                        } else {
+                             $('#updateMessage').text('You are running the latest version (' + currentVersion + ').').addClass('is-success').show();
+                            // alert('You have the latest version.');
+                        }
+                    },
+                    error: function () {
+                        $('#latestVersion').text('Error');
+                        $('#updateMessage').text('Failed to check for updates. Please try again later.').addClass('is-danger').show();
+                        // alert('Failed to check for updates. Please try again later.');
+                    },
+                    complete: function () {
+                        $('#checkUpdateButton').removeClass('is-loading');
+                    }
+                });
+            });
+            // Trigger check for updates on page load, but perhaps with a small delay or less intrusive UI update
+            // For now, let's keep it manual via button click.
         });
-      });
     </script>
-  </body>
+</body>
 </html>

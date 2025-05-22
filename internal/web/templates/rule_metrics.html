@@ -1,14 +1,17 @@
 <!DOCTYPE html>
 <html lang="en">
-  {{template "_head.html" .}}
-  <body>
-    {{ template "_navbar.html" . }}
-    <section class="section">
-      <div class="container">
-        <h1 class="title">Rule Metrics</h1>
+<head>
+    {{template "_head.html" .}}
+</head>
+<body>
+    {{template "_navbar.html" .}}
 
-        {{template "_rule_metrics_dash.html" .}}
-      </div>
+    <section class="section main-content-area">
+        <div class="container-fluid">
+            <h1 class="title is-3 has-text-centered">Rule Application Metrics</h1>
+            
+            {{template "_rule_metrics_dash.html" .}}
+        </div>
     </section>
-  </body>
+</body>
 </html>

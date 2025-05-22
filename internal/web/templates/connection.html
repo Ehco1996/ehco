@@ -1,12 +1,15 @@
 <!DOCTYPE html>
 <html lang="en">
+<head>
     {{template "_head.html" .}}
+</head>
 <body>
-    {{ template "_navbar.html" . }}
-    <section class="section">
+    {{template "_navbar.html" .}}
+
+    <section class="section main-content-area">
         <div class="container">
-            <h1 class="title">Connections</h1>
-            <h2 class="subtitle">Total: {{.AllCount}}</h2>
+            <h1 class="title is-3 has-text-centered">Manage Connections</h1>
+            <h2 class="subtitle is-5 has-text-centered mb-5">Total Connections: {{.AllCount}}</h2>
 
             <div class="tabs is-boxed is-centered">
                 <ul>
@@ -19,58 +22,82 @@
                 </ul>
             </div>
 
-            {{if gt (len .ConnectionList) 0}}
-                <div class="table-container">
-                    <table class="table is-striped is-hoverable is-fullwidth is-responsive">
-                        <thead>
-                            <tr>
-                                <th>Label</th>
-                                <th>Type</th>
-                                <th>Flow</th>
-                                <th>Stats</th>
-                                <th>Time</th>
-                            </tr>
-                        </thead>
-                        <tbody>
+            <div class="table-container">
+                <table class="table is-fullwidth is-striped is-hoverable is-bordered">
+                    <thead>
+                        <tr>
+                            <th>Label</th>
+                            <th>Type</th>
+                            <th>Flow</th>
+                            <th>Stats</th>
+                            <th>Time</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {{if not .ConnectionList}}
+                        <tr>
+                            <td colspan="5" class="has-text-centered">No {{.ConnType}} connections to display.</td>
+                        </tr>
+                        {{else}}
                             {{range .ConnectionList}}
                             <tr>
-                                <td data-label="Label">{{.RelayLabel}}</td>
-                                <td data-label="Type">{{.ConnType}}</td>
-                                <td data-label="Flow">{{.GetFlow}}</td>
-                                <td data-label="Stats">{{.Stats}}</td>
-                                <td data-label="Time">{{.GetTime}}</td>
+                                <td>{{.RelayLabel}}</td>
+                                <td>{{.ConnType}}</td>
+                                <td>{{.GetFlow}}</td>
+                                <td>{{.Stats}}</td>
+                                <td>{{.GetTime}}</td>
                             </tr>
                             {{end}}
-                        </tbody>
-                    </table>
-                </div>
-            {{else}}
-                <div class="notification is-info is-light">
-                    <p class="has-text-centered">No {{.ConnType}} connections available.</p>
-                </div>
-            {{end}}
+                        {{end}}
+                    </tbody>
+                </table>
+            </div>
 
             {{if gt .TotalPage 1}}
-            <nav class="pagination is-centered" role="navigation" aria-label="pagination" style="margin-top: 20px;">
+            <nav class="pagination is-centered mt-5" role="navigation" aria-label="pagination">
                 <a class="pagination-previous" {{if le .CurrentPage 1}}disabled{{end}}
                    href="?conn_type={{.ConnType}}&page={{.Prev}}&page_size={{.PageSize}}">Previous</a>
                 <a class="pagination-next" {{if ge .CurrentPage .TotalPage}}disabled{{end}}
                    href="?conn_type={{.ConnType}}&page={{.Next}}&page_size={{.PageSize}}">Next page</a>
                 <ul class="pagination-list">
-                    {{if gt .CurrentPage 2}}
+                    {{if gt .CurrentPage 3}}
                         <li><a class="pagination-link" href="?conn_type={{.ConnType}}&page=1&page_size={{.PageSize}}">1</a></li>
-                        {{if gt .CurrentPage 3}}<li><span class="pagination-ellipsis">&hellip;</span></li>{{end}}
+                        <li><span class="pagination-ellipsis">&hellip;</span></li>
+                    {{else}}
+                        {{range $i, $p := Iterate .CurrentPage 1 .TotalPage 3}} {{/* Show first 3 pages if current is 1,2 or 3 */}}
+                            {{if lt (add $i 1) $.CurrentPage}}
+                                <li><a class="pagination-link" href="?conn_type={{$.ConnType}}&page={{add $i 1}}&page_size={{$.PageSize}}">{{add $i 1}}</a></li>
+                            {{end}}
+                        {{end}}
                     {{end}}
+
                     {{if gt .CurrentPage 1}}
-                        <li><a class="pagination-link" href="?conn_type={{.ConnType}}&page={{sub .CurrentPage 1}}&page_size={{.PageSize}}">{{sub .CurrentPage 1}}</a></li>
+                        {{if ne .CurrentPage 2}}{{if ne .CurrentPage 3}}{{if ne .CurrentPage 1}} {{/* Avoid repeating if already shown by loop above */}}
+                             {{if gt .CurrentPage 3}} {{/* Only show prev if current page is > 3 */}}
+                                <li><a class="pagination-link" href="?conn_type={{.ConnType}}&page={{sub .CurrentPage 1}}&page_size={{.PageSize}}">{{sub .CurrentPage 1}}</a></li>
+                             {{end}}
+                        {{end}}{{end}}{{end}}
                     {{end}}
+                    
                     <li><a class="pagination-link is-current" aria-label="Page {{.CurrentPage}}" aria-current="page">{{.CurrentPage}}</a></li>
+                    
                     {{if lt .CurrentPage .TotalPage}}
-                        <li><a class="pagination-link" href="?conn_type={{.ConnType}}&page={{add .CurrentPage 1}}&page_size={{.PageSize}}">{{add .CurrentPage 1}}</a></li>
-                        {{if lt .CurrentPage (sub .TotalPage 1)}}<li><span class="pagination-ellipsis">&hellip;</span></li>{{end}}
+                         {{if ne .CurrentPage (sub .TotalPage 1)}}{{if ne .CurrentPage (sub .TotalPage 2)}}{{if ne .CurrentPage .TotalPage}}
+                            {{if lt .CurrentPage (sub .TotalPage 2)}} {{/* Only show next if current page is < TotalPage-2 */}}
+                                <li><a class="pagination-link" href="?conn_type={{.ConnType}}&page={{add .CurrentPage 1}}&page_size={{.PageSize}}">{{add .CurrentPage 1}}</a></li>
+                            {{end}}
+                        {{end}}{{end}}{{end}}
                     {{end}}
-                    {{if lt .CurrentPage (sub .TotalPage 1)}}
+
+                    {{if lt .CurrentPage (sub .TotalPage 2)}}
+                        <li><span class="pagination-ellipsis">&hellip;</span></li>
                         <li><a class="pagination-link" href="?conn_type={{.ConnType}}&page={{.TotalPage}}&page_size={{.PageSize}}">{{.TotalPage}}</a></li>
+                    {{else}}
+                         {{range $i, $p := Iterate .CurrentPage (sub .TotalPage 2) .TotalPage 1}}  {{/* Show last 3 pages if current is TotalPage, TotalPage-1, TotalPage-2 */}}
+                            {{if gt (add (sub .TotalPage 2) $i) $.CurrentPage}}
+                                <li><a class="pagination-link" href="?conn_type={{$.ConnType}}&page={{add (sub $.TotalPage 2) $i}}&page_size={{$.PageSize}}">{{add (sub $.TotalPage 2) $i}}</a></li>
+                            {{end}}
+                        {{end}}
                     {{end}}
                 </ul>
             </nav>
@@ -78,26 +105,50 @@
         </div>
     </section>
 
-    <div id="loading" class="modal">
+    <div id="loadingModal" class="modal">
         <div class="modal-background"></div>
-        <div class="modal-content">
-            <div class="loader is-loading"></div>
+        <div class="modal-content box has-text-centered" style="max-width: 300px;">
+            <p class="title is-4 has-text-dark">Loading Data...</p>
+            <progress class="progress is-large is-info" max="100"></progress> <!-- Indeterminate -->
         </div>
     </div>
 
     <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            const links = document.querySelectorAll('a:not([target="_blank"])');
-            const loading = document.getElementById('loading');
+    document.addEventListener('DOMContentLoaded', () => {
+        const links = document.querySelectorAll('.tabs a, .pagination a:not([disabled])');
+        const loadingModal = document.getElementById('loadingModal');
 
-            links.forEach(link => {
-                link.addEventListener('click', (e) => {
-                    if (!link.classList.contains('disabled')) {
-                        loading.classList.add('is-active');
-                    }
-                });
+        links.forEach(link => {
+            link.addEventListener('click', (e) => {
+                let currentFullHref = window.location.href;
+                let linkFullHref = link.href;
+
+                // For tabs, if it's already active, prevent default and do nothing.
+                if (link.parentElement && link.parentElement.classList.contains('is-active') && link.closest('.tabs')) {
+                    e.preventDefault(); 
+                    return;
+                }
+
+                // If the link leads to the exact same URL (e.g. current pagination page clicked again)
+                // or if it's a pagination link marked as 'is-current'
+                if (linkFullHref === currentFullHref || (link.classList.contains('is-current') && link.closest('.pagination'))) {
+                     e.preventDefault(); 
+                     return;
+                }
+
+                if (loadingModal) {
+                    loadingModal.classList.add('is-active');
+                }
             });
         });
+
+        // Hide modal if page is loaded from bfcache (back/forward button)
+        window.addEventListener('pageshow', function(event) {
+            if (event.persisted && loadingModal) {
+                loadingModal.classList.remove('is-active');
+            }
+        });
+    });
     </script>
 </body>
 </html>

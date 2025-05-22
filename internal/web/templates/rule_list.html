@@ -1,72 +1,108 @@
 <!DOCTYPE html>
 <html lang="en">
-  {{template "_head.html" .}}
-  <body>
-    {{ template "_navbar.html" . }}
-    <section class="section">
-      <div class="container">
-        <h2 class="subtitle">Rules</h2>
-        <table class="table is-striped is-fullwidth">
-          <thead>
-            <tr>
-              <th>Label</th>
-              <th>Listen</th>
-              <th>Listen Type</th>
-              <th>Transport Type</th>
-              <th>Remote</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {{range .Configs}}
-            <tr>
-              <td>{{.Label}}</td>
-              <td>{{.Listen}}</td>
-              <td>{{.ListenType}}</td>
-              <td>{{.TransportType}}</td>
-              <td>{{.Remotes}}</td>
-              <td>
-                <button class="button is-small is-primary health-check" data-label="{{.Label}}" onclick="checkHealth('{{.Label}}')">
-                  Check Health
-                </button>
-              </td>
-            </tr>
-            {{end}}
-          </tbody>
-        </table>
-      </div>
+<head>
+    {{template "_head.html" .}}
+</head>
+<body>
+    {{template "_navbar.html" .}}
+
+    <section class="section main-content-area">
+        <div class="container">
+            <h1 class="title is-3 has-text-centered">Manage Rules</h1>
+
+            <div class="table-container">
+                <table class="table is-bordered is-striped is-narrow is-hoverable is-fullwidth">
+                    <thead>
+                        <tr>
+                            <th>Label</th>
+                            <th>Listen</th>
+                            <th>Listen Type</th>
+                            <th>Transport Type</th>
+                            <th>Remote(s)</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {{if not .Configs}}
+                        <tr>
+                            <td colspan="6" class="has-text-centered">No rules configured.</td>
+                        </tr>
+                        {{end}}
+                        {{range .Configs}}
+                        <tr>
+                            <td>{{.Label}}</td>
+                            <td>{{.Listen}}</td>
+                            <td>{{.ListenType}}</td>
+                            <td>{{.TransportType}}</td>
+                            <td>
+                                {{range .Remotes}}
+                                    {{.}}<br>
+                                {{end}}
+                            </td>
+                            <td>
+                                <button class="button is-small is-info health-check" data-label="{{.Label}}">
+                                    <span class="icon is-small"><i class="fas fa-heartbeat"></i></span>
+                                    <span>Check Health</span>
+                                </button>
+                            </td>
+                        </tr>
+                        {{end}}
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </section>
 
     <script>
-      function checkHealth(label) {
-        $.ajax({
-          url: '/api/v1/health_check/?relay_label=' + label,
-          method: 'GET',
-          success: function (response) {
-            // Check if the response includes an error code
-            if (response.error_code === 0) {
-              // If no error, show success message with latency
-              alert(
-                'Health Check for ' +
-                  label +
-                  ': ' +
-                  response.msg + // Use 'msg' as per Go struct
-                  ' (Latency: ' +
-                  response.latency + // Ensure this matches the Go struct field name
-                  'ms)'
-              );
-            } else {
-              // If error code is not 0, show error message
-              alert('Error for ' + label + ': ' + response.msg);
-            }
-          },
-          error: function (xhr) {
-            // Parse the response JSON in case of HTTP error
-            var response = JSON.parse(xhr.responseText);
-            alert('Error: ' + response.msg); // Use 'msg' as per Go struct
-          },
+        function checkHealth(label, buttonElement) {
+            // Add loading state to the button
+            buttonElement.classList.add('is-loading');
+
+            $.ajax({
+                url: '/api/v1/health_check/?relay_label=' + encodeURIComponent(label),
+                method: 'GET',
+                dataType: 'json', // Expect JSON response
+                success: function (response) {
+                    if (response.error_code === 0) {
+                        alert('Health Check for ' + label + ': ' + response.msg + ' (Latency: ' + response.latency + 'ms)');
+                    } else {
+                        alert('Error for ' + label + ': ' + (response.msg || 'Unknown error'));
+                    }
+                },
+                error: function (xhr) {
+                    let errorMsg = 'Failed to perform health check for ' + label + '.';
+                    if (xhr.responseJSON && xhr.responseJSON.msg) {
+                        errorMsg += ' ' + xhr.responseJSON.msg;
+                    } else if (xhr.responseText) {
+                        try {
+                            const parsedError = JSON.parse(xhr.responseText);
+                            if(parsedError && parsedError.msg) {
+                                errorMsg += ' ' + parsedError.msg;
+                            } else {
+                                errorMsg += ' ' + xhr.responseText.substring(0, 100); // Limit length of raw response
+                            }
+                        } catch(e) {
+                             errorMsg += ' ' + xhr.responseText.substring(0, 100);
+                        }
+                    }
+                    alert(errorMsg);
+                },
+                complete: function () {
+                    // Remove loading state from the button
+                    buttonElement.classList.remove('is-loading');
+                }
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const healthCheckButtons = document.querySelectorAll('.health-check');
+            healthCheckButtons.forEach(button => {
+                button.addEventListener('click', function() {
+                    const label = this.dataset.label;
+                    checkHealth(label, this); // Pass the button element
+                });
+            });
         });
-      }
     </script>
-  </body>
+</body>
 </html>

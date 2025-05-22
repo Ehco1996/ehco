@@ -1,58 +1,64 @@
-<div class="card" id="metrics-card">
-  <header class="card-header is-flex is-flex-wrap-wrap">
-    <p class="card-header-title has-text-centered">Node Metrics</p>
-    <div class="card-header-icon is-flex-grow-1 is-flex is-justify-content-flex-end">
-      <div class="dropdown" id="dateRangeDropdown">
-        <div class="dropdown-trigger">
-          <button class="button" aria-haspopup="true" aria-controls="dropdown-menu" id="dateRangeButton">
-            <span id="dateRangeText">Select date range</span>
-            <span class="icon is-small">
-              <i class="fas fa-angle-down" aria-hidden="true"></i>
-            </span>
-          </button>
+<div class="level">
+    <div class="level-left">
+        <div class="level-item">
+            <div class="dropdown" id="dateRangeDropdownNode">
+                <div class="dropdown-trigger">
+                    <button class="button" aria-haspopup="true" aria-controls="dropdown-menu-node">
+                        <span id="dateRangeTextNode">Last 30 Minutes</span>
+                        <span class="icon is-small"><i class="fas fa-angle-down" aria-hidden="true"></i></span>
+                    </button>
+                </div>
+                <div class="dropdown-menu" id="dropdown-menu-node" role="menu">
+                    <div class="dropdown-content">
+                        <a href="#" class="dropdown-item" data-range="30m">Last 30 Minutes</a>
+                        <a href="#" class="dropdown-item" data-range="1h">Last 1 Hour</a>
+                        <a href="#" class="dropdown-item" data-range="3h">Last 3 Hours</a>
+                        <a href="#" class="dropdown-item" data-range="6h">Last 6 Hours</a>
+                        <a href="#" class="dropdown-item" data-range="12h">Last 12 Hours</a>
+                        <a href="#" class="dropdown-item" data-range="24h">Last 24 Hours</a>
+                        <a href="#" class="dropdown-item" data-range="7d">Last 7 Days</a>
+                        <hr class="dropdown-divider">
+                        <div class="dropdown-item">
+                            <input class="input is-small" type="text" id="dateRangeInputNode" placeholder="Custom range">
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
-        <div class="dropdown-menu" id="dropdown-menu" role="menu">
-          <div class="dropdown-content">
-            <a href="#" class="dropdown-item" data-range="30m">Last 30 minutes</a>
-            <a href="#" class="dropdown-item" data-range="1h">Last 1 hour</a>
-            <a href="#" class="dropdown-item" data-range="3h">Last 3 hours</a>
-            <a href="#" class="dropdown-item" data-range="6h">Last 6 hours</a>
-            <a href="#" class="dropdown-item" data-range="12h">Last 12 hours</a>
-            <a href="#" class="dropdown-item" data-range="24h">Last 24 hours</a>
-            <a href="#" class="dropdown-item" data-range="7d">Last 7 days</a>
-            <hr class="dropdown-divider" />
-            <a href="#" class="dropdown-item" id="dateRangeInput">Select date range</a>
-          </div>
-        </div>
-      </div>
-      <button id="refreshButton" class="button ml-2">
-        <span class="icon">
-          <i class="fas fa-sync-alt"></i>
-        </span>
-        <span>Auto Refresh</span>
-      </button>
     </div>
-  </header>
-  <div class="card-content">
-    <div class="content">
-      <div class="columns is-multiline">
-        <div class="column is-4">
-          <canvas id="cpuChart"></canvas>
+    <div class="level-right">
+        <div class="level-item">
+            <button class="button is-info" id="refreshButtonNode">
+                <span class="icon"><i class="fas fa-sync"></i></span>
+                <span>Auto Refresh</span>
+            </button>
         </div>
-        <div class="column is-4">
-          <canvas id="memoryChart"></canvas>
-        </div>
-        <div class="column is-4">
-          <canvas id="diskChart"></canvas>
-        </div>
-
-        <div class="column is-12">
-          <canvas id="networkChart"></canvas>
-        </div>
-      </div>
     </div>
-  </div>
 </div>
 
-<script src="/js/node_metrics.js"></script>
-</script>
+<div class="columns is-multiline mt-4">
+    <div class="column is-half">
+        <div class="box">
+            <h3 class="title is-5 has-text-centered">CPU Usage</h3>
+            <canvas id="cpuChart"></canvas>
+        </div>
+    </div>
+    <div class="column is-half">
+        <div class="box">
+            <h3 class="title is-5 has-text-centered">Memory Usage</h3>
+            <canvas id="memoryChart"></canvas>
+        </div>
+    </div>
+    <div class="column is-half">
+        <div class="box">
+            <h3 class="title is-5 has-text-centered">Disk Usage</h3>
+            <canvas id="diskChart"></canvas>
+        </div>
+    </div>
+    <div class="column is-half">
+        <div class="box">
+            <h3 class="title is-5 has-text-centered">Network Traffic</h3>
+            <canvas id="networkChart"></canvas>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,174 @@
+/* General Styles */
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+  background-color: #f4f7f6; /* Light grey background for the body */
+  color: #363636;
+  line-height: 1.6;
+}
+
+.main-content-area { /* Apply this class to sections that need top padding due to fixed navbar */
+  padding-top: 5.25rem; /* Adjust if navbar height changes */
+}
+
+/* Consistent container padding */
+.container, .container-fluid {
+  padding-left: 20px;
+  padding-right: 20px;
+}
+
+/* Navbar Styles (.app-navbar) */
+.app-navbar.navbar {
+  background-color: #ffffff;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.app-navbar.navbar .navbar-item {
+  font-weight: 500;
+  color: #333;
+}
+
+.app-navbar.navbar .navbar-item:hover,
+.app-navbar.navbar .navbar-item.is-active {
+  background-color: #f0f2f5;
+  color: #007bff; /* Example primary color */
+}
+
+.app-navbar.navbar .navbar-burger span {
+  background-color: #333;
+}
+
+/* Card Styles (Index Page) */
+.card {
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  transition: box-shadow 0.3s ease-in-out, transform 0.3s ease-in-out;
+}
+
+.card:hover {
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
+  transform: translateY(-2px);
+}
+
+.card .card-header-title {
+  font-weight: 600;
+  background-color: #f9f9f9; /* Light background for card headers */
+  border-bottom: 1px solid #dbdbdb;
+}
+
+.card .card-footer {
+  border-top: 1px solid #dbdbdb;
+  background-color: #f9f9f9;
+}
+.card .card-footer .button {
+    margin: 0.5rem; /* Add some space around footer buttons */
+}
+
+/* Table Styles */
+.table-container .table {
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+}
+
+.table th {
+  background-color: #f0f2f5; /* Slightly darker for table headers */
+  font-weight: 600;
+  color: #363636;
+}
+
+.table td {
+  vertical-align: middle;
+}
+
+.table tr:hover {
+  background-color: #f8f9fa; /* Subtle hover for rows */
+}
+
+.table.is-narrow td, .table.is-narrow th {
+    padding: 0.5em 0.75em; /* Adjust padding for narrow tables */
+}
+
+/* Button Styles (General Enhancements) */
+.button {
+  border-radius: 6px;
+  font-weight: 500;
+  transition: background-color 0.2s ease, transform 0.2s ease;
+}
+
+.button:hover:not([disabled]) {
+  transform: translateY(-1px);
+}
+
+.button.is-primary {
+  background-color: #007bff; /* Example primary color */
+  border-color: transparent;
+}
+.button.is-primary:hover {
+  background-color: #0069d9;
+}
+.button.is-info {
+  background-color: #17a2b8; /* Example info color */
+  border-color: transparent;
+}
+.button.is-info:hover {
+  background-color: #138496;
+}
+/* Add similar overrides for is-warning, is-danger if Bulma defaults are not preferred */
+
+.button.is-loading::after { /* Ensure Bulma's loader is visible with custom button colors */
+    border-color: transparent transparent #fff #fff !important;
+}
+
+/* Logs Page Styles */
+.logs-container {
+  background-color: #282c34; /* Dark background for logs */
+  color: #abb2bf; /* Light text on dark background */
+  border-radius: 6px;
+  padding: 1rem;
+  font-size: 0.9em; /* Slightly smaller font for logs */
+}
+
+.log-entry {
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  margin-bottom: 0.2rem;
+  white-space: pre-wrap; /* Ensure long lines wrap */
+  word-break: break-all; /* Break long words/tokens */
+}
+
+/* Minimal styling for log parts, color comes from level-specific classes */
+.log-timestamp { color: #61afef; margin-right: 10px; } /* Blueish */
+.log-level { font-weight: bold; margin-right: 10px; }
+.log-logger { color: #98c379; margin-right: 10px; } /* Greenish */
+.log-message { }
+
+/* Level specific text colors (backgrounds will be from Bulma classes on log-entry) */
+.log-entry.is-info .log-level { color: #1772d0; }
+.log-entry.is-warning .log-level { color: #f0ad4e; }
+.log-entry.is-danger .log-level { color: #d9534f; }
+.log-entry.is-dark .log-level { color: #ccc; }
+.log-entry.is-light .log-level { color: #555; }
+
+/* Ensure Bulma notification classes provide background */
+.log-entry.is-info { background-color: #eef7ff; border-left: 3px solid #1772d0; }
+.log-entry.is-warning { background-color: #fffbeb; border-left: 3px solid #f0ad4e; }
+.log-entry.is-danger { background-color: #ffefee; border-left: 3px solid #d9534f; }
+.log-entry.is-dark { background-color: #363636; color: #fff; border-left: 3px solid #666; }
+.log-entry.is-light { background-color: #f5f5f5; border-left: 3px solid #ccc; }
+
+/* Override for dark log container text */
+.logs-container .log-entry.is-dark .log-timestamp,
+.logs-container .log-entry.is-dark .log-logger,
+.logs-container .log-entry.is-dark .log-message {
+    color: #f1f1f1;
+}
+.logs-container .log-entry.is-dark .log-level { color: #ccc; }
+
+/* Metrics Dashboards (General Spacing for Controls) */
+/* Add some margin to control groups in dashboards */
+._node_metrics_dash .level, ._rule_metrics_dash .columns.is-vcentered {
+  margin-bottom: 1.5rem;
+}
+
+.box h3.title { /* Chart titles within boxes */
+    margin-bottom: 1.5rem;
+}
