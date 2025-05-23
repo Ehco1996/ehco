@@ -4,11 +4,15 @@ import (
 	"crypto/subtle"
 	"embed"
 	"fmt"
-	"html/template"
-	"io"
+	"crypto/subtle"
+	"embed"
+	"fmt"
+	"io/fs"
 	"net"
 	"net/http"
 	_ "net/http/pprof"
+	"path"
+	"strings"
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
@@ -22,15 +26,16 @@ import (
 	"github.com/Ehco1996/ehco/internal/metrics"
 )
 
-//go:embed templates/*.html js/*.js
-var templatesFS embed.FS
+//go:embed webui/frontend/dist
+var embeddedUIDir embed.FS
+
+//go:embed webui/frontend/dist/assets
+var embeddedUIAssetsDir embed.FS
 
 const (
-	metricsPath     = "/metrics/"
-	indexPath       = "/"
-	connectionsPath = "/connections/"
-	rulesPath       = "/rules/"
-	apiPrefix       = "/api/v1"
+	metricsPath = "/metrics/"
+	apiPrefix   = "/api/v1"
+	wsLogsPath  = "/ws/logs" // Added for clarity
 )
 
 type Server struct {
@@ -43,14 +48,6 @@ type Server struct {
 	cfg  *config.Config
 
 	connMgr cmgr.Cmgr
-}
-
-type echoTemplate struct {
-	templates *template.Template
-}
-
-func (t *echoTemplate) Render(w io.Writer, name string, data interface{}, c echo.Context) error {
-	return t.templates.ExecuteTemplate(w, name, data)
 }
 
 func NewServer(
@@ -70,9 +67,7 @@ func NewServer(
 		return nil, errors.Wrap(err, "failed to setup middleware")
 	}
 
-	if err := setupTemplates(e, l, cfg); err != nil {
-		return nil, errors.Wrap(err, "failed to setup templates")
-	}
+	// setupTemplates is removed
 
 	if err := setupMetrics(cfg); err != nil {
 		return nil, errors.Wrap(err, "failed to setup metrics")
@@ -128,25 +123,7 @@ func setupMiddleware(e *echo.Echo, cfg *config.Config, l *zap.SugaredLogger) err
 	return nil
 }
 
-func setupTemplates(e *echo.Echo, l *zap.SugaredLogger, cfg *config.Config) error {
-	funcMap := template.FuncMap{
-		"sub": func(a, b int) int { return a - b },
-		"add": func(a, b int) int { return a + b },
-		"CurrentCfg": func() *config.Config {
-			return cfg
-		},
-	}
-	tmpl, err := template.New("").Funcs(funcMap).ParseFS(templatesFS, "templates/*.html")
-	if err != nil {
-		return errors.Wrap(err, "failed to parse templates")
-	}
-	templates := template.Must(tmpl, nil)
-	for _, temp := range templates.Templates() {
-		l.Debug("template name: ", temp.Name())
-	}
-	e.Renderer = &echoTemplate{templates: templates}
-	return nil
-}
+// setupTemplates is removed
 
 func setupMetrics(cfg *config.Config) error {
 	if err := metrics.RegisterEhcoMetrics(cfg); err != nil {
@@ -161,26 +138,60 @@ func setupMetrics(cfg *config.Config) error {
 func setupRoutes(s *Server) {
 	e := s.e
 
-	e.StaticFS("/js", echo.MustSubFS(templatesFS, "js"))
-	e.GET(metricsPath, echo.WrapHandler(promhttp.Handler()))
-	e.GET("/debug/pprof/*", echo.WrapHandler(http.DefaultServeMux))
+	// Serve static assets from webui/frontend/dist/assets
+	// The path needs to be relative to the embedded directory structure
+	assetsFS, err := fs.Sub(embeddedUIDir, "webui/frontend/dist/assets")
+	if err != nil {
+		s.l.Fatalf("failed to create sub FS for assets: %v", err)
+	}
+	e.StaticFS("/assets", assetsFS)
 
-	// web pages
-	e.GET(indexPath, s.index)
-	e.GET(connectionsPath, s.ListConnections)
-	e.GET(rulesPath, s.ListRules)
-	e.GET("/rule_metrics/", s.RuleMetrics)
-	e.GET("/logs/", s.LogsPage)
-
+	// API routes
 	api := e.Group(apiPrefix)
 	api.GET("/config/", s.CurrentConfig)
 	api.POST("/config/reload/", s.HandleReload)
 	api.GET("/health_check/", s.HandleHealthCheck)
 	api.GET("/node_metrics/", s.GetNodeMetrics)
 	api.GET("/rule_metrics/", s.GetRuleMetrics)
+	api.GET("/connections/", s.GetConnections)
 
-	// ws
-	e.GET("/ws/logs", s.handleWebSocketLogs)
+	// WebSocket route
+	e.GET(wsLogsPath, s.handleWebSocketLogs)
+
+	// Prometheus metrics
+	e.GET(metricsPath, echo.WrapHandler(promhttp.Handler()))
+	// pprof
+	e.GET("/debug/pprof/*", echo.WrapHandler(http.DefaultServeMux))
+
+	// Catch-all for SPA: Serves index.html for any route not handled above
+	// This allows React Router to handle client-side routing.
+	e.GET("/*", func(c echo.Context) error {
+		// Do not serve index.html for API calls, WS, or other specific server-handled paths
+		// (though these should be matched by earlier routes)
+		p := c.Request().URL.Path
+		if strings.HasPrefix(p, apiPrefix) ||
+			strings.HasPrefix(p, wsLogsPath) ||
+			strings.HasPrefix(p, metricsPath) ||
+			strings.HasPrefix(p, "/assets") || // Already handled by StaticFS
+			strings.HasPrefix(p, "/debug/pprof") {
+			// Let Echo handle it as 404 or specific handler
+			return echo.NotFoundHandler(c)
+		}
+
+		indexPath := "webui/frontend/dist/index.html"
+		fileBytes, err := embeddedUIDir.ReadFile(indexPath)
+		if err != nil {
+			// Try to read from subFS in case path is relative to it
+			// This part might be tricky depending on how embed resolves paths
+			content, err := fs.ReadFile(embeddedUIDir, path.Join("webui/frontend/dist", c.Param("*")))
+			if err == nil {
+				return c.HTMLBlob(http.StatusOK, content)
+			}
+			s.l.Errorf("SPA index.html not found or error reading: %v. Attempted path: %s", err, indexPath)
+			return echo.NewHTTPError(http.StatusInternalServerError, "SPA index file not found")
+		}
+		return c.HTMLBlob(http.StatusOK, fileBytes)
+	})
 }
 
 func (s *Server) Start() error {

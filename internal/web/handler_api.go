@@ -132,3 +132,52 @@ func (s *Server) HandleHealthCheck(c echo.Context) error {
 	}
 	return c.JSON(http.StatusOK, HealthCheckResp{Message: "connect success", Latency: latency})
 }
+
+func (s *Server) GetConnections(c echo.Context) error {
+	pageStr := c.QueryParam("page")
+	page, err := strconv.Atoi(pageStr)
+	if err != nil || page < 1 {
+		page = 1
+	}
+	pageSizeStr := c.QueryParam("page_size")
+	pageSize, err := strconv.Atoi(pageSizeStr)
+	if err != nil || pageSize < 1 {
+		pageSize = defaultPageSize // defaultPageSize is defined in handler_page.go, consider moving or redefining
+	}
+	connType := c.QueryParam("conn_type")
+	total := s.connMgr.CountConnection(connType)
+	perv := 0
+	if page > 1 {
+		perv = page - 1
+	}
+	next := 0
+	if page*pageSize < total && page*pageSize > 0 {
+		next = page + 1
+	}
+
+	activeCount := s.connMgr.CountConnection("active")
+	closedCount := s.connMgr.CountConnection("closed")
+	allCount := activeCount + closedCount
+
+	connectionList := s.connMgr.ListConnections(connType, page, pageSize)
+
+	// Calculate TotalPage, ensuring it's at least 1 if total > 0
+	totalPage := 0
+	if total > 0 {
+		totalPage = (total + pageSize - 1) / pageSize
+	}
+
+
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"ConnectionList": connectionList,
+		"CurrentPage":    page,
+		"TotalPage":      totalPage,
+		"PageSize":       pageSize,
+		"Prev":           perv,
+		"Next":           next,
+		"Count":          total, // Count of connections matching connType
+		"ActiveCount":    activeCount,
+		"ClosedCount":    closedCount,
+		"AllCount":       allCount, // Total of active and closed connections
+	})
+}

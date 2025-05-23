@@ -13,6 +13,7 @@ import (
 
 const defaultPageSize = 20
 
+/*
 func MakeIndexF() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		zap.S().Named("web").Infof("index call from %s", r.RemoteAddr)
@@ -94,3 +95,4 @@ func (s *Server) RuleMetrics(c echo.Context) error {
 func (s *Server) LogsPage(c echo.Context) error {
 	return c.Render(http.StatusOK, "logs.html", nil)
 }
+*/
