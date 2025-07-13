@@ -17,7 +17,7 @@ env:
 
 jobs:
   prepare-matrix:
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' || github.event_name == 'push' }}
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
@@ -28,7 +28,7 @@ jobs:
           echo "matrix=$(cat matrix.json)" >> $GITHUB_OUTPUT
 
   build-bin:
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' || github.event_name == 'push' }}
     runs-on: ubuntu-latest
     steps:
       - name: Check out code into the Go module directory
@@ -37,7 +37,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.21"
+          go-version: "1.22"
         id: go
 
       # Updated cache step
@@ -52,12 +52,15 @@ jobs:
 
       - name: build
         run: |
+          rm -rf /tmp/ehco
           mkdir -p /tmp/ehco
           make build
           mv ./dist/ehco /tmp/ehco/ehco-amd64
           make build-arm
           mv ./dist/ehco /tmp/ehco/ehco-arm64
           cp ./build/Dockerfile /tmp/ehco/Dockerfile
+          # debug
+          ls -la /tmp/ehco
 
       - name: Upload binaries
         uses: actions/upload-artifact@v4
@@ -68,6 +71,7 @@ jobs:
           retention-days: 1
 
   build-image:
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' || github.event_name == 'push' }}
     runs-on: ubuntu-latest
     needs:
       - prepare-matrix
@@ -81,9 +85,14 @@ jobs:
         with:
           name: binaries
           path: /tmp/ehco
+
       - name: Rename the binary
         run: |
+          # debug
+          ls -la /tmp/ehco
           cp /tmp/ehco/ehco-${{ matrix.platform }} /tmp/ehco/ehco
+          # debug
+          ls -la /tmp/ehco
 
       - name: Set up qemu
         uses: docker/setup-qemu-action@v3
@@ -123,6 +132,7 @@ jobs:
           retention-days: 1
 
   merge:
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' || github.event_name == 'push' }}
     runs-on: ubuntu-latest
     needs:
       - prepare-matrix
@@ -164,10 +174,22 @@ jobs:
         working-directory: /tmp/digests
         run: |
           echo "Creating manifest list..."
-          AMD64_DIGEST=$(ls amd64/)
-          ARM64_DIGEST=$(ls arm64/)
+          # debug
+          ls -la /tmp/digests
+          ls -la /tmp/digests/amd64 || echo "amd64 digest not found"
+          ls -la /tmp/digests/arm64 || echo "arm64 digest not found"
+
+          AMD64_DIGEST=$(ls amd64/ 2>/dev/null || echo "")
+          ARM64_DIGEST=$(ls arm64/ 2>/dev/null || echo "")
+
           echo "AMD64_DIGEST: $AMD64_DIGEST"
           echo "ARM64_DIGEST: $ARM64_DIGEST"
+
+          if [ -z "$AMD64_DIGEST" ] || [ -z "$ARM64_DIGEST" ]; then
+            echo "Error: One or more digests are missing"
+            exit 1
+          fi
+
           docker buildx imagetools create \
             --tag ${{ env.REGISTRY_IMAGE }}:latest \
             ${{ env.REGISTRY_IMAGE }}@sha256:$AMD64_DIGEST \
@@ -175,4 +197,4 @@ jobs:
 
       - name: Inspect image
         run: |
-          docker buildx imagetools inspect ${{ env.REGISTRY_IMAGE }}:${{ steps.meta.outputs.version }}
+          docker buildx imagetools inspect ${{ env.REGISTRY_IMAGE }}:${{ steps.meta.outputs.version || 'latest' }}

@@ -80,8 +80,10 @@ func (s *Server) Start(ctx context.Context) error {
 		go s.WatchAndReload(ctx)
 	}
 
-	// start Cmgr
-	go s.Cmgr.Start(ctx, s.errCH)
+	// start Cmgr when need sync from server
+	if s.cfg.NeedStartCmgr() {
+		go s.Cmgr.Start(ctx, s.errCH)
+	}
 
 	select {
 	case err := <-s.errCH:

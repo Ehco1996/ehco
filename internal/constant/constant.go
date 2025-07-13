@@ -15,7 +15,7 @@ var (
 const (
 	DefaultDialTimeOut  = 3 * time.Second
 	DefaultReadTimeOut  = 5 * time.Second
-	DefaultIdleTimeOut  = 10 * time.Second
+	DefaultIdleTimeOut  = 30 * time.Second
 	DefaultSniffTimeOut = 300 * time.Millisecond
 
 	// todo,support config in relay config
