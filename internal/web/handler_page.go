@@ -16,7 +16,7 @@ const defaultPageSize = 20
 func MakeIndexF() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		zap.S().Named("web").Infof("index call from %s", r.RemoteAddr)
-		fmt.Fprintf(w, "access from remote ip: %s \n", r.RemoteAddr)
+		_, _ = fmt.Fprintf(w, "access from remote ip: %s \n", r.RemoteAddr)
 	}
 }
 
