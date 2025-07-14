@@ -23,7 +23,7 @@ jobs:
         run: go mod download
 
       - name: GoReleaser Action
-        uses: goreleaser/goreleaser-action@v5
+        uses: goreleaser/goreleaser-action@v6
         with:
           version: latest
           args: release --clean
