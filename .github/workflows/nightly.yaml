@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0 # 确保获取所有历史和标签
 
@@ -61,7 +61,7 @@ jobs:
         run: go mod download
 
       - name: GoReleaser Action
-        uses: goreleaser/goreleaser-action@v5
+        uses: goreleaser/goreleaser-action@v6
         with:
           version: v1.26.2
           args: release --clean
