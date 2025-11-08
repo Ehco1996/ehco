@@ -13,7 +13,15 @@ PACKAGE_LIST  := go list ./...
 FILES         := $(shell find . -name "*.go" -type f)
 FAIL_ON_STDOUT := awk '{ print } END { if (NR > 0) { exit 1 } }'
 
-BUILD_TAG_FOR_NODE_EXPORTER="nofibrechannel,nomountstats"
+# Detect OS and set appropriate build tags for node_exporter
+# These tags are only needed for Linux, macOS uses different collectors
+UNAME_S := $(shell uname -s)
+ifeq ($(UNAME_S),Linux)
+	BUILD_TAG_FOR_NODE_EXPORTER="nofibrechannel,nomountstats"
+else
+	BUILD_TAG_FOR_NODE_EXPORTER=""
+endif
+
 # -w -s 参数的解释：You will get the smallest binaries if you compile with -ldflags '-w -s'. The -w turns off DWARF debugging information
 # for more information, please refer to https://stackoverflow.com/questions/22267189/what-does-the-w-flag-mean-when-passed-in-via-the-ldflags-option-to-the-go-comman
 GOBUILD=CGO_ENABLED=0 go build -tags ${BUILD_TAG_FOR_NODE_EXPORTER} -trimpath -ldflags="-w -s -X ${PACKAGE}.GitBranch=${BRANCH} -X ${PACKAGE}.GitRevision=${REVISION} -X ${PACKAGE}.BuildTime=${BUILDTIME}"
