@@ -10,6 +10,7 @@ import (
 	"github.com/pkg/errors"
 	dto "github.com/prometheus/client_model/go"
 	"github.com/prometheus/common/expfmt"
+	"github.com/prometheus/common/model"
 	"go.uber.org/zap"
 )
 
@@ -71,7 +72,8 @@ func (r *readerImpl) fetchMetrics(ctx context.Context) (map[string]*dto.MetricFa
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to read response body")
 	}
-
-	var parser expfmt.TextParser
+	// Use LegacyValidation for backward compatibility with older Prometheus metrics
+	// This prevents the "Invalid name validation scheme requested: unset" panic
+	parser := expfmt.NewTextParser(model.LegacyValidation)
 	return parser.TextToMetricFamilies(strings.NewReader(string(body)))
 }
