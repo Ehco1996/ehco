@@ -13,7 +13,7 @@ import (
 	stats "github.com/xtls/xray-core/app/stats/command"
 	"github.com/xtls/xray-core/common/protocol"
 	"github.com/xtls/xray-core/common/serial"
-	"github.com/xtls/xray-core/proxy/shadowsocks"
+	"github.com/xtls/xray-core/proxy/shadowsocks_2022"
 	"github.com/xtls/xray-core/proxy/trojan"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
@@ -97,7 +97,8 @@ func (u *User) ToXrayUser() *protocol.User {
 	case ProtocolTrojan:
 		account = serial.ToTypedMessage(&trojan.Account{Password: u.Password})
 	case ProtocolSS:
-		account = serial.ToTypedMessage(&shadowsocks.Account{CipherType: mappingCipher(u.Method), Password: u.Password})
+		memoryAccount := &shadowsocks_2022.MemoryAccount{Key: u.Password}
+		account = serial.ToTypedMessage(memoryAccount.ToProto())
 	default:
 		zap.S().DPanicf("unknown protocol %s", u.Protocol)
 		return nil
@@ -297,8 +298,10 @@ func (up *UserPool) syncUserConfigsFromServer(ctx context.Context, proxyTag stri
 }
 
 func (up *UserPool) Start(ctx context.Context) error {
-	conn, err := grpc.DialContext(
-		context.Background(), up.grpcEndPoint, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithBlock())
+	conn, err := grpc.NewClient(
+		up.grpcEndPoint,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+	)
 	if err != nil {
 		return err
 	}

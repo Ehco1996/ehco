@@ -6,25 +6,12 @@ import (
 
 	proxy "github.com/xtls/xray-core/app/proxyman/command"
 	"github.com/xtls/xray-core/common/serial"
-	"github.com/xtls/xray-core/proxy/shadowsocks"
 	"go.uber.org/zap"
 )
 
 func getEmailAndTrafficType(input string) (string, string) {
 	s := strings.Split(input, ">>>")
 	return s[1], s[len(s)-1]
-}
-
-func mappingCipher(in string) shadowsocks.CipherType {
-	switch in {
-	case "aes-128-gcm":
-		return shadowsocks.CipherType_AES_128_GCM
-	case "aes-256-gcm":
-		return shadowsocks.CipherType_AES_256_GCM
-	case "chacha20-ietf-poly1305":
-		return shadowsocks.CipherType_CHACHA20_POLY1305
-	}
-	return shadowsocks.CipherType_UNKNOWN
 }
 
 // AddInboundUser add user to inbound by tag
@@ -35,8 +22,11 @@ func AddInboundUser(ctx context.Context, c proxy.HandlerServiceClient, tag strin
 			&proxy.AddUserOperation{User: user.ToXrayUser()}),
 	})
 	if err != nil {
+		if strings.Contains(err.Error(), "already exists") {
+			zap.S().Named("xray").Infof("User %s already exists", user.GetEmail())
+			return nil
+		}
 		zap.S().Named("xray").Errorf("Failed to Add User: %s To Server Tag: %s", user.GetEmail(), tag)
-		return err
 	}
 	user.running = true
 	zap.S().Named("xray").Infof("Add User: %s To Server Tag: %s", user.GetEmail(), tag)
