@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0 # 确保获取所有历史和标签
 
@@ -53,7 +53,7 @@ jobs:
           gh release delete $NIGHTLY_TAG --yes || true
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version: "1.25.1"
 
@@ -61,7 +61,7 @@ jobs:
         run: go mod download
 
       - name: GoReleaser Action
-        uses: goreleaser/goreleaser-action@v5
+        uses: goreleaser/goreleaser-action@v6
         with:
           version: v1.26.2
           args: release --clean
