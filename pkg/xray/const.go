@@ -12,6 +12,7 @@ const (
 
 	ProtocolSS     = "ss"
 	ProtocolTrojan = "trojan"
+	ProtocolVless  = "vless"
 )
 
 func InProxyTags(tag string) bool {
