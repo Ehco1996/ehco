@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 
+	"github.com/sagernet/sing-box/adapter"
 	"github.com/sagernet/sing-box/common/sniff"
 	"github.com/sagernet/sing/common/buf"
 	"github.com/sagernet/sing/common/bufio"
@@ -103,12 +104,13 @@ func (b *BaseRelayServer) sniffAndBlockProtocol(c net.Conn) (net.Conn, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), b.cfg.Options.SniffTimeout)
 	defer cancel()
 
-	sniffMetadata, err := sniff.PeekStream(ctx, c, buffer, b.cfg.Options.SniffTimeout, sniff.TLSClientHello, sniff.HTTPHost)
+	sniffMetadata := &adapter.InboundContext{}
+	err := sniff.PeekStream(ctx, sniffMetadata, c, nil, buffer, b.cfg.Options.SniffTimeout, sniff.TLSClientHello, sniff.HTTPHost)
 	if err != nil {
 		b.l.Debugf("sniff error: %s", err)
 	}
 
-	if sniffMetadata != nil {
+	if sniffMetadata.Protocol != "" {
 		b.l.Infof("sniffed protocol: %s", sniffMetadata.Protocol)
 		for _, p := range b.cfg.Options.BlockedProtocols {
 			if sniffMetadata.Protocol == p {
