@@ -15,6 +15,7 @@ import (
 	"github.com/xtls/xray-core/common/serial"
 	"github.com/xtls/xray-core/proxy/shadowsocks_2022"
 	"github.com/xtls/xray-core/proxy/trojan"
+	"github.com/xtls/xray-core/proxy/vless"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -26,6 +27,7 @@ type User struct {
 	ID       int    `json:"user_id"`
 	Method   string `json:"method"`
 	Password string `json:"password"`
+	Flow     string `json:"flow"`
 
 	Level           int   `json:"level"`
 	Enable          bool  `json:"enable"`
@@ -85,10 +87,11 @@ func (u *User) UpdateFromServer(serverSideUser *User) {
 	u.Method = serverSideUser.Method
 	u.Enable = serverSideUser.Enable
 	u.Password = serverSideUser.Password
+	u.Flow = serverSideUser.Flow
 }
 
 func (u *User) Equal(new *User) bool {
-	return u.Method == new.Method && u.Enable == new.Enable && u.Password == new.Password
+	return u.Method == new.Method && u.Enable == new.Enable && u.Password == new.Password && u.Flow == new.Flow
 }
 
 func (u *User) ToXrayUser() *protocol.User {
@@ -99,6 +102,11 @@ func (u *User) ToXrayUser() *protocol.User {
 	case ProtocolSS:
 		memoryAccount := &shadowsocks_2022.MemoryAccount{Key: u.Password}
 		account = serial.ToTypedMessage(memoryAccount.ToProto())
+	case ProtocolVless:
+		account = serial.ToTypedMessage(&vless.Account{
+			Id:   u.Password,
+			Flow: u.Flow,
+		})
 	default:
 		zap.S().DPanicf("unknown protocol %s", u.Protocol)
 		return nil
