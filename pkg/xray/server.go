@@ -19,8 +19,19 @@ import (
 
 func buildXrayInstanceCfg(cfg *conf.Config) (*core.Config, error) {
 	for _, inbound := range cfg.InboundConfigs {
-		// add tls certs for trojan
 		if inbound.Tag == XrayTrojanProxyTag || inbound.Tag == XrayVmessProxyTag || inbound.Tag == XrayVlessProxyTag {
+			// Skip TLS cert injection for Reality — it uses its own key management
+			if inbound.StreamSetting != nil && inbound.StreamSetting.Security == "reality" {
+				if inbound.StreamSetting.SocketSettings != nil {
+					inbound.StreamSetting.SocketSettings.TcpMptcp = true
+				} else {
+					inbound.StreamSetting.SocketSettings = &conf.SocketConfig{
+						TcpMptcp: true,
+					}
+				}
+				continue
+			}
+			// Inject TLS certs for standard TLS inbounds
 			if err := tls.InitTlsCfg(); err != nil {
 				return nil, err
 			}
