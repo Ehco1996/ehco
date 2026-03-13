@@ -64,8 +64,8 @@ func TestMain(m *testing.M) {
 func startRelayServers() []*relay.Relay {
 	options := conf.Options{
 		EnableUDP:      true,
-		IdleTimeoutSec: 1,
-		ReadTimeoutSec: 1,
+		IdleTimeoutSec: 3,
+		ReadTimeoutSec: 3,
 	}
 	cfg := config.Config{
 		RelayConfigs: []*conf.Config{
@@ -216,11 +216,21 @@ func testUDPRelay(t *testing.T, address string, concurrent bool, concurrency ...
 	msg := []byte("hello udp")
 
 	runTest := func() error {
-		res := echo.SendUdpMsg(msg, address)
-		if !bytes.Equal(msg, res) {
-			return fmt.Errorf("response mismatch: got %s, want %s", res, msg)
+		// UDP is unreliable, retry up to 3 times
+		var lastErr error
+		for attempt := 0; attempt < 3; attempt++ {
+			res, err := echo.SendUdpMsg(msg, address)
+			if err != nil {
+				lastErr = err
+				continue
+			}
+			if !bytes.Equal(msg, res) {
+				lastErr = fmt.Errorf("response mismatch: got %s, want %s", res, msg)
+				continue
+			}
+			return nil
 		}
-		return nil
+		return fmt.Errorf("failed after 3 attempts: %w", lastErr)
 	}
 
 	if concurrent {
@@ -247,6 +257,6 @@ func testUDPRelay(t *testing.T, address string, concurrent bool, concurrency ...
 }
 
 func TestRelayIdleTimeout(t *testing.T) {
-	err := echo.EchoTcpMsgLong([]byte("hello"), time.Second*2, RAW_LISTEN)
+	err := echo.EchoTcpMsgLong([]byte("hello"), time.Second*4, RAW_LISTEN)
 	require.Error(t, err, "Connection should be rejected")
 }

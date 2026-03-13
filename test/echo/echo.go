@@ -159,7 +159,6 @@ func SendTcpMsg(msg []byte, address string) []byte {
 	if _, err := conn.Write(msg); err != nil {
 		log.Fatal(err)
 	}
-	time.Sleep(time.Second * 1)
 	buf := make([]byte, len(msg))
 	n, err := conn.Read(buf)
 	if err != nil {
@@ -197,17 +196,21 @@ func EchoTcpMsgLong(msg []byte, sleepTime time.Duration, address string) error {
 	return nil
 }
 
-func SendUdpMsg(msg []byte, address string) []byte {
+func SendUdpMsg(msg []byte, address string) ([]byte, error) {
 	conn, err := net.Dial("udp", address)
 	if err != nil {
-		log.Fatal(err)
+		return nil, fmt.Errorf("dial udp: %w", err)
 	}
 	defer conn.Close()
 	if _, err := conn.Write(msg); err != nil {
-		log.Fatal(err)
+		return nil, fmt.Errorf("write udp: %w", err)
 	}
 	buf := make([]byte, len(msg))
-	time.Sleep(time.Second * 1)
-	n, _ := conn.Read(buf)
-	return buf[:n]
+	// set a read deadline to avoid hanging forever if the UDP response is lost
+	conn.SetReadDeadline(time.Now().Add(5 * time.Second))
+	n, err := conn.Read(buf)
+	if err != nil {
+		return nil, fmt.Errorf("read udp: %w", err)
+	}
+	return buf[:n], nil
 }
