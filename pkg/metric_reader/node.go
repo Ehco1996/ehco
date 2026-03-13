@@ -130,9 +130,15 @@ func (b *readerImpl) processLoadMetrics(metricMap map[string]*dto.MetricFamily, 
 
 func (b *readerImpl) calculateFinalMetrics(nm *NodeMetrics, cpu *cpuStats) {
 	nm.CpuCoreCount = cpu.cores
-	nm.CpuUsagePercent = 100 * (cpu.totalTime - cpu.idleTime) / cpu.totalTime
-	nm.MemoryUsagePercent = 100 * float64(nm.MemoryUsageBytes) / float64(nm.MemoryTotalBytes)
-	nm.DiskUsagePercent = 100 * float64(nm.DiskUsageBytes) / float64(nm.DiskTotalBytes)
+	if cpu.totalTime > 0 {
+		nm.CpuUsagePercent = 100 * (cpu.totalTime - cpu.idleTime) / cpu.totalTime
+	}
+	if nm.MemoryTotalBytes > 0 {
+		nm.MemoryUsagePercent = 100 * float64(nm.MemoryUsageBytes) / float64(nm.MemoryTotalBytes)
+	}
+	if nm.DiskTotalBytes > 0 {
+		nm.DiskUsagePercent = 100 * float64(nm.DiskUsageBytes) / float64(nm.DiskTotalBytes)
+	}
 
 	nm.CpuUsagePercent = math.Round(nm.CpuUsagePercent*100) / 100
 	nm.MemoryUsagePercent = math.Round(nm.MemoryUsagePercent*100) / 100

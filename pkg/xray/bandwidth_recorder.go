@@ -75,8 +75,10 @@ func (b *bandwidthRecorder) RecordOnce(ctx context.Context) (uploadIncr float64,
 		elapsed := now.Sub(b.lastRecordTime).Seconds()
 		uploadIncr = (send - b.currentSendBytes)
 		downloadIncr = (recv - b.currentRecvBytes)
-		b.uploadBandwidthBytes = uploadIncr / elapsed
-		b.downloadBandwidthBytes = downloadIncr / elapsed
+		if elapsed > 0 {
+			b.uploadBandwidthBytes = uploadIncr / elapsed
+			b.downloadBandwidthBytes = downloadIncr / elapsed
+		}
 	}
 	b.lastRecordTime = now
 	b.currentRecvBytes = recv

@@ -146,7 +146,7 @@ func NewUserPool(grpcEndPoint, remoteConfigURL, metricURL string, proxyTags []st
 	return up
 }
 
-func (up *UserPool) CreateUser(userId, level int, password, method, protocol string, enable bool) *User {
+func (up *UserPool) CreateUser(userId, level int, password, method, protocol, flow string, enable bool) *User {
 	up.Lock()
 	defer up.Unlock()
 	u := &User{
@@ -157,6 +157,7 @@ func (up *UserPool) CreateUser(userId, level int, password, method, protocol str
 		Enable:   enable,
 		Method:   method,
 		Protocol: protocol,
+		Flow:     flow,
 	}
 	up.users[u.ID] = u
 	return u
@@ -269,7 +270,7 @@ func (up *UserPool) syncUserConfigsFromServer(ctx context.Context, proxyTag stri
 		oldUser, found := up.GetUser(newUser.ID)
 		if !found {
 			newUser := up.CreateUser(
-				newUser.ID, newUser.Level, newUser.Password, newUser.Method, newUser.Protocol, newUser.Enable)
+				newUser.ID, newUser.Level, newUser.Password, newUser.Method, newUser.Protocol, newUser.Flow, newUser.Enable)
 			if newUser.Enable {
 				if err := AddInboundUser(ctx, up.proxyClient, proxyTag, newUser); err != nil {
 					return err
