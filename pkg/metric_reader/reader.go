@@ -2,12 +2,12 @@ package metric_reader
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
 	"time"
 
-	"github.com/pkg/errors"
 	dto "github.com/prometheus/client_model/go"
 	"github.com/prometheus/common/expfmt"
 	"github.com/prometheus/common/model"
@@ -39,7 +39,7 @@ func NewReader(metricsURL string) *readerImpl {
 func (b *readerImpl) ReadOnce(ctx context.Context) (*NodeMetrics, map[string]*RuleMetrics, error) {
 	metricMap, err := b.fetchMetrics(ctx)
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "failed to fetch metrics")
+		return nil, nil, fmt.Errorf("failed to fetch metrics: %w", err)
 	}
 	nm := &NodeMetrics{SyncTime: time.Now()}
 	if err := b.ParseNodeMetrics(metricMap, nm); err != nil {
@@ -59,18 +59,18 @@ func (b *readerImpl) ReadOnce(ctx context.Context) (*NodeMetrics, map[string]*Ru
 func (r *readerImpl) fetchMetrics(ctx context.Context) (map[string]*dto.MetricFamily, error) {
 	req, err := http.NewRequestWithContext(ctx, "GET", r.metricsURL, nil)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to create request")
+		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
 	resp, err := r.httpClient.Do(req)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to send request")
+		return nil, fmt.Errorf("failed to send request: %w", err)
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to read response body")
+		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}
 	// Use LegacyValidation for backward compatibility with older Prometheus metrics
 	// This prevents the "Invalid name validation scheme requested: unset" panic
