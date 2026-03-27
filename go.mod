@@ -14,8 +14,6 @@ require (
 	github.com/prometheus/client_model v0.6.2
 	github.com/prometheus/common v0.67.5
 	github.com/prometheus/node_exporter v1.10.2
-	github.com/sagernet/sing v0.8.2
-	github.com/sagernet/sing-box v1.13.2
 	github.com/stretchr/testify v1.11.1
 	github.com/urfave/cli/v2 v2.27.7
 	github.com/xtls/xray-core v1.260206.0
@@ -44,10 +42,7 @@ require (
 	github.com/dennwc/ioctl v1.0.1-0.20181021180353-017804252068 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/ema/qdisc v1.0.0 // indirect
-	github.com/florianl/go-nfqueue/v2 v2.0.2 // indirect
-	github.com/fsnotify/fsnotify v1.9.0 // indirect
 	github.com/ghodss/yaml v1.0.1-0.20220118164431-d8423dcdf344 // indirect
-	github.com/go-ole/go-ole v1.3.0 // indirect
 	github.com/gobwas/httphead v0.1.0 // indirect
 	github.com/gobwas/pool v0.2.1 // indirect
 	github.com/godbus/dbus/v5 v5.2.2 // indirect
@@ -63,7 +58,6 @@ require (
 	github.com/klauspost/compress v1.18.4 // indirect
 	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
 	github.com/labstack/gommon v0.4.2 // indirect
-	github.com/logrusorgru/aurora v2.0.3+incompatible // indirect
 	github.com/lufia/iostat v1.2.1 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
@@ -88,12 +82,8 @@ require (
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/safchain/ethtool v0.7.0 // indirect
-	github.com/sagernet/fswatch v0.1.1 // indirect
-	github.com/sagernet/gvisor v0.0.0-20250811-sing-box-mod.1 // indirect
-	github.com/sagernet/netlink v0.0.0-20240916134442-83396419aa8b // indirect
-	github.com/sagernet/nftables v0.3.0-mod.1 // indirect
+	github.com/sagernet/sing v0.8.0 // indirect
 	github.com/sagernet/sing-shadowsocks v0.2.9 // indirect
-	github.com/sagernet/sing-tun v0.8.2 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasttemplate v1.2.2 // indirect
 	github.com/vishvananda/netlink v1.3.1 // indirect

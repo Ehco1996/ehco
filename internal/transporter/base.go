@@ -4,11 +4,8 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"time"
 
-	"github.com/sagernet/sing-box/adapter"
-	"github.com/sagernet/sing-box/common/sniff"
-	"github.com/sagernet/sing/common/buf"
-	"github.com/sagernet/sing/common/bufio"
 	"go.uber.org/zap"
 
 	"github.com/Ehco1996/ehco/internal/cmgr"
@@ -99,32 +96,36 @@ func (b *BaseRelayServer) sniffAndBlockProtocol(c net.Conn) (net.Conn, error) {
 		return c, nil
 	}
 
-	buffer := buf.NewPacket()
-
-	ctx, cancel := context.WithTimeout(context.Background(), b.cfg.Options.SniffTimeout)
-	defer cancel()
-
-	sniffMetadata := &adapter.InboundContext{}
-	err := sniff.PeekStream(ctx, sniffMetadata, c, nil, buffer, b.cfg.Options.SniffTimeout, sniff.TLSClientHello, sniff.HTTPHost)
-	if err != nil {
-		b.l.Debugf("sniff error: %s", err)
+	if err := c.SetReadDeadline(time.Now().Add(b.cfg.Options.SniffTimeout)); err != nil {
+		b.l.Debugf("sniff: failed to set read deadline: %s", err)
+		return c, nil
 	}
 
-	if sniffMetadata.Protocol != "" {
-		b.l.Infof("sniffed protocol: %s", sniffMetadata.Protocol)
+	peek := make([]byte, peekBufferSize)
+	n, err := c.Read(peek)
+
+	// Reset deadline regardless of read result
+	_ = c.SetReadDeadline(time.Time{})
+
+	if n == 0 {
+		if err != nil {
+			b.l.Debugf("sniff error: %s", err)
+		}
+		return c, nil
+	}
+	peek = peek[:n]
+
+	protocol := sniffProtocol(peek)
+	if protocol != "" {
+		b.l.Infof("sniffed protocol: %s", protocol)
 		for _, p := range b.cfg.Options.BlockedProtocols {
-			if sniffMetadata.Protocol == p {
-				return c, fmt.Errorf("relay:%s blocked protocol:%s", b.cfg.Label, sniffMetadata.Protocol)
+			if protocol == p {
+				return c, fmt.Errorf("relay:%s blocked protocol:%s", b.cfg.Label, protocol)
 			}
 		}
 	}
 
-	if !buffer.IsEmpty() {
-		return bufio.NewCachedConn(c, buffer), nil
-	} else {
-		buffer.Release()
-	}
-	return c, nil
+	return newPeekedConn(c, peek), nil
 }
 
 func (b *BaseRelayServer) applyRateLimit(c net.Conn) net.Conn {
