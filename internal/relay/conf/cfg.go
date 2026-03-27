@@ -1,7 +1,6 @@
 package conf
 
 import (
-	"errors"
 	"fmt"
 	"net/url"
 	"time"
@@ -117,7 +116,7 @@ func (r *Config) Adjust() error {
 
 func (r *Config) Validate() error {
 	if err := r.Adjust(); err != nil {
-		return errors.New("adjust config failed")
+		return fmt.Errorf("adjust config failed: %w", err)
 	}
 	if err := r.validateType(); err != nil {
 		return err

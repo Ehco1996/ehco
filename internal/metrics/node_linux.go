@@ -43,7 +43,7 @@ func RegisterNodeExporterMetrics(cfg *config.Config) error {
 	}
 	nc, err := collector.NewNodeCollector(logger)
 	if err != nil {
-		return fmt.Errorf("couldn't create collector: %s", err)
+		return fmt.Errorf("couldn't create collector: %w", err)
 	}
 	prometheus.MustRegister(nc)
 	return nil

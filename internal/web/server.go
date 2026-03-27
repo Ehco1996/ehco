@@ -12,7 +12,6 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
-	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.uber.org/zap"
 
@@ -60,22 +59,22 @@ func NewServer(
 	connMgr cmgr.Cmgr,
 ) (*Server, error) {
 	if err := validateConfig(cfg); err != nil {
-		return nil, errors.Wrap(err, "invalid configuration")
+		return nil, fmt.Errorf("invalid configuration: %w", err)
 	}
 
 	l := zap.S().Named("web")
 
 	e := NewEchoServer()
 	if err := setupMiddleware(e, cfg, l); err != nil {
-		return nil, errors.Wrap(err, "failed to setup middleware")
+		return nil, fmt.Errorf("failed to setup middleware: %w", err)
 	}
 
 	if err := setupTemplates(e, l, cfg); err != nil {
-		return nil, errors.Wrap(err, "failed to setup templates")
+		return nil, fmt.Errorf("failed to setup templates: %w", err)
 	}
 
 	if err := setupMetrics(cfg); err != nil {
-		return nil, errors.Wrap(err, "failed to setup metrics")
+		return nil, fmt.Errorf("failed to setup metrics: %w", err)
 	}
 
 	s := &Server{
@@ -97,7 +96,7 @@ func NewServer(
 func validateConfig(cfg *config.Config) error {
 	// Add validation logic here
 	if cfg.WebPort <= 0 || cfg.WebPort > 65535 {
-		return errors.New("invalid web port")
+		return fmt.Errorf("invalid web port: %d", cfg.WebPort)
 	}
 	// Add more validations as needed
 	return nil
@@ -138,7 +137,7 @@ func setupTemplates(e *echo.Echo, l *zap.SugaredLogger, cfg *config.Config) erro
 	}
 	tmpl, err := template.New("").Funcs(funcMap).ParseFS(templatesFS, "templates/*.html")
 	if err != nil {
-		return errors.Wrap(err, "failed to parse templates")
+		return fmt.Errorf("failed to parse templates: %w", err)
 	}
 	templates := template.Must(tmpl, nil)
 	for _, temp := range templates.Templates() {
@@ -150,10 +149,10 @@ func setupTemplates(e *echo.Echo, l *zap.SugaredLogger, cfg *config.Config) erro
 
 func setupMetrics(cfg *config.Config) error {
 	if err := metrics.RegisterEhcoMetrics(cfg); err != nil {
-		return errors.Wrap(err, "failed to register Ehco metrics")
+		return fmt.Errorf("failed to register Ehco metrics: %w", err)
 	}
 	if err := metrics.RegisterNodeExporterMetrics(cfg); err != nil {
-		return errors.Wrap(err, "failed to register Node Exporter metrics")
+		return fmt.Errorf("failed to register Node Exporter metrics: %w", err)
 	}
 	return nil
 }
