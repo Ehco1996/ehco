@@ -194,9 +194,14 @@ func (cm *cmgrImpl) Start(ctx context.Context, errCH chan error) {
 			cm.l.Info("sync stop")
 			return
 		case <-ticker.C:
+			// Tolerate transient sync failures: retryablehttp already does
+			// internal backoff; on final error we just log and wait for the
+			// next tick. The traffic stats accumulated for this interval are
+			// dropped on the floor.
+			// TODO: persist unsent stats locally so they can be retried on
+			// later ticks instead of being lost when the upstream is down.
 			if err := cm.syncOnce(ctx); err != nil {
-				cm.l.Errorf("meet non retry error: %s ,exit now", err)
-				errCH <- err
+				cm.l.Errorf("sync failed, will retry on next tick in %ds: %s", cm.cfg.SyncInterval, err)
 			}
 		}
 	}
