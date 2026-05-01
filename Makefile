@@ -8,26 +8,23 @@ BUILDTIME=$(shell date +"%Y-%m-%d-%T")
 BRANCH=$(shell git rev-parse --abbrev-ref HEAD | tr -d '\040\011\012\015\n')
 REVISION=$(shell git rev-parse HEAD)
 
-# Derive a semver-valid VERSION from git so `make build` (and Docker, etc.)
-# produces binaries that self-report something newer than the most recent
-# stable tag. goreleaser already injects its own VERSION via GORELEASER_CURRENT_TAG,
-# so this only matters for non-goreleaser builds.
+# Pin VERSION to the most recent nightly tag so `make build` (and Docker, etc.)
+# self-reports the current in-progress release line, e.g. `1.1.7-next` while
+# v1.1.7 is being prepared. goreleaser still injects its own GORELEASER_CURRENT_TAG
+# for actual release artifacts; this only kicks in for non-goreleaser builds.
 #
-# Output shape:
-#   - on a stable tag exactly        -> X.Y.Z          (e.g. 1.1.6)
-#   - N commits past last stable tag -> X.Y.Z-dev.N+gSHA (e.g. 1.1.6-dev.8+gabc1234)
-#   - no stable tag reachable        -> falls back to constant.Version source default
-GIT_LAST_STABLE := $(shell git describe --tags --abbrev=0 --match 'v*' --exclude='*-*' 2>/dev/null)
-GIT_LAST_STABLE_VER := $(patsubst v%,%,$(GIT_LAST_STABLE))
-GIT_AHEAD := $(shell test -n "$(GIT_LAST_STABLE)" && git rev-list --count $(GIT_LAST_STABLE)..HEAD 2>/dev/null || echo 0)
-GIT_SHORT_SHA := $(shell git rev-parse --short=7 HEAD 2>/dev/null)
+# Resolution order:
+#   1. nearest reachable nightly tag matching v*-next
+#   2. nearest reachable stable tag (rare: only between a release and the next nightly cron)
+#   3. empty -> falls back to the constant.Version source default
+GIT_DESCRIBE_VERSION := $(shell git describe --tags --abbrev=0 --match 'v*-next' 2>/dev/null \
+	|| git describe --tags --abbrev=0 --match 'v*' --exclude='*-*' 2>/dev/null)
+VERSION := $(patsubst v%,%,$(GIT_DESCRIBE_VERSION))
 
-ifeq ($(GIT_LAST_STABLE),)
+ifeq ($(VERSION),)
 VERSION_LDFLAG :=
-else ifeq ($(GIT_AHEAD),0)
-VERSION_LDFLAG := -X $(PACKAGE).Version=$(GIT_LAST_STABLE_VER)
 else
-VERSION_LDFLAG := -X $(PACKAGE).Version=$(GIT_LAST_STABLE_VER)-dev.$(GIT_AHEAD)+g$(GIT_SHORT_SHA)
+VERSION_LDFLAG := -X $(PACKAGE).Version=$(VERSION)
 endif
 
 
