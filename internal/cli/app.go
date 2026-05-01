@@ -13,6 +13,13 @@ import (
 var cliLogger = log.MustNewLogger("info").Sugar().Named("cli")
 
 func startAction(ctx *cli.Context) error {
+	// No subcommand and no config source given -> the user almost certainly
+	// just typed `ehco` to see what it does. Show help instead of fataling
+	// with "invalid listen".
+	if ConfigPath == "" && LocalAddr == "" {
+		return cli.ShowAppHelp(ctx)
+	}
+
 	cfg, err := InitConfigAndComponents()
 	if err != nil {
 		cliLogger.Fatalf("InitConfigAndComponents meet err=%s", err.Error())
