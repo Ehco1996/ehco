@@ -15,11 +15,19 @@ import (
 
 	"github.com/Ehco1996/ehco/internal/constant"
 	cli "github.com/urfave/cli/v2"
+	"golang.org/x/mod/semver"
 )
 
 const (
 	githubLatestReleaseAPI = "https://api.github.com/repos/Ehco1996/ehco/releases/latest"
+	githubReleasesAPI      = "https://api.github.com/repos/Ehco1996/ehco/releases?per_page=30"
 	systemdServiceName     = "ehco"
+
+	channelAuto    = "auto"
+	channelStable  = "stable"
+	channelNightly = "nightly"
+
+	nightlyTagSuffix = "-next"
 )
 
 type ghAsset struct {
@@ -28,8 +36,11 @@ type ghAsset struct {
 }
 
 type ghRelease struct {
-	TagName string    `json:"tag_name"`
-	Assets  []ghAsset `json:"assets"`
+	TagName     string    `json:"tag_name"`
+	Prerelease  bool      `json:"prerelease"`
+	Draft       bool      `json:"draft"`
+	PublishedAt time.Time `json:"published_at"`
+	Assets      []ghAsset `json:"assets"`
 }
 
 var UpdateCMD = &cli.Command{
@@ -38,11 +49,16 @@ var UpdateCMD = &cli.Command{
 	Flags: []cli.Flag{
 		&cli.BoolFlag{
 			Name:  "force",
-			Usage: "force update even if already at the latest version",
+			Usage: "force update even if already at the latest version, or to allow downgrade / channel switch",
 		},
 		&cli.BoolFlag{
 			Name:  "no-restart",
 			Usage: "skip systemctl restart after replacing the binary",
+		},
+		&cli.StringFlag{
+			Name:  "channel",
+			Value: channelAuto,
+			Usage: "release channel to track: auto (match current build), stable, or nightly",
 		},
 	},
 	Action: runUpdate,
@@ -52,15 +68,28 @@ func runUpdate(c *cli.Context) error {
 	ctx, cancel := context.WithTimeout(c.Context, 5*time.Minute)
 	defer cancel()
 
-	rel, err := fetchLatestRelease(ctx)
+	channel, err := resolveChannel(c.String("channel"), constant.Version)
 	if err != nil {
-		return fmt.Errorf("fetch latest release: %w", err)
+		return err
+	}
+
+	rel, err := fetchTargetRelease(ctx, channel)
+	if err != nil {
+		return fmt.Errorf("fetch %s release: %w", channel, err)
 	}
 	latest := strings.TrimPrefix(rel.TagName, "v")
-	cliLogger.Infof("current version=%s latest version=%s", constant.Version, latest)
-	if !c.Bool("force") && latest == constant.Version {
-		cliLogger.Info("already up to date, nothing to do")
-		return nil
+	cliLogger.Infof("channel=%s current version=%s latest version=%s", channel, constant.Version, latest)
+
+	force := c.Bool("force")
+	if !force {
+		if latest == constant.Version {
+			cliLogger.Info("already up to date, nothing to do")
+			return nil
+		}
+		if cmp := compareVersions(latest, constant.Version); cmp < 0 {
+			return fmt.Errorf("refusing to downgrade from %s to %s; rerun with --force to override",
+				constant.Version, latest)
+		}
 	}
 
 	asset, err := pickReleaseAsset(rel.Assets)
@@ -98,29 +127,111 @@ func runUpdate(c *cli.Context) error {
 	return restartSystemdService()
 }
 
-func fetchLatestRelease(ctx context.Context) (*ghRelease, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, githubLatestReleaseAPI, nil)
-	if err != nil {
-		return nil, err
+func resolveChannel(flagVal, currentVersion string) (string, error) {
+	switch flagVal {
+	case channelStable, channelNightly:
+		return flagVal, nil
+	case channelAuto, "":
+		if isNightlyVersion(currentVersion) {
+			return channelNightly, nil
+		}
+		return channelStable, nil
+	default:
+		return "", fmt.Errorf("invalid --channel %q (want one of auto, stable, nightly)", flagVal)
 	}
-	req.Header.Set("Accept", "application/vnd.github+json")
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, err
+}
+
+func isNightlyVersion(v string) bool {
+	// goreleaser injects bare versions like "1.1.7-next" or "1.1.6"; both
+	// stable and nightly builds skip the leading "v". A nightly is anything
+	// carrying a prerelease suffix (currently "-next"), but we use a generic
+	// "contains a dash" check so future suffixes (e.g. "-rc.1") still work.
+	return strings.Contains(v, "-")
+}
+
+func fetchTargetRelease(ctx context.Context, channel string) (*ghRelease, error) {
+	switch channel {
+	case channelStable:
+		return fetchLatestStableRelease(ctx)
+	case channelNightly:
+		return fetchLatestNightlyRelease(ctx)
+	default:
+		return nil, fmt.Errorf("unknown channel %q", channel)
 	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
-		return nil, fmt.Errorf("github api %s: %s", resp.Status, strings.TrimSpace(string(body)))
-	}
+}
+
+func fetchLatestStableRelease(ctx context.Context) (*ghRelease, error) {
 	var rel ghRelease
-	if err := json.NewDecoder(resp.Body).Decode(&rel); err != nil {
+	if err := getJSON(ctx, githubLatestReleaseAPI, &rel); err != nil {
 		return nil, err
 	}
 	if rel.TagName == "" {
 		return nil, fmt.Errorf("empty tag name in github response")
 	}
 	return &rel, nil
+}
+
+func fetchLatestNightlyRelease(ctx context.Context) (*ghRelease, error) {
+	// /releases/latest excludes prereleases by design, so list recent
+	// releases and pick the freshest nightly ourselves.
+	var all []ghRelease
+	if err := getJSON(ctx, githubReleasesAPI, &all); err != nil {
+		return nil, err
+	}
+	var best *ghRelease
+	for i := range all {
+		r := &all[i]
+		if r.Draft || !r.Prerelease {
+			continue
+		}
+		if !strings.HasSuffix(r.TagName, nightlyTagSuffix) {
+			continue
+		}
+		if best == nil || r.PublishedAt.After(best.PublishedAt) {
+			best = r
+		}
+	}
+	if best == nil {
+		return nil, fmt.Errorf("no nightly release found (looking for tags ending in %q)", nightlyTagSuffix)
+	}
+	return best, nil
+}
+
+func getJSON(ctx context.Context, url string, out any) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Accept", "application/vnd.github+json")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
+		return fmt.Errorf("github api %s: %s", resp.Status, strings.TrimSpace(string(body)))
+	}
+	return json.NewDecoder(resp.Body).Decode(out)
+}
+
+// compareVersions returns -1/0/1 like semver.Compare. Inputs may have or
+// omit the leading "v"; unparseable inputs fall back to string compare so a
+// malformed version never crashes the updater (it just disables the
+// downgrade guard for that case, which --force handles).
+func compareVersions(a, b string) int {
+	va, vb := ensureV(a), ensureV(b)
+	if semver.IsValid(va) && semver.IsValid(vb) {
+		return semver.Compare(va, vb)
+	}
+	return strings.Compare(a, b)
+}
+
+func ensureV(s string) string {
+	if strings.HasPrefix(s, "v") {
+		return s
+	}
+	return "v" + s
 }
 
 func pickReleaseAsset(assets []ghAsset) (*ghAsset, error) {
