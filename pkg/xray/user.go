@@ -3,12 +3,12 @@ package xray
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"strconv"
 	"sync"
 	"time"
 
 	"github.com/Ehco1996/ehco/pkg/bytes"
+	myhttp "github.com/Ehco1996/ehco/pkg/http"
 	proxy "github.com/xtls/xray-core/app/proxyman/command"
 	stats "github.com/xtls/xray-core/app/stats/command"
 	"github.com/xtls/xray-core/common/protocol"
@@ -120,7 +120,6 @@ type UserPool struct {
 	// map key : ID
 	users map[int]*User
 
-	httpClient  *http.Client
 	proxyClient proxy.HandlerServiceClient
 	statsClient stats.StatsServiceClient
 
@@ -253,7 +252,10 @@ func (up *UserPool) syncTrafficToServer(ctx context.Context, proxyTag string) er
 			"Total Increment By Xray :", bytes.PrettyByteSize(float64(req.GetTotalTraffic())),
 		)
 	}
-	if err := postJson(up.httpClient, up.remoteConfigURL, req); err != nil {
+	// TODO: traffic accumulated in `tfs` has already been reset on each user
+	// at this point; if the upstream POST fails (after retries), this batch is
+	// lost. Persist unsent batches locally and replay them on the next tick.
+	if err := myhttp.PostJSONWithRetry(up.remoteConfigURL, req); err != nil {
 		return err
 	}
 	up.l.Sugar().Infof("Call syncTrafficToServer ONLINE USER COUNT: %d", len(tfs))
@@ -262,7 +264,7 @@ func (up *UserPool) syncTrafficToServer(ctx context.Context, proxyTag string) er
 
 func (up *UserPool) syncUserConfigsFromServer(ctx context.Context, proxyTag string) error {
 	resp := SyncUserConfigsResp{}
-	if err := getJson(up.httpClient, up.remoteConfigURL, &resp); err != nil {
+	if err := myhttp.GetJSONWithRetry(up.remoteConfigURL, &resp); err != nil {
 		return err
 	}
 	userM := make(map[int]struct{})
@@ -316,7 +318,6 @@ func (up *UserPool) Start(ctx context.Context) error {
 	}
 	up.proxyClient = proxy.NewHandlerServiceClient(conn)
 	up.statsClient = stats.NewStatsServiceClient(conn)
-	up.httpClient = &http.Client{Timeout: time.Second * 10}
 
 	syncOnce := func() error {
 		for _, tag := range up.proxyTags {
@@ -331,8 +332,11 @@ func (up *UserPool) Start(ctx context.Context) error {
 		}
 		return nil
 	}
+	// Tolerate a failed initial sync: starting up with an empty user pool is
+	// preferable to a crash-loop when the upstream is briefly unreachable.
+	// The periodic loop below will pick the users up on the next tick.
 	if err := syncOnce(); err != nil {
-		return err
+		up.l.Sugar().Errorf("Initial sync failed, will retry on next tick in %ds: %v", SyncTime, err)
 	}
 
 	ctx2, cancel := context.WithCancel(ctx)
@@ -345,7 +349,7 @@ func (up *UserPool) Start(ctx context.Context) error {
 				return
 			case <-ticker.C:
 				if err := syncOnce(); err != nil {
-					up.l.Error("Sync User Configs From Server Error: %v", zap.Error(err))
+					up.l.Error("sync failed, will retry on next tick", zap.Error(err))
 				}
 			}
 		}
