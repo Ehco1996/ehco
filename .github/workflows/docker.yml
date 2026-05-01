@@ -1,0 +1,158 @@
+name: docker-image
+
+on:
+  push:
+    branches:
+      - master
+    tags:
+      - "*"
+  workflow_dispatch:
+
+env:
+  REGISTRY_IMAGE: ehco1996/ehco
+
+permissions:
+  contents: read
+
+jobs:
+  build-bin:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v5
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: "1.26.1"
+          cache: true
+
+      - name: build binaries
+        run: |
+          rm -rf /tmp/ehco
+          mkdir -p /tmp/ehco
+          make build
+          mv ./dist/ehco /tmp/ehco/ehco-amd64
+          make build-arm
+          mv ./dist/ehco /tmp/ehco/ehco-arm64
+          cp ./build/Dockerfile /tmp/ehco/Dockerfile
+          ls -la /tmp/ehco
+
+      - name: Upload binaries
+        uses: actions/upload-artifact@v4
+        with:
+          name: binaries
+          path: /tmp/ehco
+          if-no-files-found: error
+          retention-days: 1
+
+  build-image:
+    runs-on: ubuntu-latest
+    needs: build-bin
+    strategy:
+      fail-fast: true
+      matrix:
+        platform: [amd64, arm64]
+    steps:
+      - name: Download binaries
+        uses: actions/download-artifact@v4
+        with:
+          name: binaries
+          path: /tmp/ehco
+
+      - name: Pick platform binary
+        run: cp /tmp/ehco/ehco-${{ matrix.platform }} /tmp/ehco/ehco
+
+      - name: Set up qemu
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build and push by digest
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: /tmp/ehco
+          file: /tmp/ehco/Dockerfile
+          platforms: linux/${{ matrix.platform }}
+          # Per-platform scope avoids the two matrix jobs clobbering each other,
+          # and ignore-error tolerates GHA's stale cache manifests (BlobNotFound)
+          # that previously hard-failed the build at COPY time.
+          cache-from: type=gha,scope=docker-${{ matrix.platform }},ignore-error=true
+          cache-to: type=gha,mode=max,scope=docker-${{ matrix.platform }}
+          outputs: type=image,name=${{ env.REGISTRY_IMAGE }},push-by-digest=true,name-canonical=true,push=true
+
+      - name: Export digest
+        run: |
+          mkdir -p /tmp/digests
+          digest="${{ steps.build.outputs.digest }}"
+          touch "/tmp/digests/${digest#sha256:}"
+
+      - name: Upload digest
+        uses: actions/upload-artifact@v4
+        with:
+          name: digests-${{ matrix.platform }}
+          path: /tmp/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  merge:
+    runs-on: ubuntu-latest
+    needs: build-image
+    steps:
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY_IMAGE }}
+          tags: |
+            type=sha
+            type=raw,value=latest
+            type=ref,event=tag
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Download digests
+        uses: actions/download-artifact@v4
+        with:
+          pattern: digests-*
+          path: /tmp/digests
+
+      - name: Create manifest list and push
+        working-directory: /tmp/digests
+        env:
+          META_TAGS: ${{ steps.meta.outputs.tags }}
+        run: |
+          ls -la /tmp/digests
+          AMD64_DIGEST=$(ls digests-amd64/ 2>/dev/null | head -n1)
+          ARM64_DIGEST=$(ls digests-arm64/ 2>/dev/null | head -n1)
+          if [ -z "$AMD64_DIGEST" ] || [ -z "$ARM64_DIGEST" ]; then
+            echo "Error: One or more digests are missing"
+            exit 1
+          fi
+
+          TAG_ARGS=""
+          while IFS= read -r tag; do
+            [ -n "$tag" ] && TAG_ARGS="$TAG_ARGS --tag $tag"
+          done <<< "$META_TAGS"
+
+          docker buildx imagetools create $TAG_ARGS \
+            "${REGISTRY_IMAGE}@sha256:${AMD64_DIGEST}" \
+            "${REGISTRY_IMAGE}@sha256:${ARM64_DIGEST}"
+
+      - name: Inspect image
+        run: docker buildx imagetools inspect ${{ env.REGISTRY_IMAGE }}:${{ steps.meta.outputs.version }}
