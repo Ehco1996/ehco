@@ -41,7 +41,7 @@ func CreateCliAPP() *cli.App {
 	app.Name = "ehco"
 	app.Flags = RootFlags
 	app.Version = constant.Version
-	app.Commands = []*cli.Command{InstallCMD}
+	app.Commands = []*cli.Command{InstallCMD, UpdateCMD}
 	app.Usage = "ehco is a network relay tool and a typo :)"
 	app.Action = startAction
 	return app
