@@ -6,26 +6,28 @@ on:
       - "*"
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build-go-bin:
     runs-on: ubuntu-latest
     steps:
+      - name: Check out code
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version: "1.26.1"
-        id: go
+          cache: true
 
-      - name: Check out code into the Go module directory
-        uses: actions/checkout@v4
-
-      - name: Get dependencies
-        run: go mod download
-
-      - name: GoReleaser Action
-        uses: goreleaser/goreleaser-action@v5
+      - name: GoReleaser
+        uses: goreleaser/goreleaser-action@v6
         with:
-          version: latest
+          version: "~> v1"
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GORELEASER_GITHUB_TOKEN }}
