@@ -6,6 +6,7 @@ import { Card, CardHeader } from "../ui/Card";
 import { Pill } from "../ui/Pill";
 import DescList from "../ui/DescList";
 import { api } from "../api/client";
+import { authInfo } from "../store/auth";
 import { theme, toggleTheme } from "../store/theme";
 
 export default function Settings() {
@@ -63,6 +64,16 @@ export default function Settings() {
                 [
                   "web bind",
                   `${config()!.web_host ?? "0.0.0.0"}:${config()!.web_port ?? "—"}`,
+                ],
+                [
+                  "auth",
+                  authInfo().basic && authInfo().token
+                    ? "basic + token"
+                    : authInfo().basic
+                      ? "basic"
+                      : authInfo().token
+                        ? "token"
+                        : "none",
                 ],
               ]}
             />
@@ -141,9 +152,24 @@ export default function Settings() {
             <Endpoint method="GET" path="/metrics/" />
             <Endpoint method="WS" path="/ws/logs" />
           </ul>
-          <div class="mt-3 inline-flex items-center gap-1 text-xs text-zinc-500">
-            <Plug size={12} /> All endpoints require{" "}
-            <code class="font-mono">?token=</code> when web_token is set.
+          <div class="mt-3 inline-flex flex-wrap items-center gap-1 text-xs text-zinc-500">
+            <Plug size={12} />
+            <Show
+              when={authInfo().token || authInfo().basic}
+              fallback={<span>No auth configured — all endpoints are open.</span>}
+            >
+              <span>
+                Requires{" "}
+                <Show when={authInfo().token}>
+                  <code class="font-mono">?token=</code>
+                </Show>
+                <Show when={authInfo().token && authInfo().basic}> + </Show>
+                <Show when={authInfo().basic}>
+                  <code class="font-mono">Authorization: Basic</code>
+                </Show>
+                .
+              </span>
+            </Show>
           </div>
         </Card>
       </div>

@@ -14,8 +14,10 @@ import {
   LogOut,
 } from "lucide-solid";
 import { theme, toggleTheme } from "../store/theme";
-import { signOut } from "../store/auth";
+import { authInfo, signOut } from "../store/auth";
 import Logo from "../ui/Logo";
+
+const authConfigured = () => authInfo().token || authInfo().basic;
 
 interface NavItem {
   href: string;
@@ -61,9 +63,11 @@ export default function Layout(props: { children?: JSX.Element }) {
           <NavButton onClick={toggleTheme} icon={theme() === "dark" ? Sun : Moon}>
             {theme() === "dark" ? "Light mode" : "Dark mode"}
           </NavButton>
-          <NavButton onClick={signOut} icon={LogOut}>
-            Sign out
-          </NavButton>
+          <Show when={authConfigured()}>
+            <NavButton onClick={signOut} icon={LogOut}>
+              Sign out
+            </NavButton>
+          </Show>
         </div>
       </aside>
 
@@ -121,16 +125,18 @@ export default function Layout(props: { children?: JSX.Element }) {
               {moreMobile.map((l) => (
                 <SheetTile {...l} onClose={() => setMoreOpen(false)} />
               ))}
-              <button
-                class="flex flex-col items-center justify-center gap-1 rounded-xl border border-zinc-200 p-3 text-xs font-medium text-rose-600 hover:bg-rose-50 dark:border-zinc-800 dark:text-rose-400 dark:hover:bg-rose-950/40"
-                onClick={() => {
-                  setMoreOpen(false);
-                  signOut();
-                }}
-              >
-                <LogOut size={20} />
-                Sign out
-              </button>
+              <Show when={authConfigured()}>
+                <button
+                  class="flex flex-col items-center justify-center gap-1 rounded-xl border border-zinc-200 p-3 text-xs font-medium text-rose-600 hover:bg-rose-50 dark:border-zinc-800 dark:text-rose-400 dark:hover:bg-rose-950/40"
+                  onClick={() => {
+                    setMoreOpen(false);
+                    signOut();
+                  }}
+                >
+                  <LogOut size={20} />
+                  Sign out
+                </button>
+              </Show>
             </div>
           </div>
         </div>
