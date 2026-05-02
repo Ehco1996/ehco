@@ -1,20 +1,23 @@
-import { createSignal } from "solid-js";
-import { KeyRound, Palette, RotateCw, Plug } from "lucide-solid";
+import { createResource, createSignal, Show } from "solid-js";
+import { KeyRound, Palette, RotateCw, Plug, Copy, Check } from "lucide-solid";
 import PageHeader from "../ui/PageHeader";
 import Button from "../ui/Button";
 import { Input } from "../ui/Input";
 import { Card, CardHeader } from "../ui/Card";
 import { Pill } from "../ui/Pill";
+import DescList from "../ui/DescList";
 import { api } from "../api/client";
 import { saveToken, token } from "../store/auth";
 import { theme, toggleTheme } from "../store/theme";
 
 export default function Settings() {
+  const [config] = createResource(() => api.config());
   const [tokenInput, setTokenInput] = createSignal(token());
   const [reloadStatus, setReloadStatus] = createSignal<{
     tone: "ok" | "error" | "neutral";
     text: string;
   } | null>(null);
+  const [copied, setCopied] = createSignal(false);
 
   const triggerReload = async () => {
     if (
@@ -32,14 +35,87 @@ export default function Settings() {
     }
   };
 
+  const copySync = async () => {
+    const v = String(config()?.sync_traffic_endpoint ?? "");
+    if (!v) return;
+    try {
+      await navigator.clipboard.writeText(v);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1200);
+    } catch {
+      /* ignore */
+    }
+  };
+
   return (
     <>
       <PageHeader
         title="Settings"
-        subtitle="Local UI preferences and a few admin actions."
+        subtitle="Local UI preferences, runtime config, admin actions."
       />
 
       <div class="grid gap-3 lg:grid-cols-2">
+        <Show when={config()}>
+          <Card>
+            <CardHeader title="Runtime configuration" subtitle="Read-only snapshot" />
+            <DescList
+              items={[
+                ["log level", String(config()!.log_level ?? "—")],
+                ["reload interval", `${config()!.reload_interval ?? 0}s`],
+                ["ping", config()!.enable_ping ? "enabled" : "disabled"],
+                [
+                  "web bind",
+                  `${config()!.web_host ?? "0.0.0.0"}:${config()!.web_port ?? "—"}`,
+                ],
+              ]}
+            />
+          </Card>
+
+          <Card>
+            <CardHeader
+              title="Sync endpoint"
+              subtitle="Where ehco POSTs traffic stats"
+              right={
+                <button
+                  class="inline-flex items-center gap-1 text-xs text-zinc-500 hover:text-emerald-600 dark:hover:text-emerald-400"
+                  onClick={copySync}
+                  disabled={!config()!.sync_traffic_endpoint}
+                >
+                  {copied() ? <Check size={12} /> : <Copy size={12} />}
+                  {copied() ? "copied" : "copy"}
+                </button>
+              }
+            />
+            <p class="break-all rounded-md border border-zinc-200 bg-zinc-50 p-2.5 font-mono text-xs text-zinc-700 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-300">
+              {String(config()!.sync_traffic_endpoint ?? "—")}
+            </p>
+          </Card>
+        </Show>
+
+        <Card>
+          <CardHeader
+            title="Reload configuration"
+            subtitle="Re-fetch from upstream"
+          />
+          <p class="mb-3 text-sm text-zinc-500">
+            A listener change reloads xray and drops active conns.
+          </p>
+          <div class="flex items-center gap-3">
+            <Button
+              variant="primary"
+              leadingIcon={<RotateCw size={13} />}
+              onClick={triggerReload}
+            >
+              Reload
+            </Button>
+            {reloadStatus() && (
+              <Pill tone={reloadStatus()!.tone} dot>
+                {reloadStatus()!.text}
+              </Pill>
+            )}
+          </div>
+        </Card>
+
         <Card>
           <CardHeader
             title="Access token"
@@ -78,36 +154,12 @@ export default function Settings() {
           </div>
         </Card>
 
-        <Card>
-          <CardHeader
-            title="Reload configuration"
-            subtitle="Re-fetch from upstream"
-          />
-          <p class="mb-3 text-sm text-zinc-500">
-            A listener change reloads xray and drops active conns.
-          </p>
-          <div class="flex items-center gap-3">
-            <Button
-              variant="primary"
-              leadingIcon={<RotateCw size={13} />}
-              onClick={triggerReload}
-            >
-              Reload
-            </Button>
-            {reloadStatus() && (
-              <Pill tone={reloadStatus()!.tone} dot>
-                {reloadStatus()!.text}
-              </Pill>
-            )}
-          </div>
-        </Card>
-
-        <Card>
+        <Card class="lg:col-span-2">
           <CardHeader
             title="API surface"
             subtitle="Endpoints the UI consumes"
           />
-          <ul class="space-y-1 font-mono text-xs text-zinc-600 dark:text-zinc-400">
+          <ul class="grid grid-cols-1 gap-y-1 font-mono text-xs text-zinc-600 sm:grid-cols-2 dark:text-zinc-400">
             <Endpoint method="GET" path="/api/v1/config/" />
             <Endpoint method="POST" path="/api/v1/config/reload/" />
             <Endpoint method="GET" path="/api/v1/health_check/" />

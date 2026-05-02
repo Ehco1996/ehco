@@ -49,7 +49,7 @@ export default function App() {
           <Route path="/rules" component={Rules} />
           <Route path="/xray/conns" component={XrayConns} />
           <Route path="/xray/users" component={XrayUsers} />
-          <Route path="/node" component={NodeMetrics} />
+          <Route path="/host" component={NodeMetrics} />
           <Route path="/logs" component={Logs} />
           <Route path="/settings" component={Settings} />
           <Route path="*" component={Overview} />

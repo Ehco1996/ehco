@@ -5,18 +5,19 @@ import Button from "../ui/Button";
 import { Card, CardHeader } from "../ui/Card";
 import EmptyState from "../ui/EmptyState";
 import Chart from "../ui/Chart";
+import Segmented from "../ui/Segmented";
 import { api } from "../api/client";
 import { bytes, pct } from "../util/format";
 
 const WINDOWS = [
-  { label: "5m", seconds: 5 * 60 },
-  { label: "1h", seconds: 60 * 60 },
-  { label: "6h", seconds: 6 * 60 * 60 },
-  { label: "24h", seconds: 24 * 60 * 60 },
-];
+  { value: 5 * 60, label: "5m" },
+  { value: 60 * 60, label: "1h" },
+  { value: 6 * 60 * 60, label: "6h" },
+  { value: 24 * 60 * 60, label: "24h" },
+] as const;
 
 export default function NodeMetrics() {
-  const [windowSec, setWindowSec] = createSignal(WINDOWS[1].seconds);
+  const [windowSec, setWindowSec] = createSignal<number>(WINDOWS[1].value);
 
   const [data, { refetch }] = createResource(windowSec, async (sec) => {
     const end = Math.floor(Date.now() / 1000);
@@ -28,25 +29,15 @@ export default function NodeMetrics() {
   return (
     <>
       <PageHeader
-        title="Node Metrics"
+        title="Host"
         subtitle="System resource utilisation reported by the embedded collector."
         actions={
           <>
-            <div class="inline-flex overflow-hidden rounded-md border border-zinc-200 dark:border-zinc-800">
-              {WINDOWS.map((w) => (
-                <button
-                  class={
-                    "h-8 px-2.5 text-xs font-medium transition-colors " +
-                    (windowSec() === w.seconds
-                      ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400"
-                      : "text-zinc-600 hover:bg-zinc-50 dark:text-zinc-400 dark:hover:bg-zinc-800")
-                  }
-                  onClick={() => setWindowSec(w.seconds)}
-                >
-                  {w.label}
-                </button>
-              ))}
-            </div>
+            <Segmented
+              options={WINDOWS.map((w) => ({ value: w.value, label: w.label }))}
+              value={windowSec()}
+              onChange={setWindowSec}
+            />
             <Button
               size="sm"
               leadingIcon={<RefreshCcw size={13} />}

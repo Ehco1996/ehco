@@ -5,7 +5,7 @@ import {
   ServerCog,
   Users,
   Cable,
-  Activity,
+  HardDrive,
   ScrollText,
   Settings,
   Menu,
@@ -18,17 +18,34 @@ import { theme, toggleTheme } from "../store/theme";
 import { clearToken } from "../store/auth";
 import Logo from "../ui/Logo";
 
-const primaryNav = [
+interface NavItem {
+  href: string;
+  label: string;
+  icon: typeof LayoutDashboard;
+  end?: boolean;
+}
+
+const liveNav: NavItem[] = [
   { href: "/", label: "Overview", icon: LayoutDashboard, end: true },
-  { href: "/xray/conns", label: "Conns", icon: Cable },
   { href: "/xray/users", label: "Users", icon: Users },
+  { href: "/xray/conns", label: "Conns", icon: Cable },
   { href: "/logs", label: "Logs", icon: ScrollText },
 ];
-const moreNav = [
+
+const configNav: NavItem[] = [
   { href: "/rules", label: "Rules", icon: ServerCog },
-  { href: "/node", label: "Node", icon: Activity },
+  { href: "/host", label: "Host", icon: HardDrive },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
+
+// Mobile bottom-bar — five items max for usable touch targets.
+const primaryMobile: NavItem[] = [
+  { href: "/", label: "Overview", icon: LayoutDashboard, end: true },
+  { href: "/xray/users", label: "Users", icon: Users },
+  { href: "/xray/conns", label: "Conns", icon: Cable },
+  { href: "/logs", label: "Logs", icon: ScrollText },
+];
+const moreMobile: NavItem[] = configNav;
 
 export default function Layout(props: { children?: JSX.Element }) {
   const [moreOpen, setMoreOpen] = createSignal(false);
@@ -38,12 +55,11 @@ export default function Layout(props: { children?: JSX.Element }) {
       {/* ===== Desktop sidebar ===== */}
       <aside class="hidden w-56 shrink-0 flex-col border-r border-zinc-200 bg-white px-3 py-4 md:flex dark:border-zinc-800 dark:bg-zinc-900">
         <Brand />
-        <nav class="mt-6 flex flex-1 flex-col gap-0.5">
-          {[...primaryNav, ...moreNav].map((l) => (
-            <NavLink {...l} />
-          ))}
+        <nav class="mt-6 flex flex-1 flex-col gap-4">
+          <NavGroup label="Live" items={liveNav} />
+          <NavGroup label="Config" items={configNav} />
         </nav>
-        <div class="mt-3 flex flex-col gap-0.5">
+        <div class="mt-3 flex flex-col gap-0.5 border-t border-zinc-200 pt-3 dark:border-zinc-800">
           <NavButton onClick={toggleTheme} icon={theme() === "dark" ? Sun : Moon}>
             {theme() === "dark" ? "Light mode" : "Dark mode"}
           </NavButton>
@@ -78,7 +94,7 @@ export default function Layout(props: { children?: JSX.Element }) {
 
       {/* ===== Mobile bottom tab bar ===== */}
       <nav class="safe-bottom fixed inset-x-0 bottom-0 z-30 flex h-14 items-stretch border-t border-zinc-200 bg-white/95 backdrop-blur md:hidden dark:border-zinc-800 dark:bg-zinc-900/95">
-        {primaryNav.map((l) => (
+        {primaryMobile.map((l) => (
           <TabLink {...l} />
         ))}
         <button
@@ -110,7 +126,7 @@ export default function Layout(props: { children?: JSX.Element }) {
               </button>
             </div>
             <div class="grid grid-cols-3 gap-2 px-2 pb-3 pt-1">
-              {moreNav.map((l) => (
+              {moreMobile.map((l) => (
                 <SheetTile {...l} onClose={() => setMoreOpen(false)} />
               ))}
               <button
@@ -131,6 +147,19 @@ export default function Layout(props: { children?: JSX.Element }) {
   );
 }
 
+function NavGroup(props: { label: string; items: NavItem[] }) {
+  return (
+    <div class="flex flex-col gap-0.5">
+      <div class="px-3 pb-1 text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
+        {props.label}
+      </div>
+      {props.items.map((l) => (
+        <NavLink {...l} />
+      ))}
+    </div>
+  );
+}
+
 function Brand(props: { compact?: boolean }) {
   return (
     <div class="flex items-center gap-2.5">
@@ -145,18 +174,13 @@ function Brand(props: { compact?: boolean }) {
   );
 }
 
-function NavLink(props: {
-  href: string;
-  label: string;
-  icon: typeof LayoutDashboard;
-  end?: boolean;
-}) {
+function NavLink(props: NavItem) {
   const Icon = props.icon;
   return (
     <A
       href={props.href}
       end={props.end}
-      class="flex items-center gap-2.5 rounded-md px-3 py-2 text-sm text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
+      class="flex items-center gap-2.5 rounded-md px-3 py-1.5 text-sm text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
       activeClass="!bg-emerald-50 !text-emerald-700 dark:!bg-emerald-500/10 dark:!text-emerald-400"
     >
       <Icon size={16} />
@@ -174,7 +198,7 @@ function NavButton(props: {
   return (
     <button
       onClick={props.onClick}
-      class="flex items-center gap-2.5 rounded-md px-3 py-2 text-left text-sm text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
+      class="flex items-center gap-2.5 rounded-md px-3 py-1.5 text-left text-sm text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
     >
       <Icon size={16} />
       {props.children}
@@ -182,12 +206,7 @@ function NavButton(props: {
   );
 }
 
-function TabLink(props: {
-  href: string;
-  label: string;
-  icon: typeof LayoutDashboard;
-  end?: boolean;
-}) {
+function TabLink(props: NavItem) {
   const Icon = props.icon;
   return (
     <A
@@ -202,12 +221,7 @@ function TabLink(props: {
   );
 }
 
-function SheetTile(props: {
-  href: string;
-  label: string;
-  icon: typeof LayoutDashboard;
-  onClose: () => void;
-}) {
+function SheetTile(props: NavItem & { onClose: () => void }) {
   const Icon = props.icon;
   return (
     <A

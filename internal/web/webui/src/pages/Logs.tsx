@@ -1,11 +1,12 @@
-import { createSignal, For, onCleanup, onMount, Show } from "solid-js";
-import { Pause, Play, Trash2, ArrowDown, ScrollText } from "lucide-solid";
+import { createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js";
+import { Pause, Play, Trash2, ArrowDown, ScrollText, AlertCircle } from "lucide-solid";
 import PageHeader from "../ui/PageHeader";
 import Toolbar from "../ui/Toolbar";
 import Button from "../ui/Button";
 import { Input, Select } from "../ui/Input";
 import { Pill } from "../ui/Pill";
 import EmptyState from "../ui/EmptyState";
+import Segmented from "../ui/Segmented";
 import { connectLogs } from "../api/ws";
 import type { LogFrame } from "../api/types";
 
@@ -25,13 +26,18 @@ const levelTone: Record<
   fatal: "error",
 };
 
+const ERROR_LEVELS = new Set(["error", "dpanic", "panic", "fatal"]);
+
+type LevelFilter = "all" | "info" | "warn" | "error";
+
 export default function Logs() {
   const [frames, setFrames] = createSignal<LogFrame[]>([]);
   const [status, setStatus] = createSignal<"open" | "closed" | "error">(
     "closed",
   );
   const [filter, setFilter] = createSignal("");
-  const [levelMin, setLevelMin] = createSignal("");
+  const [levelMin, setLevelMin] = createSignal<LevelFilter>("all");
+  const [logger, setLogger] = createSignal("");
   const [paused, setPaused] = createSignal(false);
   const [tail, setTail] = createSignal(true);
   let pane!: HTMLDivElement;
@@ -57,17 +63,32 @@ export default function Logs() {
     onCleanup(() => handle.close());
   });
 
-  const filtered = () => {
+  const loggers = createMemo(() => {
+    const seen = new Set<string>();
+    for (const f of frames()) if (f.logger) seen.add(f.logger);
+    return Array.from(seen).sort();
+  });
+
+  const errorCount = createMemo(
+    () => frames().filter((x) => ERROR_LEVELS.has((x.level ?? "").toLowerCase())).length,
+  );
+
+  const filtered = createMemo(() => {
     const f = filter().trim().toLowerCase();
-    const lvl = levelMin().toLowerCase();
+    const lvl = levelMin();
+    const lg = logger();
     return frames().filter((x) => {
-      if (lvl && (x.level ?? "").toLowerCase() !== lvl) return false;
+      const xl = (x.level ?? "").toLowerCase();
+      if (lvl === "error" && !ERROR_LEVELS.has(xl)) return false;
+      if (lvl === "warn" && !ERROR_LEVELS.has(xl) && xl !== "warn" && xl !== "warning") return false;
+      if (lvl === "info" && (xl === "debug" || xl === "")) return false;
+      if (lg && (x.logger ?? "") !== lg) return false;
       if (!f) return true;
       const blob =
         `${x.msg ?? ""} ${x.logger ?? ""} ${x.caller ?? ""}`.toLowerCase();
       return blob.includes(f);
     });
-  };
+  });
 
   return (
     <>
@@ -75,43 +96,59 @@ export default function Logs() {
         title="Logs"
         subtitle="Live tail of the in-process zap logger via /ws/logs."
         actions={
-          <Pill
-            tone={
-              status() === "open"
-                ? "ok"
+          <>
+            <Show when={errorCount() > 0}>
+              <Pill tone="error" dot>
+                {errorCount()} errors
+              </Pill>
+            </Show>
+            <Pill
+              tone={
+                status() === "open"
+                  ? "ok"
+                  : status() === "error"
+                    ? "error"
+                    : "neutral"
+              }
+              dot
+              pulse={status() === "open"}
+            >
+              {status() === "open"
+                ? "connected"
                 : status() === "error"
                   ? "error"
-                  : "neutral"
-            }
-            dot
-            pulse={status() === "open"}
-          >
-            {status() === "open"
-              ? "connected"
-              : status() === "error"
-                ? "error"
-                : "disconnected"}
-          </Pill>
+                  : "disconnected"}
+            </Pill>
+          </>
         }
       />
 
       <Toolbar>
+        <Segmented<LevelFilter>
+          options={[
+            { value: "all", label: "All" },
+            { value: "info", label: "Info+" },
+            { value: "warn", label: "Warn+" },
+            { value: "error", label: <span class="inline-flex items-center gap-1"><AlertCircle size={11} />Errors</span> },
+          ]}
+          value={levelMin()}
+          onChange={setLevelMin}
+        />
+        <Select
+          value={logger()}
+          onChange={(e) => setLogger(e.currentTarget.value)}
+        >
+          <option value="">all loggers</option>
+          <For each={loggers()}>
+            {(l) => <option value={l}>{l}</option>}
+          </For>
+        </Select>
         <Input
           class="min-w-[160px] flex-1"
           placeholder="search msg / logger / caller"
           value={filter()}
           onInput={(e) => setFilter(e.currentTarget.value)}
         />
-        <Select
-          value={levelMin()}
-          onChange={(e) => setLevelMin(e.currentTarget.value)}
-        >
-          <option value="">all levels</option>
-          <option value="debug">debug</option>
-          <option value="info">info</option>
-          <option value="warn">warn</option>
-          <option value="error">error</option>
-        </Select>
         <Button
           size="sm"
           leadingIcon={paused() ? <Play size={13} /> : <Pause size={13} />}
@@ -134,7 +171,7 @@ export default function Logs() {
         >
           Clear
         </Button>
-        <span class="ml-auto text-xs text-zinc-500">
+        <span class="ml-auto text-xs text-zinc-500 tabular-nums">
           {filtered().length} / {frames().length}
         </span>
       </Toolbar>
