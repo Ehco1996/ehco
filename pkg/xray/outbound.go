@@ -95,8 +95,12 @@ func (h *meteredOutbound) Dispatch(ctx context.Context, link *transport.Link) {
 	defer h.tracker.Unregister(connID)
 	defer rawConn.Close()
 
-	reader := wrapReader(buf.NewReader(rawConn), user, downlink)
-	writer := wrapWriter(buf.NewWriter(rawConn), user, uplink)
+	var reader buf.Reader = buf.NewReader(rawConn)
+	var writer buf.Writer = buf.NewWriter(rawConn)
+	if user != nil {
+		reader = &meteringReader{inner: reader, user: user}
+		writer = &meteringWriter{inner: writer, user: user}
+	}
 
 	requestDone := func() error {
 		if err := buf.Copy(link.Reader, writer); err != nil {
@@ -125,14 +129,8 @@ func (h *meteredOutbound) Dispatch(ctx context.Context, link *transport.Link) {
 	common.Interrupt(link.Reader)
 }
 
-type direction int
-
-const (
-	uplink direction = iota
-	downlink
-)
-
-// meteringReader wraps a buf.Reader and bumps the user's downlink counter.
+// meteringReader / meteringWriter wrap the dialed conn at the buf layer so
+// every chunk going through bumps the user's atomic counter.
 type meteringReader struct {
 	inner buf.Reader
 	user  *User
@@ -140,51 +138,24 @@ type meteringReader struct {
 
 func (r *meteringReader) ReadMultiBuffer() (buf.MultiBuffer, error) {
 	mb, err := r.inner.ReadMultiBuffer()
-	if user := r.user; user != nil && mb != nil {
-		var n int64
-		for _, b := range mb {
-			n += int64(b.Len())
-		}
-		if n > 0 {
-			user.AddDownloadTraffic(n)
-		}
-	}
+	r.user.AddDownloadTraffic(mbLen(mb))
 	return mb, err
 }
 
-// meteringWriter wraps a buf.Writer and bumps the user's uplink counter.
 type meteringWriter struct {
 	inner buf.Writer
 	user  *User
 }
 
 func (w *meteringWriter) WriteMultiBuffer(mb buf.MultiBuffer) error {
-	if user := w.user; user != nil && mb != nil {
-		var n int64
-		for _, b := range mb {
-			n += int64(b.Len())
-		}
-		if n > 0 {
-			user.AddUploadTraffic(n)
-		}
-	}
+	w.user.AddUploadTraffic(mbLen(mb))
 	return w.inner.WriteMultiBuffer(mb)
 }
 
-func (w *meteringWriter) Close() error {
-	return common.Close(w.inner)
-}
-
-func wrapReader(r buf.Reader, user *User, _ direction) buf.Reader {
-	if user == nil {
-		return r
+func mbLen(mb buf.MultiBuffer) int64 {
+	var n int64
+	for _, b := range mb {
+		n += int64(b.Len())
 	}
-	return &meteringReader{inner: r, user: user}
-}
-
-func wrapWriter(w buf.Writer, user *User, _ direction) buf.Writer {
-	if user == nil {
-		return w
-	}
-	return &meteringWriter{inner: w, user: user}
+	return n
 }

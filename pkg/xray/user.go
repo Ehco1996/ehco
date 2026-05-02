@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -256,32 +257,11 @@ func (up *UserPool) removeInboundUser(ctx context.Context, tag string, user *Use
 }
 
 func isAlreadyExists(err error) bool {
-	return err != nil && containsLower(err.Error(), "already exists")
+	return err != nil && strings.Contains(strings.ToLower(err.Error()), "already exists")
 }
 
 func isNotFound(err error) bool {
-	return err != nil && containsLower(err.Error(), "not found")
-}
-
-func containsLower(s, sub string) bool {
-	// simple case-insensitive contains; sub is expected lower-case
-	for i := 0; i+len(sub) <= len(s); i++ {
-		match := true
-		for j := 0; j < len(sub); j++ {
-			c := s[i+j]
-			if c >= 'A' && c <= 'Z' {
-				c += 'a' - 'A'
-			}
-			if c != sub[j] {
-				match = false
-				break
-			}
-		}
-		if match {
-			return true
-		}
-	}
-	return false
+	return err != nil && strings.Contains(strings.ToLower(err.Error()), "not found")
 }
 
 func (up *UserPool) syncTrafficToServer(ctx context.Context) error {
