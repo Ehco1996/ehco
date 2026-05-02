@@ -1,20 +1,21 @@
-import { createSignal } from "solid-js";
-import { KeyRound, Palette, RotateCw, Plug } from "lucide-solid";
+import { createResource, createSignal, Show } from "solid-js";
+import { Palette, RotateCw, Plug, Copy, Check } from "lucide-solid";
 import PageHeader from "../ui/PageHeader";
 import Button from "../ui/Button";
-import { Input } from "../ui/Input";
 import { Card, CardHeader } from "../ui/Card";
 import { Pill } from "../ui/Pill";
+import DescList from "../ui/DescList";
 import { api } from "../api/client";
-import { saveToken, token } from "../store/auth";
+import { authInfo } from "../store/auth";
 import { theme, toggleTheme } from "../store/theme";
 
 export default function Settings() {
-  const [tokenInput, setTokenInput] = createSignal(token());
+  const [config] = createResource(() => api.config());
   const [reloadStatus, setReloadStatus] = createSignal<{
     tone: "ok" | "error" | "neutral";
     text: string;
   } | null>(null);
+  const [copied, setCopied] = createSignal(false);
 
   const triggerReload = async () => {
     if (
@@ -32,51 +33,72 @@ export default function Settings() {
     }
   };
 
+  const copySync = async () => {
+    const v = String(config()?.sync_traffic_endpoint ?? "");
+    if (!v) return;
+    try {
+      await navigator.clipboard.writeText(v);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1200);
+    } catch {
+      /* ignore */
+    }
+  };
+
   return (
     <>
       <PageHeader
         title="Settings"
-        subtitle="Local UI preferences and a few admin actions."
+        subtitle="Local UI preferences, runtime config, admin actions."
       />
 
       <div class="grid gap-3 lg:grid-cols-2">
-        <Card>
-          <CardHeader
-            title="Access token"
-            subtitle="Appended to every API request as ?token=…"
-          />
-          <p class="mb-3 text-sm text-zinc-500">
-            Stored in <code class="font-mono text-xs">sessionStorage</code>.
-            Leave empty if your ehco instance has no{" "}
-            <code class="font-mono text-xs">web_token</code>.
-          </p>
-          <div class="flex gap-2">
-            <Input
-              type="password"
-              mono
-              placeholder="paste token"
-              value={tokenInput()}
-              onInput={(e) => setTokenInput(e.currentTarget.value)}
+        <Show when={config()}>
+          <Card>
+            <CardHeader title="Runtime configuration" subtitle="Read-only snapshot" />
+            <DescList
+              items={[
+                ["log level", String(config()!.log_level ?? "—")],
+                ["reload interval", `${config()!.reload_interval ?? 0}s`],
+                ["ping", config()!.enable_ping ? "enabled" : "disabled"],
+                [
+                  "web bind",
+                  `${config()!.web_host ?? "0.0.0.0"}:${config()!.web_port ?? "—"}`,
+                ],
+                [
+                  "auth",
+                  authInfo().basic && authInfo().token
+                    ? "basic + token"
+                    : authInfo().basic
+                      ? "basic"
+                      : authInfo().token
+                        ? "token"
+                        : "none",
+                ],
+              ]}
             />
-            <Button
-              variant="primary"
-              leadingIcon={<KeyRound size={13} />}
-              onClick={() => saveToken(tokenInput().trim())}
-            >
-              Save
-            </Button>
-          </div>
-        </Card>
+          </Card>
 
-        <Card>
-          <CardHeader title="Theme" subtitle="Light / dark mode override" />
-          <div class="flex items-center gap-3">
-            <Pill tone="neutral">{theme()}</Pill>
-            <Button leadingIcon={<Palette size={13} />} onClick={toggleTheme}>
-              Toggle
-            </Button>
-          </div>
-        </Card>
+          <Card>
+            <CardHeader
+              title="Sync endpoint"
+              subtitle="Where ehco POSTs traffic stats"
+              right={
+                <button
+                  class="inline-flex items-center gap-1 text-xs text-zinc-500 hover:text-emerald-600 dark:hover:text-emerald-400"
+                  onClick={copySync}
+                  disabled={!config()!.sync_traffic_endpoint}
+                >
+                  {copied() ? <Check size={12} /> : <Copy size={12} />}
+                  {copied() ? "copied" : "copy"}
+                </button>
+              }
+            />
+            <p class="break-all rounded-md border border-zinc-200 bg-zinc-50 p-2.5 font-mono text-xs text-zinc-700 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-300">
+              {String(config()!.sync_traffic_endpoint ?? "—")}
+            </p>
+          </Card>
+        </Show>
 
         <Card>
           <CardHeader
@@ -103,11 +125,21 @@ export default function Settings() {
         </Card>
 
         <Card>
+          <CardHeader title="Theme" subtitle="Light / dark mode override" />
+          <div class="flex items-center gap-3">
+            <Pill tone="neutral">{theme()}</Pill>
+            <Button leadingIcon={<Palette size={13} />} onClick={toggleTheme}>
+              Toggle
+            </Button>
+          </div>
+        </Card>
+
+        <Card class="lg:col-span-2">
           <CardHeader
             title="API surface"
             subtitle="Endpoints the UI consumes"
           />
-          <ul class="space-y-1 font-mono text-xs text-zinc-600 dark:text-zinc-400">
+          <ul class="grid grid-cols-1 gap-y-1 font-mono text-xs text-zinc-600 sm:grid-cols-2 dark:text-zinc-400">
             <Endpoint method="GET" path="/api/v1/config/" />
             <Endpoint method="POST" path="/api/v1/config/reload/" />
             <Endpoint method="GET" path="/api/v1/health_check/" />
@@ -120,9 +152,24 @@ export default function Settings() {
             <Endpoint method="GET" path="/metrics/" />
             <Endpoint method="WS" path="/ws/logs" />
           </ul>
-          <div class="mt-3 inline-flex items-center gap-1 text-xs text-zinc-500">
-            <Plug size={12} /> All endpoints require{" "}
-            <code class="font-mono">?token=</code> when web_token is set.
+          <div class="mt-3 inline-flex flex-wrap items-center gap-1 text-xs text-zinc-500">
+            <Plug size={12} />
+            <Show
+              when={authInfo().token || authInfo().basic}
+              fallback={<span>No auth configured — all endpoints are open.</span>}
+            >
+              <span>
+                Requires{" "}
+                <Show when={authInfo().token}>
+                  <code class="font-mono">?token=</code>
+                </Show>
+                <Show when={authInfo().token && authInfo().basic}> + </Show>
+                <Show when={authInfo().basic}>
+                  <code class="font-mono">Authorization: Basic</code>
+                </Show>
+                .
+              </span>
+            </Show>
           </div>
         </Card>
       </div>

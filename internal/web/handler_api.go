@@ -95,6 +95,16 @@ func (s *Server) GetRuleMetrics(c echo.Context) error {
 	return c.JSON(http.StatusOK, metrics)
 }
 
+// AuthInfo reports which auth schemes the server is enforcing so the
+// SPA can render the right login form before any credentials exist.
+// Public — must remain reachable without auth.
+func (s *Server) AuthInfo(c echo.Context) error {
+	return c.JSON(http.StatusOK, map[string]bool{
+		"token": s.cfg.WebToken != "",
+		"basic": s.cfg.WebAuthUser != "" && s.cfg.WebAuthPass != "",
+	})
+}
+
 func (s *Server) CurrentConfig(c echo.Context) error {
 	ret, err := json.Marshal(s.cfg)
 	if err != nil {

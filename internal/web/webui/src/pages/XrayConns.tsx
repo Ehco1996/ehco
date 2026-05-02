@@ -1,48 +1,50 @@
-import { createResource, createSignal, For, onCleanup, Show } from "solid-js";
+import { createMemo, createResource, createSignal, For, Show } from "solid-js";
 import { useSearchParams } from "@solidjs/router";
-import { Pause, Play, RefreshCcw, Cable } from "lucide-solid";
+import { Cable, X as XIcon } from "lucide-solid";
 import PageHeader from "../ui/PageHeader";
 import Toolbar from "../ui/Toolbar";
 import Button from "../ui/Button";
 import { Input, Select } from "../ui/Input";
 import { Pill } from "../ui/Pill";
-import { TableScroll, tableClasses as t } from "../ui/Table";
 import EmptyState from "../ui/EmptyState";
-import { Card } from "../ui/Card";
+import Segmented from "../ui/Segmented";
+import DataTable, { Column } from "../ui/DataTable";
+import RefreshPicker from "../ui/RefreshPicker";
 import { api } from "../api/client";
 import { relTime } from "../util/format";
 import { ipKind, ipKindLabel, ipKindTone } from "../util/ip";
+import { usePolling } from "../util/polling";
 import type { XrayConn } from "../api/types";
 
-const REFRESH_MS = 2000;
+type GroupMode = "flat" | "user" | "target";
 
 export default function XrayConns() {
-  const [params, setParams] = useSearchParams<{ user?: string; net?: string }>();
-  const [paused, setPaused] = createSignal(false);
+  const [params, setParams] = useSearchParams<{
+    user?: string;
+    net?: string;
+    group?: string;
+  }>();
   const [busy, setBusy] = createSignal<number | "user" | null>(null);
-  const [tick, setTick] = createSignal(0);
 
   const [data, { refetch }] = createResource<XrayConn[]>(() => api.xrayConns());
 
-  const iv = window.setInterval(() => {
-    if (paused() || document.visibilityState !== "visible") return;
-    setTick((t) => t + 1);
-    refetch();
-  }, REFRESH_MS);
-  onCleanup(() => window.clearInterval(iv));
+  const poll = usePolling(() => refetch(), { defaultSec: 5 });
 
   const filterUser = () => params.user ?? "";
   const filterNet = () => params.net ?? "";
+  const groupMode = (): GroupMode => {
+    const g = params.group;
+    return g === "user" || g === "target" ? g : "flat";
+  };
 
-  const rows = () => {
+  const filtered = createMemo(() => {
     const all = data() ?? [];
     const u = filterUser().trim();
     const n = filterNet().trim().toLowerCase();
     return all
       .filter((c) => !u || String(c.user_id) === u)
-      .filter((c) => !n || c.network.toLowerCase() === n)
-      .sort((a, b) => (a.since < b.since ? 1 : -1));
-  };
+      .filter((c) => !n || c.network.toLowerCase() === n);
+  });
 
   const killOne = async (id: number) => {
     setBusy(id);
@@ -67,44 +69,151 @@ export default function XrayConns() {
     }
   };
 
+  const targetHost = (target: string) => {
+    // strip :port from "host:port" — keep IPv6 brackets
+    const idx = target.lastIndexOf(":");
+    if (idx <= 0) return target;
+    return target.slice(0, idx);
+  };
+
+  const groupedRows = createMemo(() => {
+    const mode = groupMode();
+    if (mode === "flat") return null;
+    const map = new Map<string, XrayConn[]>();
+    for (const c of filtered()) {
+      const key = mode === "user" ? String(c.user_id) : targetHost(c.target);
+      const arr = map.get(key);
+      if (arr) arr.push(c);
+      else map.set(key, [c]);
+    }
+    return Array.from(map.entries())
+      .map(([key, conns]) => ({ key, conns }))
+      .sort((a, b) => b.conns.length - a.conns.length);
+  });
+
+  const columns: Column<XrayConn>[] = [
+    {
+      key: "id",
+      header: "id",
+      cell: (c) => (
+        <span class="font-mono text-xs text-zinc-500">{c.id}</span>
+      ),
+      sortable: true,
+      sortBy: (c) => c.id,
+      width: "80px",
+      mdOnly: true,
+    },
+    {
+      key: "user",
+      header: "user",
+      cell: (c) => <span class="font-mono">{c.user_id}</span>,
+      sortable: true,
+      sortBy: (c) => c.user_id,
+      width: "90px",
+    },
+    {
+      key: "net",
+      header: "net",
+      cell: (c) => (
+        <Pill tone={c.network === "tcp" ? "info" : "accent"}>{c.network}</Pill>
+      ),
+      sortable: true,
+      sortBy: (c) => c.network,
+      width: "70px",
+    },
+    {
+      key: "source",
+      header: "source",
+      cell: (c) => (
+        <div class="flex items-center gap-1.5">
+          <Pill tone={ipKindTone[ipKind(c.source_ip)]}>
+            {ipKindLabel[ipKind(c.source_ip)]}
+          </Pill>
+          <span class="font-mono text-xs">{c.source_ip}</span>
+        </div>
+      ),
+      mdOnly: true,
+    },
+    {
+      key: "target",
+      header: "target",
+      cell: (c) => (
+        <span class="block max-w-[320px] truncate font-mono text-xs">
+          {c.target}
+        </span>
+      ),
+      sortable: true,
+      sortBy: (c) => c.target,
+    },
+    {
+      key: "age",
+      header: "age",
+      cell: (c) => (
+        <span class="text-xs text-zinc-500">{relTime(c.since)}</span>
+      ),
+      sortable: true,
+      sortBy: (c) => -new Date(c.since).getTime(),
+      width: "80px",
+    },
+    {
+      key: "actions",
+      header: "",
+      align: "right",
+      width: "70px",
+      cell: (c) => (
+        <Button
+          variant="danger"
+          size="sm"
+          disabled={busy() === c.id}
+          onClick={(e) => {
+            e.stopPropagation();
+            killOne(c.id);
+          }}
+        >
+          kill
+        </Button>
+      ),
+    },
+  ];
+
   return (
     <>
       <PageHeader
         title="Xray Connections"
-        subtitle="Live conns from the in-process xray outbound. Auto-refresh every 2s."
-        actions={
-          <>
-            <Pill tone={paused() ? "neutral" : "ok"} dot pulse={!paused()}>
-              {paused() ? "paused" : `live · ${tick()}`}
-            </Pill>
-            <Button
-              size="sm"
-              leadingIcon={paused() ? <Play size={13} /> : <Pause size={13} />}
-              onClick={() => setPaused(!paused())}
-            >
-              {paused() ? "Resume" : "Pause"}
-            </Button>
-            <Button
-              size="sm"
-              leadingIcon={<RefreshCcw size={13} />}
-              onClick={() => refetch()}
-            >
-              Refresh
-            </Button>
-          </>
-        }
+        subtitle="Live conns from the in-process xray outbound."
+        actions={<RefreshPicker handle={poll} />}
       />
 
       <Toolbar>
-        <Input
-          mono
-          placeholder="user_id"
-          class="w-28"
-          value={filterUser()}
-          onInput={(e) =>
-            setParams({ ...params, user: e.currentTarget.value || undefined })
-          }
+        <Segmented<GroupMode>
+          options={[
+            { value: "flat", label: "Flat" },
+            { value: "user", label: "By user" },
+            { value: "target", label: "By target" },
+          ]}
+          value={groupMode()}
+          onChange={(g) => setParams({ ...params, group: g === "flat" ? undefined : g })}
         />
+        <div class="flex items-center gap-1">
+          <Input
+            mono
+            placeholder="user_id"
+            class="w-28"
+            value={filterUser()}
+            onInput={(e) =>
+              setParams({ ...params, user: e.currentTarget.value || undefined })
+            }
+          />
+          <Show when={filterUser()}>
+            <button
+              class="grid h-7 w-7 place-items-center rounded-md text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+              onClick={() => setParams({ ...params, user: undefined })}
+              title="clear"
+            >
+              <XIcon size={12} />
+            </button>
+          </Show>
+        </div>
         <Select
           value={filterNet()}
           onChange={(e) =>
@@ -123,140 +232,81 @@ export default function XrayConns() {
         >
           Kill by user
         </Button>
-        <span class="ml-auto text-xs text-zinc-500">
-          {rows().length} of {data()?.length ?? 0}
+        <span class="ml-auto text-xs text-zinc-500 tabular-nums">
+          {filtered().length} of {data()?.length ?? 0}
         </span>
       </Toolbar>
 
-      {/* Desktop table */}
-      <TableScroll class="hidden md:block">
-        <table class={t.table}>
-          <thead class={t.thead}>
-            <tr>
-              <th class={t.th}>id</th>
-              <th class={t.th}>user</th>
-              <th class={t.th}>net</th>
-              <th class={t.th}>source</th>
-              <th class={t.th}>target</th>
-              <th class={t.th}>age</th>
-              <th class={t.th + " text-right"} />
-            </tr>
-          </thead>
-          <tbody class={t.tbody}>
-            <Show
-              when={rows().length}
-              fallback={
-                <tr>
-                  <td colspan={7}>
-                    <EmptyState
-                      icon={<Cable size={28} />}
-                      title="No live connections"
-                      hint="The table will populate when xray accepts inbound traffic."
-                    />
-                  </td>
-                </tr>
-              }
-            >
-              <For each={rows()}>
-                {(c) => (
-                  <tr class={t.tr}>
-                    <td class={t.td + " font-mono text-xs text-zinc-500"}>
-                      {c.id}
-                    </td>
-                    <td class={t.td + " font-mono"}>{c.user_id}</td>
-                    <td class={t.td}>
-                      <Pill tone={c.network === "tcp" ? "info" : "accent"}>
-                        {c.network}
-                      </Pill>
-                    </td>
-                    <td class={t.td}>
-                      <div class="flex items-center gap-1.5">
-                        <Pill tone={ipKindTone[ipKind(c.source_ip)]}>
-                          {ipKindLabel[ipKind(c.source_ip)]}
-                        </Pill>
-                        <span class="font-mono text-xs">{c.source_ip}</span>
+      <Show
+        when={groupMode() === "flat"}
+        fallback={
+          <Show
+            when={groupedRows()!.length}
+            fallback={
+              <div class="rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
+                <EmptyState
+                  icon={<Cable size={28} />}
+                  title="No connections match"
+                />
+              </div>
+            }
+          >
+            <div class="flex flex-col gap-3">
+              <For each={groupedRows()!}>
+                {(g) => (
+                  <div class="rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
+                    <div class="flex items-center justify-between gap-3 border-b border-zinc-200 px-4 py-2 dark:border-zinc-800">
+                      <div class="flex items-center gap-2">
+                        <span class="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
+                          {groupMode() === "user" ? "user" : "target"}
+                        </span>
+                        <span class="font-mono text-sm">{g.key}</span>
+                        <Pill>{g.conns.length} conns</Pill>
                       </div>
-                    </td>
-                    <td
-                      class={t.td + " max-w-[280px] truncate font-mono text-xs"}
-                    >
-                      {c.target}
-                    </td>
-                    <td class={t.td + " text-xs text-zinc-500"}>
-                      {relTime(c.since)}
-                    </td>
-                    <td class={t.td + " text-right"}>
-                      <Button
-                        variant="danger"
-                        size="sm"
-                        disabled={busy() === c.id}
-                        onClick={() => killOne(c.id)}
-                      >
-                        kill
-                      </Button>
-                    </td>
-                  </tr>
+                      <Show when={groupMode() === "user"}>
+                        <Button
+                          variant="danger"
+                          size="sm"
+                          onClick={() => {
+                            if (!confirm(`Kill all ${g.conns.length} conns for user_id=${g.key}?`)) return;
+                            api.killUser(Number(g.key)).then(() => refetch());
+                          }}
+                        >
+                          kill user
+                        </Button>
+                      </Show>
+                    </div>
+                    <DataTable<XrayConn>
+                      rows={g.conns}
+                      columns={columns}
+                      rowKey={(c) => c.id}
+                      pageSize={20}
+                      defaultSort={{ key: "age", dir: "asc" }}
+                      density="compact"
+                      empty={<EmptyState title="empty" />}
+                    />
+                  </div>
                 )}
               </For>
-            </Show>
-          </tbody>
-        </table>
-      </TableScroll>
-
-      {/* Mobile card list */}
-      <div class="flex flex-col gap-2 md:hidden">
-        <Show
-          when={rows().length}
-          fallback={
-            <Card>
-              <EmptyState
-                icon={<Cable size={28} />}
-                title="No live connections"
-                hint="The list will populate when xray accepts inbound traffic."
-              />
-            </Card>
+            </div>
+          </Show>
+        }
+      >
+        <DataTable<XrayConn>
+          rows={filtered()}
+          columns={columns}
+          rowKey={(c) => c.id}
+          pageSize={50}
+          defaultSort={{ key: "age", dir: "asc" }}
+          empty={
+            <EmptyState
+              icon={<Cable size={28} />}
+              title="No live connections"
+              hint="The table will populate when xray accepts inbound traffic."
+            />
           }
-        >
-          <For each={rows()}>
-            {(c) => (
-              <div class="rounded-xl border border-zinc-200 bg-white p-3 dark:border-zinc-800 dark:bg-zinc-900">
-                <div class="flex items-start justify-between gap-2">
-                  <div class="min-w-0">
-                    <div class="flex items-center gap-2">
-                      <Pill tone={c.network === "tcp" ? "info" : "accent"}>
-                        {c.network}
-                      </Pill>
-                      <span class="font-mono text-sm">{c.user_id}</span>
-                      <span class="text-xs text-zinc-500">
-                        #{c.id}
-                      </span>
-                    </div>
-                    <div class="mt-1 truncate font-mono text-xs text-zinc-700 dark:text-zinc-300">
-                      {c.target}
-                    </div>
-                    <div class="mt-0.5 flex items-center gap-1.5 text-xs text-zinc-500">
-                      <Pill tone={ipKindTone[ipKind(c.source_ip)]}>
-                        {ipKindLabel[ipKind(c.source_ip)]}
-                      </Pill>
-                      <span class="font-mono">{c.source_ip}</span>
-                      <span>·</span>
-                      <span>{relTime(c.since)}</span>
-                    </div>
-                  </div>
-                  <Button
-                    variant="danger"
-                    size="sm"
-                    disabled={busy() === c.id}
-                    onClick={() => killOne(c.id)}
-                  >
-                    kill
-                  </Button>
-                </div>
-              </div>
-            )}
-          </For>
-        </Show>
-      </div>
+        />
+      </Show>
     </>
   );
 }

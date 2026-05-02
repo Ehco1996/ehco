@@ -95,6 +95,9 @@ func isPublicPath(path string) bool {
 	switch path {
 	case "/", "/index.html", "/favicon.ico", "/favicon.svg", "/robots.txt":
 		return true
+	case "/api/v1/auth/info":
+		// SPA queries this before login to know which credentials to ask for.
+		return true
 	}
 	return strings.HasPrefix(path, "/assets/")
 }

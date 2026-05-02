@@ -106,16 +106,28 @@ func setupMiddleware(e *echo.Echo, cfg *config.Config, _ *zap.SugaredLogger) err
 	}
 
 	if cfg.WebAuthUser != "" && cfg.WebAuthPass != "" {
-		e.Use(middleware.BasicAuthWithConfig(middleware.BasicAuthConfig{
-			Skipper: skipPublic,
-			Validator: func(username, password string, _ echo.Context) (bool, error) {
-				if subtle.ConstantTimeCompare([]byte(username), []byte(cfg.WebAuthUser)) == 1 &&
-					subtle.ConstantTimeCompare([]byte(password), []byte(cfg.WebAuthPass)) == 1 {
-					return true, nil
+		// Custom BasicAuth middleware. Echo's middleware.BasicAuthWithConfig
+		// emits a `WWW-Authenticate: Basic` header on 401, which forces the
+		// browser's native auth dialog. That dialog can't be triggered or
+		// dismissed from the SPA, so we'd have no way to render our own
+		// LoginGate or to sign out (the browser would auto-resend cached
+		// credentials on every reload). Instead we read the header
+		// ourselves, return a plain 401 on failure, and let the SPA own
+		// the login UX end-to-end.
+		e.Use(func(next echo.HandlerFunc) echo.HandlerFunc {
+			return func(c echo.Context) error {
+				if skipPublic(c) {
+					return next(c)
 				}
-				return false, nil
-			},
-		}))
+				user, pass, ok := c.Request().BasicAuth()
+				if !ok ||
+					subtle.ConstantTimeCompare([]byte(user), []byte(cfg.WebAuthUser)) != 1 ||
+					subtle.ConstantTimeCompare([]byte(pass), []byte(cfg.WebAuthPass)) != 1 {
+					return echo.NewHTTPError(http.StatusUnauthorized, "invalid credentials")
+				}
+				return next(c)
+			}
+		})
 	}
 
 	return nil
@@ -138,6 +150,7 @@ func setupRoutes(s *Server) {
 	e.GET("/debug/pprof/*", echo.WrapHandler(http.DefaultServeMux))
 
 	api := e.Group(apiPrefix)
+	api.GET("/auth/info", s.AuthInfo)
 	api.GET("/config/", s.CurrentConfig)
 	api.POST("/config/reload/", s.HandleReload)
 	api.GET("/health_check/", s.HandleHealthCheck)

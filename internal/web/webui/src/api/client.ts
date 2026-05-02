@@ -1,4 +1,4 @@
-import { token } from "../store/auth";
+import { creds } from "../store/auth";
 
 export class ApiError extends Error {
   status: number;
@@ -8,18 +8,30 @@ export class ApiError extends Error {
   }
 }
 
-function withToken(path: string): string {
-  const t = token();
-  if (!t) return path;
-  const url = new URL(path, window.location.origin);
-  url.searchParams.set("token", t);
-  return url.pathname + url.search;
+function withAuth(path: string): { url: string; headers: Record<string, string> } {
+  const c = creds();
+  let url = path;
+  if (c.token) {
+    const u = new URL(path, window.location.origin);
+    u.searchParams.set("token", c.token);
+    url = u.pathname + u.search;
+  }
+  const headers: Record<string, string> = {};
+  if (c.user || c.pass) {
+    headers["Authorization"] = "Basic " + btoa(`${c.user}:${c.pass}`);
+  }
+  return { url, headers };
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(withToken(path), {
+  const { url, headers } = withAuth(path);
+  const res = await fetch(url, {
     ...init,
-    headers: { Accept: "application/json", ...(init?.headers ?? {}) },
+    headers: {
+      Accept: "application/json",
+      ...headers,
+      ...(init?.headers ?? {}),
+    },
   });
   if (!res.ok) {
     const text = await res.text().catch(() => "");
@@ -85,7 +97,7 @@ export const api = {
 
 export function wsURL(path: string): string {
   const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
-  const t = token();
-  const q = t ? `?token=${encodeURIComponent(t)}` : "";
+  const c = creds();
+  const q = c.token ? `?token=${encodeURIComponent(c.token)}` : "";
   return `${proto}//${window.location.host}${path}${q}`;
 }

@@ -1,33 +1,35 @@
 import { createSignal, Show } from "solid-js";
 import { KeyRound } from "lucide-solid";
-import { saveToken, token } from "../store/auth";
-import { api, ApiError } from "../api/client";
+import { authInfo, creds, signIn } from "../store/auth";
 import Button from "../ui/Button";
 import { Input } from "../ui/Input";
 import Logo from "../ui/Logo";
 
-export default function LoginGate(props: { onAuthed: () => void }) {
-  const [input, setInput] = createSignal(token());
+export default function LoginGate() {
+  const c0 = creds();
+  const [token, setToken] = createSignal(c0.token);
+  const [user, setUser] = createSignal(c0.user);
+  const [pass, setPass] = createSignal(c0.pass);
   const [busy, setBusy] = createSignal(false);
   const [err, setErr] = createSignal("");
+
+  // If the server doesn't advertise either scheme (e.g. /auth/info
+  // hadn't returned yet, or no auth is configured at all), still let
+  // the user submit something — at worst they'll see a clear error.
+  const showToken = () => authInfo().token || (!authInfo().token && !authInfo().basic);
+  const showBasic = () => authInfo().basic;
 
   const submit = async (e: Event) => {
     e.preventDefault();
     setBusy(true);
     setErr("");
-    saveToken(input().trim());
-    try {
-      await api.config();
-      props.onAuthed();
-    } catch (e) {
-      if (e instanceof ApiError && e.status === 401) {
-        setErr("Token rejected. Verify ehco's web_token configuration.");
-      } else {
-        setErr(String(e));
-      }
-    } finally {
-      setBusy(false);
-    }
+    const failure = await signIn({
+      token: showToken() ? token() : "",
+      user: showBasic() ? user() : "",
+      pass: showBasic() ? pass() : "",
+    });
+    if (failure) setErr(failure);
+    setBusy(false);
   };
 
   return (
@@ -44,21 +46,55 @@ export default function LoginGate(props: { onAuthed: () => void }) {
           </div>
         </div>
 
-        <label class="mb-1 block text-xs font-medium text-zinc-600 dark:text-zinc-400">
-          Access token
-        </label>
-        <Input
-          type="password"
-          mono
-          autofocus
-          autocomplete="off"
-          placeholder="web_token"
-          value={input()}
-          onInput={(e) => setInput(e.currentTarget.value)}
-        />
-        <p class="mt-1.5 text-xs text-zinc-500">
-          Leave empty if your ehco instance has no token gate.
-        </p>
+        <Show when={showBasic()}>
+          <label class="mb-1 block text-xs font-medium text-zinc-600 dark:text-zinc-400">
+            Username
+          </label>
+          <Input
+            mono
+            autofocus
+            autocomplete="username"
+            placeholder="web_auth_user"
+            value={user()}
+            onInput={(e) => setUser(e.currentTarget.value)}
+          />
+          <label class="mb-1 mt-3 block text-xs font-medium text-zinc-600 dark:text-zinc-400">
+            Password
+          </label>
+          <Input
+            type="password"
+            mono
+            autocomplete="current-password"
+            placeholder="web_auth_pass"
+            value={pass()}
+            onInput={(e) => setPass(e.currentTarget.value)}
+          />
+        </Show>
+
+        <Show when={showToken()}>
+          <label
+            class={
+              "mb-1 block text-xs font-medium text-zinc-600 dark:text-zinc-400 " +
+              (showBasic() ? "mt-3" : "")
+            }
+          >
+            Access token
+          </label>
+          <Input
+            type="password"
+            mono
+            autofocus={!showBasic()}
+            autocomplete="off"
+            placeholder="web_token"
+            value={token()}
+            onInput={(e) => setToken(e.currentTarget.value)}
+          />
+          <Show when={!showBasic()}>
+            <p class="mt-1.5 text-xs text-zinc-500">
+              Leave empty if your ehco instance has no token gate.
+            </p>
+          </Show>
+        </Show>
 
         <Show when={err()}>
           <div class="mt-3 rounded-md border border-rose-200 bg-rose-50 p-2 text-xs text-rose-700 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-400">
