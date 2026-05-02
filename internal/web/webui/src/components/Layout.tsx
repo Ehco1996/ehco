@@ -17,7 +17,7 @@ import { theme, toggleTheme } from "../store/theme";
 import { authInfo, signOut } from "../store/auth";
 import Logo from "../ui/Logo";
 
-const authConfigured = () => authInfo().token || authInfo().basic;
+const authConfigured = () => authInfo().auth_required;
 
 interface NavItem {
   href: string;
