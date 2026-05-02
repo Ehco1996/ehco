@@ -253,13 +253,29 @@ func (xs *XrayServer) Start(ctx context.Context) error {
 }
 
 func (xs *XrayServer) needReload(newCfg *config.Config) (bool, error) {
+	// xs.cfg is shared with relay's reloader; LoadConfig nils c.XRayConfig
+	// before the (possibly slow) HTTP fetch + Unmarshal. Snapshot the pointer
+	// so we don't deref a freshly-nil'd field mid-evaluation, and skip the
+	// tick if either side isn't ready — next tick re-evaluates after the
+	// concurrent reload settles.
+	var oldXC, newXC *conf.Config
+	if xs.cfg != nil {
+		oldXC = xs.cfg.XRayConfig
+	}
+	if newCfg != nil {
+		newXC = newCfg.XRayConfig
+	}
+	if oldXC == nil || newXC == nil {
+		xs.l.Warn("skip needReload: xray config not ready (concurrent reload in progress?)")
+		return false, nil
+	}
 	oldCfgM := make(map[string]conf.InboundDetourConfig)
-	for _, inbound := range xs.cfg.XRayConfig.InboundConfigs {
+	for _, inbound := range oldXC.InboundConfigs {
 		if InProxyTags(inbound.Tag) {
 			oldCfgM[inbound.Tag] = inbound
 		}
 	}
-	for _, newInbound := range newCfg.XRayConfig.InboundConfigs {
+	for _, newInbound := range newXC.InboundConfigs {
 		if !InProxyTags(newInbound.Tag) {
 			continue
 		}
