@@ -1,5 +1,3 @@
-import { creds } from "../store/auth";
-
 export class ApiError extends Error {
   status: number;
   constructor(status: number, msg: string) {
@@ -8,28 +6,15 @@ export class ApiError extends Error {
   }
 }
 
-function withAuth(path: string): { url: string; headers: Record<string, string> } {
-  const c = creds();
-  let url = path;
-  if (c.token) {
-    const u = new URL(path, window.location.origin);
-    u.searchParams.set("token", c.token);
-    url = u.pathname + u.search;
-  }
-  const headers: Record<string, string> = {};
-  if (c.user || c.pass) {
-    headers["Authorization"] = "Basic " + btoa(`${c.user}:${c.pass}`);
-  }
-  return { url, headers };
-}
-
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const { url, headers } = withAuth(path);
-  const res = await fetch(url, {
+  // credentials: same-origin lets the cookie ride. No headers, no
+  // ?token= rewriting — auth is owned by the browser and the server
+  // session store now.
+  const res = await fetch(path, {
     ...init,
+    credentials: "same-origin",
     headers: {
       Accept: "application/json",
-      ...headers,
       ...(init?.headers ?? {}),
     },
   });
@@ -96,8 +81,8 @@ export const api = {
 };
 
 export function wsURL(path: string): string {
+  // WS upgrades carry the session cookie automatically — no query
+  // params, no auth headers (which JS can't set on WS upgrade anyway).
   const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
-  const c = creds();
-  const q = c.token ? `?token=${encodeURIComponent(c.token)}` : "";
-  return `${proto}//${window.location.host}${path}${q}`;
+  return `${proto}//${window.location.host}${path}`;
 }
