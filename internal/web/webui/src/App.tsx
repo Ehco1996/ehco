@@ -7,7 +7,6 @@ import Overview from "./pages/Overview";
 import Rules from "./pages/Rules";
 import XrayConns from "./pages/XrayConns";
 import XrayUsers from "./pages/XrayUsers";
-import NodeMetrics from "./pages/NodeMetrics";
 import Logs from "./pages/Logs";
 import Settings from "./pages/Settings";
 
@@ -49,7 +48,6 @@ export default function App() {
           <Route path="/rules" component={Rules} />
           <Route path="/xray/conns" component={XrayConns} />
           <Route path="/xray/users" component={XrayUsers} />
-          <Route path="/host" component={NodeMetrics} />
           <Route path="/logs" component={Logs} />
           <Route path="/settings" component={Settings} />
           <Route path="*" component={Overview} />

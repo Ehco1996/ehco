@@ -20,14 +20,15 @@ interface Props<T> {
   rows: T[];
   columns: Column<T>[];
   rowKey: (row: T) => string | number;
+  /** Initial page size; user can change via the footer selector. */
   pageSize?: number;
+  /** Page-size options shown in the footer selector. 0 = All. */
+  pageSizeOptions?: number[];
   defaultSort?: { key: string; dir: SortDir };
   onRowClick?: (row: T) => void;
   empty?: JSX.Element;
   /** Optional density override; defaults to "comfortable". */
   density?: "comfortable" | "compact";
-  /** Stable identity hint so sort state survives re-renders if pages mount under shared layout. */
-  storageKey?: string;
 }
 
 export default function DataTable<T>(props: Props<T>) {
@@ -35,9 +36,11 @@ export default function DataTable<T>(props: Props<T>) {
     props.defaultSort ?? null,
   );
   const [page, setPage] = createSignal(1);
+  // 0 means "All"; otherwise a positive page size.
+  const [pageSize, setPageSize] = createSignal(props.pageSize ?? 50);
 
-  const pageSize = () => props.pageSize ?? 50;
   const density = () => props.density ?? "comfortable";
+  const pageSizeOptions = () => props.pageSizeOptions ?? [25, 50, 100, 0];
 
   const sorted = createMemo(() => {
     const s = sort();
@@ -55,14 +58,17 @@ export default function DataTable<T>(props: Props<T>) {
     });
   });
 
+  const effectiveSize = () => (pageSize() === 0 ? sorted().length || 1 : pageSize());
+
   const totalPages = createMemo(() =>
-    Math.max(1, Math.ceil(sorted().length / pageSize())),
+    Math.max(1, Math.ceil(sorted().length / effectiveSize())),
   );
 
   const pageRows = createMemo(() => {
+    if (pageSize() === 0) return sorted();
     const p = Math.min(page(), totalPages());
-    const start = (p - 1) * pageSize();
-    return sorted().slice(start, start + pageSize());
+    const start = (p - 1) * effectiveSize();
+    return sorted().slice(start, start + effectiveSize());
   });
 
   const toggleSort = (key: string) => {
@@ -173,13 +179,35 @@ export default function DataTable<T>(props: Props<T>) {
           </tbody>
         </table>
       </div>
-      <Show when={sorted().length > pageSize()}>
-        <div class="flex items-center justify-between gap-3 border-t border-zinc-200 px-3 py-2 text-xs text-zinc-500 dark:border-zinc-800">
+      <div class="flex flex-wrap items-center justify-between gap-3 border-t border-zinc-200 px-3 py-2 text-xs text-zinc-500 dark:border-zinc-800">
+        <div class="inline-flex items-center gap-2">
+          <span>Rows</span>
+          <select
+            class="h-7 rounded-md border border-zinc-200 bg-white px-1.5 text-xs focus:border-emerald-500 focus:outline-none dark:border-zinc-800 dark:bg-zinc-900"
+            value={pageSize()}
+            onChange={(e) => {
+              setPageSize(Number(e.currentTarget.value));
+              setPage(1);
+            }}
+          >
+            <For each={pageSizeOptions()}>
+              {(n) => <option value={n}>{n === 0 ? "All" : n}</option>}
+            </For>
+          </select>
           <span class="tabular-nums">
-            {(page() - 1) * pageSize() + 1}–
-            {Math.min(page() * pageSize(), sorted().length)} of{" "}
-            {sorted().length}
+            <Show when={sorted().length} fallback="0">
+              {pageSize() === 0
+                ? `${sorted().length}`
+                : `${(page() - 1) * effectiveSize() + 1}–${Math.min(
+                    page() * effectiveSize(),
+                    sorted().length,
+                  )}`}
+              {" of "}
+              {sorted().length}
+            </Show>
           </span>
+        </div>
+        <Show when={pageSize() !== 0 && totalPages() > 1}>
           <div class="inline-flex items-center gap-1">
             <button
               class="grid h-7 w-7 place-items-center rounded-md text-zinc-600 hover:bg-zinc-100 disabled:opacity-30 dark:text-zinc-400 dark:hover:bg-zinc-800"
@@ -199,8 +227,8 @@ export default function DataTable<T>(props: Props<T>) {
               <ChevronRight size={14} />
             </button>
           </div>
-        </div>
-      </Show>
+        </Show>
+      </div>
     </div>
   );
 }

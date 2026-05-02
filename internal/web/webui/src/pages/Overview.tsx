@@ -14,50 +14,71 @@ import { Card, CardHeader } from "../ui/Card";
 import { Pill } from "../ui/Pill";
 import Sparkline from "../ui/Sparkline";
 import EmptyState from "../ui/EmptyState";
+import Chart from "../ui/Chart";
+import Segmented from "../ui/Segmented";
+import RefreshPicker from "../ui/RefreshPicker";
 import { api } from "../api/client";
 import { bytes, pct, relTime } from "../util/format";
 import { ipKind, ipKindLabel, ipKindTone } from "../util/ip";
+import { usePolling } from "../util/polling";
 import { recordUserSnapshot, userSamples } from "../store/userTrafficHistory";
 import type { XrayUser } from "../api/types";
 
-const POLL_MS = 5000;
 const TOP_N = 8;
+
+const HOST_WINDOWS = [
+  { value: 5 * 60, label: "5m" },
+  { value: 60 * 60, label: "1h" },
+  { value: 6 * 60 * 60, label: "6h" },
+  { value: 24 * 60 * 60, label: "24h" },
+] as const;
 
 export default function Overview() {
   const nav = useNavigate();
   const [config] = createResource(() => api.config());
   const [conns, { refetch: rcConns }] = createResource(() => api.xrayConns());
   const [users, { refetch: rcUsers }] = createResource(() => api.xrayUsers());
-  const [node, { refetch: rcNode }] = createResource(() =>
+  const [hostLatest, { refetch: rcHost }] = createResource(() =>
     api.nodeMetrics({ latest: true }),
   );
 
-  const [tick, setTick] = createSignal(0);
-  const iv = window.setInterval(() => {
-    if (document.visibilityState !== "visible") return;
-    setTick((t) => t + 1);
-    rcConns();
-    rcUsers();
-    rcNode();
-  }, POLL_MS);
-  onCleanup(() => window.clearInterval(iv));
+  const [hostWindow, setHostWindow] = createSignal<number>(HOST_WINDOWS[1].value);
+  const [hostHistory, { refetch: rcHostHistory }] = createResource(
+    hostWindow,
+    async (sec) => {
+      const end = Math.floor(Date.now() / 1000);
+      return api.nodeMetrics({ start_ts: end - sec, end_ts: end });
+    },
+  );
+
+  const poll = usePolling(
+    () => {
+      rcConns();
+      rcUsers();
+      rcHost();
+      rcHostHistory();
+    },
+    { defaultSec: 15 },
+  );
+  void poll; // ensure timer is armed; onCleanup is wired inside the hook
 
   // Feed throughput samples so the Top Users sparkline has signal.
   createEffect(() => {
     const u = users();
     if (u) recordUserSnapshot(u);
   });
+  onCleanup(() => {});
 
   const allUsers = () => users() ?? [];
   const allConns = () => conns() ?? [];
-  const latestNode = () => node()?.data?.[node()!.data.length - 1];
+  const latestHost = () => hostLatest()?.data?.[hostLatest()!.data.length - 1];
+  const hostSeries = () => hostHistory()?.data ?? [];
 
   const totalUp = () => allUsers().reduce((a, u) => a + u.upload_total, 0);
   const totalDown = () => allUsers().reduce((a, u) => a + u.download_total, 0);
   const ruleCount = () =>
     Array.isArray(config()?.relay_configs) ? config()!.relay_configs!.length : 0;
 
-  // Active in last ~5 min: any sparkline sample > 0.
   const activeUsers = () =>
     allUsers().filter((u) => userSamples(u.user_id).some((v) => v > 0)).length;
 
@@ -87,11 +108,7 @@ export default function Overview() {
       <PageHeader
         title="Overview"
         subtitle="What's flowing right now."
-        actions={
-          <Pill tone="ok" dot pulse>
-            live · {tick()}
-          </Pill>
-        }
+        actions={<RefreshPicker handle={poll} />}
       />
 
       <div class="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
@@ -231,33 +248,79 @@ export default function Overview() {
         </Card>
       </div>
 
-      <Show when={latestNode()}>
+      <Show
+        when={latestHost()}
+        fallback={
+          <div class="mt-4 flex items-center gap-2 rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2 text-xs text-zinc-500 dark:border-zinc-800 dark:bg-zinc-950">
+            <Activity size={13} /> Host metrics not reporting yet.
+          </div>
+        }
+      >
         <Card class="mt-4" padded={false}>
-          <div class="flex items-center justify-between gap-3 px-4 py-3 sm:px-5">
-            <CardHeader
-              title="Host"
-              subtitle="System resource snapshot"
+          <div class="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-200 px-4 py-3 sm:px-5 dark:border-zinc-800">
+            <CardHeader title="Host" subtitle="System resource utilisation" />
+            <Segmented
+              options={HOST_WINDOWS.map((w) => ({ value: w.value, label: w.label }))}
+              value={hostWindow()}
+              onChange={setHostWindow}
+              size="sm"
             />
-            <button
-              class="inline-flex items-center gap-1 text-xs text-emerald-700 hover:underline dark:text-emerald-400"
-              onClick={() => nav("/host")}
-            >
-              detail <ArrowRight size={12} />
-            </button>
           </div>
-          <div class="grid grid-cols-2 gap-3 px-4 pb-4 sm:grid-cols-4 sm:px-5 sm:pb-5">
-            <HostStat label="CPU" value={pct(latestNode()!.cpu_usage)} />
-            <HostStat label="Memory" value={pct(latestNode()!.memory_usage)} />
-            <HostStat label="Net in" value={bytes(latestNode()!.network_in)} />
-            <HostStat label="Net out" value={bytes(latestNode()!.network_out)} />
+          <div class="grid grid-cols-2 gap-3 px-4 pt-4 sm:grid-cols-4 sm:px-5">
+            <HostStat label="CPU" value={pct(latestHost()!.cpu_usage)} />
+            <HostStat label="Memory" value={pct(latestHost()!.memory_usage)} />
+            <HostStat label="Net in" value={bytes(latestHost()!.network_in)} />
+            <HostStat label="Net out" value={bytes(latestHost()!.network_out)} />
           </div>
+          <Show when={hostSeries().length > 1}>
+            <div class="grid grid-cols-1 gap-3 px-4 pb-4 pt-3 sm:px-5 sm:pb-5 lg:grid-cols-2">
+              <div class="rounded-lg border border-zinc-200 p-3 dark:border-zinc-800">
+                <div class="mb-2 text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
+                  CPU & Memory
+                </div>
+                <Chart
+                  height={160}
+                  timestamps={hostSeries().map((d) => d.timestamp)}
+                  series={[
+                    {
+                      label: "CPU %",
+                      stroke: "#10b981",
+                      values: hostSeries().map((d) => d.cpu_usage),
+                    },
+                    {
+                      label: "Memory %",
+                      stroke: "#6366f1",
+                      values: hostSeries().map((d) => d.memory_usage),
+                    },
+                  ]}
+                  yFormat={(v) => pct(v)}
+                />
+              </div>
+              <div class="rounded-lg border border-zinc-200 p-3 dark:border-zinc-800">
+                <div class="mb-2 text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
+                  Network
+                </div>
+                <Chart
+                  height={160}
+                  timestamps={hostSeries().map((d) => d.timestamp)}
+                  series={[
+                    {
+                      label: "in",
+                      stroke: "#0ea5e9",
+                      values: hostSeries().map((d) => d.network_in),
+                    },
+                    {
+                      label: "out",
+                      stroke: "#f97316",
+                      values: hostSeries().map((d) => d.network_out),
+                    },
+                  ]}
+                  yFormat={(v) => bytes(v)}
+                />
+              </div>
+            </div>
+          </Show>
         </Card>
-      </Show>
-
-      <Show when={!latestNode()}>
-        <div class="mt-4 flex items-center gap-2 rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2 text-xs text-zinc-500 dark:border-zinc-800 dark:bg-zinc-950">
-          <Activity size={13} /> Host metrics not reporting yet.
-        </div>
       </Show>
     </>
   );

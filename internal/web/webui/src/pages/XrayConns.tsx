@@ -1,6 +1,6 @@
-import { createMemo, createResource, createSignal, For, onCleanup, Show } from "solid-js";
+import { createMemo, createResource, createSignal, For, Show } from "solid-js";
 import { useSearchParams } from "@solidjs/router";
-import { Pause, Play, RefreshCcw, Cable, X as XIcon } from "lucide-solid";
+import { Cable, X as XIcon } from "lucide-solid";
 import PageHeader from "../ui/PageHeader";
 import Toolbar from "../ui/Toolbar";
 import Button from "../ui/Button";
@@ -9,12 +9,12 @@ import { Pill } from "../ui/Pill";
 import EmptyState from "../ui/EmptyState";
 import Segmented from "../ui/Segmented";
 import DataTable, { Column } from "../ui/DataTable";
+import RefreshPicker from "../ui/RefreshPicker";
 import { api } from "../api/client";
 import { relTime } from "../util/format";
 import { ipKind, ipKindLabel, ipKindTone } from "../util/ip";
+import { usePolling } from "../util/polling";
 import type { XrayConn } from "../api/types";
-
-const REFRESH_MS = 2000;
 
 type GroupMode = "flat" | "user" | "target";
 
@@ -24,18 +24,11 @@ export default function XrayConns() {
     net?: string;
     group?: string;
   }>();
-  const [paused, setPaused] = createSignal(false);
   const [busy, setBusy] = createSignal<number | "user" | null>(null);
-  const [tick, setTick] = createSignal(0);
 
   const [data, { refetch }] = createResource<XrayConn[]>(() => api.xrayConns());
 
-  const iv = window.setInterval(() => {
-    if (paused() || document.visibilityState !== "visible") return;
-    setTick((t) => t + 1);
-    refetch();
-  }, REFRESH_MS);
-  onCleanup(() => window.clearInterval(iv));
+  const poll = usePolling(() => refetch(), { defaultSec: 5 });
 
   const filterUser = () => params.user ?? "";
   const filterNet = () => params.net ?? "";
@@ -187,28 +180,8 @@ export default function XrayConns() {
     <>
       <PageHeader
         title="Xray Connections"
-        subtitle="Live conns from the in-process xray outbound. Auto-refresh every 2s."
-        actions={
-          <>
-            <Pill tone={paused() ? "neutral" : "ok"} dot pulse={!paused()}>
-              {paused() ? "paused" : `live · ${tick()}`}
-            </Pill>
-            <Button
-              size="sm"
-              leadingIcon={paused() ? <Play size={13} /> : <Pause size={13} />}
-              onClick={() => setPaused(!paused())}
-            >
-              {paused() ? "Resume" : "Pause"}
-            </Button>
-            <Button
-              size="sm"
-              leadingIcon={<RefreshCcw size={13} />}
-              onClick={() => refetch()}
-            >
-              Refresh
-            </Button>
-          </>
-        }
+        subtitle="Live conns from the in-process xray outbound."
+        actions={<RefreshPicker handle={poll} />}
       />
 
       <Toolbar>

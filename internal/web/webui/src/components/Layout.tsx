@@ -5,7 +5,6 @@ import {
   ServerCog,
   Users,
   Cable,
-  HardDrive,
   ScrollText,
   Settings,
   Menu,
@@ -34,7 +33,6 @@ const liveNav: NavItem[] = [
 
 const configNav: NavItem[] = [
   { href: "/rules", label: "Rules", icon: ServerCog },
-  { href: "/host", label: "Host", icon: HardDrive },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 

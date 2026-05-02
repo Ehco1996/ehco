@@ -1,6 +1,6 @@
-import { createEffect, createMemo, createResource, createSignal, onCleanup } from "solid-js";
+import { createEffect, createMemo, createResource, createSignal } from "solid-js";
 import { useNavigate } from "@solidjs/router";
-import { RefreshCcw, Users as UsersIcon, ArrowRight } from "lucide-solid";
+import { Users as UsersIcon, ArrowRight } from "lucide-solid";
 import PageHeader from "../ui/PageHeader";
 import Toolbar from "../ui/Toolbar";
 import Button from "../ui/Button";
@@ -10,8 +10,10 @@ import EmptyState from "../ui/EmptyState";
 import Sparkline from "../ui/Sparkline";
 import Segmented from "../ui/Segmented";
 import DataTable, { Column } from "../ui/DataTable";
+import RefreshPicker from "../ui/RefreshPicker";
 import { api } from "../api/client";
 import { bytes } from "../util/format";
+import { usePolling } from "../util/polling";
 import { recordUserSnapshot, userSamples } from "../store/userTrafficHistory";
 import type { XrayUser } from "../api/types";
 
@@ -25,11 +27,7 @@ export default function XrayUsers() {
   const [view, setView] = createSignal<View>("active");
   const nav = useNavigate();
 
-  const iv = window.setInterval(() => {
-    if (document.visibilityState !== "visible") return;
-    refetch();
-  }, 5000);
-  onCleanup(() => window.clearInterval(iv));
+  const poll = usePolling(() => refetch(), { defaultSec: 15 });
 
   createEffect(() => {
     const d = data();
@@ -192,15 +190,7 @@ export default function XrayUsers() {
       <PageHeader
         title="Xray Users"
         subtitle="Cumulative byte counters since process boot. Reset on restart."
-        actions={
-          <Button
-            size="sm"
-            leadingIcon={<RefreshCcw size={13} />}
-            onClick={() => refetch()}
-          >
-            Refresh
-          </Button>
-        }
+        actions={<RefreshPicker handle={poll} />}
       />
 
       <Toolbar>
