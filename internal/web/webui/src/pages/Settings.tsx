@@ -1,18 +1,15 @@
 import { createResource, createSignal, Show } from "solid-js";
-import { KeyRound, Palette, RotateCw, Plug, Copy, Check } from "lucide-solid";
+import { Palette, RotateCw, Plug, Copy, Check } from "lucide-solid";
 import PageHeader from "../ui/PageHeader";
 import Button from "../ui/Button";
-import { Input } from "../ui/Input";
 import { Card, CardHeader } from "../ui/Card";
 import { Pill } from "../ui/Pill";
 import DescList from "../ui/DescList";
 import { api } from "../api/client";
-import { saveToken, token } from "../store/auth";
 import { theme, toggleTheme } from "../store/theme";
 
 export default function Settings() {
   const [config] = createResource(() => api.config());
-  const [tokenInput, setTokenInput] = createSignal(token());
   const [reloadStatus, setReloadStatus] = createSignal<{
     tone: "ok" | "error" | "neutral";
     text: string;
@@ -113,34 +110,6 @@ export default function Settings() {
                 {reloadStatus()!.text}
               </Pill>
             )}
-          </div>
-        </Card>
-
-        <Card>
-          <CardHeader
-            title="Access token"
-            subtitle="Appended to every API request as ?token=…"
-          />
-          <p class="mb-3 text-sm text-zinc-500">
-            Stored in <code class="font-mono text-xs">sessionStorage</code>.
-            Leave empty if your ehco instance has no{" "}
-            <code class="font-mono text-xs">web_token</code>.
-          </p>
-          <div class="flex gap-2">
-            <Input
-              type="password"
-              mono
-              placeholder="paste token"
-              value={tokenInput()}
-              onInput={(e) => setTokenInput(e.currentTarget.value)}
-            />
-            <Button
-              variant="primary"
-              leadingIcon={<KeyRound size={13} />}
-              onClick={() => saveToken(tokenInput().trim())}
-            >
-              Save
-            </Button>
           </div>
         </Card>
 

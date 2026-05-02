@@ -1,12 +1,11 @@
 import { createSignal, Show } from "solid-js";
 import { KeyRound } from "lucide-solid";
-import { saveToken, token } from "../store/auth";
-import { api, ApiError } from "../api/client";
+import { signIn, token } from "../store/auth";
 import Button from "../ui/Button";
 import { Input } from "../ui/Input";
 import Logo from "../ui/Logo";
 
-export default function LoginGate(props: { onAuthed: () => void }) {
+export default function LoginGate() {
   const [input, setInput] = createSignal(token());
   const [busy, setBusy] = createSignal(false);
   const [err, setErr] = createSignal("");
@@ -15,19 +14,9 @@ export default function LoginGate(props: { onAuthed: () => void }) {
     e.preventDefault();
     setBusy(true);
     setErr("");
-    saveToken(input().trim());
-    try {
-      await api.config();
-      props.onAuthed();
-    } catch (e) {
-      if (e instanceof ApiError && e.status === 401) {
-        setErr("Token rejected. Verify ehco's web_token configuration.");
-      } else {
-        setErr(String(e));
-      }
-    } finally {
-      setBusy(false);
-    }
+    const failure = await signIn(input());
+    if (failure) setErr(failure);
+    setBusy(false);
   };
 
   return (
