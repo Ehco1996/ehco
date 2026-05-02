@@ -25,18 +25,27 @@ type bandwidthRecorder struct {
 
 	httpClient *http.Client
 	metricsURL string
+	apiToken   string // optional bearer token; empty when web auth disabled
 }
 
-func NewBandwidthRecorder(metricsURL string) *bandwidthRecorder {
+func NewBandwidthRecorder(metricsURL, apiToken string) *bandwidthRecorder {
 	c := &http.Client{Timeout: 30 * time.Second}
 	return &bandwidthRecorder{
 		httpClient: c,
 		metricsURL: metricsURL,
+		apiToken:   apiToken,
 	}
 }
 
 func (b *bandwidthRecorder) RecordOnce(ctx context.Context) (uploadIncr float64, downloadIncr float64, err error) {
-	response, err := b.httpClient.Get(b.metricsURL)
+	req, err := http.NewRequestWithContext(ctx, "GET", b.metricsURL, nil)
+	if err != nil {
+		return
+	}
+	if b.apiToken != "" {
+		req.Header.Set("Authorization", "Bearer "+b.apiToken)
+	}
+	response, err := b.httpClient.Do(req)
 	if err != nil {
 		return
 	}

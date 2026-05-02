@@ -89,14 +89,19 @@ func assetHandler() echo.HandlerFunc {
 }
 
 // isPublicPath identifies routes that should bypass the auth middleware
-// so the SPA shell + its public assets can load without a token. API,
-// metrics, ws, and pprof remain protected.
+// so the SPA shell + its public assets and the login flow can load
+// without a session. Metrics, config, WS, and pprof remain protected.
 func isPublicPath(path string) bool {
 	switch path {
 	case "/", "/index.html", "/favicon.ico", "/favicon.svg", "/robots.txt":
 		return true
 	case "/api/v1/auth/info":
-		// SPA queries this before login to know which credentials to ask for.
+		// SPA queries this before login to know whether auth is required.
+		return true
+	case "/api/v1/auth/login", "/api/v1/auth/logout":
+		// Login obviously needs to be reachable without a session;
+		// logout is idempotent and safe to expose unauthenticated so
+		// the SPA can clean up without a round-trip dance.
 		return true
 	}
 	return strings.HasPrefix(path, "/assets/")

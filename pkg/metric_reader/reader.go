@@ -20,6 +20,7 @@ type Reader interface {
 
 type readerImpl struct {
 	metricsURL string
+	apiToken   string // optional bearer token; empty when web auth disabled
 	httpClient *http.Client
 
 	lastMetrics     *NodeMetrics
@@ -27,11 +28,12 @@ type readerImpl struct {
 	l               *zap.SugaredLogger
 }
 
-func NewReader(metricsURL string) *readerImpl {
+func NewReader(metricsURL, apiToken string) *readerImpl {
 	c := &http.Client{Timeout: 30 * time.Second}
 	return &readerImpl{
 		httpClient: c,
 		metricsURL: metricsURL,
+		apiToken:   apiToken,
 		l:          zap.S().Named("metric_reader"),
 	}
 }
@@ -60,6 +62,9 @@ func (r *readerImpl) fetchMetrics(ctx context.Context) (map[string]*dto.MetricFa
 	req, err := http.NewRequestWithContext(ctx, "GET", r.metricsURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+	if r.apiToken != "" {
+		req.Header.Set("Authorization", "Bearer "+r.apiToken)
 	}
 
 	resp, err := r.httpClient.Do(req)
