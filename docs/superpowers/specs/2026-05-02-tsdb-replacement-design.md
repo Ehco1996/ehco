@@ -330,3 +330,36 @@ This guards against scenarios where tsdb growth (e.g. a runaway sampling rate, o
 ## 13. Open questions
 
 None. All design decisions finalized; see decision log in conversation log.
+
+## 14. Breaking changes
+
+### Upstream sync JSON shape (`POST <SyncURL>`)
+
+The `node` field of the sync request body changed shape. Old shape (from
+`metric_reader.NodeMetrics`):
+
+- `cpu_usage_percent`, `cpu_core_count`, `cpu_load_info`
+- `memory_usage_percent`, `memory_total_bytes`, `memory_usage_bytes`
+- `disk_usage_percent`, `disk_total_bytes`, `disk_usage_bytes`
+- `network_receive_bytes_total`, `network_transmit_bytes_total`,
+  `network_receive_bytes_rate`, `network_transmit_bytes_rate`
+- `sync_time`
+
+New shape (from `syncNodeMetrics`):
+
+- `timestamp` (Unix seconds)
+- `cpu_usage`, `memory_usage`, `disk_usage` (all percent 0-100)
+- `network_in`, `network_out` (bytes/sec)
+
+Upstream consumers must update their parsers. Total/raw counters are no longer
+sent (only percentages and rates).
+
+### `/metrics` HTTP endpoint removed
+
+External Prometheus scrapers will see 404. Use `/api/v1/node_metrics` and
+`/api/v1/rule_metrics` instead, or upgrade your scraper out of band.
+
+### `--metric_url` flag removed
+
+The flag and its `EHCO_METRIC_URL` env var are gone. Remove from any service
+unit files / wrapper scripts that set them.

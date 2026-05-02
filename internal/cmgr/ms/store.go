@@ -8,26 +8,27 @@ import (
 	"path/filepath"
 	"sort"
 	"sync"
+	"time"
 
 	"github.com/nakabonne/tstorage"
 	"go.uber.org/zap"
 )
 
-const writeTimeout = 0 // tstorage default
-
 type MetricsStore struct {
-	dir   string
-	tsdb  tstorage.Storage
-	idx   PairLister
-	idxMu sync.RWMutex
-	l     *zap.SugaredLogger
+	dir          string
+	tsdb         tstorage.Storage
+	idx          PairLister
+	idxMu        sync.RWMutex
+	l            *zap.SugaredLogger
+	watermarkPct int
 
 	wmCancel context.CancelFunc
 }
 
-// NewMetricsStore opens (or creates) tstorage at dataDir and starts the disk
-// watermark goroutine bound to ctx. watermarkPct=0 selects the default (50%).
-func NewMetricsStore(ctx context.Context, dataDir string, watermarkPct int) (*MetricsStore, error) {
+// NewMetricsStore opens (or creates) tstorage at dataDir.
+// watermarkPct=0 selects the default (50%).
+// Call Start(ctx) to launch the disk-watermark goroutine.
+func NewMetricsStore(dataDir string, watermarkPct int) (*MetricsStore, error) {
 	if err := os.MkdirAll(dataDir, 0o755); err != nil {
 		return nil, fmt.Errorf("mkdir tsdb dir: %w", err)
 	}
@@ -35,20 +36,28 @@ func NewMetricsStore(ctx context.Context, dataDir string, watermarkPct int) (*Me
 		tstorage.WithDataPath(dataDir),
 		tstorage.WithRetention(retention),
 		tstorage.WithTimestampPrecision(tstorage.Seconds),
+		tstorage.WithWriteTimeout(5*time.Second),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("open tstorage: %w", err)
 	}
 
-	wmCtx, cancel := context.WithCancel(ctx)
 	ms := &MetricsStore{
-		dir:      dataDir,
-		tsdb:     storage,
-		l:        zap.S().Named("ms"),
-		wmCancel: cancel,
+		dir:          dataDir,
+		tsdb:         storage,
+		l:            zap.S().Named("ms"),
+		watermarkPct: watermarkPct,
 	}
-	ms.startWatermark(wmCtx, watermarkPct)
 	return ms, nil
+}
+
+// Start launches the disk-watermark goroutine bound to ctx. It must be called
+// at most once. If Start is never called, no goroutines run and Close is still
+// safe to call (it will just flush the WAL).
+func (ms *MetricsStore) Start(ctx context.Context) {
+	wmCtx, cancel := context.WithCancel(ctx)
+	ms.wmCancel = cancel
+	ms.startWatermark(wmCtx, ms.watermarkPct)
 }
 
 func (ms *MetricsStore) SetPairLister(p PairLister) {
@@ -195,6 +204,10 @@ func (ms *MetricsStore) fetchRuleSeries(pr LabelRemote, start, end int64) ([]Rul
 		labels []tstorage.Label
 		set    func(*RuleMetricsData, float64)
 	}
+	// Note: rule_bytes_total has both flow=tx and flow=rx written by AddRuleMetric,
+	// but RuleMetricsData currently only surfaces tx (matches the legacy SQLite
+	// "transmit" semantics). When the frontend rewrite needs rx, add fields to
+	// RuleMetricsData and queries here.
 	queries := []query{
 		{MetricRulePingMs, base, func(r *RuleMetricsData, v float64) { r.PingLatency = int64(v) }},
 		{MetricRuleConnCount, withConn(base, ConnTypeTCP), func(r *RuleMetricsData, v float64) { r.TCPConnectionCount = int64(v) }},

@@ -65,7 +65,7 @@ func NewCmgr(cfg *Config) (Cmgr, error) {
 	if cfg.NeedMetrics() {
 		homeDir, _ := os.UserHomeDir()
 		dataDir := filepath.Join(homeDir, ".ehco", "tsdb")
-		store, err := ms.NewMetricsStore(context.Background(), dataDir, cfg.MaxDiskUsagePercent)
+		store, err := ms.NewMetricsStore(dataDir, cfg.MaxDiskUsagePercent)
 		if err != nil {
 			return nil, err
 		}
@@ -189,6 +189,9 @@ func (cm *cmgrImpl) GetActiveConnectCntByRelayLabel(label string) int {
 }
 
 func (cm *cmgrImpl) Start(ctx context.Context, errCH chan error) {
+	if cm.ms != nil {
+		cm.ms.Start(ctx)
+	}
 	defer func() {
 		if cm.ms != nil {
 			if err := cm.ms.Close(); err != nil {

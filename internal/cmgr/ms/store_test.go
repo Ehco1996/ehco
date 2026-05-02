@@ -29,7 +29,7 @@ func (f *fakeIdx) Pairs(label, remote string) []ms.LabelRemote {
 func newStore(t *testing.T) *ms.MetricsStore {
 	t.Helper()
 	dir := filepath.Join(t.TempDir(), "tsdb")
-	store, err := ms.NewMetricsStore(context.Background(), dir, 0)
+	store, err := ms.NewMetricsStore(dir, 0)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = store.Close() })
 	return store
