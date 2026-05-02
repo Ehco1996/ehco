@@ -44,6 +44,14 @@ jobs:
           go-version: "1.26.1"
           cache: true
 
+      - name: Set up Bun
+        # Pinned to match the bun version that produced bun.lock;
+        # `bun install --frozen-lockfile` is sensitive to bun-major drift.
+        # Bump together with the local dev environment.
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.2.21"
+
       - name: tidy
         run: make tidy
 
