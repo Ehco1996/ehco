@@ -2,6 +2,10 @@
 before:
   hooks:
     - go mod download
+    # Build the embedded SPA into internal/web/webui/dist before goreleaser
+    # runs `go build` — the //go:embed all:webui/dist directive fails at
+    # compile time if dist/ is missing on a fresh checkout.
+    - make ui
 builds:
   - id: ehco
     main: ./cmd/ehco/main.go

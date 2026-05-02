@@ -48,6 +48,14 @@ jobs:
           go-version: "1.26.1"
           cache: true
 
+      - name: Set up Bun
+        # See release.yml — GoReleaser bypasses the Makefile so the SPA
+        # build runs via .goreleaser.yml's before-hook (`make ui`), which
+        # needs bun on PATH.
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.2.21"
+
       - name: GoReleaser
         uses: goreleaser/goreleaser-action@v6
         with:

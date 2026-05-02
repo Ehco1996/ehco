@@ -43,6 +43,12 @@ type User struct {
 	UploadTraffic   int64 `json:"upload_traffic"`
 	DownloadTraffic int64 `json:"download_traffic"`
 
+	// Cumulative since boot — bumped on every Add*Traffic call alongside the
+	// reset-able counters above. Not reset on sync; powers the read-only
+	// /api/v1/xray/users admin view. Reset only on process restart.
+	UploadTotal   int64 `json:"upload_total"`
+	DownloadTotal int64 `json:"download_total"`
+
 	Protocol string `json:"protocol"`
 
 	// recentIPs accumulates distinct client source IPs seen by the metered
@@ -86,10 +92,12 @@ func (u *User) GetEmail() string {
 
 func (u *User) AddUploadTraffic(n int64) {
 	atomic.AddInt64(&u.UploadTraffic, n)
+	atomic.AddInt64(&u.UploadTotal, n)
 }
 
 func (u *User) AddDownloadTraffic(n int64) {
 	atomic.AddInt64(&u.DownloadTraffic, n)
+	atomic.AddInt64(&u.DownloadTotal, n)
 }
 
 // RecordIP appends a distinct source IP into the per-user FIFO. When the cap
