@@ -10,6 +10,7 @@ import (
 	"github.com/Ehco1996/ehco/internal/config"
 	"github.com/Ehco1996/ehco/internal/tls"
 	"github.com/Ehco1996/ehco/internal/web"
+	xlog "github.com/xtls/xray-core/common/log"
 	"github.com/xtls/xray-core/core"
 	"github.com/xtls/xray-core/features/inbound"
 	"github.com/xtls/xray-core/features/outbound"
@@ -139,6 +140,12 @@ func (xs *XrayServer) Setup() error {
 		return err
 	}
 	xs.instance = instance
+
+	// Replace xray-core's default log handler (stdout/stderr) with a zap
+	// bridge so xray's lines flow through the same WebSocket fan-out used by
+	// ehco's own zap output. Must run after core.New, which installs xray's
+	// default handler from cfg.Log; Reload re-runs Setup so this re-applies.
+	xlog.RegisterHandler(newZapBridgeHandler(zap.L().Named("xray-core")))
 
 	if xs.cfg.SyncTrafficEndPoint != "" {
 		var proxyTags []string
