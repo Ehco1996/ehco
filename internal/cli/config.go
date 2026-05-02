@@ -25,7 +25,8 @@ func loadConfig() (cfg *config.Config, err error) {
 	} else {
 		cfg = &config.Config{
 			WebPort:        WebPort,
-			WebToken:       WebToken,
+			DashboardPass:  DashboardPass,
+			ApiToken:       ApiToken,
 			EnablePing:     EnablePing,
 			PATH:           ConfigPath,
 			LogLeveL:       LogLevel,
