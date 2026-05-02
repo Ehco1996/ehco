@@ -88,13 +88,14 @@ func InitConfigAndComponents() (*config.Config, error) {
 func MustStartComponents(mainCtx context.Context, cfg *config.Config) {
 	cliLogger.Infof("Start ehco with version:%s", constant.Version)
 
+	metrics.Start(mainCtx, cfg)
+
 	// start relay server
 	rs, err := relay.NewServer(cfg)
 	if err != nil {
 		cliLogger.Fatalf("NewRelayServer meet err=%s", err.Error())
 	}
 	go func() {
-		metrics.EhcoAlive.Set(metrics.EhcoAliveStateRunning)
 		sErr := rs.Start(mainCtx)
 		if sErr != nil {
 			cliLogger.Fatalf("StartRelayServer meet err=%s", sErr.Error())

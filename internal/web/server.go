@@ -12,20 +12,17 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.uber.org/zap"
 
 	"github.com/Ehco1996/ehco/internal/cmgr"
 	"github.com/Ehco1996/ehco/internal/config"
 	"github.com/Ehco1996/ehco/internal/glue"
-	"github.com/Ehco1996/ehco/internal/metrics"
 )
 
 //go:embed templates/*.html js/*.js
 var templatesFS embed.FS
 
 const (
-	metricsPath     = "/metrics/"
 	indexPath       = "/"
 	connectionsPath = "/connections/"
 	rulesPath       = "/rules/"
@@ -71,10 +68,6 @@ func NewServer(
 
 	if err := setupTemplates(e, l, cfg); err != nil {
 		return nil, fmt.Errorf("failed to setup templates: %w", err)
-	}
-
-	if err := setupMetrics(cfg); err != nil {
-		return nil, fmt.Errorf("failed to setup metrics: %w", err)
 	}
 
 	s := &Server{
@@ -147,21 +140,10 @@ func setupTemplates(e *echo.Echo, l *zap.SugaredLogger, cfg *config.Config) erro
 	return nil
 }
 
-func setupMetrics(cfg *config.Config) error {
-	if err := metrics.RegisterEhcoMetrics(cfg); err != nil {
-		return fmt.Errorf("failed to register Ehco metrics: %w", err)
-	}
-	if err := metrics.RegisterNodeExporterMetrics(cfg); err != nil {
-		return fmt.Errorf("failed to register Node Exporter metrics: %w", err)
-	}
-	return nil
-}
-
 func setupRoutes(s *Server) {
 	e := s.e
 
 	e.StaticFS("/js", echo.MustSubFS(templatesFS, "js"))
-	e.GET(metricsPath, echo.WrapHandler(promhttp.Handler()))
 	e.GET("/debug/pprof/*", echo.WrapHandler(http.DefaultServeMux))
 
 	// web pages

@@ -132,17 +132,3 @@ func (c *Config) NeedStartCmgr() bool {
 	return c.RelaySyncURL != "" && c.RelaySyncInterval > 0
 }
 
-func (c *Config) GetMetricURL() string {
-	if !c.NeedStartWebServer() {
-		return ""
-	}
-	url := fmt.Sprintf("http://%s:%d/metrics/", c.WebHost, c.WebPort)
-	if c.WebToken != "" {
-		url += fmt.Sprintf("?token=%s", c.WebToken)
-	}
-	// for basic auth
-	if c.WebAuthUser != "" && c.WebAuthPass != "" {
-		url = fmt.Sprintf("http://%s:%s@%s:%d/metrics/", c.WebAuthUser, c.WebAuthPass, c.WebHost, c.WebPort)
-	}
-	return url
-}

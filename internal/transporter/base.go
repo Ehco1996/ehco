@@ -42,9 +42,8 @@ func newBaseRelayServer(cfg *conf.Config, cmgr cmgr.Cmgr) (*BaseRelayServer, err
 }
 
 func (b *BaseRelayServer) RelayTCPConn(ctx context.Context, c net.Conn, remote *lb.Node) error {
-	labels := []string{b.cfg.Label, metrics.METRIC_CONN_TYPE_TCP, remote.Address}
-	metrics.CurConnectionCount.WithLabelValues(labels...).Inc()
-	defer metrics.CurConnectionCount.WithLabelValues(labels...).Dec()
+	metrics.IncConn(b.cfg.Label, metrics.ConnTypeTCP, remote.Address)
+	defer metrics.DecConn(b.cfg.Label, metrics.ConnTypeTCP, remote.Address)
 
 	if err := b.checkConnectionLimit(); err != nil {
 		return err
@@ -67,9 +66,8 @@ func (b *BaseRelayServer) RelayTCPConn(ctx context.Context, c net.Conn, remote *
 }
 
 func (b *BaseRelayServer) RelayUDPConn(ctx context.Context, c net.Conn, remote *lb.Node) error {
-	labels := []string{b.cfg.Label, metrics.METRIC_CONN_TYPE_UDP, remote.Address}
-	metrics.CurConnectionCount.WithLabelValues(labels...).Inc()
-	defer metrics.CurConnectionCount.WithLabelValues(labels...).Dec()
+	metrics.IncConn(b.cfg.Label, metrics.ConnTypeUDP, remote.Address)
+	defer metrics.DecConn(b.cfg.Label, metrics.ConnTypeUDP, remote.Address)
 
 	rc, err := b.relayer.HandShake(ctx, remote, false)
 	if err != nil {

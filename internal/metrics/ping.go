@@ -10,6 +10,8 @@ import (
 	"go.uber.org/zap"
 )
 
+const pingInterval = time.Second * 30
+
 func (pg *PingGroup) newPinger(ruleLabel string, remote string, addr string) (*ping.Pinger, error) {
 	pinger := ping.New(addr)
 	if err := pinger.Resolve(); err != nil {
@@ -31,8 +33,7 @@ func (pg *PingGroup) newPinger(ruleLabel string, remote string, addr string) (*p
 
 	pinger.OnRecv = func(pkt *ping.Packet) {
 		ip := pkt.IPAddr.String()
-		PingResponseDurationMilliseconds.WithLabelValues(
-			ruleLabel, remote, ip).Observe(float64(pkt.Rtt.Milliseconds()))
+		RecordPing(ruleLabel, remote, ip, pkt.Rtt.Milliseconds())
 		pg.logger.Sugar().Infof("%d bytes from %s icmp_seq=%d time=%v ttl=%v",
 			pkt.Nbytes, pkt.Addr, pkt.Seq, pkt.Rtt, pkt.Ttl)
 	}

@@ -10,7 +10,7 @@ import (
 
 	"github.com/Ehco1996/ehco/internal/cmgr/ms"
 	"github.com/Ehco1996/ehco/internal/conn"
-	"github.com/Ehco1996/ehco/pkg/metric_reader"
+	"github.com/Ehco1996/ehco/internal/metrics"
 	"go.uber.org/zap"
 )
 
@@ -53,7 +53,6 @@ type cmgrImpl struct {
 	closedConnectionsMap map[string][]conn.RelayConn
 
 	ms *ms.MetricsStore
-	mr metric_reader.Reader
 }
 
 func NewCmgr(cfg *Config) (Cmgr, error) {
@@ -64,15 +63,20 @@ func NewCmgr(cfg *Config) (Cmgr, error) {
 		closedConnectionsMap: make(map[string][]conn.RelayConn),
 	}
 	if cfg.NeedMetrics() {
-		cmgr.mr = metric_reader.NewReader(cfg.MetricsURL)
-
 		homeDir, _ := os.UserHomeDir()
-		dbPath := filepath.Join(homeDir, ".ehco", "metrics.db")
-		ms, err := ms.NewMetricsStore(dbPath)
+		dataDir := filepath.Join(homeDir, ".ehco", "tsdb")
+		store, err := ms.NewMetricsStore(context.Background(), dataDir, cfg.MaxDiskUsagePercent)
 		if err != nil {
 			return nil, err
 		}
-		cmgr.ms = ms
+		store.SetPairLister(metrics.Pairs{})
+		cmgr.ms = store
+
+		if legacy := ms.LegacyDBPath(); legacy != "" {
+			if _, err := os.Stat(legacy); err == nil {
+				cmgr.l.Warnf("legacy SQLite metrics db at %s is no longer used and can be safely deleted", legacy)
+			}
+		}
 	}
 	return cmgr, nil
 }
@@ -185,6 +189,13 @@ func (cm *cmgrImpl) GetActiveConnectCntByRelayLabel(label string) int {
 }
 
 func (cm *cmgrImpl) Start(ctx context.Context, errCH chan error) {
+	defer func() {
+		if cm.ms != nil {
+			if err := cm.ms.Close(); err != nil {
+				cm.l.Errorf("close metrics store: %v", err)
+			}
+		}
+	}()
 	cm.l.Infof("Start Cmgr sync interval=%d", cm.cfg.SyncInterval)
 	ticker := time.NewTicker(time.Second * time.Duration(cm.cfg.SyncInterval))
 	defer ticker.Stop()
@@ -209,28 +220,26 @@ func (cm *cmgrImpl) Start(ctx context.Context, errCH chan error) {
 
 func (cm *cmgrImpl) QueryNodeMetrics(ctx context.Context, req *ms.QueryNodeMetricsReq, refresh bool) (*ms.QueryNodeMetricsResp, error) {
 	if refresh {
-		nm, _, err := cm.mr.ReadOnce(ctx)
-		if err != nil {
-			return nil, err
-		}
-		if err := cm.ms.AddNodeMetric(ctx, nm); err != nil {
-			return nil, err
-		}
+		cm.snapshotOnce(ctx)
 	}
 	return cm.ms.QueryNodeMetric(ctx, req)
 }
 
 func (cm *cmgrImpl) QueryRuleMetrics(ctx context.Context, req *ms.QueryRuleMetricsReq, refresh bool) (*ms.QueryRuleMetricsResp, error) {
 	if refresh {
-		_, rm, err := cm.mr.ReadOnce(ctx)
-		if err != nil {
-			return nil, err
-		}
-		for _, m := range rm {
-			if err := cm.ms.AddRuleMetric(ctx, m); err != nil {
-				return nil, err
-			}
-		}
+		cm.snapshotOnce(ctx)
 	}
 	return cm.ms.QueryRuleMetric(ctx, req)
+}
+
+func (cm *cmgrImpl) snapshotOnce(ctx context.Context) {
+	nm, rules := metrics.Snapshot()
+	if err := cm.ms.AddNodeMetric(ctx, nm); err != nil {
+		cm.l.Errorf("snapshot AddNodeMetric: %v", err)
+	}
+	for _, rs := range rules {
+		if err := cm.ms.AddRuleMetric(ctx, rs); err != nil {
+			cm.l.Errorf("snapshot AddRuleMetric: %v", err)
+		}
+	}
 }

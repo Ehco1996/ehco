@@ -1,17 +1,17 @@
 package cmgr
 
 type Config struct {
-	SyncURL      string
-	MetricsURL   string
-	SyncInterval int // in seconds
+	SyncInterval        int
+	SyncURL             string
+	MaxDiskUsagePercent int // 0 = use default (50)
 }
 
 func (c *Config) NeedSync() bool {
-	return c.SyncURL != "" && c.SyncInterval > 0
+	return c.SyncURL != ""
 }
 
 func (c *Config) NeedMetrics() bool {
-	return c.MetricsURL != "" && c.SyncInterval > 0
+	return c.SyncInterval > 0
 }
 
 func (c *Config) Adjust() {

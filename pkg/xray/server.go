@@ -111,7 +111,7 @@ func (xs *XrayServer) Setup() error {
 		if len(proxyTags) == 0 {
 			return errors.New("can't find proxy tag in config")
 		}
-		xs.up = NewUserPool(xs.cfg.XRayConfig.API.Listen, xs.cfg.SyncTrafficEndPoint, xs.cfg.GetMetricURL(), proxyTags)
+		xs.up = NewUserPool(xs.cfg.XRayConfig.API.Listen, xs.cfg.SyncTrafficEndPoint, proxyTags)
 	}
 	return nil
 }

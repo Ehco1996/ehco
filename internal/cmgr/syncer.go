@@ -5,8 +5,8 @@ import (
 
 	"github.com/Ehco1996/ehco/internal/conn"
 	"github.com/Ehco1996/ehco/internal/constant"
+	"github.com/Ehco1996/ehco/internal/metrics"
 	myhttp "github.com/Ehco1996/ehco/pkg/http"
-	"github.com/Ehco1996/ehco/pkg/metric_reader"
 	"go.uber.org/zap"
 )
 
@@ -24,10 +24,19 @@ type VersionInfo struct {
 	ShortCommit string `json:"short_commit"`
 }
 
+type syncNodeMetrics struct {
+	Timestamp   int64   `json:"timestamp"`
+	CPUUsage    float64 `json:"cpu_usage"`
+	MemoryUsage float64 `json:"memory_usage"`
+	DiskUsage   float64 `json:"disk_usage"`
+	NetworkIn   float64 `json:"network_in"`
+	NetworkOut  float64 `json:"network_out"`
+}
+
 type syncReq struct {
-	Version VersionInfo               `json:"version"`
-	Node    metric_reader.NodeMetrics `json:"node"`
-	Stats   []StatsPerRule            `json:"stats"`
+	Version VersionInfo     `json:"version"`
+	Node    syncNodeMetrics `json:"node"`
+	Stats   []StatsPerRule  `json:"stats"`
 }
 
 func (cm *cmgrImpl) syncOnce(ctx context.Context) error {
@@ -45,18 +54,21 @@ func (cm *cmgrImpl) syncOnce(ctx context.Context) error {
 	}
 
 	if cm.cfg.NeedMetrics() {
-		nm, rmm, err := cm.mr.ReadOnce(ctx)
-		if err != nil {
-			cm.l.Errorf("read metrics failed: %v", err)
-		} else {
-			req.Node = *nm
-			if err := cm.ms.AddNodeMetric(ctx, nm); err != nil {
-				cm.l.Errorf("add metrics to store failed: %v", err)
-			}
-			for _, rm := range rmm {
-				if err := cm.ms.AddRuleMetric(ctx, rm); err != nil {
-					cm.l.Errorf("add rule metrics to store failed: %v", err)
-				}
+		nm, rules := metrics.Snapshot()
+		req.Node = syncNodeMetrics{
+			Timestamp:   nm.SyncTime.Unix(),
+			CPUUsage:    nm.CPUUsage,
+			MemoryUsage: nm.MemoryUsage,
+			DiskUsage:   nm.DiskUsage,
+			NetworkIn:   nm.NetworkIn,
+			NetworkOut:  nm.NetworkOut,
+		}
+		if err := cm.ms.AddNodeMetric(ctx, nm); err != nil {
+			cm.l.Errorf("add node metric: %v", err)
+		}
+		for _, rs := range rules {
+			if err := cm.ms.AddRuleMetric(ctx, rs); err != nil {
+				cm.l.Errorf("add rule metric: %v", err)
 			}
 		}
 	}

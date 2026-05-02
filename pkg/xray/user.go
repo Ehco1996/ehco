@@ -131,7 +131,7 @@ type UserPool struct {
 	remoteConfigURL string
 }
 
-func NewUserPool(grpcEndPoint, remoteConfigURL, metricURL string, proxyTags []string) *UserPool {
+func NewUserPool(grpcEndPoint, remoteConfigURL string, proxyTags []string) *UserPool {
 	up := &UserPool{
 		l:               zap.L().Named("user_pool"),
 		users:           make(map[int]*User),
@@ -139,9 +139,7 @@ func NewUserPool(grpcEndPoint, remoteConfigURL, metricURL string, proxyTags []st
 		grpcEndPoint:    grpcEndPoint,
 		remoteConfigURL: remoteConfigURL,
 	}
-	if metricURL != "" {
-		up.br = NewBandwidthRecorder(metricURL)
-	}
+	up.br = NewBandwidthRecorder()
 	return up
 }
 
@@ -240,14 +238,11 @@ func (up *UserPool) syncTrafficToServer(ctx context.Context, proxyTag string) er
 			return err
 		}
 
-		ub := up.br.GetUploadBandwidth()
-		req.UploadBandwidth = int64(ub)
-		db := up.br.GetDownloadBandwidth()
-		req.DownloadBandwidth = int64(db)
+		req.UploadBandwidth = int64(uploadIncr)
+		req.DownloadBandwidth = int64(downloadIncr)
 		up.l.Sugar().Debug(
-			"Upload Bandwidth :", bytes.PrettyByteSize(ub),
-			"Download Bandwidth :", bytes.PrettyByteSize(db),
-			"Total Bandwidth :", bytes.PrettyByteSize(ub+db),
+			"Upload Increment :", bytes.PrettyByteSize(uploadIncr),
+			"Download Increment :", bytes.PrettyByteSize(downloadIncr),
 			"Total Increment By BR", bytes.PrettyByteSize(uploadIncr+downloadIncr),
 			"Total Increment By Xray :", bytes.PrettyByteSize(float64(req.GetTotalTraffic())),
 		)

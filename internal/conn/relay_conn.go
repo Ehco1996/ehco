@@ -199,12 +199,10 @@ func (c *innerConn) recordStats(n int, isRead bool) {
 		return
 	}
 	if isRead {
-		labels := []string{c.rc.RelayLabel, c.rc.ConnType, metrics.METRIC_FLOW_READ, c.rc.remote.Address}
-		metrics.NetWorkTransmitBytes.WithLabelValues(labels...).Add(float64(n))
+		metrics.AddBytes(c.rc.RelayLabel, c.rc.ConnType, c.rc.remote.Address, metrics.FlowRx, int64(n))
 		c.rc.Stats.Record(0, int64(n))
 	} else {
-		labels := []string{c.rc.RelayLabel, c.rc.ConnType, metrics.METRIC_FLOW_WRITE, c.rc.remote.Address}
-		metrics.NetWorkTransmitBytes.WithLabelValues(labels...).Add(float64(n))
+		metrics.AddBytes(c.rc.RelayLabel, c.rc.ConnType, c.rc.remote.Address, metrics.FlowTx, int64(n))
 		c.rc.Stats.Record(int64(n), 0)
 	}
 }
