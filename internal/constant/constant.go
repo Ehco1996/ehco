@@ -5,7 +5,11 @@ import "time"
 type RelayType string
 
 var (
-	Version     = "1.1.6"
+	// Version is overridden at link time by Makefile / goreleaser ldflags.
+	// The literal here is a fallback for raw `go build` invocations on master,
+	// kept slightly newer than the most recent stable tag so the update
+	// command's nightly auto-detection and downgrade guard behave sanely.
+	Version     = "1.1.7-next"
 	GitBranch   string
 	GitRevision string
 	BuildTime   string
