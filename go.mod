@@ -10,10 +10,12 @@ require (
 	github.com/hashicorp/go-retryablehttp v0.7.8
 	github.com/juju/ratelimit v1.0.2
 	github.com/labstack/echo/v4 v4.15.1
+	github.com/nakabonne/tstorage v0.3.6
 	github.com/prometheus/client_golang v1.23.2
 	github.com/prometheus/client_model v0.6.2
 	github.com/prometheus/common v0.67.5
 	github.com/prometheus/node_exporter v1.10.2
+	github.com/shirou/gopsutil/v4 v4.26.4
 	github.com/stretchr/testify v1.11.1
 	github.com/urfave/cli/v2 v2.27.7
 	github.com/xtls/xray-core v1.260206.0
