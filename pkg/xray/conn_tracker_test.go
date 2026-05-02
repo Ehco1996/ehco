@@ -3,7 +3,12 @@ package xray
 import (
 	"context"
 	"net"
+	"strconv"
 	"testing"
+
+	xnet "github.com/xtls/xray-core/common/net"
+	"github.com/xtls/xray-core/common/protocol"
+	"github.com/xtls/xray-core/common/session"
 )
 
 // fakeConn is a minimal net.Conn that just tracks Close calls.
@@ -16,10 +21,25 @@ func (c *fakeConn) Close() error { c.closed = true; return nil }
 
 func newFakeConn() *fakeConn { return &fakeConn{} }
 
+// makeSessions builds synthetic inbound/outbound session structs for tests.
+// email is also used as user_id (matches the production convention where the
+// email field carries the numeric id as a string).
+func makeSessions(email, srcIP, target string, network xnet.Network) (*session.Inbound, *session.Outbound) {
+	inb := &session.Inbound{
+		User:   &protocol.MemoryUser{Email: email},
+		Source: xnet.Destination{Network: network, Address: xnet.ParseAddress(srcIP), Port: 12345},
+	}
+	ob := &session.Outbound{
+		Target: xnet.Destination{Network: network, Address: xnet.ParseAddress(target), Port: 443},
+	}
+	return inb, ob
+}
+
 func TestConnTrackerRegisterAndUnregister(t *testing.T) {
 	tr := newConnTracker()
 	_, cancel := context.WithCancel(context.Background())
-	id := tr.Register(1, "1", "tcp", "1.1.1.1:443", newFakeConn(), cancel)
+	inb, ob := makeSessions("1", "10.0.0.1", "1.1.1.1", xnet.Network_TCP)
+	id := tr.Register(inb, ob, newFakeConn(), cancel)
 	if id == 0 {
 		t.Fatal("expected non-zero id")
 	}
@@ -28,6 +48,11 @@ func TestConnTrackerRegisterAndUnregister(t *testing.T) {
 	}
 	if got := tr.List(1); len(got) != 1 {
 		t.Fatalf("List(1) want 1, got %d", len(got))
+	}
+	// derived fields should be readable through ConnInfo
+	info := tr.List(1)[0]
+	if info.UserID != 1 || info.Email != "1" || info.SourceIP != "10.0.0.1" || info.Network != "tcp" {
+		t.Fatalf("unexpected info: %+v", info)
 	}
 	tr.Unregister(id)
 	if got := tr.List(0); len(got) != 0 {
@@ -46,7 +71,8 @@ func TestConnTrackerKill(t *testing.T) {
 	tr := newConnTracker()
 	ctx, cancel := context.WithCancel(context.Background())
 	conn := newFakeConn()
-	id := tr.Register(7, "7", "tcp", "x:1", conn, cancel)
+	inb, ob := makeSessions("7", "10.0.0.7", "x", xnet.Network_TCP)
+	id := tr.Register(inb, ob, conn, cancel)
 	if !tr.Kill(id) {
 		t.Fatal("Kill should return true for known id")
 	}
@@ -71,10 +97,12 @@ func TestConnTrackerKillByUser(t *testing.T) {
 	tr := newConnTracker()
 	for i := 0; i < 3; i++ {
 		_, cancel := context.WithCancel(context.Background())
-		tr.Register(42, "42", "tcp", "x:1", newFakeConn(), cancel)
+		inb, ob := makeSessions("42", "10.0.0.42", "x", xnet.Network_TCP)
+		tr.Register(inb, ob, newFakeConn(), cancel)
 	}
 	_, cancel := context.WithCancel(context.Background())
-	tr.Register(99, "99", "tcp", "x:1", newFakeConn(), cancel)
+	inb, ob := makeSessions("99", "10.0.0.99", "x", xnet.Network_TCP)
+	tr.Register(inb, ob, newFakeConn(), cancel)
 
 	if n := tr.KillByUser(42); n != 3 {
 		t.Fatalf("KillByUser(42) want 3, got %d", n)
@@ -89,9 +117,25 @@ func TestConnTrackerKillAll(t *testing.T) {
 	tr := newConnTracker()
 	for u := 1; u <= 4; u++ {
 		_, cancel := context.WithCancel(context.Background())
-		tr.Register(u, "", "tcp", "x:1", newFakeConn(), cancel)
+		inb, ob := makeSessions(strconv.Itoa(u), "10.0.0.1", "x", xnet.Network_TCP)
+		tr.Register(inb, ob, newFakeConn(), cancel)
 	}
 	if n := tr.KillAll(); n != 4 {
 		t.Fatalf("KillAll want 4, got %d", n)
+	}
+}
+
+func TestConnTrackerCountTCPByUser(t *testing.T) {
+	tr := newConnTracker()
+	_, c1 := context.WithCancel(context.Background())
+	inbT, obT := makeSessions("5", "10.0.0.5", "x", xnet.Network_TCP)
+	tr.Register(inbT, obT, newFakeConn(), c1)
+
+	_, c2 := context.WithCancel(context.Background())
+	inbU, obU := makeSessions("5", "10.0.0.5", "x", xnet.Network_UDP)
+	tr.Register(inbU, obU, newFakeConn(), c2)
+
+	if n := tr.CountTCPByUser(5); n != 1 {
+		t.Fatalf("CountTCPByUser(5) want 1 (only the TCP conn), got %d", n)
 	}
 }

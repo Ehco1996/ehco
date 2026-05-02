@@ -4,12 +4,10 @@ import (
 	"context"
 	goerrors "errors"
 	"io"
-	"strconv"
 
 	"github.com/xtls/xray-core/common"
 	"github.com/xtls/xray-core/common/buf"
 	"github.com/xtls/xray-core/common/errors"
-	"github.com/xtls/xray-core/common/net"
 	"github.com/xtls/xray-core/common/serial"
 	"github.com/xtls/xray-core/common/session"
 	"github.com/xtls/xray-core/common/task"
@@ -42,27 +40,24 @@ func (h *meteredOutbound) ProxySettings() *serial.TypedMessage  { return nil }
 func (h *meteredOutbound) Dispatch(ctx context.Context, link *transport.Link) {
 	obs := session.OutboundsFromContext(ctx)
 	if len(obs) == 0 {
-		common.Interrupt(link.Reader)
-		common.Interrupt(link.Writer)
+		_ = common.Interrupt(link.Reader)
+		_ = common.Interrupt(link.Writer)
 		return
 	}
 	ob := obs[len(obs)-1]
 	target := ob.Target
 	if !target.IsValid() {
-		common.Interrupt(link.Reader)
-		common.Interrupt(link.Writer)
+		_ = common.Interrupt(link.Reader)
+		_ = common.Interrupt(link.Writer)
 		return
 	}
 	ob.Name = "metered"
 
-	// extract user identity from inbound session ctx
-	var userID int
-	var email string
-	if inb := session.InboundFromContext(ctx); inb != nil && inb.User != nil {
+	inb := session.InboundFromContext(ctx)
+	userID := userIDFromInbound(inb)
+	email := ""
+	if inb != nil && inb.User != nil {
 		email = inb.User.Email
-		if id, err := strconv.Atoi(email); err == nil {
-			userID = id
-		}
 	}
 
 	dialCtx, cancel := context.WithCancel(ctx)
@@ -75,14 +70,9 @@ func (h *meteredOutbound) Dispatch(ctx context.Context, link *transport.Link) {
 			zap.String("email", email),
 			zap.Error(err),
 		)
-		common.Interrupt(link.Writer)
-		common.Interrupt(link.Reader)
+		_ = common.Interrupt(link.Writer)
+		_ = common.Interrupt(link.Reader)
 		return
-	}
-
-	network := "tcp"
-	if target.Network == net.Network_UDP {
-		network = "udp"
 	}
 
 	// pool may be nil if SyncTrafficEndPoint wasn't configured; counters disabled.
@@ -91,7 +81,21 @@ func (h *meteredOutbound) Dispatch(ctx context.Context, link *transport.Link) {
 		user, _ = h.pool.GetUser(userID)
 	}
 
-	connID := h.tracker.Register(userID, email, network, target.NetAddr(), rawConn, cancel)
+	// Record the access IP for this cycle's traffic report. Source should
+	// always be populated by xray on inbound accept; if it isn't, that's a
+	// real anomaly worth surfacing.
+	if user != nil {
+		srcIP := sourceIPFromInbound(inb)
+		if srcIP == "" {
+			h.l.Warn("inbound source address missing, skipping IP record",
+				zap.String("email", email),
+			)
+		} else {
+			user.RecordIP(srcIP)
+		}
+	}
+
+	connID := h.tracker.Register(inb, ob, rawConn, cancel)
 	defer h.tracker.Unregister(connID)
 	defer rawConn.Close()
 
@@ -123,10 +127,10 @@ func (h *meteredOutbound) Dispatch(ctx context.Context, link *transport.Link) {
 				zap.String("email", email),
 				zap.Error(err),
 			)
-			common.Interrupt(link.Writer)
+			_ = common.Interrupt(link.Writer)
 		}
 	}
-	common.Interrupt(link.Reader)
+	_ = common.Interrupt(link.Reader)
 }
 
 // meteringReader / meteringWriter wrap the dialed conn at the buf layer so

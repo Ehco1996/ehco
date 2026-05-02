@@ -21,6 +21,11 @@ import (
 	"go.uber.org/zap"
 )
 
+// maxRecentIPsPerUser caps the per-user accumulated source-IP set between two
+// sync cycles. When exceeded, the oldest IP is dropped (FIFO) and a warning
+// is logged.
+const maxRecentIPsPerUser = 10
+
 type User struct {
 	running bool
 
@@ -38,6 +43,13 @@ type User struct {
 	DownloadTraffic int64 `json:"download_traffic"`
 
 	Protocol string `json:"protocol"`
+
+	// recentIPs accumulates distinct client source IPs seen by the metered
+	// outbound during the current sync cycle. Snapshotted and cleared by
+	// snapshotAndReset alongside the byte counters.
+	ipMu        sync.Mutex
+	recentIPs   []string            // FIFO order
+	recentIPSet map[string]struct{} // membership index for O(1) dedup
 }
 
 type UserTraffic struct {
@@ -79,11 +91,46 @@ func (u *User) AddDownloadTraffic(n int64) {
 	atomic.AddInt64(&u.DownloadTraffic, n)
 }
 
-// snapshotAndReset returns the accumulated up/down byte counts and resets
-// them in a single atomic swap, so concurrent increments aren't lost.
-func (u *User) snapshotAndReset() (up, down int64) {
+// RecordIP appends a distinct source IP into the per-user FIFO. When the cap
+// is hit, the oldest IP is dropped to make room. Empty input is ignored.
+func (u *User) RecordIP(ip string) {
+	if ip == "" {
+		return
+	}
+	u.ipMu.Lock()
+	defer u.ipMu.Unlock()
+	if u.recentIPSet == nil {
+		u.recentIPSet = make(map[string]struct{}, maxRecentIPsPerUser)
+	}
+	if _, exists := u.recentIPSet[ip]; exists {
+		return
+	}
+	u.recentIPs = append(u.recentIPs, ip)
+	u.recentIPSet[ip] = struct{}{}
+	if len(u.recentIPs) > maxRecentIPsPerUser {
+		oldest := u.recentIPs[0]
+		u.recentIPs = u.recentIPs[1:]
+		delete(u.recentIPSet, oldest)
+		zap.L().Named("user_pool").Warn("recent IPs cap reached, dropping oldest",
+			zap.Int("user_id", u.ID),
+			zap.String("dropped_ip", oldest),
+			zap.String("new_ip", ip),
+		)
+	}
+}
+
+// snapshotAndReset returns the accumulated up/down byte counts plus the set
+// of source IPs seen this cycle, and resets all of them. The byte counters
+// use atomic swaps so concurrent increments aren't lost; the IP set is
+// guarded by ipMu.
+func (u *User) snapshotAndReset() (up, down int64, ips []string) {
 	up = atomic.SwapInt64(&u.UploadTraffic, 0)
 	down = atomic.SwapInt64(&u.DownloadTraffic, 0)
+	u.ipMu.Lock()
+	ips = u.recentIPs
+	u.recentIPs = nil
+	u.recentIPSet = nil
+	u.ipMu.Unlock()
 	return
 }
 
@@ -129,8 +176,9 @@ type UserPool struct {
 	// map key : ID
 	users map[int]*User
 
-	im inbound.Manager
-	br *bandwidthRecorder
+	im      inbound.Manager
+	br      *bandwidthRecorder
+	tracker *connTracker
 
 	proxyTags       []string
 	cancel          context.CancelFunc
@@ -154,6 +202,13 @@ func NewUserPool(remoteConfigURL, metricURL string, proxyTags []string) *UserPoo
 // uses to add/remove users on each protocol's inbound.
 func (up *UserPool) SetInboundManager(im inbound.Manager) {
 	up.im = im
+}
+
+// SetConnTracker wires the connection registry so syncTrafficToServer can
+// derive per-user TCP conn counts. Optional — when unset, TcpCount is reported
+// as 0.
+func (up *UserPool) SetConnTracker(t *connTracker) {
+	up.tracker = t
 }
 
 func (up *UserPool) CreateUser(userId, level int, password, method, protocol, flow string, enable bool) *User {
@@ -267,17 +322,24 @@ func isNotFound(err error) bool {
 func (up *UserPool) syncTrafficToServer(ctx context.Context) error {
 	tfs := make([]*UserTraffic, 0)
 	for _, user := range up.GetAllUsers() {
-		up_, down := user.snapshotAndReset()
+		up_, down, ips := user.snapshotAndReset()
 		if up_ == 0 && down == 0 {
 			continue
 		}
-		up.l.Sugar().Infof("User %d traffic up=%d down=%d", user.ID, up_, down)
+		if ips == nil {
+			ips = []string{}
+		}
+		var tcpCount int64
+		if up.tracker != nil {
+			tcpCount = int64(up.tracker.CountTCPByUser(user.ID))
+		}
+		up.l.Sugar().Infof("User %d traffic up=%d down=%d ips=%v tcp=%d", user.ID, up_, down, ips, tcpCount)
 		tfs = append(tfs, &UserTraffic{
 			ID:              user.ID,
 			UploadTraffic:   up_,
 			DownloadTraffic: down,
-			IPList:          []string{},
-			TcpCount:        0,
+			IPList:          ips,
+			TcpCount:        tcpCount,
 		})
 	}
 

@@ -151,6 +151,7 @@ func (xs *XrayServer) Setup() error {
 			return errors.New("can't find proxy tag in config")
 		}
 		xs.up = NewUserPool(xs.cfg.SyncTrafficEndPoint, xs.cfg.GetMetricURL(), proxyTags)
+		xs.up.SetConnTracker(xs.tracker)
 
 		im, ok := instance.GetFeature(inbound.ManagerType()).(inbound.Manager)
 		if !ok || im == nil {
