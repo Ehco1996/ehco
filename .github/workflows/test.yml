@@ -52,6 +52,12 @@ jobs:
         with:
           bun-version: "1.2.21"
 
+      - name: build SPA
+        # Must run before lint/test/build: //go:embed all:webui/dist
+        # is type-checked by golangci-lint (and resolved by `go build`),
+        # so the dist tree has to exist on disk before any Go tool runs.
+        run: make ui
+
       - name: tidy
         run: make tidy
 
