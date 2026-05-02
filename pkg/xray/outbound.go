@@ -138,7 +138,7 @@ type meteringReader struct {
 
 func (r *meteringReader) ReadMultiBuffer() (buf.MultiBuffer, error) {
 	mb, err := r.inner.ReadMultiBuffer()
-	r.user.AddDownloadTraffic(mbLen(mb))
+	r.user.AddDownloadTraffic(mbLen(mb) * 2) // ×2 = inbound + outbound pricing all vps provider to this
 	return mb, err
 }
 
