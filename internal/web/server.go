@@ -1,14 +1,12 @@
 package web
 
 import (
-	"crypto/subtle"
 	"fmt"
 	"net"
 	"net/http"
 	_ "net/http/pprof"
 
 	"github.com/labstack/echo/v4"
-	"github.com/labstack/echo/v4/middleware"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.uber.org/zap"
 
@@ -31,6 +29,7 @@ type Server struct {
 	addr string
 	l    *zap.SugaredLogger
 	cfg  *config.Config
+	auth *authenticator
 
 	connMgr cmgr.Cmgr
 }
@@ -48,9 +47,8 @@ func NewServer(
 	l := zap.S().Named("web")
 
 	e := NewEchoServer()
-	if err := setupMiddleware(e, cfg, l); err != nil {
-		return nil, fmt.Errorf("failed to setup middleware: %w", err)
-	}
+	auth := newAuthenticator(cfg)
+	setupMiddleware(e, auth)
 
 	if err := setupMetrics(cfg); err != nil {
 		return nil, fmt.Errorf("failed to setup metrics: %w", err)
@@ -63,6 +61,7 @@ func NewServer(
 		e:       e,
 		l:       l,
 		cfg:     cfg,
+		auth:    auth,
 		connMgr: connMgr,
 		addr:    net.JoinHostPort(cfg.WebHost, fmt.Sprintf("%d", cfg.WebPort)),
 	}
@@ -79,58 +78,11 @@ func validateConfig(cfg *config.Config) error {
 	return nil
 }
 
-func setupMiddleware(e *echo.Echo, cfg *config.Config, _ *zap.SugaredLogger) error {
+func setupMiddleware(e *echo.Echo, auth *authenticator) {
 	e.Use(NginxLogMiddleware(zap.S().Named("web")))
-
-	skipPublic := func(c echo.Context) bool {
-		// SPA shell + its content-hashed assets must load without a token,
-		// otherwise the user can't reach the login modal to enter one.
-		// API/metrics/ws/pprof keep their auth.
-		return isPublicPath(c.Request().URL.Path)
-	}
-
-	if cfg.WebToken != "" {
-		e.Use(middleware.KeyAuthWithConfig(middleware.KeyAuthConfig{
-			Skipper:   skipPublic,
-			KeyLookup: "query:token",
-			Validator: func(key string, _ echo.Context) (bool, error) {
-				return key == cfg.WebToken, nil
-			},
-			// Default behaviour returns 400 when the key is missing entirely;
-			// flatten to 401 so the SPA can treat "needs auth" uniformly
-			// regardless of whether the user submitted a wrong token or none.
-			ErrorHandler: func(err error, _ echo.Context) error {
-				return echo.NewHTTPError(http.StatusUnauthorized, err.Error())
-			},
-		}))
-	}
-
-	if cfg.WebAuthUser != "" && cfg.WebAuthPass != "" {
-		// Custom BasicAuth middleware. Echo's middleware.BasicAuthWithConfig
-		// emits a `WWW-Authenticate: Basic` header on 401, which forces the
-		// browser's native auth dialog. That dialog can't be triggered or
-		// dismissed from the SPA, so we'd have no way to render our own
-		// LoginGate or to sign out (the browser would auto-resend cached
-		// credentials on every reload). Instead we read the header
-		// ourselves, return a plain 401 on failure, and let the SPA own
-		// the login UX end-to-end.
-		e.Use(func(next echo.HandlerFunc) echo.HandlerFunc {
-			return func(c echo.Context) error {
-				if skipPublic(c) {
-					return next(c)
-				}
-				user, pass, ok := c.Request().BasicAuth()
-				if !ok ||
-					subtle.ConstantTimeCompare([]byte(user), []byte(cfg.WebAuthUser)) != 1 ||
-					subtle.ConstantTimeCompare([]byte(pass), []byte(cfg.WebAuthPass)) != 1 {
-					return echo.NewHTTPError(http.StatusUnauthorized, "invalid credentials")
-				}
-				return next(c)
-			}
-		})
-	}
-
-	return nil
+	// Single auth middleware: cookie-session for browsers, bearer-header
+	// for machine clients. No more dual gate, no more query-string token.
+	e.Use(auth.authMiddleware())
 }
 
 func setupMetrics(cfg *config.Config) error {
@@ -151,6 +103,8 @@ func setupRoutes(s *Server) {
 
 	api := e.Group(apiPrefix)
 	api.GET("/auth/info", s.AuthInfo)
+	api.POST("/auth/login", s.HandleLogin)
+	api.POST("/auth/logout", s.HandleLogout)
 	api.GET("/config/", s.CurrentConfig)
 	api.POST("/config/reload/", s.HandleReload)
 	api.GET("/health_check/", s.HandleHealthCheck)
