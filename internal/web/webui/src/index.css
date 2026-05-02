@@ -1,0 +1,112 @@
+@import "tailwindcss";
+@import "uplot/dist/uPlot.min.css";
+
+/* ---------- Design tokens ----------
+ * Single source of truth for colour, type, motion. Light + dark are
+ * expressed via Tailwind utilities for component code; CSS vars are
+ * here only for things referenced by raw CSS (uPlot, scrollbars,
+ * focus rings).
+ * ----------------------------------- */
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+    Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono",
+    monospace;
+}
+
+:root {
+  --accent: oklch(0.62 0.15 160);
+  --ring: oklch(0.62 0.15 160 / 0.45);
+  --surface: oklch(0.99 0 0);
+  --surface-2: oklch(1 0 0);
+  --border: oklch(0.92 0 0);
+  --border-strong: oklch(0.88 0 0);
+  --text: oklch(0.2 0 0);
+  --text-muted: oklch(0.55 0 0);
+}
+
+.dark {
+  --accent: oklch(0.78 0.16 160);
+  --ring: oklch(0.78 0.16 160 / 0.45);
+  --surface: oklch(0.16 0 0);
+  --surface-2: oklch(0.20 0 0);
+  --border: oklch(0.27 0 0);
+  --border-strong: oklch(0.32 0 0);
+  --text: oklch(0.95 0 0);
+  --text-muted: oklch(0.6 0 0);
+}
+
+/* ---------- Base ---------- */
+
+html, body, #root { height: 100%; }
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+  background: var(--surface);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Numbers always align — applied broadly so columns of bytes line up. */
+table, .font-mono, .tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Single canonical focus ring used everywhere. Tailwind's default ring
+ * gets in the way; we hide focus when the user used the mouse and only
+ * show it for keyboard nav. */
+:where(button, a, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* ---------- uPlot dark mode patch ---------- */
+
+.dark .uplot,
+.dark .u-title,
+.dark .u-legend,
+.dark .u-label,
+.dark .u-value {
+  color: var(--text) !important;
+}
+.dark .u-axis text {
+  fill: var(--text-muted) !important;
+}
+.dark .u-grid line {
+  stroke: var(--border) !important;
+  opacity: 0.5;
+}
+
+/* ---------- Scrollbars ---------- */
+
+.scroll-pretty::-webkit-scrollbar { width: 8px; height: 8px; }
+.scroll-pretty::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 4px;
+}
+.scroll-pretty::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+
+/* ---------- Status pulse ---------- */
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: 0.45; transform: scale(0.8); }
+}
+.pulse-dot { animation: pulse-dot 1.6s ease-in-out infinite; }
+
+/* ---------- Safe-area for mobile bottom tab bar ---------- */
+
+.safe-bottom {
+  padding-bottom: max(env(safe-area-inset-bottom), 0px);
+}

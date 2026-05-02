@@ -1,4 +1,4 @@
-.PHONY: tools lint fmt test test-e2e build tidy release
+.PHONY: tools lint fmt test test-e2e build tidy release ui ui-dev ui-clean
 
 NAME=ehco
 BINDIR=dist
@@ -69,13 +69,27 @@ test:
 test-e2e:
 	go test -tags ${BUILD_TAG_FOR_NODE_EXPORTER} -v -count=1 -timeout=3m -run TestE2E ./pkg/xray/...
 
-build:
+# SPA build — produces internal/web/webui/dist/ which is //go:embed'd by
+# the web package. `make build` depends on this so a fresh checkout always
+# embeds the latest UI.
+ui:
+	cd internal/web/webui && bun install --frozen-lockfile && bun run build
+
+# Vite dev server with /api and /ws proxied to a locally-running ehco on
+# 127.0.0.1:9000. Use this instead of rebuilding the SPA on every change.
+ui-dev:
+	cd internal/web/webui && bun run dev
+
+ui-clean:
+	rm -rf internal/web/webui/dist internal/web/webui/node_modules
+
+build: ui
 	${GOBUILD} -o $(BINDIR)/$(NAME) cmd/ehco/main.go
 
-build-arm:
+build-arm: ui
 	GOARCH=arm GOOS=linux ${GOBUILD} -o $(BINDIR)/$(NAME) cmd/ehco/main.go
 
-build-linux-amd64:
+build-linux-amd64: ui
 	GOARCH=amd64 GOOS=linux ${GOBUILD} -o $(BINDIR)/$(NAME)_amd64 cmd/ehco/main.go
 
 tidy:

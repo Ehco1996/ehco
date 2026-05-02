@@ -2,10 +2,7 @@ package web
 
 import (
 	"crypto/subtle"
-	"embed"
 	"fmt"
-	"html/template"
-	"io"
 	"net"
 	"net/http"
 	_ "net/http/pprof"
@@ -21,15 +18,9 @@ import (
 	"github.com/Ehco1996/ehco/internal/metrics"
 )
 
-//go:embed templates/*.html js/*.js
-var templatesFS embed.FS
-
 const (
-	metricsPath     = "/metrics/"
-	indexPath       = "/"
-	connectionsPath = "/connections/"
-	rulesPath       = "/rules/"
-	apiPrefix       = "/api/v1"
+	metricsPath = "/metrics/"
+	apiPrefix   = "/api/v1"
 )
 
 type Server struct {
@@ -42,14 +33,6 @@ type Server struct {
 	cfg  *config.Config
 
 	connMgr cmgr.Cmgr
-}
-
-type echoTemplate struct {
-	templates *template.Template
-}
-
-func (t *echoTemplate) Render(w io.Writer, name string, data interface{}, c echo.Context) error {
-	return t.templates.ExecuteTemplate(w, name, data)
 }
 
 func NewServer(
@@ -67,10 +50,6 @@ func NewServer(
 	e := NewEchoServer()
 	if err := setupMiddleware(e, cfg, l); err != nil {
 		return nil, fmt.Errorf("failed to setup middleware: %w", err)
-	}
-
-	if err := setupTemplates(e, l, cfg); err != nil {
-		return nil, fmt.Errorf("failed to setup templates: %w", err)
 	}
 
 	if err := setupMetrics(cfg); err != nil {
@@ -94,56 +73,51 @@ func NewServer(
 }
 
 func validateConfig(cfg *config.Config) error {
-	// Add validation logic here
 	if cfg.WebPort <= 0 || cfg.WebPort > 65535 {
 		return fmt.Errorf("invalid web port: %d", cfg.WebPort)
 	}
-	// Add more validations as needed
 	return nil
 }
 
-func setupMiddleware(e *echo.Echo, cfg *config.Config, l *zap.SugaredLogger) error {
-	e.Use(NginxLogMiddleware(l))
+func setupMiddleware(e *echo.Echo, cfg *config.Config, _ *zap.SugaredLogger) error {
+	e.Use(NginxLogMiddleware(zap.S().Named("web")))
+
+	skipPublic := func(c echo.Context) bool {
+		// SPA shell + its content-hashed assets must load without a token,
+		// otherwise the user can't reach the login modal to enter one.
+		// API/metrics/ws/pprof keep their auth.
+		return isPublicPath(c.Request().URL.Path)
+	}
 
 	if cfg.WebToken != "" {
 		e.Use(middleware.KeyAuthWithConfig(middleware.KeyAuthConfig{
+			Skipper:   skipPublic,
 			KeyLookup: "query:token",
-			Validator: func(key string, c echo.Context) (bool, error) {
+			Validator: func(key string, _ echo.Context) (bool, error) {
 				return key == cfg.WebToken, nil
+			},
+			// Default behaviour returns 400 when the key is missing entirely;
+			// flatten to 401 so the SPA can treat "needs auth" uniformly
+			// regardless of whether the user submitted a wrong token or none.
+			ErrorHandler: func(err error, _ echo.Context) error {
+				return echo.NewHTTPError(http.StatusUnauthorized, err.Error())
 			},
 		}))
 	}
 
 	if cfg.WebAuthUser != "" && cfg.WebAuthPass != "" {
-		e.Use(middleware.BasicAuth(func(username, password string, c echo.Context) (bool, error) {
-			if subtle.ConstantTimeCompare([]byte(username), []byte(cfg.WebAuthUser)) == 1 &&
-				subtle.ConstantTimeCompare([]byte(password), []byte(cfg.WebAuthPass)) == 1 {
-				return true, nil
-			}
-			return false, nil
+		e.Use(middleware.BasicAuthWithConfig(middleware.BasicAuthConfig{
+			Skipper: skipPublic,
+			Validator: func(username, password string, _ echo.Context) (bool, error) {
+				if subtle.ConstantTimeCompare([]byte(username), []byte(cfg.WebAuthUser)) == 1 &&
+					subtle.ConstantTimeCompare([]byte(password), []byte(cfg.WebAuthPass)) == 1 {
+					return true, nil
+				}
+				return false, nil
+			},
 		}))
 	}
 
-	return nil
-}
-
-func setupTemplates(e *echo.Echo, l *zap.SugaredLogger, cfg *config.Config) error {
-	funcMap := template.FuncMap{
-		"sub": func(a, b int) int { return a - b },
-		"add": func(a, b int) int { return a + b },
-		"CurrentCfg": func() *config.Config {
-			return cfg
-		},
-	}
-	tmpl, err := template.New("").Funcs(funcMap).ParseFS(templatesFS, "templates/*.html")
-	if err != nil {
-		return fmt.Errorf("failed to parse templates: %w", err)
-	}
-	templates := template.Must(tmpl, nil)
-	for _, temp := range templates.Templates() {
-		l.Debug("template name: ", temp.Name())
-	}
-	e.Renderer = &echoTemplate{templates: templates}
 	return nil
 }
 
@@ -160,16 +134,8 @@ func setupMetrics(cfg *config.Config) error {
 func setupRoutes(s *Server) {
 	e := s.e
 
-	e.StaticFS("/js", echo.MustSubFS(templatesFS, "js"))
 	e.GET(metricsPath, echo.WrapHandler(promhttp.Handler()))
 	e.GET("/debug/pprof/*", echo.WrapHandler(http.DefaultServeMux))
-
-	// web pages
-	e.GET(indexPath, s.index)
-	e.GET(connectionsPath, s.ListConnections)
-	e.GET(rulesPath, s.ListRules)
-	e.GET("/rule_metrics/", s.RuleMetrics)
-	e.GET("/logs/", s.LogsPage)
 
 	api := e.Group(apiPrefix)
 	api.GET("/config/", s.CurrentConfig)
@@ -178,8 +144,14 @@ func setupRoutes(s *Server) {
 	api.GET("/node_metrics/", s.GetNodeMetrics)
 	api.GET("/rule_metrics/", s.GetRuleMetrics)
 
-	// ws
 	e.GET("/ws/logs", s.handleWebSocketLogs)
+
+	// SPA: assets are served from the embedded dist tree, every other
+	// path falls through to the SPA shell so client-side routing works.
+	e.GET("/assets/*", assetHandler())
+	e.GET("/favicon.ico", assetHandler())
+	e.GET("/", spaHandler())
+	e.GET("/*", spaHandler())
 }
 
 // APIGroup returns the /api/v1 echo group so other components (e.g. XrayServer)
