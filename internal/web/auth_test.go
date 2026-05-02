@@ -154,20 +154,3 @@ func TestSessionStore_Revoke(t *testing.T) {
 	}
 }
 
-func TestLegacyConfigFolding(t *testing.T) {
-	cfg := &config.Config{
-		WebHost:     "127.0.0.1",
-		WebPort:     9999,
-		WebToken:    "legacy-token",
-		WebAuthPass: "legacy-pass",
-	}
-	if err := cfg.Adjust(); err != nil {
-		t.Fatalf("adjust: %v", err)
-	}
-	if cfg.DashboardPass != "legacy-pass" {
-		t.Fatalf("WebAuthPass should fold to DashboardPass, got %q", cfg.DashboardPass)
-	}
-	if cfg.ApiToken != "legacy-token" {
-		t.Fatalf("WebToken should fold to ApiToken, got %q", cfg.ApiToken)
-	}
-}

@@ -29,15 +29,6 @@ type Config struct {
 	// scrapers, curl). Sent via Authorization: Bearer or X-Ehco-Token.
 	ApiToken string `json:"api_token,omitempty"`
 
-	// Legacy fields kept so a config file or upstream JSON written for
-	// the previous (KeyAuth + BasicAuth) auth scheme still works. The
-	// loader in Adjust() folds these onto DashboardPass / ApiToken if
-	// the new fields are empty. WebAuthUser is intentionally accepted
-	// but ignored — the new scheme has no separate username.
-	WebToken    string `json:"web_token,omitempty"`
-	WebAuthUser string `json:"web_auth_user,omitempty"`
-	WebAuthPass string `json:"web_auth_pass,omitempty"`
-
 	LogLeveL       string `json:"log_level,omitempty"`
 	EnablePing     bool   `json:"enable_ping,omitempty"`
 	ReloadInterval int    `json:"reload_interval,omitempty"`
@@ -106,16 +97,6 @@ func (c *Config) Adjust() error {
 	}
 	if c.WebHost == "" {
 		c.WebHost = "0.0.0.0"
-	}
-	// Fold legacy fields onto the new ones. Done here (post-decode,
-	// pre-validation) so every code path that calls LoadConfig sees
-	// the same shape regardless of whether the source JSON came from
-	// a current or pre-cookie-auth mizhiwu serializer.
-	if c.DashboardPass == "" && c.WebAuthPass != "" {
-		c.DashboardPass = c.WebAuthPass
-	}
-	if c.ApiToken == "" && c.WebToken != "" {
-		c.ApiToken = c.WebToken
 	}
 
 	for _, r := range c.RelayConfigs {
