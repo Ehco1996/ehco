@@ -11,11 +11,38 @@ import (
 	"github.com/Ehco1996/ehco/internal/tls"
 	"github.com/Ehco1996/ehco/internal/web"
 	"github.com/xtls/xray-core/core"
+	"github.com/xtls/xray-core/features/inbound"
+	"github.com/xtls/xray-core/features/outbound"
 	"github.com/xtls/xray-core/infra/conf"
 	_ "github.com/xtls/xray-core/main/distro/all" // register all features
 	"github.com/xtls/xray-core/proxy/trojan"
 	"go.uber.org/zap"
 )
+
+// stripUnused removes the api/stats/policy/outbound configuration from the
+// xray-core conf.Config. We no longer use xray's gRPC api or its stats counters
+// (replaced by the in-process inbound.Manager + meteredOutbound), so leaving
+// these in place would just bind ports and accumulate dead counters.
+//
+// The inbound tagged "api" (a dokodemo-door listener that serves the gRPC
+// commander) is also dropped so the configured port is freed.
+func stripUnused(cfg *conf.Config) {
+	cfg.API = nil
+	cfg.Stats = nil
+	cfg.Policy = nil
+	cfg.OutboundConfigs = nil
+
+	if len(cfg.InboundConfigs) > 0 {
+		filtered := cfg.InboundConfigs[:0]
+		for _, in := range cfg.InboundConfigs {
+			if in.Tag == XrayAPITag {
+				continue
+			}
+			filtered = append(filtered, in)
+		}
+		cfg.InboundConfigs = filtered
+	}
+}
 
 func buildXrayInstanceCfg(cfg *conf.Config) (*core.Config, error) {
 	for _, inbound := range cfg.InboundConfigs {
@@ -51,6 +78,7 @@ func buildXrayInstanceCfg(cfg *conf.Config) (*core.Config, error) {
 			}
 		}
 	}
+	stripUnused(cfg)
 	coreCfg, err := cfg.Build()
 	if err != nil {
 		return nil, err
@@ -63,6 +91,7 @@ type XrayServer struct {
 	cfg *config.Config
 
 	up       *UserPool
+	tracker  *connTracker
 	fallBack *http.Server
 	instance *core.Instance
 
@@ -70,8 +99,18 @@ type XrayServer struct {
 }
 
 func NewXrayServer(cfg *config.Config) *XrayServer {
-	return &XrayServer{l: zap.L().Named("xray"), cfg: cfg}
+	return &XrayServer{
+		l:       zap.L().Named("xray"),
+		cfg:     cfg,
+		tracker: newConnTracker(),
+	}
 }
+
+// Tracker exposes the active connection registry so the admin API can list/kill conns.
+func (xs *XrayServer) Tracker() *connTracker { return xs.tracker }
+
+// UserPool exposes the in-process user pool. May be nil when sync is disabled.
+func (xs *XrayServer) UserPool() *UserPool { return xs.up }
 
 func (xs *XrayServer) Setup() error {
 	coreCfg, err := buildXrayInstanceCfg(xs.cfg.XRayConfig)
@@ -100,8 +139,8 @@ func (xs *XrayServer) Setup() error {
 		return err
 	}
 	xs.instance = instance
+
 	if xs.cfg.SyncTrafficEndPoint != "" {
-		// find api port and server, hard code api Tag to `api`
 		var proxyTags []string
 		for _, inbound := range xs.cfg.XRayConfig.InboundConfigs {
 			if InProxyTags(inbound.Tag) {
@@ -111,13 +150,37 @@ func (xs *XrayServer) Setup() error {
 		if len(proxyTags) == 0 {
 			return errors.New("can't find proxy tag in config")
 		}
-		xs.up = NewUserPool(xs.cfg.XRayConfig.API.Listen, xs.cfg.SyncTrafficEndPoint, xs.cfg.GetMetricURL(), proxyTags)
+		xs.up = NewUserPool(xs.cfg.SyncTrafficEndPoint, xs.cfg.GetMetricURL(), proxyTags)
+		xs.up.SetConnTracker(xs.tracker)
+
+		im, ok := instance.GetFeature(inbound.ManagerType()).(inbound.Manager)
+		if !ok || im == nil {
+			return errors.New("xray inbound manager feature missing")
+		}
+		xs.up.SetInboundManager(im)
+	}
+
+	// Register our metered outbound as the default. We stripped all outbound
+	// configs from cfg, so no other handler exists yet — AddHandler with an
+	// empty tag becomes the default handler used by the dispatcher.
+	om, ok := instance.GetFeature(outbound.ManagerType()).(outbound.Manager)
+	if !ok || om == nil {
+		return errors.New("xray outbound manager feature missing")
+	}
+	if err := om.AddHandler(context.Background(), newMeteredOutbound(xs.tracker, xs.up)); err != nil {
+		return fmt.Errorf("register metered outbound: %w", err)
 	}
 	return nil
 }
 
 func (xs *XrayServer) Stop() {
 	xs.l.Warn("Stop Xray Server now...")
+	if xs.tracker != nil {
+		killed := xs.tracker.KillAll()
+		if killed > 0 {
+			xs.l.Sugar().Infof("Killed %d active conns on stop", killed)
+		}
+	}
 	if xs.instance != nil {
 		if err := xs.instance.Close(); err != nil {
 			xs.l.Error("stop instance meet error", zap.Error(err))

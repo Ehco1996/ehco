@@ -1,4 +1,4 @@
-.PHONY: tools lint fmt test build tidy release
+.PHONY: tools lint fmt test test-e2e build tidy release
 
 NAME=ehco
 BINDIR=dist
@@ -61,7 +61,13 @@ fmt: tools
 	@tools/bin/gofumpt -l -w $(FILES) 2>&1 | $(FAIL_ON_STDOUT)
 
 test:
-	go test -tags ${BUILD_TAG_FOR_NODE_EXPORTER} -v -count=1 -timeout=1m ./...
+	go test -tags ${BUILD_TAG_FOR_NODE_EXPORTER} -v -count=1 -timeout=3m ./...
+
+# Just the pkg/xray e2e suite — runs three protocols × {tcp, udp where supported}
+# plus vless+REALITY against a self-spun client xray + echo backend. Uses real
+# sockets; takes ~15s end to end.
+test-e2e:
+	go test -tags ${BUILD_TAG_FOR_NODE_EXPORTER} -v -count=1 -timeout=3m -run TestE2E ./pkg/xray/...
 
 build:
 	${GOBUILD} -o $(BINDIR)/$(NAME) cmd/ehco/main.go

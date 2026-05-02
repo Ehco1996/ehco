@@ -182,6 +182,13 @@ func setupRoutes(s *Server) {
 	e.GET("/ws/logs", s.handleWebSocketLogs)
 }
 
+// APIGroup returns the /api/v1 echo group so other components (e.g. XrayServer)
+// can mount their own endpoints under the same auth/middleware stack.
+// Must be called before Start.
+func (s *Server) APIGroup() *echo.Group {
+	return s.e.Group(apiPrefix)
+}
+
 func (s *Server) Start() error {
 	s.l.Infof("Start Web Server at http://%s", s.addr)
 	return s.e.Start(s.addr)

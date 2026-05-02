@@ -53,8 +53,13 @@ func (c *Config) LoadConfig(force bool) error {
 		c.l.Warnf("Skip Load Config, last load time: %s", c.lastLoadTime)
 		return nil
 	}
-	// reset
+	// reset: drop all decoded state before re-unmarshaling. Several xray-conf
+	// types implement UnmarshalJSON that append rather than replace (e.g.
+	// PortList.Range), so re-decoding into a stale struct accumulates state
+	// across reloads. Forcing fields to nil makes the decoder allocate fresh
+	// objects.
 	c.RelayConfigs = nil
+	c.XRayConfig = nil
 	c.lastLoadTime = time.Now()
 	if c.NeedSyncFromServer() {
 		if err := c.readFromHttp(); err != nil {
