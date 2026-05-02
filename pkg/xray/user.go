@@ -351,21 +351,25 @@ func (up *UserPool) syncTrafficToServer(ctx context.Context) error {
 
 	req := &SyncTrafficReq{Data: tfs}
 	if up.br != nil {
+		// Bandwidth is best-effort: a failed /metrics/ fetch (e.g. web server
+		// not yet ready at boot, or a transient blip) shouldn't block the user
+		// traffic upload. Report 0 for this cycle and try again next tick.
 		uploadIncr, downloadIncr, err := up.br.RecordOnce(ctx)
 		if err != nil {
-			return err
+			up.l.Sugar().Warnf("bandwidth fetch failed (will retry next tick): %v", err)
+		} else {
+			ub := up.br.GetUploadBandwidth()
+			req.UploadBandwidth = int64(ub)
+			db := up.br.GetDownloadBandwidth()
+			req.DownloadBandwidth = int64(db)
+			up.l.Sugar().Debug(
+				"Upload Bandwidth :", bytes.PrettyByteSize(ub),
+				"Download Bandwidth :", bytes.PrettyByteSize(db),
+				"Total Bandwidth :", bytes.PrettyByteSize(ub+db),
+				"Total Increment By BR", bytes.PrettyByteSize(uploadIncr+downloadIncr),
+				"Total Increment Per User :", bytes.PrettyByteSize(float64(req.GetTotalTraffic())),
+			)
 		}
-		ub := up.br.GetUploadBandwidth()
-		req.UploadBandwidth = int64(ub)
-		db := up.br.GetDownloadBandwidth()
-		req.DownloadBandwidth = int64(db)
-		up.l.Sugar().Debug(
-			"Upload Bandwidth :", bytes.PrettyByteSize(ub),
-			"Download Bandwidth :", bytes.PrettyByteSize(db),
-			"Total Bandwidth :", bytes.PrettyByteSize(ub+db),
-			"Total Increment By BR", bytes.PrettyByteSize(uploadIncr+downloadIncr),
-			"Total Increment Per User :", bytes.PrettyByteSize(float64(req.GetTotalTraffic())),
-		)
 	}
 	if payload, err := json.Marshal(req); err == nil {
 		up.l.Sugar().Infof("syncTrafficToServer payload: %s", payload)
