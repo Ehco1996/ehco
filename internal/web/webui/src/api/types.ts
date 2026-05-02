@@ -82,7 +82,12 @@ export interface XrayConfig {
 export interface EhcoConfig {
   web_port?: number;
   web_host?: string;
-  web_token?: string;
+  // Server-side dashboard / machine credentials. Sent down with the
+  // config response; the SPA never displays them, but the index
+  // signature catch-all needs them named so consumers don't
+  // accidentally treat them as ordinary settings.
+  dashboard_pass?: string;
+  api_token?: string;
   enable_ping?: boolean;
   log_level?: string;
   reload_interval?: number;

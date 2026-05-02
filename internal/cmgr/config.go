@@ -3,7 +3,8 @@ package cmgr
 type Config struct {
 	SyncURL      string
 	MetricsURL   string
-	SyncInterval int // in seconds
+	ApiToken     string // bearer token for authed local /metrics/ pull
+	SyncInterval int    // in seconds
 }
 
 func (c *Config) NeedSync() bool {

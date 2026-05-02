@@ -18,12 +18,16 @@ import (
 type Config struct {
 	PATH string `json:"-"`
 
-	NodeLabel   string `json:"node_label,omitempty"`
-	WebHost     string `json:"web_host,omitempty"`
-	WebPort     int    `json:"web_port,omitempty"`
-	WebToken    string `json:"web_token,omitempty"`
-	WebAuthUser string `json:"web_auth_user,omitempty"`
-	WebAuthPass string `json:"web_auth_pass,omitempty"`
+	NodeLabel string `json:"node_label,omitempty"`
+	WebHost   string `json:"web_host,omitempty"`
+	WebPort   int    `json:"web_port,omitempty"`
+
+	// Dashboard login password for the embedded SPA. The username is
+	// implicit (single-tenant); only the password is configured.
+	DashboardPass string `json:"dashboard_pass,omitempty"`
+	// Bearer token for non-browser callers (mizhiwu reload client,
+	// scrapers, curl). Sent via Authorization: Bearer or X-Ehco-Token.
+	ApiToken string `json:"api_token,omitempty"`
 
 	LogLeveL       string `json:"log_level,omitempty"`
 	EnablePing     bool   `json:"enable_ping,omitempty"`
@@ -141,13 +145,8 @@ func (c *Config) GetMetricURL() string {
 	if !c.NeedStartWebServer() {
 		return ""
 	}
-	url := fmt.Sprintf("http://%s:%d/metrics/", c.WebHost, c.WebPort)
-	if c.WebToken != "" {
-		url += fmt.Sprintf("?token=%s", c.WebToken)
-	}
-	// for basic auth
-	if c.WebAuthUser != "" && c.WebAuthPass != "" {
-		url = fmt.Sprintf("http://%s:%s@%s:%d/metrics/", c.WebAuthUser, c.WebAuthPass, c.WebHost, c.WebPort)
-	}
-	return url
+	// Plain URL: no creds in query, no creds in basic-auth userinfo.
+	// Internal callers attach Authorization: Bearer <ApiToken> as a
+	// header instead — see metric_reader / bandwidth_recorder.
+	return fmt.Sprintf("http://%s:%d/metrics/", c.WebHost, c.WebPort)
 }

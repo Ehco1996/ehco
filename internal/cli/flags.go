@@ -13,7 +13,8 @@ var (
 	TransportType        constant.RelayType
 	ConfigPath           string
 	WebPort              int
-	WebToken             string
+	DashboardPass        string
+	ApiToken             string
 	EnablePing           bool
 	SystemFilePath       = "/etc/systemd/system/ehco.service"
 	LogLevel             string
@@ -70,10 +71,16 @@ var RootFlags = []cli.Flag{
 		Destination: &EnablePing,
 	},
 	&cli.StringFlag{
-		Name:        "web_token",
-		Usage:       "如果访问webui时不带着正确的token，会直接reset连接",
-		EnvVars:     []string{"EHCO_WEB_TOKEN"},
-		Destination: &WebToken,
+		Name:        "dashboard_pass",
+		Usage:       "ehco 内置面板登录密码 (留空则关闭面板登录)",
+		EnvVars:     []string{"EHCO_DASHBOARD_PASS"},
+		Destination: &DashboardPass,
+	},
+	&cli.StringFlag{
+		Name:        "api_token",
+		Usage:       "非浏览器调用方走 Authorization: Bearer 时使用的 token",
+		EnvVars:     []string{"EHCO_API_TOKEN"},
+		Destination: &ApiToken,
 	},
 	&cli.StringFlag{
 		Name:        "log_level",

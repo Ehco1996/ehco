@@ -64,7 +64,7 @@ func NewCmgr(cfg *Config) (Cmgr, error) {
 		closedConnectionsMap: make(map[string][]conn.RelayConn),
 	}
 	if cfg.NeedMetrics() {
-		cmgr.mr = metric_reader.NewReader(cfg.MetricsURL)
+		cmgr.mr = metric_reader.NewReader(cfg.MetricsURL, cfg.ApiToken)
 
 		homeDir, _ := os.UserHomeDir()
 		dbPath := filepath.Join(homeDir, ".ehco", "metrics.db")

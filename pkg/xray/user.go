@@ -194,7 +194,7 @@ type UserPool struct {
 	remoteConfigURL string
 }
 
-func NewUserPool(remoteConfigURL, metricURL string, proxyTags []string) *UserPool {
+func NewUserPool(remoteConfigURL, metricURL, apiToken string, proxyTags []string) *UserPool {
 	up := &UserPool{
 		l:               zap.L().Named("user_pool"),
 		users:           make(map[int]*User),
@@ -202,7 +202,7 @@ func NewUserPool(remoteConfigURL, metricURL string, proxyTags []string) *UserPoo
 		remoteConfigURL: remoteConfigURL,
 	}
 	if metricURL != "" {
-		up.br = NewBandwidthRecorder(metricURL)
+		up.br = NewBandwidthRecorder(metricURL, apiToken)
 	}
 	return up
 }

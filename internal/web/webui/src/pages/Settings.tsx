@@ -67,13 +67,7 @@ export default function Settings() {
                 ],
                 [
                   "auth",
-                  authInfo().basic && authInfo().token
-                    ? "basic + token"
-                    : authInfo().basic
-                      ? "basic"
-                      : authInfo().token
-                        ? "token"
-                        : "none",
+                  authInfo().auth_required ? "session (cookie / bearer)" : "none",
                 ],
               ]}
             />
@@ -155,19 +149,12 @@ export default function Settings() {
           <div class="mt-3 inline-flex flex-wrap items-center gap-1 text-xs text-zinc-500">
             <Plug size={12} />
             <Show
-              when={authInfo().token || authInfo().basic}
+              when={authInfo().auth_required}
               fallback={<span>No auth configured — all endpoints are open.</span>}
             >
               <span>
-                Requires{" "}
-                <Show when={authInfo().token}>
-                  <code class="font-mono">?token=</code>
-                </Show>
-                <Show when={authInfo().token && authInfo().basic}> + </Show>
-                <Show when={authInfo().basic}>
-                  <code class="font-mono">Authorization: Basic</code>
-                </Show>
-                .
+                Browsers authenticate via the session cookie set at login;
+                machine clients send <code class="font-mono">Authorization: Bearer &lt;api_token&gt;</code>.
               </span>
             </Show>
           </div>

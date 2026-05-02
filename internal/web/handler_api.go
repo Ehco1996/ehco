@@ -95,13 +95,18 @@ func (s *Server) GetRuleMetrics(c echo.Context) error {
 	return c.JSON(http.StatusOK, metrics)
 }
 
-// AuthInfo reports which auth schemes the server is enforcing so the
-// SPA can render the right login form before any credentials exist.
-// Public — must remain reachable without auth.
+// AuthInfo reports whether the server requires login and whether the
+// current request already carries a valid session/bearer. The SPA boots
+// off this — if auth_required is false it skips LoginGate entirely; if
+// authenticated is true on first hit (e.g. cookie still valid) it goes
+// straight to the dashboard.
+//
+// Public — must remain reachable without auth so the SPA can probe.
 func (s *Server) AuthInfo(c echo.Context) error {
+	authenticated, _, _ := s.auth.checkRequest(c.Request())
 	return c.JSON(http.StatusOK, map[string]bool{
-		"token": s.cfg.WebToken != "",
-		"basic": s.cfg.WebAuthUser != "" && s.cfg.WebAuthPass != "",
+		"auth_required": s.auth.authRequired(),
+		"authenticated": authenticated,
 	})
 }
 
