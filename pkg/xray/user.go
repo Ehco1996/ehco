@@ -2,6 +2,7 @@ package xray
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -326,12 +327,17 @@ func (up *UserPool) syncTrafficToServer(ctx context.Context) error {
 		if up_ == 0 && down == 0 {
 			continue
 		}
-		if ips == nil {
-			ips = []string{}
-		}
 		var tcpCount int64
 		if up.tracker != nil {
+			// Merge live-conn source IPs into the cycle's IP set: RecordIP only
+			// fires once per Dispatch (conn open), so long-lived conns that
+			// span multiple cycles wouldn't otherwise show up in cycles after
+			// their first.
+			ips = mergeLiveIPs(ips, up.tracker.List(user.ID))
 			tcpCount = int64(up.tracker.CountTCPByUser(user.ID))
+		}
+		if ips == nil {
+			ips = []string{}
 		}
 		up.l.Sugar().Infof("User %d traffic up=%d down=%d ips=%v tcp=%d", user.ID, up_, down, ips, tcpCount)
 		tfs = append(tfs, &UserTraffic{
@@ -361,6 +367,9 @@ func (up *UserPool) syncTrafficToServer(ctx context.Context) error {
 			"Total Increment Per User :", bytes.PrettyByteSize(float64(req.GetTotalTraffic())),
 		)
 	}
+	if payload, err := json.Marshal(req); err == nil {
+		up.l.Sugar().Infof("syncTrafficToServer payload: %s", payload)
+	}
 	// TODO: traffic in `tfs` was atomically reset; if the upstream POST
 	// fails (after retries), this batch is lost. Persist unsent batches
 	// locally and replay them on the next tick.
@@ -369,6 +378,29 @@ func (up *UserPool) syncTrafficToServer(ctx context.Context) error {
 	}
 	up.l.Sugar().Infof("syncTrafficToServer ONLINE USER COUNT: %d", len(tfs))
 	return nil
+}
+
+// mergeLiveIPs adds source IPs from currently-live conns into the per-cycle IP
+// list, deduping. Empty sources and entries already present in ips are skipped.
+func mergeLiveIPs(ips []string, live []ConnInfo) []string {
+	if len(live) == 0 {
+		return ips
+	}
+	seen := make(map[string]struct{}, len(ips)+len(live))
+	for _, ip := range ips {
+		seen[ip] = struct{}{}
+	}
+	for _, c := range live {
+		if c.SourceIP == "" {
+			continue
+		}
+		if _, ok := seen[c.SourceIP]; ok {
+			continue
+		}
+		seen[c.SourceIP] = struct{}{}
+		ips = append(ips, c.SourceIP)
+	}
+	return ips
 }
 
 func (up *UserPool) syncUserConfigsFromServer(ctx context.Context, proxyTag string) error {
