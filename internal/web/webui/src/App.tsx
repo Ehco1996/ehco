@@ -9,6 +9,7 @@ import XrayConns from "./pages/XrayConns";
 import XrayUsers from "./pages/XrayUsers";
 import Logs from "./pages/Logs";
 import Settings from "./pages/Settings";
+import Updates from "./pages/Updates";
 
 export default function App() {
   onMount(probeAuth);
@@ -30,6 +31,7 @@ export default function App() {
           <Route path="/xray/users" component={XrayUsers} />
           <Route path="/logs" component={Logs} />
           <Route path="/settings" component={Settings} />
+          <Route path="/updates" component={Updates} />
           <Route path="*" component={Overview} />
         </HashRouter>
       </Show>

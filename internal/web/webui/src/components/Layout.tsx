@@ -7,6 +7,7 @@ import {
   Cable,
   ScrollText,
   Settings,
+  Download,
   Menu,
   X,
   Sun,
@@ -35,6 +36,7 @@ const liveNav: NavItem[] = [
 
 const configNav: NavItem[] = [
   { href: "/rules", label: "Rules", icon: ServerCog },
+  { href: "/updates", label: "Updates", icon: Download },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 

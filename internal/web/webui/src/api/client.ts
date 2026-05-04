@@ -34,6 +34,10 @@ import type {
   HealthCheckResp,
   QueryNodeMetricsResp,
   QueryRuleMetricsResp,
+  VersionInfo,
+  UpdateCheck,
+  UpdateStatus,
+  UpdateApplyOptions,
 } from "./types";
 
 export const api = {
@@ -78,6 +82,16 @@ export const api = {
       { method: "DELETE" },
     ),
   xrayUsers: () => request<XrayUser[]>("/api/v1/xray/users"),
+  version: () => request<VersionInfo>("/api/v1/version"),
+  updateCheck: (channel: string) =>
+    request<UpdateCheck>(`/api/v1/update/check?channel=${encodeURIComponent(channel)}`),
+  updateApply: (opts: UpdateApplyOptions) =>
+    request<{ state: string }>("/api/v1/update/apply", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(opts),
+    }),
+  updateStatus: () => request<UpdateStatus>("/api/v1/update/status"),
 };
 
 export function wsURL(path: string): string {
