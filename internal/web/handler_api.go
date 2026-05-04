@@ -19,7 +19,7 @@ const (
 type queryParams struct {
 	startTS int64
 	endTS   int64
-	refresh bool
+	latest  bool
 }
 
 func parseQueryParams(c echo.Context) (*queryParams, error) {
@@ -27,7 +27,6 @@ func parseQueryParams(c echo.Context) (*queryParams, error) {
 	params := &queryParams{
 		startTS: now - defaultTimeRange,
 		endTS:   now,
-		refresh: false,
 	}
 
 	if start, err := parseTimestamp(c.QueryParam("start_ts")); err == nil {
@@ -38,8 +37,8 @@ func parseQueryParams(c echo.Context) (*queryParams, error) {
 		params.endTS = end
 	}
 
-	if refresh, err := strconv.ParseBool(c.QueryParam("latest")); err == nil {
-		params.refresh = refresh
+	if latest, err := strconv.ParseBool(c.QueryParam("latest")); err == nil {
+		params.latest = latest
 	}
 
 	if params.startTS >= params.endTS {
@@ -62,10 +61,10 @@ func (s *Server) GetNodeMetrics(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
 	req := &ms.QueryNodeMetricsReq{StartTimestamp: params.startTS, EndTimestamp: params.endTS, Num: -1}
-	if params.refresh {
+	if params.latest {
 		req.Num = 1
 	}
-	metrics, err := s.connMgr.QueryNodeMetrics(c.Request().Context(), req, params.refresh)
+	metrics, err := s.connMgr.QueryNodeMetrics(c.Request().Context(), req)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
@@ -84,11 +83,11 @@ func (s *Server) GetRuleMetrics(c echo.Context) error {
 		RuleLabel:      c.QueryParam("label"),
 		Remote:         c.QueryParam("remote"),
 	}
-	if params.refresh {
+	if params.latest {
 		req.Num = 1
 	}
 
-	metrics, err := s.connMgr.QueryRuleMetrics(c.Request().Context(), req, params.refresh)
+	metrics, err := s.connMgr.QueryRuleMetrics(c.Request().Context(), req)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}

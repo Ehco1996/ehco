@@ -8,6 +8,7 @@ import {
   ScrollText,
   Settings,
   Download,
+  Activity,
   Menu,
   X,
   Sun,
@@ -29,6 +30,7 @@ interface NavItem {
 
 const liveNav: NavItem[] = [
   { href: "/", label: "Overview", icon: LayoutDashboard, end: true },
+  { href: "/node", label: "Node", icon: Activity },
   { href: "/xray/users", label: "Users", icon: Users },
   { href: "/xray/conns", label: "Conns", icon: Cable },
   { href: "/logs", label: "Logs", icon: ScrollText },

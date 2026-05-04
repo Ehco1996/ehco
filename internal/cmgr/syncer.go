@@ -24,15 +24,34 @@ type VersionInfo struct {
 	ShortCommit string `json:"short_commit"`
 }
 
-type syncReq struct {
-	Version VersionInfo               `json:"version"`
-	Node    metric_reader.NodeMetrics `json:"node"`
-	Stats   []StatsPerRule            `json:"stats"`
+// sampleMetrics reads /metrics/ once and persists node + per-rule rows
+// to the local store. Cheap; called on every fast tick so the dashboard
+// has sub-minute resolution regardless of whether control-plane sync is
+// configured.
+func (cm *cmgrImpl) sampleMetrics(ctx context.Context) {
+	if !cm.cfg.NeedMetrics() {
+		return
+	}
+	nm, rmm, err := cm.mr.ReadOnce(ctx)
+	if err != nil {
+		cm.l.Debugf("metrics sample failed: %v", err)
+		return
+	}
+	if err := cm.ms.AddNodeMetric(ctx, nm); err != nil {
+		cm.l.Errorf("persist node metric: %v", err)
+	}
+	for _, rm := range rmm {
+		if err := cm.ms.AddRuleMetric(ctx, rm); err != nil {
+			cm.l.Errorf("persist rule metric: %v", err)
+		}
+	}
 }
 
-func (cm *cmgrImpl) syncOnce(ctx context.Context) error {
+// pushStats drains closedConnectionsMap and POSTs accumulated traffic
+// stats to the control plane. Called at SyncInterval cadence (default
+// 60s); a tighter cadence would just spam the control plane.
+func (cm *cmgrImpl) pushStats(ctx context.Context) error {
 	cm.l.Infof("sync once total closed connections: %d", cm.countClosedConnection())
-	// todo: opt lock
 	cm.lock.Lock()
 
 	shortCommit := constant.GitRevision
@@ -45,26 +64,15 @@ func (cm *cmgrImpl) syncOnce(ctx context.Context) error {
 	}
 
 	if cm.cfg.NeedMetrics() {
-		nm, rmm, err := cm.mr.ReadOnce(ctx)
-		if err != nil {
-			cm.l.Errorf("read metrics failed: %v", err)
+		if nm, _, err := cm.mr.ReadOnce(ctx); err != nil {
+			cm.l.Errorf("read metrics for sync: %v", err)
 		} else {
 			req.Node = *nm
-			if err := cm.ms.AddNodeMetric(ctx, nm); err != nil {
-				cm.l.Errorf("add metrics to store failed: %v", err)
-			}
-			for _, rm := range rmm {
-				if err := cm.ms.AddRuleMetric(ctx, rm); err != nil {
-					cm.l.Errorf("add rule metrics to store failed: %v", err)
-				}
-			}
 		}
 	}
 
 	for label, conns := range cm.closedConnectionsMap {
-		s := StatsPerRule{
-			RelayLabel: label,
-		}
+		s := StatsPerRule{RelayLabel: label}
 		var totalLatency int64
 		for _, c := range conns {
 			s.ConnectionCnt++
@@ -80,11 +88,16 @@ func (cm *cmgrImpl) syncOnce(ctx context.Context) error {
 	cm.closedConnectionsMap = make(map[string][]conn.RelayConn)
 	cm.lock.Unlock()
 
-	if cm.cfg.NeedSync() {
-		cm.l.Debug("syncing data to server", zap.Any("data", req))
-		return myhttp.PostJSONWithRetry(cm.cfg.SyncURL, &req)
-	} else {
-		cm.l.Debugf("remove %d closed connections", len(req.Stats))
+	if !cm.cfg.NeedSync() {
+		cm.l.Debugf("removed %d closed connections", len(req.Stats))
+		return nil
 	}
-	return nil
+	cm.l.Debug("syncing data to server", zap.Any("data", req))
+	return myhttp.PostJSONWithRetry(cm.cfg.SyncURL, &req)
+}
+
+type syncReq struct {
+	Version VersionInfo               `json:"version"`
+	Node    metric_reader.NodeMetrics `json:"node"`
+	Stats   []StatsPerRule            `json:"stats"`
 }
