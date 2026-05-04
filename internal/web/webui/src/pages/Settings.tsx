@@ -56,7 +56,7 @@ export default function Settings() {
       <div class="grid gap-3 lg:grid-cols-2">
         <Show when={config()}>
           <Card>
-            <CardHeader title="Runtime configuration" subtitle="Read-only snapshot" />
+            <CardHeader title="runtime configuration" subtitle="read-only snapshot" />
             <DescList
               items={[
                 ["log level", String(config()!.log_level ?? "—")],
@@ -76,8 +76,8 @@ export default function Settings() {
 
           <Card>
             <CardHeader
-              title="Sync endpoint"
-              subtitle="Where ehco POSTs traffic stats"
+              title="sync endpoint"
+              subtitle="where ehco POSTs traffic stats"
               right={
                 <button
                   class="inline-flex items-center gap-1 text-xs text-zinc-500 hover:text-emerald-600 dark:hover:text-emerald-400"
@@ -97,8 +97,8 @@ export default function Settings() {
 
         <Card>
           <CardHeader
-            title="Reload configuration"
-            subtitle="Re-fetch from upstream"
+            title="reload configuration"
+            subtitle="re-fetch from upstream"
           />
           <p class="mb-3 text-sm text-zinc-500">
             A listener change reloads xray and drops active conns.
@@ -120,7 +120,7 @@ export default function Settings() {
         </Card>
 
         <Card>
-          <CardHeader title="Theme" subtitle="Light / dark mode override" />
+          <CardHeader title="theme" subtitle="light / dark mode override" />
           <div class="flex items-center gap-3">
             <Pill tone="neutral">{theme()}</Pill>
             <Button leadingIcon={<Palette size={13} />} onClick={toggleTheme}>
@@ -135,8 +135,8 @@ export default function Settings() {
 
         <Card class="lg:col-span-2">
           <CardHeader
-            title="API surface"
-            subtitle="Endpoints the UI consumes"
+            title="api surface"
+            subtitle="endpoints the ui consumes"
           />
           <ul class="grid grid-cols-1 gap-y-1 font-mono text-xs text-zinc-600 sm:grid-cols-2 dark:text-zinc-400">
             <Endpoint method="GET" path="/api/v1/config/" />

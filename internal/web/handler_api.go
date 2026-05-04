@@ -149,11 +149,6 @@ type OverviewResp struct {
 	Xray  *glue.XraySnapshot `json:"xray,omitempty"`
 	Host  *ms.NodeMetrics    `json:"host,omitempty"`
 	Rules int                `json:"rules"`
-	// NetRate{In,Out} are bytes/sec — already pre-computed by the
-	// metric_reader, just lifted from the latest host sample. Nil
-	// when no sample has landed yet.
-	NetRateIn  float64 `json:"net_rate_in"`
-	NetRateOut float64 `json:"net_rate_out"`
 }
 
 func (s *Server) Overview(c echo.Context) error {
@@ -169,16 +164,15 @@ func (s *Server) Overview(c echo.Context) error {
 	}
 
 	if s.connMgr != nil {
+		now := time.Now()
 		req := &ms.QueryNodeMetricsReq{
-			StartTimestamp: time.Now().Add(-5 * time.Minute).Unix(),
-			EndTimestamp:   time.Now().Unix(),
+			StartTimestamp: now.Add(-5 * time.Minute).Unix(),
+			EndTimestamp:   now.Unix(),
 			Num:            1,
 		}
 		if resp, err := s.connMgr.QueryNodeMetrics(c.Request().Context(), req); err == nil && len(resp.Data) > 0 {
 			h := resp.Data[0]
 			out.Host = &h
-			out.NetRateIn = h.NetworkIn
-			out.NetRateOut = h.NetworkOut
 		}
 	}
 

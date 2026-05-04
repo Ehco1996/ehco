@@ -47,8 +47,6 @@ export interface OverviewResp {
   xray?: XraySnapshot;
   host?: NodeMetric;
   rules: number;
-  net_rate_in: number;
-  net_rate_out: number;
 }
 
 export interface QueryNodeMetricsResp {

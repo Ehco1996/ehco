@@ -6,29 +6,12 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
-	"strings"
 
 	"github.com/Ehco1996/ehco/internal/config"
 	"github.com/alecthomas/kingpin/v2"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/node_exporter/collector"
 )
-
-// zapLevelToSlogLevel converts zap log level string to slog.Level
-func zapLevelToSlogLevel(zapLevel string) slog.Level {
-	switch strings.ToLower(zapLevel) {
-	case "debug":
-		return slog.LevelDebug
-	case "info":
-		return slog.LevelInfo
-	case "warn", "warning":
-		return slog.LevelWarn
-	case "error":
-		return slog.LevelError
-	default:
-		return slog.LevelInfo
-	}
-}
 
 func RegisterNodeExporterMetrics(cfg *config.Config) error {
 	slogLevel := zapLevelToSlogLevel(cfg.LogLeveL)

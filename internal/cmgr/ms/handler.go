@@ -149,61 +149,36 @@ func (ms *MetricsStore) QueryNodeMetric(ctx context.Context, req *QueryNodeMetri
 }
 
 func (ms *MetricsStore) QueryRuleMetric(ctx context.Context, req *QueryRuleMetricsReq) (*QueryRuleMetricsResp, error) {
-	// Bucketed mode: keep the last sample per (label, remote) inside each
+	// Bucketed mode keeps the last sample per (label, remote) inside each
 	// step-second window. The bytes columns are monotonic counters, so
 	// last-of-bucket preserves the deltas the SPA computes — averaging
-	// them would smear the curve.
-	var (
-		query string
-		args  []interface{}
-	)
+	// would smear the curve.
+	const cols = `timestamp, label, remote, ping_latency,
+        tcp_connection_count, tcp_handshake_duration, tcp_network_transmit_bytes,
+        udp_connection_count, udp_handshake_duration, udp_network_transmit_bytes`
+
+	whereSQL := "WHERE timestamp >= ? AND timestamp <= ?"
+	whereArgs := []interface{}{req.StartTimestamp, req.EndTimestamp}
+	if req.RuleLabel != "" {
+		whereSQL += " AND label = ?"
+		whereArgs = append(whereArgs, req.RuleLabel)
+	}
+	if req.Remote != "" {
+		whereSQL += " AND remote = ?"
+		whereArgs = append(whereArgs, req.Remote)
+	}
+
+	var query string
+	var args []interface{}
 	if req.Step > 1 {
-		query = `
-        SELECT timestamp, label, remote, ping_latency,
-               tcp_connection_count, tcp_handshake_duration, tcp_network_transmit_bytes,
-               udp_connection_count, udp_handshake_duration, udp_network_transmit_bytes
-        FROM rule_metrics
-        WHERE rowid IN (
-            SELECT MAX(rowid) FROM rule_metrics
-            WHERE timestamp >= ? AND timestamp <= ?`
-		args = []interface{}{req.StartTimestamp, req.EndTimestamp}
-		if req.RuleLabel != "" {
-			query += " AND label = ?"
-			args = append(args, req.RuleLabel)
-		}
-		if req.Remote != "" {
-			query += " AND remote = ?"
-			args = append(args, req.Remote)
-		}
-		query += `
-            GROUP BY (timestamp/?), label, remote
-        )
-        ORDER BY timestamp DESC
-        LIMIT ?
-    `
-		args = append(args, req.Step, req.Num)
+		query = "SELECT " + cols + " FROM rule_metrics WHERE rowid IN (" +
+			"SELECT MAX(rowid) FROM rule_metrics " + whereSQL +
+			" GROUP BY (timestamp/?), label, remote) ORDER BY timestamp DESC LIMIT ?"
+		args = append(append([]interface{}{}, whereArgs...), req.Step, req.Num)
 	} else {
-		query = `
-        SELECT timestamp, label, remote, ping_latency,
-               tcp_connection_count, tcp_handshake_duration, tcp_network_transmit_bytes,
-               udp_connection_count, udp_handshake_duration, udp_network_transmit_bytes
-        FROM rule_metrics
-        WHERE timestamp >= ? AND timestamp <= ?
-    `
-		args = []interface{}{req.StartTimestamp, req.EndTimestamp}
-		if req.RuleLabel != "" {
-			query += " AND label = ?"
-			args = append(args, req.RuleLabel)
-		}
-		if req.Remote != "" {
-			query += " AND remote = ?"
-			args = append(args, req.Remote)
-		}
-		query += `
-        ORDER BY timestamp DESC
-        LIMIT ?
-    `
-		args = append(args, req.Num)
+		query = "SELECT " + cols + " FROM rule_metrics " + whereSQL +
+			" ORDER BY timestamp DESC LIMIT ?"
+		args = append(whereArgs, req.Num)
 	}
 
 	rows, err := ms.db.Query(query, args...)

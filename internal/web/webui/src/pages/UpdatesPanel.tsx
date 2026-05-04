@@ -147,7 +147,7 @@ export default function UpdatesPanel() {
       </div>
 
       <Card>
-        <CardHeader title="Current build" subtitle="Reported by this binary." />
+        <CardHeader title="current build" subtitle="reported by this binary" />
         <DescList
           items={[
             ["Version", version()?.version ?? "—"],
@@ -167,7 +167,7 @@ export default function UpdatesPanel() {
 
       <Card class="mt-4">
         <div class="flex flex-wrap items-center gap-3">
-          <CardHeader title="Check for updates" subtitle="GitHub releases (Ehco1996/ehco)." />
+          <CardHeader title="check for updates" subtitle="github releases (Ehco1996/ehco)" />
           <div class="ml-auto flex items-center gap-2">
             <Segmented<Channel>
               options={[
@@ -261,7 +261,7 @@ export default function UpdatesPanel() {
       <Show when={status() && status()!.state !== "idle"}>
         <Card class="mt-4">
           <CardHeader
-            title="Update progress"
+            title="update progress"
             subtitle={status()!.from ? `${status()!.from} → ${status()!.to || "?"}` : undefined}
           />
           <Show when={applyErr()}>

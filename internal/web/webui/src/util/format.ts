@@ -31,6 +31,20 @@ export function rate(bps: number | undefined | null): string {
   return `${bytes(bps)}/s`;
 }
 
+// bytesShort is like bytes() but with single-letter units and no space:
+// "12M", "1.4G", "830K". Used in chart y-axes where label width is tight.
+export function bytesShort(n: number | undefined | null): string {
+  if (!n || n < 0) return "0";
+  const u = ["", "K", "M", "G", "T", "P"];
+  let i = 0;
+  let v = n;
+  while (v >= 1024 && i < u.length - 1) {
+    v /= 1024;
+    i++;
+  }
+  return `${v.toFixed(v >= 100 || i === 0 ? 0 : v >= 10 ? 0 : 1)}${u[i]}`;
+}
+
 // pickStep returns a server-side bucket size (in seconds) for a given
 // time window. Aim is ≤ ~360 points per chart, regardless of window —
 // keeps payload small and uPlot snappy at 30d zoom levels.
