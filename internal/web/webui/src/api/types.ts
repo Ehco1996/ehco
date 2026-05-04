@@ -161,6 +161,32 @@ export interface UpdateApplyOptions {
   restart: boolean;
 }
 
+export interface OpStatsSnapshot {
+  count: number;
+  avg_ms: number;
+  max_ms: number;
+  last_ms: number;
+}
+
+export interface DBHealth {
+  db_file_bytes: number;
+  db_page_count: number;
+  db_page_size: number;
+  db_freelist_pages: number;
+  node_metrics_rows: number;
+  rule_metrics_rows: number;
+  last_rule_write_ts: number;
+  stats: Record<string, OpStatsSnapshot>;
+}
+
+export interface DBMaintenanceResult {
+  node_deleted?: number;
+  rule_deleted?: number;
+  bytes_before?: number;
+  bytes_after?: number;
+  duration_ms: number;
+}
+
 export interface LogFrame {
   level: string;
   ts?: string;

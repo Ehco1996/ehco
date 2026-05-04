@@ -1,21 +1,45 @@
-import { createResource, createSignal, Show } from "solid-js";
-import { Palette, RotateCw, Plug, Copy, Check } from "lucide-solid";
+import { createResource, createSignal, For, Show } from "solid-js";
+import {
+  Palette,
+  RotateCw,
+  Plug,
+  Copy,
+  Check,
+  Trash2,
+  HardDrive,
+  AlertTriangle,
+} from "lucide-solid";
 import PageHeader from "../ui/PageHeader";
 import Button from "../ui/Button";
 import { Card, CardHeader } from "../ui/Card";
 import { Pill } from "../ui/Pill";
 import DescList from "../ui/DescList";
 import { api } from "../api/client";
+import type { DBHealth, DBMaintenanceResult } from "../api/types";
 import { authInfo } from "../store/auth";
 import { theme, toggleTheme } from "../store/theme";
+import { bytes } from "../util/format";
 import UpdatesPanel from "./UpdatesPanel";
+
+// truncateConfirm must match the literal in internal/cmgr/ms/health.go.
+// Wire shape, not user copy — the prompt label can change freely, but
+// what we POST cannot.
+const TRUNCATE_CONFIRM = "yes I am sure";
+
+type ToneStatus = {
+  tone: "ok" | "error" | "neutral";
+  text: string;
+} | null;
 
 export default function Settings() {
   const [config] = createResource(() => api.config());
-  const [reloadStatus, setReloadStatus] = createSignal<{
-    tone: "ok" | "error" | "neutral";
-    text: string;
-  } | null>(null);
+  const [health, { refetch: refetchHealth }] = createResource(() =>
+    api.dbHealth(),
+  );
+  const [reloadStatus, setReloadStatus] = createSignal<ToneStatus>(null);
+  const [maintStatus, setMaintStatus] = createSignal<ToneStatus>(null);
+  const [cleanupDays, setCleanupDays] = createSignal(30);
+  const [busyOp, setBusyOp] = createSignal<string | null>(null);
   const [copied, setCopied] = createSignal(false);
 
   const triggerReload = async () => {
@@ -45,6 +69,84 @@ export default function Settings() {
       /* ignore */
     }
   };
+
+  // runMaint funnels every maintenance op through the same loading +
+  // toast-style status pipeline. Keeps the four buttons free of
+  // try/catch boilerplate and ensures the health card always refreshes
+  // on completion.
+  const runMaint = async (
+    op: string,
+    fn: () => Promise<DBMaintenanceResult | string>,
+    fmtOk: (r: DBMaintenanceResult | string) => string,
+  ) => {
+    setBusyOp(op);
+    setMaintStatus({ tone: "neutral", text: `${op}…` });
+    try {
+      const r = await fn();
+      setMaintStatus({ tone: "ok", text: fmtOk(r) });
+      refetchHealth();
+    } catch (e) {
+      setMaintStatus({ tone: "error", text: String(e) });
+    } finally {
+      setBusyOp(null);
+    }
+  };
+
+  const onCleanup = () =>
+    runMaint(
+      "cleanup",
+      () => api.dbCleanup(cleanupDays()),
+      (r) => {
+        const m = r as DBMaintenanceResult;
+        return `pruned node=${m.node_deleted ?? 0} rule=${m.rule_deleted ?? 0} in ${m.duration_ms}ms`;
+      },
+    );
+
+  const onVacuum = () => {
+    if (
+      !confirm(
+        "VACUUM rewrites the db file and locks all queries until done. Cheap on small dbs (~ms), seconds at GB scale. Proceed?",
+      )
+    )
+      return;
+    runMaint(
+      "vacuum",
+      () => api.dbVacuum(),
+      (r) => {
+        const m = r as DBMaintenanceResult;
+        return `${bytes(m.bytes_before)} → ${bytes(m.bytes_after)} in ${m.duration_ms}ms`;
+      },
+    );
+  };
+
+  const onTruncate = () => {
+    const got = prompt(
+      `Wipe ALL local metrics history. This cannot be undone.\n\nType the confirmation phrase exactly:\n  ${TRUNCATE_CONFIRM}`,
+    );
+    if (got == null) return;
+    if (got !== TRUNCATE_CONFIRM) {
+      setMaintStatus({ tone: "error", text: "confirmation phrase mismatch" });
+      return;
+    }
+    runMaint(
+      "truncate",
+      () => api.dbTruncate(got),
+      (r) => {
+        const m = r as DBMaintenanceResult;
+        return `wiped node=${m.node_deleted ?? 0} rule=${m.rule_deleted ?? 0}`;
+      },
+    );
+  };
+
+  const onResetStats = () =>
+    runMaint(
+      "reset_stats",
+      async () => {
+        await api.dbResetStats();
+        return "ok";
+      },
+      () => "stats reset",
+    );
 
   return (
     <>
@@ -129,6 +231,67 @@ export default function Settings() {
           </div>
         </Card>
 
+        <Show when={health()}>
+          <StorageCard h={health()!} />
+          <LatencyCard h={health()!} onReset={onResetStats} busy={busyOp()} />
+
+          <Card class="lg:col-span-2">
+            <CardHeader
+              title="maintenance"
+              subtitle="prune · compact · wipe · reset stats"
+            />
+            <div class="grid gap-3 md:grid-cols-3">
+              <div class="flex items-end gap-2">
+                <label class="flex flex-col text-xs text-zinc-500">
+                  <span class="mb-1">older than (days)</span>
+                  <input
+                    type="number"
+                    min="1"
+                    class="w-24 rounded-md border border-zinc-200 bg-white px-2 py-1 text-sm dark:border-zinc-800 dark:bg-zinc-950"
+                    value={cleanupDays()}
+                    onInput={(e) =>
+                      setCleanupDays(Math.max(1, Number(e.currentTarget.value) || 1))
+                    }
+                  />
+                </label>
+                <Button
+                  leadingIcon={<Trash2 size={13} />}
+                  onClick={onCleanup}
+                  disabled={busyOp() != null}
+                >
+                  Clean
+                </Button>
+              </div>
+              <div class="flex items-end">
+                <Button
+                  leadingIcon={<HardDrive size={13} />}
+                  onClick={onVacuum}
+                  disabled={busyOp() != null}
+                >
+                  VACUUM
+                </Button>
+              </div>
+              <div class="flex items-end">
+                <Button
+                  variant="danger"
+                  leadingIcon={<AlertTriangle size={13} />}
+                  onClick={onTruncate}
+                  disabled={busyOp() != null}
+                >
+                  Truncate all…
+                </Button>
+              </div>
+            </div>
+            <Show when={maintStatus()}>
+              <div class="mt-3">
+                <Pill tone={maintStatus()!.tone} dot>
+                  {maintStatus()!.text}
+                </Pill>
+              </div>
+            </Show>
+          </Card>
+        </Show>
+
         <div class="lg:col-span-2">
           <UpdatesPanel />
         </div>
@@ -145,6 +308,11 @@ export default function Settings() {
             <Endpoint method="GET" path="/api/v1/overview" />
             <Endpoint method="GET" path="/api/v1/node_metrics/" />
             <Endpoint method="GET" path="/api/v1/rule_metrics/" />
+            <Endpoint method="GET" path="/api/v1/db/health" />
+            <Endpoint method="POST" path="/api/v1/db/cleanup" />
+            <Endpoint method="POST" path="/api/v1/db/vacuum" />
+            <Endpoint method="POST" path="/api/v1/db/truncate" />
+            <Endpoint method="POST" path="/api/v1/db/reset_stats" />
             <Endpoint method="GET" path="/api/v1/xray/conns" />
             <Endpoint method="DELETE" path="/api/v1/xray/conns/:id" />
             <Endpoint method="DELETE" path="/api/v1/xray/conns?user=…" />
@@ -167,6 +335,95 @@ export default function Settings() {
         </Card>
       </div>
     </>
+  );
+}
+
+function StorageCard(props: { h: DBHealth }) {
+  const fragPct = () => {
+    const pc = props.h.db_page_count;
+    return pc > 0 ? (props.h.db_freelist_pages / pc) * 100 : 0;
+  };
+  const lastWriteText = () => {
+    if (!props.h.last_rule_write_ts) return "never";
+    const ageSec = Math.max(0, Date.now() / 1000 - props.h.last_rule_write_ts);
+    if (ageSec < 60) return `${Math.round(ageSec)}s ago`;
+    if (ageSec < 3600) return `${Math.round(ageSec / 60)}m ago`;
+    if (ageSec < 86400) return `${Math.round(ageSec / 3600)}h ago`;
+    return `${Math.round(ageSec / 86400)}d ago`;
+  };
+  return (
+    <Card>
+      <CardHeader title="storage" subtitle="local SQLite metrics store" />
+      <DescList
+        items={[
+          ["db file", bytes(props.h.db_file_bytes)],
+          [
+            "pages",
+            `${props.h.db_page_count.toLocaleString()} × ${props.h.db_page_size}B`,
+          ],
+          [
+            "freelist",
+            `${props.h.db_freelist_pages.toLocaleString()} (${fragPct().toFixed(1)}%)${fragPct() > 30 ? " — VACUUM recommended" : ""}`,
+          ],
+          ["node_metrics", `${props.h.node_metrics_rows.toLocaleString()} rows`],
+          [
+            "rule_metrics",
+            `${props.h.rule_metrics_rows.toLocaleString()} rows${props.h.rule_metrics_rows === 0 ? " — no data, check sync pipeline" : ""}`,
+          ],
+          ["last rule write", lastWriteText()],
+        ]}
+      />
+    </Card>
+  );
+}
+
+function LatencyCard(props: {
+  h: DBHealth;
+  onReset: () => void;
+  busy: string | null;
+}) {
+  const rows = () =>
+    Object.entries(props.h.stats).map(([name, s]) => ({ name, ...s }));
+  return (
+    <Card>
+      <CardHeader
+        title="query latency"
+        subtitle="since process start"
+        right={
+          <button
+            class="text-xs text-zinc-500 hover:text-emerald-600 disabled:opacity-50 dark:hover:text-emerald-400"
+            onClick={props.onReset}
+            disabled={props.busy != null}
+          >
+            reset
+          </button>
+        }
+      />
+      <table class="w-full font-mono text-xs">
+        <thead class="text-zinc-500">
+          <tr>
+            <th class="text-left">op</th>
+            <th class="text-right">count</th>
+            <th class="text-right">avg</th>
+            <th class="text-right">max</th>
+            <th class="text-right">last</th>
+          </tr>
+        </thead>
+        <tbody>
+          <For each={rows()}>
+            {(r) => (
+              <tr class="border-t border-zinc-100 dark:border-zinc-900">
+                <td class="py-1">{r.name}</td>
+                <td class="text-right">{r.count.toLocaleString()}</td>
+                <td class="text-right">{r.count ? `${r.avg_ms.toFixed(2)}ms` : "—"}</td>
+                <td class="text-right">{r.count ? `${r.max_ms.toFixed(2)}ms` : "—"}</td>
+                <td class="text-right">{r.count ? `${r.last_ms.toFixed(2)}ms` : "—"}</td>
+              </tr>
+            )}
+          </For>
+        </tbody>
+      </table>
+    </Card>
   );
 }
 
