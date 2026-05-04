@@ -80,14 +80,17 @@ export default function UpdatesPanel() {
     timer = window.setInterval(tick, 1500) as unknown as number;
   };
 
-  // Hydrate any in-flight job on mount so a refresh during update doesn't
-  // lose the indicator.
-  api.updateStatus().then((s) => {
-    if (s.state !== "idle") {
-      setStatus(s);
-      if (s.state !== "done" && s.state !== "failed") startPolling();
-    }
-  }).catch(() => {});
+  // Hydrate any in-flight job on mount so a refresh during update
+  // doesn't lose the indicator.
+  api
+    .updateStatus()
+    .then((s) => {
+      if (s.state !== "idle") {
+        setStatus(s);
+        if (s.state !== "done" && s.state !== "failed") startPolling();
+      }
+    })
+    .catch(() => {});
 
   const runCheck = async () => {
     setChecking(true);
@@ -104,12 +107,19 @@ export default function UpdatesPanel() {
   const applyUpdate = async () => {
     const c = check();
     if (!c) return;
-    if (!confirm(
-      `Update to ${c.latest_version}? This replaces the running binary and restarts ehco. Active connections will drop.`,
-    )) return;
+    if (
+      !confirm(
+        `Update to ${c.latest_version}? This replaces the running binary and restarts ehco. Active connections will drop.`,
+      )
+    )
+      return;
     setApplyErr("");
     try {
-      await api.updateApply({ channel: channel(), force: false, restart: true });
+      await api.updateApply({
+        channel: channel(),
+        force: false,
+        restart: true,
+      });
       setStatus({
         state: "checking",
         channel: channel(),
@@ -125,71 +135,75 @@ export default function UpdatesPanel() {
 
   const inProgress = () => {
     const s = status()?.state;
-    return s === "checking" || s === "downloading" || s === "installing" || s === "restarting";
+    return (
+      s === "checking" ||
+      s === "downloading" ||
+      s === "installing" ||
+      s === "restarting"
+    );
   };
   const isNightly = () => version()?.version.includes("-") ?? false;
   const linuxOnly = () => version()?.go_os === "linux";
 
   return (
     <>
-      <div class="mb-3 flex items-center justify-between">
-        <div>
-          <h2 class="text-[12px] font-semibold uppercase tracking-[0.14em] text-zinc-500">
-            updates
-          </h2>
-          <p class="mt-0.5 text-[11px] text-zinc-500">
-            check for new ehco builds and apply them in place
-          </p>
-        </div>
-        <Pill tone={isNightly() ? "warn" : "info"}>
-          {isNightly() ? "nightly build" : "stable build"}
-        </Pill>
-      </div>
-
       <Card>
-        <CardHeader title="current build" subtitle="reported by this binary" />
+        <CardHeader
+          title="build & self-update"
+          subtitle="github releases · Ehco1996/ehco"
+          right={
+            <div class="flex items-center gap-2">
+              <Show when={version()}>
+                <Pill tone={isNightly() ? "warn" : "info"}>
+                  {isNightly() ? "nightly" : "stable"}
+                </Pill>
+              </Show>
+              <Segmented<Channel>
+                options={[
+                  { value: "auto", label: "Auto" },
+                  { value: "stable", label: "Stable" },
+                  { value: "nightly", label: "Nightly" },
+                ]}
+                value={channel()}
+                onChange={setChannel}
+                size="sm"
+              />
+              <Button
+                size="sm"
+                variant="primary"
+                loading={checking()}
+                leadingIcon={<RefreshCw size={13} />}
+                onClick={runCheck}
+              >
+                Check
+              </Button>
+            </div>
+          }
+        />
+
         <DescList
           items={[
-            ["Version", version()?.version ?? "—"],
-            ["Branch", version()?.git_branch || "—"],
-            ["Commit", (version()?.git_revision ?? "").slice(0, 7) || "—"],
-            ["Built", version()?.build_time || "—"],
-            ["Started", version()?.start_time ? relTime(version()!.start_time) : "—"],
-            ["Platform", version() ? `${version()!.go_os}/${version()!.go_arch}` : "—"],
+            ["version", version()?.version ?? "—"],
+            ["branch", version()?.git_branch || "—"],
+            ["commit", (version()?.git_revision ?? "").slice(0, 7) || "—"],
+            ["built", version()?.build_time || "—"],
+            [
+              "started",
+              version()?.start_time ? relTime(version()!.start_time) : "—",
+            ],
+            [
+              "platform",
+              version() ? `${version()!.go_os}/${version()!.go_arch}` : "—",
+            ],
           ]}
         />
+
         <Show when={version() && !linuxOnly()}>
           <div class="mt-3 rounded-md border border-amber-200 bg-amber-50 p-2 text-xs text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-300">
-            Self-update is only supported on linux. On {version()!.go_os} you'll need to rebuild from source.
+            Self-update is only supported on linux. On {version()!.go_os} you'll
+            need to rebuild from source.
           </div>
         </Show>
-      </Card>
-
-      <Card class="mt-4">
-        <div class="flex flex-wrap items-center gap-3">
-          <CardHeader title="check for updates" subtitle="github releases (Ehco1996/ehco)" />
-          <div class="ml-auto flex items-center gap-2">
-            <Segmented<Channel>
-              options={[
-                { value: "auto", label: "Auto" },
-                { value: "stable", label: "Stable" },
-                { value: "nightly", label: "Nightly" },
-              ]}
-              value={channel()}
-              onChange={setChannel}
-              size="sm"
-            />
-            <Button
-              size="sm"
-              variant="primary"
-              loading={checking()}
-              leadingIcon={<RefreshCw size={13} />}
-              onClick={runCheck}
-            >
-              Check
-            </Button>
-          </div>
-        </div>
 
         <Show when={checkErr()}>
           <div class="mt-3 rounded-md border border-rose-200 bg-rose-50 p-2 text-xs text-rose-700 dark:border-rose-900/50 dark:bg-rose-950/30 dark:text-rose-400">
@@ -199,7 +213,7 @@ export default function UpdatesPanel() {
 
         <Show when={check()}>
           {(c) => (
-            <div class="mt-4">
+            <div class="mt-3">
               <Show
                 when={c().update_available}
                 fallback={
@@ -207,8 +221,8 @@ export default function UpdatesPanel() {
                     <CircleCheck size={15} />
                     <span>
                       Up to date — already on{" "}
-                      <span class="font-mono">{c().current_version}</span>{" "}
-                      ({c().channel} channel).
+                      <span class="font-mono">{c().current_version}</span> (
+                      {c().channel} channel).
                     </span>
                   </div>
                 }
@@ -248,7 +262,8 @@ export default function UpdatesPanel() {
                       Update now
                     </Button>
                     <span class="text-xs text-amber-800/70 dark:text-amber-300/70">
-                      Asset: <span class="font-mono">{c().asset_name || "n/a"}</span>
+                      Asset:{" "}
+                      <span class="font-mono">{c().asset_name || "n/a"}</span>
                     </span>
                   </div>
                 </div>
@@ -259,10 +274,14 @@ export default function UpdatesPanel() {
       </Card>
 
       <Show when={status() && status()!.state !== "idle"}>
-        <Card class="mt-4">
+        <Card class="mt-3">
           <CardHeader
             title="update progress"
-            subtitle={status()!.from ? `${status()!.from} → ${status()!.to || "?"}` : undefined}
+            subtitle={
+              status()!.from
+                ? `${status()!.from} → ${status()!.to || "?"}`
+                : undefined
+            }
           />
           <Show when={applyErr()}>
             <div class="mb-2 rounded-md border border-rose-200 bg-rose-50 p-2 text-xs text-rose-700 dark:border-rose-900/50 dark:bg-rose-950/30 dark:text-rose-400">
@@ -297,7 +316,13 @@ function StepIndicator(props: { state: UpdateState }) {
           return (
             <>
               <Show when={i() > 0}>
-                <span class={done() ? "h-px w-6 bg-emerald-400" : "h-px w-6 bg-zinc-300 dark:bg-zinc-700"} />
+                <span
+                  class={
+                    done()
+                      ? "h-px w-6 bg-emerald-400"
+                      : "h-px w-6 bg-zinc-300 dark:bg-zinc-700"
+                  }
+                />
               </Show>
               <span
                 class={
@@ -309,7 +334,11 @@ function StepIndicator(props: { state: UpdateState }) {
                 <span
                   class={
                     "h-1.5 w-1.5 rounded-full " +
-                    (active() ? "animate-pulse bg-emerald-500" : done() ? "bg-emerald-500" : "bg-zinc-400")
+                    (active()
+                      ? "animate-pulse bg-emerald-500"
+                      : done()
+                        ? "bg-emerald-500"
+                        : "bg-zinc-400")
                   }
                 />
                 {cap(label)}

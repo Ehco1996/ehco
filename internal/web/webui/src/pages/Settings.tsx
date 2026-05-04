@@ -1,8 +1,6 @@
 import { createResource, createSignal, For, Show } from "solid-js";
 import {
-  Palette,
   RotateCw,
-  Plug,
   Copy,
   Check,
   Trash2,
@@ -17,13 +15,13 @@ import DescList from "../ui/DescList";
 import { api } from "../api/client";
 import type { DBHealth, DBMaintenanceResult } from "../api/types";
 import { authInfo } from "../store/auth";
-import { theme, toggleTheme } from "../store/theme";
 import { bytes } from "../util/format";
+import { copyText } from "../util/clipboard";
 import UpdatesPanel from "./UpdatesPanel";
 
-// truncateConfirm must match the literal in internal/cmgr/ms/health.go.
-// Wire shape, not user copy — the prompt label can change freely, but
-// what we POST cannot.
+// Wire-shape literal — must match the constant in
+// internal/cmgr/ms/health.go. The button label can change freely; what
+// we POST cannot.
 const TRUNCATE_CONFIRM = "yes I am sure";
 
 type ToneStatus = {
@@ -61,19 +59,15 @@ export default function Settings() {
   const copySync = async () => {
     const v = String(config()?.sync_traffic_endpoint ?? "");
     if (!v) return;
-    try {
-      await navigator.clipboard.writeText(v);
+    if (await copyText(v)) {
       setCopied(true);
       setTimeout(() => setCopied(false), 1200);
-    } catch {
-      /* ignore */
     }
   };
 
   // runMaint funnels every maintenance op through the same loading +
-  // toast-style status pipeline. Keeps the four buttons free of
-  // try/catch boilerplate and ensures the health card always refreshes
-  // on completion.
+  // status pipeline so the four buttons stay free of try/catch
+  // boilerplate and the health card always refreshes on completion.
   const runMaint = async (
     op: string,
     fn: () => Promise<DBMaintenanceResult | string>,
@@ -152,13 +146,33 @@ export default function Settings() {
     <>
       <PageHeader
         title="settings"
-        subtitle="local ui preferences · runtime config · admin actions"
+        subtitle="runtime config · storage health · self-update"
       />
 
       <div class="grid gap-3 lg:grid-cols-2">
         <Show when={config()}>
           <Card>
-            <CardHeader title="runtime configuration" subtitle="read-only snapshot" />
+            <CardHeader
+              title="runtime configuration"
+              subtitle="read-only snapshot · re-fetch from upstream"
+              right={
+                <div class="flex items-center gap-2">
+                  {reloadStatus() && (
+                    <Pill tone={reloadStatus()!.tone} dot>
+                      {reloadStatus()!.text}
+                    </Pill>
+                  )}
+                  <Button
+                    size="sm"
+                    variant="primary"
+                    leadingIcon={<RotateCw size={12} />}
+                    onClick={triggerReload}
+                  >
+                    Reload
+                  </Button>
+                </div>
+              }
+            />
             <DescList
               items={[
                 ["log level", String(config()!.log_level ?? "—")],
@@ -196,145 +210,47 @@ export default function Settings() {
             </p>
           </Card>
         </Show>
+      </div>
 
-        <Card>
-          <CardHeader
-            title="reload configuration"
-            subtitle="re-fetch from upstream"
-          />
-          <p class="mb-3 text-sm text-zinc-500">
-            A listener change reloads xray and drops active conns.
-          </p>
-          <div class="flex items-center gap-3">
-            <Button
-              variant="primary"
-              leadingIcon={<RotateCw size={13} />}
-              onClick={triggerReload}
-            >
-              Reload
-            </Button>
-            {reloadStatus() && (
-              <Pill tone={reloadStatus()!.tone} dot>
-                {reloadStatus()!.text}
-              </Pill>
-            )}
-          </div>
-        </Card>
-
-        <Card>
-          <CardHeader title="theme" subtitle="light / dark mode override" />
-          <div class="flex items-center gap-3">
-            <Pill tone="neutral">{theme()}</Pill>
-            <Button leadingIcon={<Palette size={13} />} onClick={toggleTheme}>
-              Toggle
-            </Button>
-          </div>
-        </Card>
-
-        <Show when={health()}>
+      <Show when={health()}>
+        <SectionTitle
+          title="database"
+          subtitle="local SQLite metrics store"
+        />
+        <div class="grid gap-3 lg:grid-cols-2">
           <StorageCard h={health()!} />
           <LatencyCard h={health()!} onReset={onResetStats} busy={busyOp()} />
-
-          <Card class="lg:col-span-2">
-            <CardHeader
-              title="maintenance"
-              subtitle="prune · compact · wipe · reset stats"
-            />
-            <div class="grid gap-3 md:grid-cols-3">
-              <div class="flex items-end gap-2">
-                <label class="flex flex-col text-xs text-zinc-500">
-                  <span class="mb-1">older than (days)</span>
-                  <input
-                    type="number"
-                    min="1"
-                    class="w-24 rounded-md border border-zinc-200 bg-white px-2 py-1 text-sm dark:border-zinc-800 dark:bg-zinc-950"
-                    value={cleanupDays()}
-                    onInput={(e) =>
-                      setCleanupDays(Math.max(1, Number(e.currentTarget.value) || 1))
-                    }
-                  />
-                </label>
-                <Button
-                  leadingIcon={<Trash2 size={13} />}
-                  onClick={onCleanup}
-                  disabled={busyOp() != null}
-                >
-                  Clean
-                </Button>
-              </div>
-              <div class="flex items-end">
-                <Button
-                  leadingIcon={<HardDrive size={13} />}
-                  onClick={onVacuum}
-                  disabled={busyOp() != null}
-                >
-                  VACUUM
-                </Button>
-              </div>
-              <div class="flex items-end">
-                <Button
-                  variant="danger"
-                  leadingIcon={<AlertTriangle size={13} />}
-                  onClick={onTruncate}
-                  disabled={busyOp() != null}
-                >
-                  Truncate all…
-                </Button>
-              </div>
-            </div>
-            <Show when={maintStatus()}>
-              <div class="mt-3">
-                <Pill tone={maintStatus()!.tone} dot>
-                  {maintStatus()!.text}
-                </Pill>
-              </div>
-            </Show>
-          </Card>
-        </Show>
-
-        <div class="lg:col-span-2">
-          <UpdatesPanel />
-        </div>
-
-        <Card class="lg:col-span-2">
-          <CardHeader
-            title="api surface"
-            subtitle="endpoints the ui consumes"
+          <MaintenanceCard
+            cleanupDays={cleanupDays()}
+            setCleanupDays={setCleanupDays}
+            busyOp={busyOp()}
+            status={maintStatus()}
+            onCleanup={onCleanup}
+            onVacuum={onVacuum}
+            onTruncate={onTruncate}
           />
-          <ul class="grid grid-cols-1 gap-y-1 font-mono text-xs text-zinc-600 sm:grid-cols-2 dark:text-zinc-400">
-            <Endpoint method="GET" path="/api/v1/config/" />
-            <Endpoint method="POST" path="/api/v1/config/reload/" />
-            <Endpoint method="GET" path="/api/v1/health_check/" />
-            <Endpoint method="GET" path="/api/v1/overview" />
-            <Endpoint method="GET" path="/api/v1/node_metrics/" />
-            <Endpoint method="GET" path="/api/v1/rule_metrics/" />
-            <Endpoint method="GET" path="/api/v1/db/health" />
-            <Endpoint method="POST" path="/api/v1/db/cleanup" />
-            <Endpoint method="POST" path="/api/v1/db/vacuum" />
-            <Endpoint method="POST" path="/api/v1/db/truncate" />
-            <Endpoint method="POST" path="/api/v1/db/reset_stats" />
-            <Endpoint method="GET" path="/api/v1/xray/conns" />
-            <Endpoint method="DELETE" path="/api/v1/xray/conns/:id" />
-            <Endpoint method="DELETE" path="/api/v1/xray/conns?user=…" />
-            <Endpoint method="GET" path="/api/v1/xray/users" />
-            <Endpoint method="GET" path="/metrics/" />
-            <Endpoint method="WS" path="/ws/logs" />
-          </ul>
-          <div class="mt-3 inline-flex flex-wrap items-center gap-1 text-xs text-zinc-500">
-            <Plug size={12} />
-            <Show
-              when={authInfo().auth_required}
-              fallback={<span>No auth configured — all endpoints are open.</span>}
-            >
-              <span>
-                Browsers authenticate via the session cookie set at login;
-                machine clients send <code class="font-mono">Authorization: Bearer &lt;api_token&gt;</code>.
-              </span>
-            </Show>
-          </div>
-        </Card>
-      </div>
+        </div>
+      </Show>
+
+      <SectionTitle
+        title="updates"
+        subtitle="check for new ehco builds and apply them in place"
+      />
+      <UpdatesPanel />
     </>
+  );
+}
+
+function SectionTitle(props: { title: string; subtitle?: string }) {
+  return (
+    <div class="mb-2 mt-6">
+      <h2 class="text-[12px] font-semibold uppercase tracking-[0.14em] text-zinc-500">
+        {props.title}
+      </h2>
+      <Show when={props.subtitle}>
+        <p class="mt-0.5 text-[11px] text-zinc-500">{props.subtitle}</p>
+      </Show>
+    </div>
   );
 }
 
@@ -353,7 +269,7 @@ function StorageCard(props: { h: DBHealth }) {
   };
   return (
     <Card>
-      <CardHeader title="storage" subtitle="local SQLite metrics store" />
+      <CardHeader title="storage" subtitle="file size · pages · row counts" />
       <DescList
         items={[
           ["db file", bytes(props.h.db_file_bytes)],
@@ -399,25 +315,29 @@ function LatencyCard(props: {
           </button>
         }
       />
-      <table class="w-full font-mono text-xs">
+      <table class="w-full table-fixed font-mono text-xs">
+        <colgroup>
+          <col class="w-[40%]" />
+          <col class="w-[20%]" />
+          <col class="w-[20%]" />
+          <col class="w-[20%]" />
+        </colgroup>
         <thead class="text-zinc-500">
           <tr>
             <th class="text-left">op</th>
             <th class="text-right">count</th>
             <th class="text-right">avg</th>
             <th class="text-right">max</th>
-            <th class="text-right">last</th>
           </tr>
         </thead>
         <tbody>
           <For each={rows()}>
             {(r) => (
               <tr class="border-t border-zinc-100 dark:border-zinc-900">
-                <td class="py-1">{r.name}</td>
+                <td class="py-1 truncate">{r.name}</td>
                 <td class="text-right">{r.count.toLocaleString()}</td>
                 <td class="text-right">{r.count ? `${r.avg_ms.toFixed(2)}ms` : "—"}</td>
                 <td class="text-right">{r.count ? `${r.max_ms.toFixed(2)}ms` : "—"}</td>
-                <td class="text-right">{r.count ? `${r.last_ms.toFixed(2)}ms` : "—"}</td>
               </tr>
             )}
           </For>
@@ -427,20 +347,68 @@ function LatencyCard(props: {
   );
 }
 
-const methodTones: Record<string, "info" | "ok" | "error" | "warn"> = {
-  GET: "info",
-  POST: "ok",
-  DELETE: "error",
-  WS: "warn",
-};
-
-function Endpoint(props: { method: string; path: string }) {
+function MaintenanceCard(props: {
+  cleanupDays: number;
+  setCleanupDays: (n: number) => void;
+  busyOp: string | null;
+  status: ToneStatus;
+  onCleanup: () => void;
+  onVacuum: () => void;
+  onTruncate: () => void;
+}) {
   return (
-    <li class="flex items-center gap-2">
-      <span class="w-12">
-        <Pill tone={methodTones[props.method]}>{props.method}</Pill>
-      </span>
-      <span>{props.path}</span>
-    </li>
+    <Card class="lg:col-span-2">
+      <CardHeader
+        title="maintenance"
+        subtitle="prune · compact · wipe"
+        right={
+          <Show when={props.status}>
+            <Pill tone={props.status!.tone} dot>
+              {props.status!.text}
+            </Pill>
+          </Show>
+        }
+      />
+      <div class="flex flex-wrap items-end gap-3">
+        <label class="flex items-end gap-2">
+          <span class="flex flex-col text-xs text-zinc-500">
+            <span class="mb-1">older than (days)</span>
+            <input
+              type="number"
+              min="1"
+              class="w-20 rounded-md border border-zinc-200 bg-white px-2 py-1 text-sm dark:border-zinc-800 dark:bg-zinc-950"
+              value={props.cleanupDays}
+              onInput={(e) =>
+                props.setCleanupDays(
+                  Math.max(1, Number(e.currentTarget.value) || 1),
+                )
+              }
+            />
+          </span>
+          <Button
+            leadingIcon={<Trash2 size={13} />}
+            onClick={props.onCleanup}
+            disabled={props.busyOp != null}
+          >
+            Clean
+          </Button>
+        </label>
+        <Button
+          leadingIcon={<HardDrive size={13} />}
+          onClick={props.onVacuum}
+          disabled={props.busyOp != null}
+        >
+          VACUUM
+        </Button>
+        <Button
+          variant="danger"
+          leadingIcon={<AlertTriangle size={13} />}
+          onClick={props.onTruncate}
+          disabled={props.busyOp != null}
+        >
+          Truncate all…
+        </Button>
+      </div>
+    </Card>
   );
 }
