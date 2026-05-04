@@ -39,6 +39,8 @@ import type {
   UpdateStatus,
   UpdateApplyOptions,
   OverviewResp,
+  DBHealth,
+  DBMaintenanceResult,
 } from "./types";
 
 export const api = {
@@ -96,6 +98,23 @@ export const api = {
       body: JSON.stringify(opts),
     }),
   updateStatus: () => request<UpdateStatus>("/api/v1/update/status"),
+  dbHealth: () => request<DBHealth>("/api/v1/db/health"),
+  dbCleanup: (older_than_days: number) =>
+    request<DBMaintenanceResult>("/api/v1/db/cleanup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ older_than_days }),
+    }),
+  dbVacuum: () =>
+    request<DBMaintenanceResult>("/api/v1/db/vacuum", { method: "POST" }),
+  dbTruncate: (confirm: string) =>
+    request<DBMaintenanceResult>("/api/v1/db/truncate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ confirm }),
+    }),
+  dbResetStats: () =>
+    request<string>("/api/v1/db/reset_stats", { method: "POST" }),
 };
 
 export function wsURL(path: string): string {

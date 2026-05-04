@@ -4,17 +4,35 @@ import (
 	"database/sql"
 	"os"
 	"path/filepath"
+	"sync/atomic"
 	"time"
 
 	"go.uber.org/zap"
 	_ "modernc.org/sqlite"
 )
 
+// defaultRetentionDays is how far back cleanOldData and the
+// CleanupOlderThan default keep rows. Mirrors the historical 30d window.
+const defaultRetentionDays = 30
+
 type MetricsStore struct {
 	db     *sql.DB
 	dbPath string
 
 	l *zap.SugaredLogger
+
+	// stats is the latency/throughput recorder shared by every public
+	// method on this store. See stats.go.
+	stats Stats
+
+	// nodeRows / ruleRows are best-effort row-count caches kept in
+	// sync with INSERT / DELETE so Health() doesn't need a per-call
+	// SELECT COUNT(*). Refreshed on startup, recomputed after
+	// Cleanup / Truncate / Vacuum where the exact post-state matters.
+	// INSERT OR REPLACE on a duplicate PK can briefly overcount; the
+	// drift is bounded and resets every time Recount() runs.
+	nodeRows atomic.Int64
+	ruleRows atomic.Int64
 }
 
 func NewMetricsStore(dbPath string) (*MetricsStore, error) {
@@ -45,25 +63,59 @@ func NewMetricsStore(dbPath string) (*MetricsStore, error) {
 	if err := ms.cleanOldData(); err != nil {
 		return nil, err
 	}
+	if err := ms.recountRows(); err != nil {
+		return nil, err
+	}
 	return ms, nil
 }
 
+func (ms *MetricsStore) Close() error {
+	return ms.db.Close()
+}
+
 func (ms *MetricsStore) cleanOldData() error {
-	thirtyDaysAgo := time.Now().AddDate(0, 0, -30).Unix()
+	defer track(&ms.stats.Cleanup)()
+	cutoff := time.Now().AddDate(0, 0, -defaultRetentionDays).Unix()
+	_, _, err := ms.deleteOlderThan(cutoff)
+	return err
+}
 
-	// 清理 node_metrics 表
-	_, err := ms.db.Exec("DELETE FROM node_metrics WHERE timestamp < ?", thirtyDaysAgo)
+// deleteOlderThan runs the two-table prune and returns the number of
+// rows removed from each. Centralises the SQL so cleanOldData and the
+// CleanupOlderThan API path stay consistent.
+func (ms *MetricsStore) deleteOlderThan(cutoff int64) (nodeDeleted, ruleDeleted int64, err error) {
+	res, err := ms.db.Exec("DELETE FROM node_metrics WHERE timestamp < ?", cutoff)
 	if err != nil {
+		return 0, 0, err
+	}
+	nodeDeleted, _ = res.RowsAffected()
+
+	res, err = ms.db.Exec("DELETE FROM rule_metrics WHERE timestamp < ?", cutoff)
+	if err != nil {
+		return nodeDeleted, 0, err
+	}
+	ruleDeleted, _ = res.RowsAffected()
+
+	ms.nodeRows.Add(-nodeDeleted)
+	ms.ruleRows.Add(-ruleDeleted)
+	ms.l.Infof("pruned node_metrics=%d rule_metrics=%d (cutoff=%d)", nodeDeleted, ruleDeleted, cutoff)
+	return nodeDeleted, ruleDeleted, nil
+}
+
+// recountRows refreshes the cached row counts from the source of truth.
+// Cheap on startup (db usually small, even at 30d full retention); we
+// also call it after Truncate / Vacuum where the cache may have drifted
+// or been wiped wholesale.
+func (ms *MetricsStore) recountRows() error {
+	var nodeRows, ruleRows int64
+	if err := ms.db.QueryRow("SELECT COUNT(*) FROM node_metrics").Scan(&nodeRows); err != nil {
 		return err
 	}
-
-	// 清理 rule_metrics 表
-	_, err = ms.db.Exec("DELETE FROM rule_metrics WHERE timestamp < ?", thirtyDaysAgo)
-	if err != nil {
+	if err := ms.db.QueryRow("SELECT COUNT(*) FROM rule_metrics").Scan(&ruleRows); err != nil {
 		return err
 	}
-
-	ms.l.Infof("Cleaned data older than 30 days")
+	ms.nodeRows.Store(nodeRows)
+	ms.ruleRows.Store(ruleRows)
 	return nil
 }
 

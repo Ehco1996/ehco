@@ -65,14 +65,23 @@ type QueryRuleMetricsResp struct {
 }
 
 func (ms *MetricsStore) AddNodeMetric(ctx context.Context, m *metric_reader.NodeMetrics) error {
+	defer track(&ms.stats.AddNode)()
 	_, err := ms.db.ExecContext(ctx, `
     INSERT OR REPLACE INTO node_metrics (timestamp, cpu_usage, memory_usage, disk_usage, network_in, network_out)
     VALUES (?, ?, ?, ?, ?, ?)
 `, m.SyncTime.Unix(), m.CpuUsagePercent, m.MemoryUsagePercent, m.DiskUsagePercent, m.NetworkReceiveBytesRate, m.NetworkTransmitBytesRate)
-	return err
+	if err != nil {
+		return err
+	}
+	// INSERT OR REPLACE may collapse duplicates rather than add a row;
+	// the count is best-effort and is reconciled by recountRows on
+	// next Vacuum / Truncate / restart.
+	ms.nodeRows.Add(1)
+	return nil
 }
 
 func (ms *MetricsStore) AddRuleMetric(ctx context.Context, rm *metric_reader.RuleMetrics) error {
+	defer track(&ms.stats.AddRule)()
 	tx, err := ms.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -91,6 +100,7 @@ func (ms *MetricsStore) AddRuleMetric(ctx context.Context, rm *metric_reader.Rul
 	}
 	defer stmt.Close() //nolint:errcheck
 
+	var inserted int64
 	for remote, pingMetric := range rm.PingMetrics {
 		_, err := stmt.ExecContext(ctx, rm.SyncTime.Unix(), rm.Label, remote, pingMetric.Latency,
 			rm.TCPConnectionCount[remote], rm.TCPHandShakeDuration[remote], rm.TCPNetworkTransmitBytes[remote],
@@ -98,12 +108,20 @@ func (ms *MetricsStore) AddRuleMetric(ctx context.Context, rm *metric_reader.Rul
 		if err != nil {
 			return err
 		}
+		inserted++
 	}
 
-	return tx.Commit()
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	// Same caveat as AddNodeMetric: REPLACE collapses, count is
+	// best-effort, reconciled on Vacuum / Truncate / restart.
+	ms.ruleRows.Add(inserted)
+	return nil
 }
 
 func (ms *MetricsStore) QueryNodeMetric(ctx context.Context, req *QueryNodeMetricsReq) (*QueryNodeMetricsResp, error) {
+	defer track(&ms.stats.QueryNode)()
 	var (
 		rows *sql.Rows
 		err  error
@@ -149,6 +167,7 @@ func (ms *MetricsStore) QueryNodeMetric(ctx context.Context, req *QueryNodeMetri
 }
 
 func (ms *MetricsStore) QueryRuleMetric(ctx context.Context, req *QueryRuleMetricsReq) (*QueryRuleMetricsResp, error) {
+	defer track(&ms.stats.QueryRule)()
 	// Bucketed mode keeps the last sample per (label, remote) inside each
 	// step-second window. The bytes columns are monotonic counters, so
 	// last-of-bucket preserves the deltas the SPA computes — averaging

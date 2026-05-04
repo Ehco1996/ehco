@@ -2,6 +2,7 @@ package cmgr
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"sort"
@@ -41,7 +42,20 @@ type Cmgr interface {
 	// Metrics related
 	QueryNodeMetrics(ctx context.Context, req *ms.QueryNodeMetricsReq) (*ms.QueryNodeMetricsResp, error)
 	QueryRuleMetrics(ctx context.Context, req *ms.QueryRuleMetricsReq) (*ms.QueryRuleMetricsResp, error)
+
+	// Storage health & maintenance. Each call surfaces the local
+	// SQLite store; on builds without metrics enabled, the underlying
+	// store is nil and these return ErrMetricsDisabled.
+	DBHealth(ctx context.Context) (*ms.DBHealth, error)
+	DBCleanup(ctx context.Context, days int) (*ms.MaintenanceResult, error)
+	DBVacuum(ctx context.Context) (*ms.MaintenanceResult, error)
+	DBTruncate(ctx context.Context, confirm string) (*ms.MaintenanceResult, error)
+	DBResetStats() error
 }
+
+// ErrMetricsDisabled is returned by storage-health methods when the
+// MetricsStore was never opened (no upstream sync URL configured).
+var ErrMetricsDisabled = errors.New("metrics store disabled")
 
 type cmgrImpl struct {
 	lock sync.RWMutex
@@ -229,4 +243,40 @@ func (cm *cmgrImpl) QueryNodeMetrics(ctx context.Context, req *ms.QueryNodeMetri
 
 func (cm *cmgrImpl) QueryRuleMetrics(ctx context.Context, req *ms.QueryRuleMetricsReq) (*ms.QueryRuleMetricsResp, error) {
 	return cm.ms.QueryRuleMetric(ctx, req)
+}
+
+func (cm *cmgrImpl) DBHealth(ctx context.Context) (*ms.DBHealth, error) {
+	if cm.ms == nil {
+		return nil, ErrMetricsDisabled
+	}
+	return cm.ms.Health(ctx)
+}
+
+func (cm *cmgrImpl) DBCleanup(ctx context.Context, days int) (*ms.MaintenanceResult, error) {
+	if cm.ms == nil {
+		return nil, ErrMetricsDisabled
+	}
+	return cm.ms.CleanupOlderThan(ctx, days)
+}
+
+func (cm *cmgrImpl) DBVacuum(ctx context.Context) (*ms.MaintenanceResult, error) {
+	if cm.ms == nil {
+		return nil, ErrMetricsDisabled
+	}
+	return cm.ms.Vacuum(ctx)
+}
+
+func (cm *cmgrImpl) DBTruncate(ctx context.Context, confirm string) (*ms.MaintenanceResult, error) {
+	if cm.ms == nil {
+		return nil, ErrMetricsDisabled
+	}
+	return cm.ms.Truncate(ctx, confirm)
+}
+
+func (cm *cmgrImpl) DBResetStats() error {
+	if cm.ms == nil {
+		return ErrMetricsDisabled
+	}
+	cm.ms.ResetStats()
+	return nil
 }

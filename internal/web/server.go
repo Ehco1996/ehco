@@ -132,6 +132,16 @@ func setupRoutes(s *Server) {
 	api.POST("/update/apply", s.UpdateApply)
 	api.GET("/update/status", s.UpdateStatus)
 
+	// Local SQLite store: read-side health snapshot + maintenance ops.
+	// All four mutations are auth-gated through the api group's
+	// existing middleware — the /db/truncate confirm-string is a
+	// second line of defence, not a first.
+	api.GET("/db/health", s.GetDBHealth)
+	api.POST("/db/cleanup", s.PostDBCleanup)
+	api.POST("/db/vacuum", s.PostDBVacuum)
+	api.POST("/db/truncate", s.PostDBTruncate)
+	api.POST("/db/reset_stats", s.PostDBResetStats)
+
 	e.GET("/ws/logs", s.handleWebSocketLogs)
 
 	// SPA: assets are served from the embedded dist tree, every other

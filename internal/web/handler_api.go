@@ -2,11 +2,13 @@ package web
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
 	"time"
 
+	"github.com/Ehco1996/ehco/internal/cmgr"
 	"github.com/Ehco1996/ehco/internal/cmgr/ms"
 	"github.com/Ehco1996/ehco/internal/glue"
 	"github.com/labstack/echo/v4"
@@ -177,6 +179,75 @@ func (s *Server) Overview(c echo.Context) error {
 	}
 
 	return c.JSON(http.StatusOK, out)
+}
+
+// dbMaintenanceErr maps domain errors from the cmgr/ms layer onto echo
+// HTTP errors. Centralised so every db/* handler treats the same error
+// the same way.
+func dbMaintenanceErr(err error) *echo.HTTPError {
+	switch {
+	case errors.Is(err, cmgr.ErrMetricsDisabled):
+		return echo.NewHTTPError(http.StatusServiceUnavailable, err.Error())
+	case errors.Is(err, ms.ErrTruncateNotConfirmed):
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	default:
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+	}
+}
+
+func (s *Server) GetDBHealth(c echo.Context) error {
+	h, err := s.connMgr.DBHealth(c.Request().Context())
+	if err != nil {
+		return dbMaintenanceErr(err)
+	}
+	return c.JSON(http.StatusOK, h)
+}
+
+type dbCleanupReq struct {
+	OlderThanDays int `json:"older_than_days"`
+}
+
+func (s *Server) PostDBCleanup(c echo.Context) error {
+	var req dbCleanupReq
+	if err := c.Bind(&req); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
+	res, err := s.connMgr.DBCleanup(c.Request().Context(), req.OlderThanDays)
+	if err != nil {
+		return dbMaintenanceErr(err)
+	}
+	return c.JSON(http.StatusOK, res)
+}
+
+func (s *Server) PostDBVacuum(c echo.Context) error {
+	res, err := s.connMgr.DBVacuum(c.Request().Context())
+	if err != nil {
+		return dbMaintenanceErr(err)
+	}
+	return c.JSON(http.StatusOK, res)
+}
+
+type dbTruncateReq struct {
+	Confirm string `json:"confirm"`
+}
+
+func (s *Server) PostDBTruncate(c echo.Context) error {
+	var req dbTruncateReq
+	if err := c.Bind(&req); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
+	res, err := s.connMgr.DBTruncate(c.Request().Context(), req.Confirm)
+	if err != nil {
+		return dbMaintenanceErr(err)
+	}
+	return c.JSON(http.StatusOK, res)
+}
+
+func (s *Server) PostDBResetStats(c echo.Context) error {
+	if err := s.connMgr.DBResetStats(); err != nil {
+		return dbMaintenanceErr(err)
+	}
+	return c.NoContent(http.StatusNoContent)
 }
 
 func (s *Server) HandleHealthCheck(c echo.Context) error {
