@@ -98,6 +98,54 @@ export interface EhcoConfig {
   [k: string]: unknown;
 }
 
+export interface VersionInfo {
+  version: string;
+  git_branch: string;
+  git_revision: string;
+  build_time: string;
+  start_time: string; // RFC3339
+  go_os: string;
+  go_arch: string;
+}
+
+export interface UpdateCheck {
+  channel: string;
+  current_version: string;
+  latest_version: string;
+  latest_tag: string;
+  release_name: string;
+  release_body: string;
+  release_url: string;
+  published_at: string; // RFC3339
+  update_available: boolean;
+  asset_name: string;
+  asset_url: string;
+}
+
+export type UpdateState =
+  | "idle"
+  | "checking"
+  | "downloading"
+  | "installing"
+  | "restarting"
+  | "done"
+  | "failed";
+
+export interface UpdateStatus {
+  state: UpdateState;
+  channel?: string;
+  from?: string;
+  to?: string;
+  started_at?: string;
+  error?: string;
+}
+
+export interface UpdateApplyOptions {
+  channel: string;
+  force: boolean;
+  restart: boolean;
+}
+
 export interface LogFrame {
   level: string;
   ts?: string;

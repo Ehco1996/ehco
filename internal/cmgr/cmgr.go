@@ -39,8 +39,8 @@ type Cmgr interface {
 	Start(ctx context.Context, errCH chan error)
 
 	// Metrics related
-	QueryNodeMetrics(ctx context.Context, req *ms.QueryNodeMetricsReq, refresh bool) (*ms.QueryNodeMetricsResp, error)
-	QueryRuleMetrics(ctx context.Context, req *ms.QueryRuleMetricsReq, refresh bool) (*ms.QueryRuleMetricsResp, error)
+	QueryNodeMetrics(ctx context.Context, req *ms.QueryNodeMetricsReq) (*ms.QueryNodeMetricsResp, error)
+	QueryRuleMetrics(ctx context.Context, req *ms.QueryRuleMetricsReq) (*ms.QueryRuleMetricsResp, error)
 }
 
 type cmgrImpl struct {
@@ -184,53 +184,49 @@ func (cm *cmgrImpl) GetActiveConnectCntByRelayLabel(label string) int {
 	return len(cm.activeConnectionsMap[label])
 }
 
+// metricsSampleInterval is the cadence at which we read /metrics/ and
+// persist a row to the local store, so the dashboard's Node page has
+// sub-minute resolution. SyncInterval (default 60s) controls the coarser
+// control-plane push only.
+const metricsSampleInterval = 5 * time.Second
+
 func (cm *cmgrImpl) Start(ctx context.Context, errCH chan error) {
-	cm.l.Infof("Start Cmgr sync interval=%d", cm.cfg.SyncInterval)
-	ticker := time.NewTicker(time.Second * time.Duration(cm.cfg.SyncInterval))
+	cm.l.Infof("Start Cmgr sync interval=%d sample interval=%s", cm.cfg.SyncInterval, metricsSampleInterval)
+	syncEvery := int(time.Duration(cm.cfg.SyncInterval)*time.Second/metricsSampleInterval) - 1
+	if syncEvery < 1 {
+		syncEvery = 1
+	}
+	ticker := time.NewTicker(metricsSampleInterval)
 	defer ticker.Stop()
+	tick := 0
 	for {
 		select {
 		case <-ctx.Done():
 			cm.l.Info("sync stop")
 			return
 		case <-ticker.C:
+			cm.sampleMetrics(ctx)
+			tick++
+			if tick%syncEvery != 0 {
+				continue
+			}
 			// Tolerate transient sync failures: retryablehttp already does
 			// internal backoff; on final error we just log and wait for the
 			// next tick. The traffic stats accumulated for this interval are
 			// dropped on the floor.
 			// TODO: persist unsent stats locally so they can be retried on
 			// later ticks instead of being lost when the upstream is down.
-			if err := cm.syncOnce(ctx); err != nil {
-				cm.l.Errorf("sync failed, will retry on next tick in %ds: %s", cm.cfg.SyncInterval, err)
+			if err := cm.pushStats(ctx); err != nil {
+				cm.l.Errorf("sync failed, will retry next tick in %ds: %s", cm.cfg.SyncInterval, err)
 			}
 		}
 	}
 }
 
-func (cm *cmgrImpl) QueryNodeMetrics(ctx context.Context, req *ms.QueryNodeMetricsReq, refresh bool) (*ms.QueryNodeMetricsResp, error) {
-	if refresh {
-		nm, _, err := cm.mr.ReadOnce(ctx)
-		if err != nil {
-			return nil, err
-		}
-		if err := cm.ms.AddNodeMetric(ctx, nm); err != nil {
-			return nil, err
-		}
-	}
+func (cm *cmgrImpl) QueryNodeMetrics(ctx context.Context, req *ms.QueryNodeMetricsReq) (*ms.QueryNodeMetricsResp, error) {
 	return cm.ms.QueryNodeMetric(ctx, req)
 }
 
-func (cm *cmgrImpl) QueryRuleMetrics(ctx context.Context, req *ms.QueryRuleMetricsReq, refresh bool) (*ms.QueryRuleMetricsResp, error) {
-	if refresh {
-		_, rm, err := cm.mr.ReadOnce(ctx)
-		if err != nil {
-			return nil, err
-		}
-		for _, m := range rm {
-			if err := cm.ms.AddRuleMetric(ctx, m); err != nil {
-				return nil, err
-			}
-		}
-	}
+func (cm *cmgrImpl) QueryRuleMetrics(ctx context.Context, req *ms.QueryRuleMetricsReq) (*ms.QueryRuleMetricsResp, error) {
 	return cm.ms.QueryRuleMetric(ctx, req)
 }

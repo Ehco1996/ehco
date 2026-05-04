@@ -5,6 +5,7 @@ import (
 	"net"
 	"net/http"
 	_ "net/http/pprof"
+	"sync/atomic"
 
 	"github.com/labstack/echo/v4"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -31,7 +32,8 @@ type Server struct {
 	cfg  *config.Config
 	auth *authenticator
 
-	connMgr cmgr.Cmgr
+	connMgr   cmgr.Cmgr
+	updateJob atomic.Pointer[JobStatus]
 }
 
 func NewServer(
@@ -110,6 +112,10 @@ func setupRoutes(s *Server) {
 	api.GET("/health_check/", s.HandleHealthCheck)
 	api.GET("/node_metrics/", s.GetNodeMetrics)
 	api.GET("/rule_metrics/", s.GetRuleMetrics)
+	api.GET("/version", s.Version)
+	api.GET("/update/check", s.UpdateCheck)
+	api.POST("/update/apply", s.UpdateApply)
+	api.GET("/update/status", s.UpdateStatus)
 
 	e.GET("/ws/logs", s.handleWebSocketLogs)
 
