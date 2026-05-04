@@ -6,8 +6,35 @@ import (
 	"strconv"
 	"sync/atomic"
 
+	"github.com/Ehco1996/ehco/internal/glue"
 	"github.com/labstack/echo/v4"
 )
+
+// Snapshot satisfies glue.XrayStatus — read by the web admin's
+// /api/v1/overview aggregate. Locks each subsystem briefly; safe to
+// call from any goroutine.
+func (xs *XrayServer) Snapshot() glue.XraySnapshot {
+	snap := glue.XraySnapshot{}
+	if xs.tracker != nil {
+		snap.Conns = xs.tracker.Count()
+	}
+	if xs.up == nil {
+		return snap
+	}
+	users := xs.up.GetAllUsers()
+	snap.Users = len(users)
+	for _, u := range users {
+		if u.Enable {
+			snap.EnabledUsers++
+		}
+		if u.running {
+			snap.RunningUsers++
+		}
+		snap.UploadTotal += atomic.LoadInt64(&u.UploadTotal)
+		snap.DownloadTotal += atomic.LoadInt64(&u.DownloadTotal)
+	}
+	return snap
+}
 
 // RegisterRoutes mounts the xray management endpoints onto the given echo group.
 // Authentication is provided by the surrounding web server's middleware.

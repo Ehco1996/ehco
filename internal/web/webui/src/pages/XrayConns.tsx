@@ -161,17 +161,19 @@ export default function XrayConns() {
       align: "right",
       width: "70px",
       cell: (c) => (
-        <Button
-          variant="danger"
-          size="sm"
-          disabled={busy() === c.id}
-          onClick={(e) => {
-            e.stopPropagation();
-            killOne(c.id);
-          }}
-        >
-          kill
-        </Button>
+        <span class="opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+          <Button
+            variant="danger"
+            size="sm"
+            disabled={busy() === c.id}
+            onClick={(e) => {
+              e.stopPropagation();
+              killOne(c.id);
+            }}
+          >
+            kill
+          </Button>
+        </span>
       ),
     },
   ];
@@ -179,8 +181,8 @@ export default function XrayConns() {
   return (
     <>
       <PageHeader
-        title="Xray Connections"
-        subtitle="Live conns from the in-process xray outbound."
+        title="connections"
+        subtitle="live conns from the in-process xray outbound"
         actions={<RefreshPicker handle={poll} />}
       />
 
@@ -243,7 +245,7 @@ export default function XrayConns() {
           <Show
             when={groupedRows()!.length}
             fallback={
-              <div class="rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
+              <div class="rounded-md border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
                 <EmptyState
                   icon={<Cable size={28} />}
                   title="No connections match"
@@ -254,7 +256,7 @@ export default function XrayConns() {
             <div class="flex flex-col gap-3">
               <For each={groupedRows()!}>
                 {(g) => (
-                  <div class="rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
+                  <div class="rounded-md border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
                     <div class="flex items-center justify-between gap-3 border-b border-zinc-200 px-4 py-2 dark:border-zinc-800">
                       <div class="flex items-center gap-2">
                         <span class="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">

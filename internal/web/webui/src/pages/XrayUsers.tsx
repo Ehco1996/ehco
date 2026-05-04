@@ -176,7 +176,7 @@ export default function XrayUsers() {
           size="sm"
           onClick={(e) => {
             e.stopPropagation();
-            nav(`/xray/conns?user=${u.user_id}`);
+            nav(`/conns?user=${u.user_id}`);
           }}
         >
           conns <ArrowRight size={13} />
@@ -188,8 +188,8 @@ export default function XrayUsers() {
   return (
     <>
       <PageHeader
-        title="Xray Users"
-        subtitle="Cumulative byte counters since process boot. Reset on restart."
+        title="users"
+        subtitle="cumulative byte counters since process boot · reset on restart"
         actions={<RefreshPicker handle={poll} />}
       />
 
@@ -222,7 +222,7 @@ export default function XrayUsers() {
         rowKey={(u) => u.user_id}
         pageSize={50}
         defaultSort={{ key: "down", dir: "desc" }}
-        onRowClick={(u) => nav(`/xray/conns?user=${u.user_id}`)}
+        onRowClick={(u) => nav(`/conns?user=${u.user_id}`)}
         empty={
           <EmptyState
             icon={<UsersIcon size={28} />}

@@ -8,7 +8,7 @@ export function Card(props: {
   const padded = props.padded ?? true;
   return (
     <div
-      class={`rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900 ${padded ? "p-4 sm:p-5" : ""} ${props.class ?? ""}`}
+      class={`rounded-md border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900 ${padded ? "p-4 sm:p-5" : ""} ${props.class ?? ""}`}
     >
       {props.children}
     </div>
@@ -23,11 +23,13 @@ export function CardHeader(props: {
   return (
     <div class="mb-3 flex items-baseline justify-between gap-3">
       <div class="min-w-0">
-        <h3 class="truncate text-sm font-semibold tracking-tight">
+        <h3 class="truncate text-[12px] font-semibold uppercase tracking-[0.12em]">
           {props.title}
         </h3>
         {props.subtitle && (
-          <p class="mt-0.5 truncate text-xs text-zinc-500">{props.subtitle}</p>
+          <p class="mt-0.5 truncate text-[11px] normal-case tracking-normal text-zinc-500">
+            {props.subtitle}
+          </p>
         )}
       </div>
       {props.right && (

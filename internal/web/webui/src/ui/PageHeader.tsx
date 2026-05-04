@@ -6,13 +6,14 @@ export default function PageHeader(props: {
   actions?: JSX.Element;
 }) {
   return (
-    <div class="mb-5 flex flex-col gap-3 border-b border-zinc-200 pb-4 sm:mb-6 sm:flex-row sm:items-end sm:justify-between sm:gap-4 dark:border-zinc-800">
+    <div class="mb-4 flex flex-col gap-3 border-b border-zinc-200 pb-3 sm:mb-5 sm:flex-row sm:items-end sm:justify-between sm:gap-4 dark:border-zinc-800">
       <div class="min-w-0">
-        <h1 class="text-xl font-semibold tracking-tight sm:text-2xl">
+        <h1 class="text-[18px] font-semibold tracking-tight sm:text-[20px]">
+          <span class="text-emerald-600 dark:text-emerald-400">{">"}</span>{" "}
           {props.title}
         </h1>
         {props.subtitle && (
-          <p class="mt-1 text-sm text-zinc-500">{props.subtitle}</p>
+          <p class="mt-1 text-[12px] text-zinc-500">{props.subtitle}</p>
         )}
       </div>
       {props.actions && (

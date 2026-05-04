@@ -2,6 +2,7 @@ package ms
 
 import (
 	"context"
+	"database/sql"
 
 	"github.com/Ehco1996/ehco/pkg/metric_reader"
 )
@@ -20,6 +21,10 @@ type QueryNodeMetricsReq struct {
 	StartTimestamp int64
 	EndTimestamp   int64
 	Num            int64
+	// Step buckets samples into N-second windows when > 1, averaging
+	// every gauge field per bucket. Lets the SPA pull 7d/30d windows
+	// without dragging back hundreds of thousands of raw points.
+	Step int64
 }
 
 type QueryNodeMetricsResp struct {
@@ -47,6 +52,11 @@ type QueryRuleMetricsReq struct {
 	StartTimestamp int64
 	EndTimestamp   int64
 	Num            int64
+	// Step keeps the last sample per (label, remote) within each
+	// N-second bucket. Counter-style fields (transmit bytes) keep
+	// monotonic semantics so the SPA's delta-on-consecutive-points
+	// trend math still works after bucketing.
+	Step int64
 }
 
 type QueryRuleMetricsResp struct {
@@ -94,13 +104,33 @@ func (ms *MetricsStore) AddRuleMetric(ctx context.Context, rm *metric_reader.Rul
 }
 
 func (ms *MetricsStore) QueryNodeMetric(ctx context.Context, req *QueryNodeMetricsReq) (*QueryNodeMetricsResp, error) {
-	rows, err := ms.db.QueryContext(ctx, `
-	SELECT timestamp, cpu_usage, memory_usage, disk_usage, network_in, network_out
-	FROM node_metrics
-	WHERE timestamp >= ? AND timestamp <= ?
-	ORDER BY timestamp DESC
-	LIMIT ?
-`, req.StartTimestamp, req.EndTimestamp, req.Num)
+	var (
+		rows *sql.Rows
+		err  error
+	)
+	if req.Step > 1 {
+		// Floor each timestamp to a step-second bucket and average every
+		// gauge field. Cheaper than rolling a separate downsample table
+		// for the windows we care about (≤30d).
+		rows, err = ms.db.QueryContext(ctx, `
+		SELECT (timestamp/?)*? AS bucket_ts,
+		       AVG(cpu_usage), AVG(memory_usage), AVG(disk_usage),
+		       AVG(network_in), AVG(network_out)
+		FROM node_metrics
+		WHERE timestamp >= ? AND timestamp <= ?
+		GROUP BY bucket_ts
+		ORDER BY bucket_ts DESC
+		LIMIT ?
+	`, req.Step, req.Step, req.StartTimestamp, req.EndTimestamp, req.Num)
+	} else {
+		rows, err = ms.db.QueryContext(ctx, `
+		SELECT timestamp, cpu_usage, memory_usage, disk_usage, network_in, network_out
+		FROM node_metrics
+		WHERE timestamp >= ? AND timestamp <= ?
+		ORDER BY timestamp DESC
+		LIMIT ?
+	`, req.StartTimestamp, req.EndTimestamp, req.Num)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -119,29 +149,37 @@ func (ms *MetricsStore) QueryNodeMetric(ctx context.Context, req *QueryNodeMetri
 }
 
 func (ms *MetricsStore) QueryRuleMetric(ctx context.Context, req *QueryRuleMetricsReq) (*QueryRuleMetricsResp, error) {
-	query := `
-        SELECT timestamp, label, remote, ping_latency,
-               tcp_connection_count, tcp_handshake_duration, tcp_network_transmit_bytes,
-               udp_connection_count, udp_handshake_duration, udp_network_transmit_bytes
-        FROM rule_metrics
-        WHERE timestamp >= ? AND timestamp <= ?
-    `
-	args := []interface{}{req.StartTimestamp, req.EndTimestamp}
+	// Bucketed mode keeps the last sample per (label, remote) inside each
+	// step-second window. The bytes columns are monotonic counters, so
+	// last-of-bucket preserves the deltas the SPA computes — averaging
+	// would smear the curve.
+	const cols = `timestamp, label, remote, ping_latency,
+        tcp_connection_count, tcp_handshake_duration, tcp_network_transmit_bytes,
+        udp_connection_count, udp_handshake_duration, udp_network_transmit_bytes`
 
+	whereSQL := "WHERE timestamp >= ? AND timestamp <= ?"
+	whereArgs := []interface{}{req.StartTimestamp, req.EndTimestamp}
 	if req.RuleLabel != "" {
-		query += " AND label = ?"
-		args = append(args, req.RuleLabel)
+		whereSQL += " AND label = ?"
+		whereArgs = append(whereArgs, req.RuleLabel)
 	}
 	if req.Remote != "" {
-		query += " AND remote = ?"
-		args = append(args, req.Remote)
+		whereSQL += " AND remote = ?"
+		whereArgs = append(whereArgs, req.Remote)
 	}
 
-	query += `
-        ORDER BY timestamp DESC
-        LIMIT ?
-    `
-	args = append(args, req.Num)
+	var query string
+	var args []interface{}
+	if req.Step > 1 {
+		query = "SELECT " + cols + " FROM rule_metrics WHERE rowid IN (" +
+			"SELECT MAX(rowid) FROM rule_metrics " + whereSQL +
+			" GROUP BY (timestamp/?), label, remote) ORDER BY timestamp DESC LIMIT ?"
+		args = append(append([]interface{}{}, whereArgs...), req.Step, req.Num)
+	} else {
+		query = "SELECT " + cols + " FROM rule_metrics " + whereSQL +
+			" ORDER BY timestamp DESC LIMIT ?"
+		args = append(whereArgs, req.Num)
+	}
 
 	rows, err := ms.db.Query(query, args...)
 	if err != nil {

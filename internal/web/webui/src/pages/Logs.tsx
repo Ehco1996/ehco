@@ -93,8 +93,8 @@ export default function Logs() {
   return (
     <>
       <PageHeader
-        title="Logs"
-        subtitle="Live tail of the in-process zap logger via /ws/logs."
+        title="logs"
+        subtitle="live tail of the in-process zap logger via /ws/logs"
         actions={
           <>
             <Show when={errorCount() > 0}>
@@ -178,7 +178,7 @@ export default function Logs() {
 
       <div
         ref={pane}
-        class="scroll-pretty h-[calc(100vh-280px)] min-h-[300px] overflow-y-auto rounded-xl border border-zinc-200 bg-zinc-50 p-2 font-mono text-[11px] leading-relaxed sm:text-xs md:h-[calc(100vh-260px)] dark:border-zinc-800 dark:bg-zinc-950"
+        class="scroll-pretty h-[calc(100vh-280px)] min-h-[300px] overflow-y-auto rounded-md border border-zinc-200 bg-zinc-50 p-1 font-mono text-[11px] leading-relaxed sm:text-[12px] md:h-[calc(100vh-260px)] dark:border-zinc-800 dark:bg-zinc-950"
       >
         <Show
           when={filtered().length}
@@ -199,9 +199,14 @@ export default function Logs() {
           }
         >
           <For each={filtered()}>
-            {(l) => (
-              <div class="flex gap-2 px-1.5 py-0.5 hover:bg-white dark:hover:bg-zinc-900">
-                <span class="hidden shrink-0 text-zinc-500 sm:inline">
+            {(l, i) => (
+              <div
+                class={
+                  "flex gap-2 px-1.5 py-0.5 hover:bg-white dark:hover:bg-zinc-900 " +
+                  (i() % 2 === 1 ? "bg-zinc-100/40 dark:bg-zinc-900/40" : "")
+                }
+              >
+                <span class="hidden shrink-0 tabular-nums text-zinc-500 sm:inline">
                   {(l.ts ?? "").replace(/T/, " ").slice(0, 19)}
                 </span>
                 <span class="w-12 shrink-0">

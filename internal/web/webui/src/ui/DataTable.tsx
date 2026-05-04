@@ -86,10 +86,10 @@ export default function DataTable<T>(props: Props<T>) {
   const padY = () => (density() === "compact" ? "py-1.5" : "py-2.5");
 
   return (
-    <div class="rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
+    <div class="rounded-md border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
       <div class="scroll-pretty overflow-x-auto">
-        <table class="w-full text-left text-sm">
-          <thead class="bg-zinc-50/80 text-[11px] font-semibold uppercase tracking-wider text-zinc-500 dark:bg-zinc-900/50">
+        <table class="w-full text-left text-[13px]">
+          <thead class="bg-zinc-50/80 text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500 dark:bg-zinc-900/50">
             <tr>
               <For each={props.columns}>
                 {(c) => (

@@ -30,8 +30,23 @@ export interface NodeMetric {
   cpu_usage: number;
   memory_usage: number;
   disk_usage: number;
-  network_in: number;
-  network_out: number;
+  network_in: number;  // bytes/sec
+  network_out: number; // bytes/sec
+}
+
+export interface XraySnapshot {
+  conns: number;
+  users: number;
+  enabled_users: number;
+  running_users: number;
+  upload_total: number;
+  download_total: number;
+}
+
+export interface OverviewResp {
+  xray?: XraySnapshot;
+  host?: NodeMetric;
+  rules: number;
 }
 
 export interface QueryNodeMetricsResp {

@@ -1,14 +1,12 @@
 import { JSX, createSignal, Show } from "solid-js";
 import { A } from "@solidjs/router";
 import {
-  LayoutDashboard,
+  Activity,
   ServerCog,
   Users,
   Cable,
   ScrollText,
   Settings,
-  Download,
-  Activity,
   Menu,
   X,
   Sun,
@@ -24,32 +22,33 @@ const authConfigured = () => authInfo().auth_required;
 interface NavItem {
   href: string;
   label: string;
-  icon: typeof LayoutDashboard;
+  icon: typeof Activity;
   end?: boolean;
 }
 
-const liveNav: NavItem[] = [
-  { href: "/", label: "Overview", icon: LayoutDashboard, end: true },
-  { href: "/node", label: "Node", icon: Activity },
-  { href: "/xray/users", label: "Users", icon: Users },
-  { href: "/xray/conns", label: "Conns", icon: Cable },
-  { href: "/logs", label: "Logs", icon: ScrollText },
-];
-
-const configNav: NavItem[] = [
+// Single flat nav. Home subsumes the old standalone Node page; Settings
+// owns the Updates flow as an embedded section.
+const nav: NavItem[] = [
+  { href: "/", label: "Home", icon: Activity, end: true },
+  { href: "/users", label: "Users", icon: Users },
+  { href: "/conns", label: "Conns", icon: Cable },
   { href: "/rules", label: "Rules", icon: ServerCog },
-  { href: "/updates", label: "Updates", icon: Download },
+  { href: "/logs", label: "Logs", icon: ScrollText },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 
 // Mobile bottom-bar — five items max for usable touch targets.
+// Settings is shoved into "More" sheet to keep tap targets honest.
 const primaryMobile: NavItem[] = [
-  { href: "/", label: "Overview", icon: LayoutDashboard, end: true },
-  { href: "/xray/users", label: "Users", icon: Users },
-  { href: "/xray/conns", label: "Conns", icon: Cable },
+  { href: "/", label: "Home", icon: Activity, end: true },
+  { href: "/users", label: "Users", icon: Users },
+  { href: "/conns", label: "Conns", icon: Cable },
   { href: "/logs", label: "Logs", icon: ScrollText },
 ];
-const moreMobile: NavItem[] = configNav;
+const moreMobile: NavItem[] = [
+  { href: "/rules", label: "Rules", icon: ServerCog },
+  { href: "/settings", label: "Settings", icon: Settings },
+];
 
 export default function Layout(props: { children?: JSX.Element }) {
   const [moreOpen, setMoreOpen] = createSignal(false);
@@ -57,11 +56,12 @@ export default function Layout(props: { children?: JSX.Element }) {
   return (
     <div class="flex h-full flex-col md:flex-row">
       {/* ===== Desktop sidebar ===== */}
-      <aside class="hidden w-56 shrink-0 flex-col border-r border-zinc-200 bg-white px-3 py-4 md:flex dark:border-zinc-800 dark:bg-zinc-900">
+      <aside class="hidden w-52 shrink-0 flex-col border-r border-zinc-200 bg-white px-2 py-4 md:flex dark:border-zinc-800 dark:bg-zinc-900">
         <Brand />
-        <nav class="mt-6 flex flex-1 flex-col gap-4">
-          <NavGroup label="Live" items={liveNav} />
-          <NavGroup label="Config" items={configNav} />
+        <nav class="mt-6 flex flex-1 flex-col gap-0.5">
+          {nav.map((l) => (
+            <NavLink {...l} />
+          ))}
         </nav>
         <div class="mt-3 flex flex-col gap-0.5 border-t border-zinc-200 pt-3 dark:border-zinc-800">
           <NavButton onClick={toggleTheme} icon={theme() === "dark" ? Sun : Moon}>
@@ -131,7 +131,7 @@ export default function Layout(props: { children?: JSX.Element }) {
               ))}
               <Show when={authConfigured()}>
                 <button
-                  class="flex flex-col items-center justify-center gap-1 rounded-xl border border-zinc-200 p-3 text-xs font-medium text-rose-600 hover:bg-rose-50 dark:border-zinc-800 dark:text-rose-400 dark:hover:bg-rose-950/40"
+                  class="flex flex-col items-center justify-center gap-1 rounded-md border border-zinc-200 p-3 text-xs font-medium text-rose-600 hover:bg-rose-50 dark:border-zinc-800 dark:text-rose-400 dark:hover:bg-rose-950/40"
                   onClick={() => {
                     setMoreOpen(false);
                     signOut();
@@ -149,27 +149,18 @@ export default function Layout(props: { children?: JSX.Element }) {
   );
 }
 
-function NavGroup(props: { label: string; items: NavItem[] }) {
-  return (
-    <div class="flex flex-col gap-0.5">
-      <div class="px-3 pb-1 text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
-        {props.label}
-      </div>
-      {props.items.map((l) => (
-        <NavLink {...l} />
-      ))}
-    </div>
-  );
-}
-
 function Brand(props: { compact?: boolean }) {
   return (
-    <div class="flex items-center gap-2.5">
-      <Logo size={props.compact ? 28 : 32} />
+    <div class="flex items-center gap-2.5 px-2">
+      <Logo size={props.compact ? 26 : 28} />
       <div class="leading-tight">
-        <div class="text-sm font-semibold">ehco</div>
+        <div class="text-[13px] font-semibold tracking-tight">
+          ehco<span class="caret-blink ml-0.5 inline-block h-3 w-1.5 -translate-y-[1px] bg-emerald-500 align-middle" />
+        </div>
         {!props.compact && (
-          <div class="text-[11px] text-zinc-500">admin</div>
+          <div class="text-[10px] uppercase tracking-[0.18em] text-zinc-500">
+            admin
+          </div>
         )}
       </div>
     </div>
@@ -182,27 +173,27 @@ function NavLink(props: NavItem) {
     <A
       href={props.href}
       end={props.end}
-      class="flex items-center gap-2.5 rounded-md px-3 py-1.5 text-sm text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
-      activeClass="!bg-emerald-50 !text-emerald-700 dark:!bg-emerald-500/10 dark:!text-emerald-400"
+      class="flex items-center gap-2.5 rounded-md px-3 py-1.5 text-[13px] text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
+      activeClass="!bg-emerald-500/10 !text-emerald-700 dark:!text-emerald-400"
     >
-      <Icon size={16} />
-      {props.label}
+      <Icon size={15} />
+      <span>{props.label}</span>
     </A>
   );
 }
 
 function NavButton(props: {
   onClick: () => void;
-  icon: typeof LayoutDashboard;
+  icon: typeof Activity;
   children: JSX.Element;
 }) {
   const Icon = props.icon;
   return (
     <button
       onClick={props.onClick}
-      class="flex items-center gap-2.5 rounded-md px-3 py-1.5 text-left text-sm text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
+      class="flex items-center gap-2.5 rounded-md px-3 py-1.5 text-left text-[13px] text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
     >
-      <Icon size={16} />
+      <Icon size={15} />
       {props.children}
     </button>
   );
@@ -229,7 +220,7 @@ function SheetTile(props: NavItem & { onClose: () => void }) {
     <A
       href={props.href}
       onClick={() => props.onClose()}
-      class="flex flex-col items-center justify-center gap-1 rounded-xl border border-zinc-200 p-3 text-xs font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-800"
+      class="flex flex-col items-center justify-center gap-1 rounded-md border border-zinc-200 p-3 text-xs font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-800"
       activeClass="!border-emerald-500/50 !text-emerald-700 dark:!text-emerald-400"
     >
       <Icon size={20} />

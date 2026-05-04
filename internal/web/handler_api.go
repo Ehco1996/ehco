@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/Ehco1996/ehco/internal/cmgr/ms"
+	"github.com/Ehco1996/ehco/internal/glue"
 	"github.com/labstack/echo/v4"
 )
 
@@ -20,6 +21,7 @@ type queryParams struct {
 	startTS int64
 	endTS   int64
 	latest  bool
+	step    int64
 }
 
 func parseQueryParams(c echo.Context) (*queryParams, error) {
@@ -41,6 +43,10 @@ func parseQueryParams(c echo.Context) (*queryParams, error) {
 		params.latest = latest
 	}
 
+	if step, err := strconv.ParseInt(c.QueryParam("step"), 10, 64); err == nil && step > 0 {
+		params.step = step
+	}
+
 	if params.startTS >= params.endTS {
 		return nil, fmt.Errorf(errInvalidParam, "time range")
 	}
@@ -60,7 +66,7 @@ func (s *Server) GetNodeMetrics(c echo.Context) error {
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
-	req := &ms.QueryNodeMetricsReq{StartTimestamp: params.startTS, EndTimestamp: params.endTS, Num: -1}
+	req := &ms.QueryNodeMetricsReq{StartTimestamp: params.startTS, EndTimestamp: params.endTS, Num: -1, Step: params.step}
 	if params.latest {
 		req.Num = 1
 	}
@@ -80,6 +86,7 @@ func (s *Server) GetRuleMetrics(c echo.Context) error {
 		StartTimestamp: params.startTS,
 		EndTimestamp:   params.endTS,
 		Num:            -1,
+		Step:           params.step,
 		RuleLabel:      c.QueryParam("label"),
 		Remote:         c.QueryParam("remote"),
 	}
@@ -132,6 +139,44 @@ func (s *Server) HandleReload(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
 	return nil
+}
+
+// OverviewResp bundles everything the SPA's home page polls — saves
+// the front-end the 3 parallel fetches it would otherwise need on
+// every refresh tick. Fields stay nil/zero when their subsystem is
+// disabled (xray-less deployments, no host sampler yet).
+type OverviewResp struct {
+	Xray  *glue.XraySnapshot `json:"xray,omitempty"`
+	Host  *ms.NodeMetrics    `json:"host,omitempty"`
+	Rules int                `json:"rules"`
+}
+
+func (s *Server) Overview(c echo.Context) error {
+	out := OverviewResp{}
+
+	if s.cfg != nil {
+		out.Rules = len(s.cfg.RelayConfigs)
+	}
+
+	if p := s.xrayStatus.Load(); p != nil && *p != nil {
+		snap := (*p).Snapshot()
+		out.Xray = &snap
+	}
+
+	if s.connMgr != nil {
+		now := time.Now()
+		req := &ms.QueryNodeMetricsReq{
+			StartTimestamp: now.Add(-5 * time.Minute).Unix(),
+			EndTimestamp:   now.Unix(),
+			Num:            1,
+		}
+		if resp, err := s.connMgr.QueryNodeMetrics(c.Request().Context(), req); err == nil && len(resp.Data) > 0 {
+			h := resp.Data[0]
+			out.Host = &h
+		}
+	}
+
+	return c.JSON(http.StatusOK, out)
 }
 
 func (s *Server) HandleHealthCheck(c echo.Context) error {

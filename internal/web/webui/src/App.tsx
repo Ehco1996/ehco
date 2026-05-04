@@ -1,16 +1,14 @@
 import { Show, onMount } from "solid-js";
-import { HashRouter, Route } from "@solidjs/router";
+import { HashRouter, Route, Navigate } from "@solidjs/router";
 import { authState, probeAuth } from "./store/auth";
 import LoginGate from "./components/LoginGate";
 import Layout from "./components/Layout";
-import Overview from "./pages/Overview";
+import Home from "./pages/Home";
 import Rules from "./pages/Rules";
 import XrayConns from "./pages/XrayConns";
 import XrayUsers from "./pages/XrayUsers";
 import Logs from "./pages/Logs";
 import Settings from "./pages/Settings";
-import Updates from "./pages/Updates";
-import NodeMetricsPage from "./pages/NodeMetrics";
 
 export default function App() {
   onMount(probeAuth);
@@ -26,15 +24,18 @@ export default function App() {
     >
       <Show when={authState() === "ok"} fallback={<LoginGate />}>
         <HashRouter root={Layout}>
-          <Route path="/" component={Overview} />
+          <Route path="/" component={Home} />
+          <Route path="/users" component={XrayUsers} />
+          <Route path="/conns" component={XrayConns} />
           <Route path="/rules" component={Rules} />
-          <Route path="/xray/conns" component={XrayConns} />
-          <Route path="/xray/users" component={XrayUsers} />
           <Route path="/logs" component={Logs} />
           <Route path="/settings" component={Settings} />
-          <Route path="/updates" component={Updates} />
-          <Route path="/node" component={NodeMetricsPage} />
-          <Route path="*" component={Overview} />
+          {/* Legacy paths kept so bookmarks survive the IA shuffle. */}
+          <Route path="/xray/users" component={() => <Navigate href="/users" />} />
+          <Route path="/xray/conns" component={() => <Navigate href="/conns" />} />
+          <Route path="/node" component={() => <Navigate href="/" />} />
+          <Route path="/updates" component={() => <Navigate href="/settings" />} />
+          <Route path="*" component={() => <Navigate href="/" />} />
         </HashRouter>
       </Show>
     </Show>
