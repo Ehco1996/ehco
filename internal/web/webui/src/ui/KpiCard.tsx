@@ -7,16 +7,16 @@ export default function KpiCard(props: {
   icon?: JSX.Element;
 }) {
   return (
-    <div class="rounded-xl border border-zinc-200 bg-white p-3 sm:p-4 dark:border-zinc-800 dark:bg-zinc-900">
-      <div class="flex items-center justify-between text-[11px] font-medium uppercase tracking-wider text-zinc-500">
+    <div class="rounded-md border border-zinc-200 bg-white p-3 sm:p-4 dark:border-zinc-800 dark:bg-zinc-900">
+      <div class="flex items-center justify-between text-[10px] font-semibold uppercase tracking-[0.16em] text-zinc-500">
         <span>{props.label}</span>
         {props.icon && <span class="text-zinc-400">{props.icon}</span>}
       </div>
-      <div class="mt-2 font-mono text-xl font-semibold tracking-tight sm:text-2xl">
+      <div class="mt-2 font-mono text-[20px] font-semibold tabular-nums tracking-tight sm:text-[24px]">
         {props.value}
       </div>
       {props.hint && (
-        <div class="mt-1 truncate text-xs text-zinc-500">{props.hint}</div>
+        <div class="mt-1 truncate text-[11px] text-zinc-500">{props.hint}</div>
       )}
     </div>
   );

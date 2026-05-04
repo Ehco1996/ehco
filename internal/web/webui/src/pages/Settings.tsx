@@ -8,6 +8,7 @@ import DescList from "../ui/DescList";
 import { api } from "../api/client";
 import { authInfo } from "../store/auth";
 import { theme, toggleTheme } from "../store/theme";
+import UpdatesPanel from "./UpdatesPanel";
 
 export default function Settings() {
   const [config] = createResource(() => api.config());
@@ -48,8 +49,8 @@ export default function Settings() {
   return (
     <>
       <PageHeader
-        title="Settings"
-        subtitle="Local UI preferences, runtime config, admin actions."
+        title="settings"
+        subtitle="local ui preferences · runtime config · admin actions"
       />
 
       <div class="grid gap-3 lg:grid-cols-2">
@@ -128,6 +129,10 @@ export default function Settings() {
           </div>
         </Card>
 
+        <div class="lg:col-span-2">
+          <UpdatesPanel />
+        </div>
+
         <Card class="lg:col-span-2">
           <CardHeader
             title="API surface"
@@ -137,6 +142,7 @@ export default function Settings() {
             <Endpoint method="GET" path="/api/v1/config/" />
             <Endpoint method="POST" path="/api/v1/config/reload/" />
             <Endpoint method="GET" path="/api/v1/health_check/" />
+            <Endpoint method="GET" path="/api/v1/overview" />
             <Endpoint method="GET" path="/api/v1/node_metrics/" />
             <Endpoint method="GET" path="/api/v1/rule_metrics/" />
             <Endpoint method="GET" path="/api/v1/xray/conns" />

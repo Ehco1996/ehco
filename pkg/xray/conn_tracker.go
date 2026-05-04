@@ -217,6 +217,13 @@ func (t *connTracker) List(userID int) []ConnInfo {
 	return out
 }
 
+// Count returns the total number of live conns across all users.
+func (t *connTracker) Count() int {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	return len(t.entries)
+}
+
 // CountTCPByUser returns how many live TCP conns the user currently has.
 // Used by the traffic sync to populate UserTraffic.TcpCount.
 func (t *connTracker) CountTCPByUser(userID int) int {

@@ -1,38 +1,42 @@
+@import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap");
 @import "tailwindcss";
 @import "uplot/dist/uPlot.min.css";
 
 /* ---------- Design tokens ----------
- * Single source of truth for colour, type, motion. Light + dark are
- * expressed via Tailwind utilities for component code; CSS vars are
- * here only for things referenced by raw CSS (uPlot, scrollbars,
- * focus rings).
+ * Operator's-terminal direction: a single mono typeface drives every
+ * surface. Hierarchy comes from weight + size, not from sans/mono
+ * mixing. One signal colour (emerald) on a tight zinc palette.
  * ----------------------------------- */
 
 @theme {
-  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI",
-    Roboto, "Helvetica Neue", Arial, sans-serif;
-  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono",
-    monospace;
+  --font-sans: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas,
+    "Liberation Mono", monospace;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas,
+    "Liberation Mono", monospace;
 }
 
 :root {
   --accent: oklch(0.62 0.15 160);
+  --accent-strong: oklch(0.55 0.16 160);
   --ring: oklch(0.62 0.15 160 / 0.45);
-  --surface: oklch(0.99 0 0);
+  --surface: oklch(0.985 0 0);
   --surface-2: oklch(1 0 0);
+  --surface-sunk: oklch(0.965 0 0);
   --border: oklch(0.92 0 0);
-  --border-strong: oklch(0.88 0 0);
-  --text: oklch(0.2 0 0);
-  --text-muted: oklch(0.55 0 0);
+  --border-strong: oklch(0.86 0 0);
+  --text: oklch(0.18 0 0);
+  --text-muted: oklch(0.5 0 0);
 }
 
 .dark {
   --accent: oklch(0.78 0.16 160);
+  --accent-strong: oklch(0.84 0.18 160);
   --ring: oklch(0.78 0.16 160 / 0.45);
-  --surface: oklch(0.16 0 0);
-  --surface-2: oklch(0.20 0 0);
+  --surface: oklch(0.145 0 0);
+  --surface-2: oklch(0.185 0 0);
+  --surface-sunk: oklch(0.115 0 0);
   --border: oklch(0.27 0 0);
-  --border-strong: oklch(0.32 0 0);
+  --border-strong: oklch(0.34 0 0);
   --text: oklch(0.95 0 0);
   --text-muted: oklch(0.6 0 0);
 }
@@ -47,26 +51,24 @@ html {
 
 body {
   font-family: var(--font-sans);
-  font-size: 14px;
-  line-height: 1.5;
+  font-size: 13px;
+  line-height: 1.55;
+  letter-spacing: -0.005em;
   background: var(--surface);
   color: var(--text);
+  font-variant-numeric: tabular-nums;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
 
-/* Numbers always align — applied broadly so columns of bytes line up. */
 table, .font-mono, .tabular {
   font-variant-numeric: tabular-nums;
 }
 
-/* Single canonical focus ring used everywhere. Tailwind's default ring
- * gets in the way; we hide focus when the user used the mouse and only
- * show it for keyboard nav. */
 :where(button, a, input, select, textarea, [tabindex]):focus-visible {
   outline: 2px solid var(--ring);
   outline-offset: 2px;
-  border-radius: 6px;
+  border-radius: 4px;
 }
 
 /* ---------- uPlot dark mode patch ---------- */
@@ -104,6 +106,14 @@ table, .font-mono, .tabular {
   50%      { opacity: 0.45; transform: scale(0.8); }
 }
 .pulse-dot { animation: pulse-dot 1.6s ease-in-out infinite; }
+
+/* ---------- Caret blink for terminal-style brand ---------- */
+
+@keyframes caret-blink {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+.caret-blink { animation: caret-blink 1.1s step-end infinite; }
 
 /* ---------- Safe-area for mobile bottom tab bar ---------- */
 

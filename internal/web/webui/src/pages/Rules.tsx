@@ -5,12 +5,19 @@ import Button from "../ui/Button";
 import { Pill } from "../ui/Pill";
 import EmptyState from "../ui/EmptyState";
 import Sparkline from "../ui/Sparkline";
+import Segmented from "../ui/Segmented";
 import DataTable, { Column } from "../ui/DataTable";
 import { api, ApiError } from "../api/client";
-import { bytes } from "../util/format";
+import { bytes, pickStep } from "../util/format";
 import type { RelayConfig, RuleMetric } from "../api/types";
 
-const HISTORY_SECONDS = 60 * 60;
+const HISTORY_WINDOWS = [
+  { value: 60 * 60, label: "1h" },
+  { value: 6 * 60 * 60, label: "6h" },
+  { value: 24 * 60 * 60, label: "24h" },
+  { value: 7 * 24 * 60 * 60, label: "7d" },
+  { value: 30 * 24 * 60 * 60, label: "30d" },
+] as const;
 
 interface HCResult {
   state: "running" | "ok" | "err";
@@ -29,9 +36,14 @@ export default function Rules() {
   const [latest, { refetch: rcLatest }] = createResource(() =>
     api.ruleMetrics({ latest: true }),
   );
-  const [history, { refetch: rcHistory }] = createResource(async () => {
+  const [historyWindow, setHistoryWindow] = createSignal<number>(HISTORY_WINDOWS[0].value);
+  const [history, { refetch: rcHistory }] = createResource(historyWindow, async (sec) => {
     const end = Math.floor(Date.now() / 1000);
-    return api.ruleMetrics({ start_ts: end - HISTORY_SECONDS, end_ts: end });
+    return api.ruleMetrics({
+      start_ts: end - sec,
+      end_ts: end,
+      step: pickStep(sec),
+    });
   });
   const [hc, setHc] = createSignal<Record<string, HCResult>>({});
 
@@ -148,7 +160,7 @@ export default function Rules() {
     },
     {
       key: "trend",
-      header: "1h trend",
+      header: `${HISTORY_WINDOWS.find((w) => w.value === historyWindow())?.label ?? ""} trend`,
       cell: (r) => (
         <span class="text-emerald-600 dark:text-emerald-400">
           <Sparkline values={r.series} width={90} height={22} />
@@ -233,16 +245,24 @@ export default function Rules() {
   return (
     <>
       <PageHeader
-        title="Relay Rules"
-        subtitle="Static rules with the last hour of throughput per remote."
+        title="rules"
+        subtitle="static relay rules with throughput per remote"
         actions={
-          <Button
-            size="sm"
-            leadingIcon={<RefreshCcw size={13} />}
-            onClick={refreshAll}
-          >
-            Refresh
-          </Button>
+          <>
+            <Segmented
+              options={HISTORY_WINDOWS.map((w) => ({ value: w.value, label: w.label }))}
+              value={historyWindow()}
+              onChange={setHistoryWindow}
+              size="sm"
+            />
+            <Button
+              size="sm"
+              leadingIcon={<RefreshCcw size={13} />}
+              onClick={refreshAll}
+            >
+              Refresh
+            </Button>
+          </>
         }
       />
 

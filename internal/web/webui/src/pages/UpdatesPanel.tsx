@@ -1,6 +1,5 @@
 import { createResource, createSignal, For, onCleanup, Show } from "solid-js";
 import { Download, RefreshCw, CircleCheck, CircleAlert } from "lucide-solid";
-import PageHeader from "../ui/PageHeader";
 import { Card, CardHeader } from "../ui/Card";
 import Button from "../ui/Button";
 import { Pill } from "../ui/Pill";
@@ -26,7 +25,7 @@ const STEPS: UpdateState[] = [
 ];
 const cap = (s: string) => s[0].toUpperCase() + s.slice(1);
 
-export default function Updates() {
+export default function UpdatesPanel() {
   const [version, { refetch: rcVersion }] = createResource<VersionInfo>(() =>
     api.version(),
   );
@@ -133,15 +132,19 @@ export default function Updates() {
 
   return (
     <>
-      <PageHeader
-        title="Updates"
-        subtitle="Check for new ehco builds and apply them in place."
-        actions={
-          <Pill tone={isNightly() ? "warn" : "info"}>
-            {isNightly() ? "nightly build" : "stable build"}
-          </Pill>
-        }
-      />
+      <div class="mb-3 flex items-center justify-between">
+        <div>
+          <h2 class="text-[12px] font-semibold uppercase tracking-[0.14em] text-zinc-500">
+            updates
+          </h2>
+          <p class="mt-0.5 text-[11px] text-zinc-500">
+            check for new ehco builds and apply them in place
+          </p>
+        </div>
+        <Pill tone={isNightly() ? "warn" : "info"}>
+          {isNightly() ? "nightly build" : "stable build"}
+        </Pill>
+      </div>
 
       <Card>
         <CardHeader title="Current build" subtitle="Reported by this binary." />

@@ -34,6 +34,20 @@ type Server struct {
 
 	connMgr   cmgr.Cmgr
 	updateJob atomic.Pointer[JobStatus]
+
+	// xrayStatus is wired post-construction by cli boot once the
+	// XrayServer exists. Always read via Load() — may be nil when
+	// xray sync is disabled. Atomic pointer keeps it lock-free.
+	xrayStatus atomic.Pointer[glue.XrayStatus]
+}
+
+// SetXrayStatus is called by cli boot once the XrayServer is
+// constructed. The /overview handler picks it up via Load().
+func (s *Server) SetXrayStatus(p glue.XrayStatus) {
+	if p == nil {
+		return
+	}
+	s.xrayStatus.Store(&p)
 }
 
 func NewServer(
@@ -112,6 +126,7 @@ func setupRoutes(s *Server) {
 	api.GET("/health_check/", s.HandleHealthCheck)
 	api.GET("/node_metrics/", s.GetNodeMetrics)
 	api.GET("/rule_metrics/", s.GetRuleMetrics)
+	api.GET("/overview", s.Overview)
 	api.GET("/version", s.Version)
 	api.GET("/update/check", s.UpdateCheck)
 	api.POST("/update/apply", s.UpdateApply)

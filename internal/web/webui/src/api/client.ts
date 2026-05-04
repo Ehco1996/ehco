@@ -38,6 +38,7 @@ import type {
   UpdateCheck,
   UpdateStatus,
   UpdateApplyOptions,
+  OverviewResp,
 } from "./types";
 
 export const api = {
@@ -48,11 +49,12 @@ export const api = {
     request<HealthCheckResp>(
       `/api/v1/health_check/?relay_label=${encodeURIComponent(label)}`,
     ),
-  nodeMetrics: (params: { start_ts?: number; end_ts?: number; latest?: boolean }) => {
+  nodeMetrics: (params: { start_ts?: number; end_ts?: number; latest?: boolean; step?: number }) => {
     const q = new URLSearchParams();
     if (params.start_ts != null) q.set("start_ts", String(params.start_ts));
     if (params.end_ts != null) q.set("end_ts", String(params.end_ts));
     if (params.latest) q.set("latest", "true");
+    if (params.step && params.step > 1) q.set("step", String(params.step));
     return request<QueryNodeMetricsResp>(`/api/v1/node_metrics/?${q.toString()}`);
   },
   ruleMetrics: (params: {
@@ -61,6 +63,7 @@ export const api = {
     start_ts?: number;
     end_ts?: number;
     latest?: boolean;
+    step?: number;
   }) => {
     const q = new URLSearchParams();
     for (const [k, v] of Object.entries(params)) {
@@ -68,6 +71,7 @@ export const api = {
     }
     return request<QueryRuleMetricsResp>(`/api/v1/rule_metrics/?${q.toString()}`);
   },
+  overview: () => request<OverviewResp>("/api/v1/overview"),
   xrayConns: (userId?: number) => {
     const q = userId ? `?user=${userId}` : "";
     return request<XrayConn[]>(`/api/v1/xray/conns${q}`);
