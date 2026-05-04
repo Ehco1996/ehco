@@ -267,9 +267,16 @@ export default function XrayConns() {
                         <Button
                           variant="danger"
                           size="sm"
-                          onClick={() => {
+                          disabled={busy() === "user"}
+                          onClick={async () => {
                             if (!confirm(`Kill all ${g.conns.length} conns for user_id=${g.key}?`)) return;
-                            api.killUser(Number(g.key)).then(() => refetch());
+                            setBusy("user");
+                            try {
+                              await api.killUser(Number(g.key));
+                              await refetch();
+                            } finally {
+                              setBusy(null);
+                            }
                           }}
                         >
                           kill user
