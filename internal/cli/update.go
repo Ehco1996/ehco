@@ -24,6 +24,6 @@ var UpdateCMD = &cli.Command{
 			Channel: c.String("channel"),
 			Force:   c.Bool("force"),
 			Restart: !c.Bool("no-restart"),
-		}, constant.Version, constant.GitRevision, cliLogger, nil)
+		}, constant.Version, constant.GitRevision, cliLogger)
 	},
 }

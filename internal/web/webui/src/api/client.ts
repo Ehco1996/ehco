@@ -35,7 +35,6 @@ import type {
   QueryNodeMetricsResp,
   VersionInfo,
   UpdateCheck,
-  UpdateStatus,
   UpdateApplyOptions,
   OverviewResp,
   DBHealth,
@@ -77,12 +76,11 @@ export const api = {
   updateCheck: (channel: string) =>
     request<UpdateCheck>(`/api/v1/update/check?channel=${encodeURIComponent(channel)}`),
   updateApply: (opts: UpdateApplyOptions) =>
-    request<{ state: string }>("/api/v1/update/apply", {
+    request<void>("/api/v1/update/apply", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(opts),
     }),
-  updateStatus: () => request<UpdateStatus>("/api/v1/update/status"),
   dbHealth: () => request<DBHealth>("/api/v1/db/health"),
   dbCleanup: (older_than_days: number) =>
     request<DBMaintenanceResult>("/api/v1/db/cleanup", {

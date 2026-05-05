@@ -29,18 +29,6 @@ const (
 	systemdServiceName = "ehco"
 )
 
-// State is the phase of an Apply run; consumed by the web UI.
-type State string
-
-const (
-	StateChecking    State = "checking"
-	StateDownloading State = "downloading"
-	StateInstalling  State = "installing"
-	StateRestarting  State = "restarting"
-	StateDone        State = "done"
-	StateFailed      State = "failed"
-)
-
 // CheckResult describes a release relative to the running binary.
 type CheckResult struct {
 	Channel         string    `json:"channel"`
@@ -110,16 +98,12 @@ func Check(ctx context.Context, channel, currentVersion, currentRevision string)
 	return res, nil
 }
 
-// Apply downloads + swaps + (optionally) restarts. Each phase is reported
-// to onState so the dashboard can render progress; CLI passes nil.
-func Apply(ctx context.Context, opts ApplyOptions, currentVersion, currentRevision string, log *zap.SugaredLogger, onState func(State)) error {
-	emit := func(s State) {
-		if onState != nil {
-			onState(s)
-		}
-	}
-
-	emit(StateChecking)
+// Apply downloads + swaps + (optionally) restarts. Errors are returned
+// for the caller to surface; phase tracking has been intentionally
+// dropped — the systemd restart kills this process before any
+// "restarting/done" state could be polled, making intermediate states
+// unreliable. The dashboard polls /version to detect completion.
+func Apply(ctx context.Context, opts ApplyOptions, currentVersion, currentRevision string, log *zap.SugaredLogger) error {
 	resolved, rel, err := pickRelease(ctx, opts.Channel, currentVersion)
 	if err != nil {
 		return err
@@ -134,7 +118,6 @@ func Apply(ctx context.Context, opts ApplyOptions, currentVersion, currentRevisi
 					rel.TagName, currentRevision)
 			} else {
 				log.Info("already up to date")
-				emit(StateDone)
 				return nil
 			}
 		} else if compareVersions(latest, currentVersion) < 0 {
@@ -156,14 +139,12 @@ func Apply(ctx context.Context, opts ApplyOptions, currentVersion, currentRevisi
 	}
 	tmpPath := binPath + ".new"
 
-	emit(StateDownloading)
 	log.Infof("downloading %s -> %s", asset.BrowserDownloadURL, tmpPath)
 	if err := download(ctx, asset.BrowserDownloadURL, tmpPath); err != nil {
 		_ = os.Remove(tmpPath)
 		return fmt.Errorf("download: %w", err)
 	}
 
-	emit(StateInstalling)
 	// rename(2) over a running ELF on linux is safe: the kernel keeps the
 	// old inode alive for the running process while new invocations
 	// resolve to the new file.
@@ -179,15 +160,9 @@ func Apply(ctx context.Context, opts ApplyOptions, currentVersion, currentRevisi
 
 	if !opts.Restart {
 		log.Info("skipping restart; restart manually to pick up the new binary")
-		emit(StateDone)
 		return nil
 	}
-	emit(StateRestarting)
-	if err := restartSystemd(log); err != nil {
-		return err
-	}
-	emit(StateDone)
-	return nil
+	return restartSystemd(log)
 }
 
 func pickRelease(ctx context.Context, channel, currentVersion string) (string, *ghRelease, error) {

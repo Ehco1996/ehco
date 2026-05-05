@@ -23,18 +23,6 @@ type VersionInfo struct {
 	GoArch      string    `json:"go_arch"`
 }
 
-// JobStatus is the in-memory record of the most-recent update attempt.
-// Process-local on purpose: after a successful restart the new process
-// boots with no record, the SPA reloads /version and sees the new build.
-type JobStatus struct {
-	State     updater.State `json:"state"`
-	Channel   string        `json:"channel"`
-	From      string        `json:"from"`
-	To        string        `json:"to"`
-	StartedAt time.Time     `json:"started_at"`
-	Error     string        `json:"error,omitempty"`
-}
-
 func (s *Server) Version(c echo.Context) error {
 	return c.JSON(http.StatusOK, VersionInfo{
 		Version:     constant.Version,
@@ -61,6 +49,10 @@ func (s *Server) UpdateCheck(c echo.Context) error {
 	return c.JSON(http.StatusOK, res)
 }
 
+// UpdateApply kicks off the update in a detached goroutine and returns
+// immediately. The dashboard polls /version to detect completion (the
+// running process restarts mid-flow, so any in-process state machine is
+// inherently lossy). Failures are logged via s.l; check journalctl.
 func (s *Server) UpdateApply(c echo.Context) error {
 	if runtime.GOOS != "linux" {
 		return echo.NewHTTPError(http.StatusBadRequest,
@@ -73,58 +65,14 @@ func (s *Server) UpdateApply(c echo.Context) error {
 	if opts.Channel == "" {
 		opts.Channel = updater.ChannelAuto
 	}
-
-	prev := s.updateJob.Load()
-	if prev != nil && isInProgress(prev.State) {
-		return echo.NewHTTPError(http.StatusConflict, "another update is already running")
-	}
-
-	job := &JobStatus{
-		State:     updater.StateChecking,
-		Channel:   opts.Channel,
-		From:      constant.Version,
-		StartedAt: time.Now().UTC(),
-	}
-	s.updateJob.Store(job)
 	s.l.Infof("update apply requested channel=%s force=%v restart=%v", opts.Channel, opts.Force, opts.Restart)
 
-	// Detached context: closing the browser shouldn't abort an in-flight swap.
-	go s.runUpdate(opts, job)
-	return c.JSON(http.StatusAccepted, map[string]string{"state": string(updater.StateChecking)})
-}
-
-func (s *Server) runUpdate(opts updater.ApplyOptions, job *JobStatus) {
-	ctx, cancel := context.WithTimeout(context.Background(), updateApplyTimeout)
-	defer cancel()
-
-	onState := func(st updater.State) {
-		// Copy-on-write so /status readers always see a consistent snapshot.
-		next := *job
-		next.State = st
-		s.updateJob.Store(&next)
-		*job = next
-	}
-
-	if err := updater.Apply(ctx, opts, constant.Version, constant.GitRevision, s.l, onState); err != nil {
-		next := *job
-		next.State = updater.StateFailed
-		next.Error = err.Error()
-		s.updateJob.Store(&next)
-		s.l.Errorf("update failed: %v", err)
-	}
-}
-
-func (s *Server) UpdateStatus(c echo.Context) error {
-	if j := s.updateJob.Load(); j != nil {
-		return c.JSON(http.StatusOK, j)
-	}
-	return c.JSON(http.StatusOK, map[string]string{"state": "idle"})
-}
-
-func isInProgress(s updater.State) bool {
-	switch s {
-	case updater.StateChecking, updater.StateDownloading, updater.StateInstalling, updater.StateRestarting:
-		return true
-	}
-	return false
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), updateApplyTimeout)
+		defer cancel()
+		if err := updater.Apply(ctx, opts, constant.Version, constant.GitRevision, s.l); err != nil {
+			s.l.Errorf("update failed: %v", err)
+		}
+	}()
+	return c.NoContent(http.StatusAccepted)
 }

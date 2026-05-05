@@ -122,24 +122,6 @@ export interface UpdateCheck {
   asset_url: string;
 }
 
-export type UpdateState =
-  | "idle"
-  | "checking"
-  | "downloading"
-  | "installing"
-  | "restarting"
-  | "done"
-  | "failed";
-
-export interface UpdateStatus {
-  state: UpdateState;
-  channel?: string;
-  from?: string;
-  to?: string;
-  started_at?: string;
-  error?: string;
-}
-
 export interface UpdateApplyOptions {
   channel: string;
   force: boolean;

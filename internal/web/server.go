@@ -32,8 +32,7 @@ type Server struct {
 	cfg  *config.Config
 	auth *authenticator
 
-	connMgr   cmgr.Cmgr
-	updateJob atomic.Pointer[JobStatus]
+	connMgr cmgr.Cmgr
 
 	// xrayStatus is wired post-construction by cli boot once the
 	// XrayServer exists. Always read via Load() — may be nil when
@@ -126,7 +125,6 @@ func setupRoutes(s *Server) {
 	api.GET("/version", s.Version)
 	api.GET("/update/check", s.UpdateCheck)
 	api.POST("/update/apply", s.UpdateApply)
-	api.GET("/update/status", s.UpdateStatus)
 
 	// Local SQLite store: read-side health snapshot + maintenance ops.
 	// All four mutations are auth-gated through the api group's
