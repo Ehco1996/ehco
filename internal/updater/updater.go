@@ -80,7 +80,8 @@ type ghRelease struct {
 }
 
 // Check resolves channel against currentVersion and queries GitHub.
-func Check(ctx context.Context, channel, currentVersion string) (*CheckResult, error) {
+// currentBuildTime is the ldflag-injected constant.BuildTime; empty is fine.
+func Check(ctx context.Context, channel, currentVersion, currentBuildTime string) (*CheckResult, error) {
 	resolved, rel, err := pickRelease(ctx, channel, currentVersion)
 	if err != nil {
 		return nil, err
@@ -96,7 +97,11 @@ func Check(ctx context.Context, channel, currentVersion string) (*CheckResult, e
 		ReleaseURL:     rel.HTMLURL,
 		PublishedAt:    rel.PublishedAt,
 	}
-	res.UpdateAvailable = latest != currentVersion && compareVersions(latest, currentVersion) > 0
+	if latest == currentVersion {
+		res.UpdateAvailable = nightlyRepublished(rel, currentBuildTime)
+	} else {
+		res.UpdateAvailable = compareVersions(latest, currentVersion) > 0
+	}
 	if a := pickAsset(rel.Assets); a != nil {
 		res.AssetName = a.Name
 		res.AssetURL = a.BrowserDownloadURL
@@ -106,7 +111,7 @@ func Check(ctx context.Context, channel, currentVersion string) (*CheckResult, e
 
 // Apply downloads + swaps + (optionally) restarts. Each phase is reported
 // to onState so the dashboard can render progress; CLI passes nil.
-func Apply(ctx context.Context, opts ApplyOptions, currentVersion string, log *zap.SugaredLogger, onState func(State)) error {
+func Apply(ctx context.Context, opts ApplyOptions, currentVersion, currentBuildTime string, log *zap.SugaredLogger, onState func(State)) error {
 	emit := func(s State) {
 		if onState != nil {
 			onState(s)
@@ -123,11 +128,15 @@ func Apply(ctx context.Context, opts ApplyOptions, currentVersion string, log *z
 
 	if !opts.Force {
 		if latest == currentVersion {
-			log.Info("already up to date")
-			emit(StateDone)
-			return nil
-		}
-		if compareVersions(latest, currentVersion) < 0 {
+			if nightlyRepublished(rel, currentBuildTime) {
+				log.Infof("nightly tag %s republished after local build (%s); reinstalling",
+					rel.TagName, currentBuildTime)
+			} else {
+				log.Info("already up to date")
+				emit(StateDone)
+				return nil
+			}
+		} else if compareVersions(latest, currentVersion) < 0 {
 			return fmt.Errorf("refusing to downgrade %s -> %s; use force", currentVersion, latest)
 		}
 	}
@@ -257,6 +266,33 @@ func getJSON(ctx context.Context, url string, out any) error {
 		return fmt.Errorf("github %s: %s", resp.Status, strings.TrimSpace(string(body)))
 	}
 	return json.NewDecoder(resp.Body).Decode(out)
+}
+
+// nightlyRepublished reports whether a release whose tag matches the
+// running version is actually newer than the current binary. Nightly
+// uses a rolling tag (v1.1.7-next), so version-string equality alone
+// would mask republished builds. Only meaningful for prereleases; stable
+// tags don't roll.
+func nightlyRepublished(rel *ghRelease, currentBuildTime string) bool {
+	if !rel.Prerelease || currentBuildTime == "" {
+		return false
+	}
+	built, ok := parseBuildTime(currentBuildTime)
+	if !ok {
+		return false
+	}
+	return rel.PublishedAt.After(built)
+}
+
+// parseBuildTime accepts both ldflag formats: goreleaser's RFC3339
+// ({{.Date}}) and the Makefile's "2006-01-02-15:04:05".
+func parseBuildTime(s string) (time.Time, bool) {
+	for _, layout := range []string{time.RFC3339, "2006-01-02-15:04:05"} {
+		if t, err := time.Parse(layout, s); err == nil {
+			return t, true
+		}
+	}
+	return time.Time{}, false
 }
 
 // compareVersions returns -1/0/1 like semver.Compare. Falls back to

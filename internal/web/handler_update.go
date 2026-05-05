@@ -54,7 +54,7 @@ func (s *Server) UpdateCheck(c echo.Context) error {
 	}
 	ctx, cancel := context.WithTimeout(c.Request().Context(), 30*time.Second)
 	defer cancel()
-	res, err := updater.Check(ctx, channel, constant.Version)
+	res, err := updater.Check(ctx, channel, constant.Version, constant.BuildTime)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadGateway, err.Error())
 	}
@@ -105,7 +105,7 @@ func (s *Server) runUpdate(opts updater.ApplyOptions, job *JobStatus) {
 		*job = next
 	}
 
-	if err := updater.Apply(ctx, opts, constant.Version, s.l, onState); err != nil {
+	if err := updater.Apply(ctx, opts, constant.Version, constant.BuildTime, s.l, onState); err != nil {
 		next := *job
 		next.State = updater.StateFailed
 		next.Error = err.Error()
