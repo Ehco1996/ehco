@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"github.com/Ehco1996/ehco/internal/cmgr/ms"
+	"github.com/Ehco1996/ehco/internal/cmgr/sampler"
 	"github.com/Ehco1996/ehco/internal/conn"
-	"github.com/Ehco1996/ehco/pkg/metric_reader"
 	"go.uber.org/zap"
 )
 
@@ -67,7 +67,8 @@ type cmgrImpl struct {
 	closedConnectionsMap map[string][]conn.RelayConn
 
 	ms *ms.MetricsStore
-	mr metric_reader.Reader
+	ns *sampler.NodeSampler
+	rs *sampler.RuleSampler
 }
 
 func NewCmgr(cfg *Config) (Cmgr, error) {
@@ -78,7 +79,8 @@ func NewCmgr(cfg *Config) (Cmgr, error) {
 		closedConnectionsMap: make(map[string][]conn.RelayConn),
 	}
 	if cfg.NeedMetrics() {
-		cmgr.mr = metric_reader.NewReader(cfg.MetricsURL, cfg.ApiToken)
+		cmgr.ns = sampler.NewNodeSampler()
+		cmgr.rs = sampler.NewRuleSampler()
 
 		homeDir, _ := os.UserHomeDir()
 		dbPath := filepath.Join(homeDir, ".ehco", "metrics.db")

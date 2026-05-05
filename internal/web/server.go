@@ -105,9 +105,6 @@ func setupMetrics(cfg *config.Config) error {
 	if err := metrics.RegisterEhcoMetrics(cfg); err != nil {
 		return fmt.Errorf("failed to register Ehco metrics: %w", err)
 	}
-	if err := metrics.RegisterNodeExporterMetrics(cfg); err != nil {
-		return fmt.Errorf("failed to register Node Exporter metrics: %w", err)
-	}
 	return nil
 }
 

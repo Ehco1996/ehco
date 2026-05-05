@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Ehco1996/ehco/pkg/metric_reader"
+	"github.com/Ehco1996/ehco/internal/cmgr/sampler"
 )
 
 func newTestStore(t *testing.T) *MetricsStore {
@@ -41,7 +41,7 @@ func TestHealth_TracksWritesAndQueries(t *testing.T) {
 	ctx := context.Background()
 
 	now := time.Now()
-	if err := ms.AddNodeMetric(ctx, &metric_reader.NodeMetrics{
+	if err := ms.AddNodeMetric(ctx, &sampler.NodeMetrics{
 		SyncTime:                 now,
 		CpuUsagePercent:          1,
 		MemoryUsagePercent:       2,
@@ -87,7 +87,7 @@ func TestCleanupOlderThan_RemovesAndReportsCounts(t *testing.T) {
 	old := time.Now().Add(-90 * 24 * time.Hour)
 	fresh := time.Now()
 	for _, ts := range []time.Time{old, fresh} {
-		if err := ms.AddNodeMetric(ctx, &metric_reader.NodeMetrics{SyncTime: ts}); err != nil {
+		if err := ms.AddNodeMetric(ctx, &sampler.NodeMetrics{SyncTime: ts}); err != nil {
 			t.Fatalf("AddNodeMetric: %v", err)
 		}
 	}
@@ -108,7 +108,7 @@ func TestCleanupOlderThan_RemovesAndReportsCounts(t *testing.T) {
 func TestTruncate_RequiresExactConfirm(t *testing.T) {
 	ms := newTestStore(t)
 	ctx := context.Background()
-	if err := ms.AddNodeMetric(ctx, &metric_reader.NodeMetrics{SyncTime: time.Now()}); err != nil {
+	if err := ms.AddNodeMetric(ctx, &sampler.NodeMetrics{SyncTime: time.Now()}); err != nil {
 		t.Fatalf("AddNodeMetric: %v", err)
 	}
 
@@ -129,7 +129,7 @@ func TestTruncate_RequiresExactConfirm(t *testing.T) {
 func TestResetStats_ClearsCounters(t *testing.T) {
 	ms := newTestStore(t)
 	ctx := context.Background()
-	_ = ms.AddNodeMetric(ctx, &metric_reader.NodeMetrics{SyncTime: time.Now()})
+	_ = ms.AddNodeMetric(ctx, &sampler.NodeMetrics{SyncTime: time.Now()})
 	if h, _ := ms.Health(ctx); h.Stats["add_node"].Count != 1 {
 		t.Fatalf("setup: expected add_node count=1")
 	}

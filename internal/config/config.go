@@ -141,12 +141,3 @@ func (c *Config) NeedStartCmgr() bool {
 	return c.RelaySyncURL != "" && c.RelaySyncInterval > 0
 }
 
-func (c *Config) GetMetricURL() string {
-	if !c.NeedStartWebServer() {
-		return ""
-	}
-	// Plain URL: no creds in query, no creds in basic-auth userinfo.
-	// Internal callers attach Authorization: Bearer <ApiToken> as a
-	// header instead — see metric_reader / bandwidth_recorder.
-	return fmt.Sprintf("http://%s:%d/metrics/", c.WebHost, c.WebPort)
-}

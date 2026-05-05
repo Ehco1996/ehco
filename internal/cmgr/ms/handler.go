@@ -4,7 +4,7 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/Ehco1996/ehco/pkg/metric_reader"
+	"github.com/Ehco1996/ehco/internal/cmgr/sampler"
 )
 
 type NodeMetrics struct {
@@ -64,7 +64,7 @@ type QueryRuleMetricsResp struct {
 	Data  []RuleMetricsData `json:"data"`
 }
 
-func (ms *MetricsStore) AddNodeMetric(ctx context.Context, m *metric_reader.NodeMetrics) error {
+func (ms *MetricsStore) AddNodeMetric(ctx context.Context, m *sampler.NodeMetrics) error {
 	defer track(&ms.stats.AddNode)()
 	_, err := ms.db.ExecContext(ctx, `
     INSERT OR REPLACE INTO node_metrics (timestamp, cpu_usage, memory_usage, disk_usage, network_in, network_out)
@@ -80,7 +80,7 @@ func (ms *MetricsStore) AddNodeMetric(ctx context.Context, m *metric_reader.Node
 	return nil
 }
 
-func (ms *MetricsStore) AddRuleMetric(ctx context.Context, rm *metric_reader.RuleMetrics) error {
+func (ms *MetricsStore) AddRuleMetric(ctx context.Context, rm *sampler.RuleMetrics) error {
 	defer track(&ms.stats.AddRule)()
 	tx, err := ms.db.BeginTx(ctx, nil)
 	if err != nil {
