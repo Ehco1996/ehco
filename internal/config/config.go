@@ -52,6 +52,13 @@ func (c *Config) NeedSyncFromServer() bool {
 	return strings.Contains(c.PATH, "http")
 }
 
+// LastLoadTime returns the wall-clock timestamp of the most recent
+// successful (or attempted — see LoadConfig) reload. Zero before the
+// first call.
+func (c *Config) LastLoadTime() time.Time {
+	return c.lastLoadTime
+}
+
 func (c *Config) LoadConfig(force bool) error {
 	if c.ReloadInterval > 0 && time.Since(c.lastLoadTime).Seconds() < float64(c.ReloadInterval) && !force {
 		c.l.Warnf("Skip Load Config, last load time: %s", c.lastLoadTime)

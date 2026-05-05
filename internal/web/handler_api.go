@@ -127,6 +127,11 @@ type OverviewResp struct {
 	Xray  *glue.XraySnapshot `json:"xray,omitempty"`
 	Host  *ms.NodeMetrics    `json:"host,omitempty"`
 	Rules int                `json:"rules"`
+	// LastReloadAt is the wall-clock timestamp of the most recent config
+	// reload attempt (file or HTTP). The freshness signal for routing
+	// rules / xray inbounds — distinct from boot time, which is
+	// surfaced on the settings page.
+	LastReloadAt time.Time `json:"last_reload_at,omitempty"`
 }
 
 func (s *Server) Overview(c echo.Context) error {
@@ -134,6 +139,7 @@ func (s *Server) Overview(c echo.Context) error {
 
 	if s.cfg != nil {
 		out.Rules = len(s.cfg.RelayConfigs)
+		out.LastReloadAt = s.cfg.LastLoadTime()
 	}
 
 	if p := s.xrayStatus.Load(); p != nil && *p != nil {

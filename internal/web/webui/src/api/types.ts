@@ -47,6 +47,9 @@ export interface OverviewResp {
   xray?: XraySnapshot;
   host?: NodeMetric;
   rules: number;
+  // RFC3339; zero-value omitted by the server. Time of last config
+  // reload attempt (file or remote HTTP).
+  last_reload_at?: string;
 }
 
 export interface QueryNodeMetricsResp {

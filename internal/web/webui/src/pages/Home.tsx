@@ -75,6 +75,36 @@ export default function Home() {
 
   const xray = () => overview()?.xray;
   const host = () => overview()?.host;
+  const lastReload = () => {
+    const v = overview()?.last_reload_at;
+    return v && !v.startsWith("0001-01-01") ? v : undefined;
+  };
+
+  // Trapezoidal integration of rate samples → bytes over the window.
+  // Each sample is bytes/sec averaged over its bucket; multiply by the
+  // gap to the next sample. The first and last samples each contribute
+  // half a gap so the total tracks the chart area.
+  const windowedTotals = createMemo(() => {
+    const s = series();
+    if (s.length < 2) return { in: 0, out: 0, peakIn: 0, peakOut: 0 };
+    let totIn = 0;
+    let totOut = 0;
+    let peakIn = 0;
+    let peakOut = 0;
+    for (let i = 0; i < s.length; i++) {
+      const cur = s[i];
+      if (cur.network_in > peakIn) peakIn = cur.network_in;
+      if (cur.network_out > peakOut) peakOut = cur.network_out;
+      if (i < s.length - 1) {
+        const dt = s[i + 1].timestamp - cur.timestamp;
+        if (dt > 0 && dt < 24 * 3600) {
+          totIn += ((cur.network_in + s[i + 1].network_in) / 2) * dt;
+          totOut += ((cur.network_out + s[i + 1].network_out) / 2) * dt;
+        }
+      }
+    }
+    return { in: totIn, out: totOut, peakIn, peakOut };
+  });
 
   const topUsers = createMemo<ScoredUser[]>(() => {
     const list = (users() ?? []).map<ScoredUser>((u) => ({
@@ -125,6 +155,15 @@ export default function Home() {
         mem={host()?.memory_usage}
       />
 
+      <WindowedAnchor
+        totals={windowedTotals()}
+        haveSeries={series().length > 1}
+        windowSec={windowSec()}
+        lifetimeIn={xray()?.upload_total ?? 0}
+        lifetimeOut={xray()?.download_total ?? 0}
+        lastReload={lastReload()}
+      />
+
       <ChartCard
         class="mt-3"
         title="throughput"
@@ -159,7 +198,11 @@ export default function Home() {
 
       <div class="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2">
         <Card padded={false}>
-          <ListHeader title="top users" subtitle="by recent throughput · last 5m" linkTo="/users" />
+          <ListHeader
+            title="top users"
+            subtitle="recent · last 5m  ·  lifetime total"
+            linkTo="/users"
+          />
           <Show
             when={topUsers().length}
             fallback={<EmptyState icon={<UsersIcon size={24} />} title="No users registered" />}
@@ -180,6 +223,15 @@ export default function Home() {
                     </span>
                     <span class="w-20 shrink-0 text-right font-mono text-[11px] tabular-nums text-zinc-500">
                       {recent > 0 ? bytes(recent) : "—"}
+                    </span>
+                    <span
+                      class="hidden w-20 shrink-0 text-right font-mono text-[11px] tabular-nums text-zinc-400 sm:inline-block dark:text-zinc-500"
+                      title="lifetime total since process start"
+                    >
+                      {(() => {
+                        const total = user.upload_total + user.download_total;
+                        return total > 0 ? bytes(total) : "—";
+                      })()}
                     </span>
                     <span class="w-10 shrink-0 text-right font-mono text-[11px] tabular-nums text-zinc-500">
                       {user.tcp_conn_count}c
@@ -318,6 +370,53 @@ function ThroughputAnchor(props: {
           <Stat label="users" value={props.users} hint="running" />
           <Stat label="cpu" value={props.cpu != null ? pct(props.cpu) : "—"} />
           <Stat label="mem" value={props.mem != null ? pct(props.mem) : "—"} />
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+function windowLabel(sec: number): string {
+  if (sec < 3600) return `${Math.round(sec / 60)}m`;
+  if (sec < 86400) return `${Math.round(sec / 3600)}h`;
+  return `${Math.round(sec / 86400)}d`;
+}
+
+function WindowedAnchor(props: {
+  totals: { in: number; out: number; peakIn: number; peakOut: number };
+  haveSeries: boolean;
+  windowSec: number;
+  lifetimeIn: number;
+  lifetimeOut: number;
+  lastReload?: string;
+}) {
+  const win = () => windowLabel(props.windowSec);
+  const dash = (s: string) => (props.haveSeries ? s : "—");
+  return (
+    <div class="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+      <Card padded={false}>
+        <div class="px-5 pt-3 pb-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-500">
+          windowed · last {win()}
+        </div>
+        <div class="grid grid-cols-2 divide-x divide-zinc-200 sm:grid-cols-4 dark:divide-zinc-800">
+          <Stat label="total in" value={dash(bytes(props.totals.in))} />
+          <Stat label="total out" value={dash(bytes(props.totals.out))} />
+          <Stat label="peak in" value={dash(`${bytes(props.totals.peakIn)}/s`)} />
+          <Stat label="peak out" value={dash(`${bytes(props.totals.peakOut)}/s`)} />
+        </div>
+      </Card>
+      <Card padded={false}>
+        <div class="px-5 pt-3 pb-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-500">
+          lifetime · since boot
+        </div>
+        <div class="grid grid-cols-3 divide-x divide-zinc-200 dark:divide-zinc-800">
+          <Stat label="in" value={bytes(props.lifetimeIn)} />
+          <Stat label="out" value={bytes(props.lifetimeOut)} />
+          <Stat
+            label="config"
+            value={props.lastReload ? relTime(props.lastReload) : "—"}
+            hint="reload"
+          />
         </div>
       </Card>
     </div>
