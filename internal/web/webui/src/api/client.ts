@@ -33,7 +33,6 @@ import type {
   EhcoConfig,
   HealthCheckResp,
   QueryNodeMetricsResp,
-  QueryRuleMetricsResp,
   VersionInfo,
   UpdateCheck,
   UpdateStatus,
@@ -58,20 +57,6 @@ export const api = {
     if (params.latest) q.set("latest", "true");
     if (params.step && params.step > 1) q.set("step", String(params.step));
     return request<QueryNodeMetricsResp>(`/api/v1/node_metrics/?${q.toString()}`);
-  },
-  ruleMetrics: (params: {
-    label?: string;
-    remote?: string;
-    start_ts?: number;
-    end_ts?: number;
-    latest?: boolean;
-    step?: number;
-  }) => {
-    const q = new URLSearchParams();
-    for (const [k, v] of Object.entries(params)) {
-      if (v != null && v !== "") q.set(k, String(v));
-    }
-    return request<QueryRuleMetricsResp>(`/api/v1/rule_metrics/?${q.toString()}`);
   },
   overview: () => request<OverviewResp>("/api/v1/overview"),
   xrayConns: (userId?: number) => {

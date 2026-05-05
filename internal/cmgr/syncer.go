@@ -24,9 +24,9 @@ type VersionInfo struct {
 	ShortCommit string `json:"short_commit"`
 }
 
-// sampleMetrics samples host + per-rule stats once and persists them to
-// the local store. Cheap enough to run on every fast tick so the
-// dashboard has sub-minute resolution regardless of whether control-plane
+// sampleMetrics samples host stats once and persists them to the local
+// store. Cheap enough to run on every fast tick so the dashboard's Node
+// page has sub-minute resolution regardless of whether control-plane
 // sync is configured.
 func (cm *cmgrImpl) sampleMetrics(ctx context.Context) {
 	if !cm.cfg.NeedMetrics() {
@@ -35,19 +35,10 @@ func (cm *cmgrImpl) sampleMetrics(ctx context.Context) {
 	nm, err := cm.ns.Sample(ctx)
 	if err != nil {
 		cm.l.Debugf("node sample failed: %v", err)
-	} else if err := cm.ms.AddNodeMetric(ctx, nm); err != nil {
-		cm.l.Errorf("persist node metric: %v", err)
-	}
-
-	rmm, err := cm.rs.Sample()
-	if err != nil {
-		cm.l.Debugf("rule sample failed: %v", err)
 		return
 	}
-	for _, rm := range rmm {
-		if err := cm.ms.AddRuleMetric(ctx, rm); err != nil {
-			cm.l.Errorf("persist rule metric: %v", err)
-		}
+	if err := cm.ms.AddNodeMetric(ctx, nm); err != nil {
+		cm.l.Errorf("persist node metric: %v", err)
 	}
 }
 

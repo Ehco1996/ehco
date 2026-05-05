@@ -122,7 +122,6 @@ func setupRoutes(s *Server) {
 	api.POST("/config/reload/", s.HandleReload)
 	api.GET("/health_check/", s.HandleHealthCheck)
 	api.GET("/node_metrics/", s.GetNodeMetrics)
-	api.GET("/rule_metrics/", s.GetRuleMetrics)
 	api.GET("/overview", s.Overview)
 	api.GET("/version", s.Version)
 	api.GET("/update/check", s.UpdateCheck)

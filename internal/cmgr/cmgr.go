@@ -41,7 +41,6 @@ type Cmgr interface {
 
 	// Metrics related
 	QueryNodeMetrics(ctx context.Context, req *ms.QueryNodeMetricsReq) (*ms.QueryNodeMetricsResp, error)
-	QueryRuleMetrics(ctx context.Context, req *ms.QueryRuleMetricsReq) (*ms.QueryRuleMetricsResp, error)
 
 	// Storage health & maintenance. Each call surfaces the local
 	// SQLite store; on builds without metrics enabled, the underlying
@@ -68,7 +67,6 @@ type cmgrImpl struct {
 
 	ms *ms.MetricsStore
 	ns *sampler.NodeSampler
-	rs *sampler.RuleSampler
 }
 
 func NewCmgr(cfg *Config) (Cmgr, error) {
@@ -80,7 +78,6 @@ func NewCmgr(cfg *Config) (Cmgr, error) {
 	}
 	if cfg.NeedMetrics() {
 		cmgr.ns = sampler.NewNodeSampler()
-		cmgr.rs = sampler.NewRuleSampler()
 
 		homeDir, _ := os.UserHomeDir()
 		dbPath := filepath.Join(homeDir, ".ehco", "metrics.db")
@@ -241,10 +238,6 @@ func (cm *cmgrImpl) Start(ctx context.Context, errCH chan error) {
 
 func (cm *cmgrImpl) QueryNodeMetrics(ctx context.Context, req *ms.QueryNodeMetricsReq) (*ms.QueryNodeMetricsResp, error) {
 	return cm.ms.QueryNodeMetric(ctx, req)
-}
-
-func (cm *cmgrImpl) QueryRuleMetrics(ctx context.Context, req *ms.QueryRuleMetricsReq) (*ms.QueryRuleMetricsResp, error) {
-	return cm.ms.QueryRuleMetric(ctx, req)
 }
 
 func (cm *cmgrImpl) DBHealth(ctx context.Context) (*ms.DBHealth, error) {

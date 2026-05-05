@@ -25,14 +25,13 @@ type MetricsStore struct {
 	// method on this store. See stats.go.
 	stats Stats
 
-	// nodeRows / ruleRows are best-effort row-count caches kept in
-	// sync with INSERT / DELETE so Health() doesn't need a per-call
-	// SELECT COUNT(*). Refreshed on startup, recomputed after
-	// Cleanup / Truncate / Vacuum where the exact post-state matters.
-	// INSERT OR REPLACE on a duplicate PK can briefly overcount; the
-	// drift is bounded and resets every time Recount() runs.
+	// nodeRows is a best-effort row-count cache kept in sync with INSERT
+	// / DELETE so Health() doesn't need a per-call SELECT COUNT(*).
+	// Refreshed on startup, recomputed after Cleanup / Truncate / Vacuum
+	// where the exact post-state matters. INSERT OR REPLACE on a
+	// duplicate PK can briefly overcount; the drift is bounded and
+	// resets every time recountRows() runs.
 	nodeRows atomic.Int64
-	ruleRows atomic.Int64
 }
 
 func NewMetricsStore(dbPath string) (*MetricsStore, error) {
@@ -76,51 +75,35 @@ func (ms *MetricsStore) Close() error {
 func (ms *MetricsStore) cleanOldData() error {
 	defer track(&ms.stats.Cleanup)()
 	cutoff := time.Now().AddDate(0, 0, -defaultRetentionDays).Unix()
-	_, _, err := ms.deleteOlderThan(cutoff)
+	_, err := ms.deleteOlderThan(cutoff)
 	return err
 }
 
-// deleteOlderThan runs the two-table prune and returns the number of
-// rows removed from each. Centralises the SQL so cleanOldData and the
-// CleanupOlderThan API path stay consistent.
-func (ms *MetricsStore) deleteOlderThan(cutoff int64) (nodeDeleted, ruleDeleted int64, err error) {
+func (ms *MetricsStore) deleteOlderThan(cutoff int64) (nodeDeleted int64, err error) {
 	res, err := ms.db.Exec("DELETE FROM node_metrics WHERE timestamp < ?", cutoff)
 	if err != nil {
-		return 0, 0, err
+		return 0, err
 	}
 	nodeDeleted, _ = res.RowsAffected()
-
-	res, err = ms.db.Exec("DELETE FROM rule_metrics WHERE timestamp < ?", cutoff)
-	if err != nil {
-		return nodeDeleted, 0, err
-	}
-	ruleDeleted, _ = res.RowsAffected()
-
 	ms.nodeRows.Add(-nodeDeleted)
-	ms.ruleRows.Add(-ruleDeleted)
-	ms.l.Infof("pruned node_metrics=%d rule_metrics=%d (cutoff=%d)", nodeDeleted, ruleDeleted, cutoff)
-	return nodeDeleted, ruleDeleted, nil
+	ms.l.Infof("pruned node_metrics=%d (cutoff=%d)", nodeDeleted, cutoff)
+	return nodeDeleted, nil
 }
 
-// recountRows refreshes the cached row counts from the source of truth.
+// recountRows refreshes the cached row count from the source of truth.
 // Cheap on startup (db usually small, even at 30d full retention); we
 // also call it after Truncate / Vacuum where the cache may have drifted
 // or been wiped wholesale.
 func (ms *MetricsStore) recountRows() error {
-	var nodeRows, ruleRows int64
+	var nodeRows int64
 	if err := ms.db.QueryRow("SELECT COUNT(*) FROM node_metrics").Scan(&nodeRows); err != nil {
 		return err
 	}
-	if err := ms.db.QueryRow("SELECT COUNT(*) FROM rule_metrics").Scan(&ruleRows); err != nil {
-		return err
-	}
 	ms.nodeRows.Store(nodeRows)
-	ms.ruleRows.Store(ruleRows)
 	return nil
 }
 
 func (ms *MetricsStore) initDB() error {
-	// init NodeMetrics table
 	if _, err := ms.db.Exec(`
         CREATE TABLE IF NOT EXISTS node_metrics (
             timestamp INTEGER,
@@ -134,23 +117,11 @@ func (ms *MetricsStore) initDB() error {
     `); err != nil {
 		return err
 	}
-
-	// init rule_metrics
-	if _, err := ms.db.Exec(`
-        CREATE TABLE IF NOT EXISTS rule_metrics (
-            timestamp INTEGER,
-            label TEXT,
-            remote TEXT,
-            ping_latency INTEGER,
-            tcp_connection_count INTEGER,
-            tcp_handshake_duration BIGINT,
-            tcp_network_transmit_bytes BIGINT,
-            udp_connection_count INTEGER,
-            udp_handshake_duration BIGINT,
-            udp_network_transmit_bytes BIGINT,
-            PRIMARY KEY (timestamp, label, remote)
-        )
-    `); err != nil {
+	// Drop any pre-existing rule_metrics table from previous releases —
+	// the rule-level metrics feature was removed and will be rebuilt
+	// from scratch. Leaving the table around just wastes pages on
+	// upgraded nodes.
+	if _, err := ms.db.Exec(`DROP TABLE IF EXISTS rule_metrics`); err != nil {
 		return err
 	}
 	return nil

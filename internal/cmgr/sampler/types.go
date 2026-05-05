@@ -22,24 +22,3 @@ type NodeMetrics struct {
 
 	SyncTime time.Time
 }
-
-type PingMetric struct {
-	Latency int64  `json:"latency"`
-	Target  string `json:"target"`
-}
-
-type RuleMetrics struct {
-	Label string
-
-	PingMetrics map[string]*PingMetric
-
-	TCPConnectionCount      map[string]int64
-	TCPHandShakeDuration    map[string]int64
-	TCPNetworkTransmitBytes map[string]int64
-
-	UDPConnectionCount      map[string]int64
-	UDPHandShakeDuration    map[string]int64
-	UDPNetworkTransmitBytes map[string]int64
-
-	SyncTime time.Time
-}

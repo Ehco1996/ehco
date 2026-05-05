@@ -25,8 +25,8 @@ func TestHealth_EmptyStore(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Health: %v", err)
 	}
-	if h.NodeMetricsRows != 0 || h.RuleMetricsRows != 0 {
-		t.Fatalf("expected empty store, got node=%d rule=%d", h.NodeMetricsRows, h.RuleMetricsRows)
+	if h.NodeMetricsRows != 0 {
+		t.Fatalf("expected empty store, got node=%d", h.NodeMetricsRows)
 	}
 	if h.PageSize == 0 {
 		t.Fatalf("page size should be reported (got 0)")
