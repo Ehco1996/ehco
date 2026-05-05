@@ -1,23 +1,12 @@
 import { createMemo, createResource, createSignal, Show } from "solid-js";
-import { RefreshCcw, ServerCog, Heart } from "lucide-solid";
+import { ServerCog, Heart } from "lucide-solid";
 import PageHeader from "../ui/PageHeader";
 import Button from "../ui/Button";
 import { Pill } from "../ui/Pill";
 import EmptyState from "../ui/EmptyState";
-import Sparkline from "../ui/Sparkline";
-import Segmented from "../ui/Segmented";
 import DataTable, { Column } from "../ui/DataTable";
 import { api, ApiError } from "../api/client";
-import { bytes, pickStep } from "../util/format";
-import type { RelayConfig, RuleMetric } from "../api/types";
-
-const HISTORY_WINDOWS = [
-  { value: 60 * 60, label: "1h" },
-  { value: 6 * 60 * 60, label: "6h" },
-  { value: 24 * 60 * 60, label: "24h" },
-  { value: 7 * 24 * 60 * 60, label: "7d" },
-  { value: 30 * 24 * 60 * 60, label: "30d" },
-] as const;
+import type { RelayConfig } from "../api/types";
 
 interface HCResult {
   state: "running" | "ok" | "err";
@@ -27,24 +16,10 @@ interface HCResult {
 interface Row {
   cfg: RelayConfig;
   remote: string;
-  metric: RuleMetric | undefined;
-  series: number[];
 }
 
 export default function Rules() {
   const [config] = createResource(() => api.config());
-  const [latest, { refetch: rcLatest }] = createResource(() =>
-    api.ruleMetrics({ latest: true }),
-  );
-  const [historyWindow, setHistoryWindow] = createSignal<number>(HISTORY_WINDOWS[0].value);
-  const [history, { refetch: rcHistory }] = createResource(historyWindow, async (sec) => {
-    const end = Math.floor(Date.now() / 1000);
-    return api.ruleMetrics({
-      start_ts: end - sec,
-      end_ts: end,
-      step: pickStep(sec),
-    });
-  });
   const [hc, setHc] = createSignal<Record<string, HCResult>>({});
 
   const ruleList = (): RelayConfig[] => {
@@ -52,51 +27,12 @@ export default function Rules() {
     return Array.isArray(c) ? c : [];
   };
 
-  const latestFor = (label: string, remote: string) =>
-    (latest()?.data ?? []).find(
-      (m) => m.label === label && m.remote === remote,
-    );
-
-  const historyByKey = createMemo(() => {
-    const out = new Map<string, number[]>();
-    const points = history()?.data ?? [];
-    if (!points.length) return out;
-    const grouped = new Map<string, RuleMetric[]>();
-    for (const p of points) {
-      const k = `${p.label}|${p.remote}`;
-      (grouped.get(k) ?? grouped.set(k, []).get(k)!).push(p);
-    }
-    for (const [k, arr] of grouped) {
-      arr.sort((a, b) => a.timestamp - b.timestamp);
-      const deltas: number[] = [];
-      for (let i = 1; i < arr.length; i++) {
-        const d =
-          arr[i].tcp_network_transmit_bytes -
-          arr[i - 1].tcp_network_transmit_bytes;
-        deltas.push(Math.max(0, d));
-      }
-      out.set(k, deltas);
-    }
-    return out;
-  });
-
   const rows = createMemo<Row[]>(() =>
     ruleList().map((cfg) => {
       const remotes = [...(cfg.tcp_remotes ?? []), ...(cfg.udp_remotes ?? [])];
-      const remote = remotes[0] ?? "";
-      return {
-        cfg,
-        remote,
-        metric: latestFor(cfg.label ?? "", remote),
-        series: historyByKey().get(`${cfg.label}|${remote}`) ?? [],
-      };
+      return { cfg, remote: remotes[0] ?? "" };
     }),
   );
-
-  const refreshAll = () => {
-    rcLatest();
-    rcHistory();
-  };
 
   const checkOne = async (label: string) => {
     if (!label) return;
@@ -159,52 +95,6 @@ export default function Rules() {
       mdOnly: true,
     },
     {
-      key: "trend",
-      header: `${HISTORY_WINDOWS.find((w) => w.value === historyWindow())?.label ?? ""} trend`,
-      cell: (r) => (
-        <span class="text-emerald-600 dark:text-emerald-400">
-          <Sparkline values={r.series} width={90} height={22} />
-        </span>
-      ),
-      mdOnly: true,
-    },
-    {
-      key: "xfer",
-      header: "tcp xfer",
-      align: "right",
-      cell: (r) => (
-        <span class="font-mono text-xs">
-          {r.metric ? bytes(r.metric.tcp_network_transmit_bytes) : "—"}
-        </span>
-      ),
-      sortable: true,
-      sortBy: (r) => r.metric?.tcp_network_transmit_bytes ?? 0,
-    },
-    {
-      key: "conns",
-      header: "conns",
-      align: "right",
-      cell: (r) => (
-        <span class="font-mono">{r.metric?.tcp_connection_count ?? "—"}</span>
-      ),
-      sortable: true,
-      sortBy: (r) => r.metric?.tcp_connection_count ?? 0,
-      width: "80px",
-    },
-    {
-      key: "ping",
-      header: "ping",
-      align: "right",
-      cell: (r) => (
-        <span class="font-mono">
-          {r.metric?.ping_latency != null ? `${r.metric.ping_latency}ms` : "—"}
-        </span>
-      ),
-      sortable: true,
-      sortBy: (r) => r.metric?.ping_latency ?? Infinity,
-      width: "80px",
-    },
-    {
       key: "probe",
       header: "probe",
       align: "right",
@@ -246,24 +136,7 @@ export default function Rules() {
     <>
       <PageHeader
         title="rules"
-        subtitle="static relay rules with throughput per remote"
-        actions={
-          <>
-            <Segmented
-              options={HISTORY_WINDOWS.map((w) => ({ value: w.value, label: w.label }))}
-              value={historyWindow()}
-              onChange={setHistoryWindow}
-              size="sm"
-            />
-            <Button
-              size="sm"
-              leadingIcon={<RefreshCcw size={13} />}
-              onClick={refreshAll}
-            >
-              Refresh
-            </Button>
-          </>
-        }
+        subtitle="static relay rules — per-rule metrics removed pending rewrite"
       />
 
       <DataTable<Row>
@@ -271,7 +144,6 @@ export default function Rules() {
         columns={columns}
         rowKey={(r) => `${r.cfg.label}|${r.remote}`}
         pageSize={50}
-        defaultSort={{ key: "xfer", dir: "desc" }}
         empty={
           <EmptyState
             icon={<ServerCog size={28} />}

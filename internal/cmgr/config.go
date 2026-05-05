@@ -2,9 +2,12 @@ package cmgr
 
 type Config struct {
 	SyncURL      string
-	MetricsURL   string
-	ApiToken     string // bearer token for authed local /metrics/ pull
-	SyncInterval int    // in seconds
+	SyncInterval int // in seconds
+
+	// EnableMetrics opens the local SQLite metrics store and starts the
+	// host / rule samplers. Off when there is no web server to surface
+	// the data — sampling without a reader is just disk churn.
+	EnableMetrics bool
 }
 
 func (c *Config) NeedSync() bool {
@@ -12,7 +15,7 @@ func (c *Config) NeedSync() bool {
 }
 
 func (c *Config) NeedMetrics() bool {
-	return c.MetricsURL != "" && c.SyncInterval > 0
+	return c.EnableMetrics && c.SyncInterval > 0
 }
 
 func (c *Config) Adjust() {

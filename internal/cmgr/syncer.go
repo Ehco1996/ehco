@@ -3,10 +3,10 @@ package cmgr
 import (
 	"context"
 
+	"github.com/Ehco1996/ehco/internal/cmgr/sampler"
 	"github.com/Ehco1996/ehco/internal/conn"
 	"github.com/Ehco1996/ehco/internal/constant"
 	myhttp "github.com/Ehco1996/ehco/pkg/http"
-	"github.com/Ehco1996/ehco/pkg/metric_reader"
 	"go.uber.org/zap"
 )
 
@@ -24,26 +24,21 @@ type VersionInfo struct {
 	ShortCommit string `json:"short_commit"`
 }
 
-// sampleMetrics reads /metrics/ once and persists node + per-rule rows
-// to the local store. Cheap; called on every fast tick so the dashboard
-// has sub-minute resolution regardless of whether control-plane sync is
-// configured.
+// sampleMetrics samples host stats once and persists them to the local
+// store. Cheap enough to run on every fast tick so the dashboard's Node
+// page has sub-minute resolution regardless of whether control-plane
+// sync is configured.
 func (cm *cmgrImpl) sampleMetrics(ctx context.Context) {
 	if !cm.cfg.NeedMetrics() {
 		return
 	}
-	nm, rmm, err := cm.mr.ReadOnce(ctx)
+	nm, err := cm.ns.Sample(ctx)
 	if err != nil {
-		cm.l.Debugf("metrics sample failed: %v", err)
+		cm.l.Debugf("node sample failed: %v", err)
 		return
 	}
 	if err := cm.ms.AddNodeMetric(ctx, nm); err != nil {
 		cm.l.Errorf("persist node metric: %v", err)
-	}
-	for _, rm := range rmm {
-		if err := cm.ms.AddRuleMetric(ctx, rm); err != nil {
-			cm.l.Errorf("persist rule metric: %v", err)
-		}
 	}
 }
 
@@ -64,8 +59,8 @@ func (cm *cmgrImpl) pushStats(ctx context.Context) error {
 	}
 
 	if cm.cfg.NeedMetrics() {
-		if nm, _, err := cm.mr.ReadOnce(ctx); err != nil {
-			cm.l.Errorf("read metrics for sync: %v", err)
+		if nm, err := cm.ns.Sample(ctx); err != nil {
+			cm.l.Errorf("sample node metrics for sync: %v", err)
 		} else {
 			req.Node = *nm
 		}
@@ -97,7 +92,7 @@ func (cm *cmgrImpl) pushStats(ctx context.Context) error {
 }
 
 type syncReq struct {
-	Version VersionInfo               `json:"version"`
-	Node    metric_reader.NodeMetrics `json:"node"`
-	Stats   []StatsPerRule            `json:"stats"`
+	Version VersionInfo         `json:"version"`
+	Node    sampler.NodeMetrics `json:"node"`
+	Stats   []StatsPerRule      `json:"stats"`
 }

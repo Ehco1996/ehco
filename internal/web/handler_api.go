@@ -79,30 +79,6 @@ func (s *Server) GetNodeMetrics(c echo.Context) error {
 	return c.JSON(http.StatusOK, metrics)
 }
 
-func (s *Server) GetRuleMetrics(c echo.Context) error {
-	params, err := parseQueryParams(c)
-	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
-	}
-	req := &ms.QueryRuleMetricsReq{
-		StartTimestamp: params.startTS,
-		EndTimestamp:   params.endTS,
-		Num:            -1,
-		Step:           params.step,
-		RuleLabel:      c.QueryParam("label"),
-		Remote:         c.QueryParam("remote"),
-	}
-	if params.latest {
-		req.Num = 1
-	}
-
-	metrics, err := s.connMgr.QueryRuleMetrics(c.Request().Context(), req)
-	if err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
-	}
-	return c.JSON(http.StatusOK, metrics)
-}
-
 // AuthInfo reports whether the server requires login and whether the
 // current request already carries a valid session/bearer. The SPA boots
 // off this — if auth_required is false it skips LoginGate entirely; if

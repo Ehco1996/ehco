@@ -105,9 +105,6 @@ func setupMetrics(cfg *config.Config) error {
 	if err := metrics.RegisterEhcoMetrics(cfg); err != nil {
 		return fmt.Errorf("failed to register Ehco metrics: %w", err)
 	}
-	if err := metrics.RegisterNodeExporterMetrics(cfg); err != nil {
-		return fmt.Errorf("failed to register Node Exporter metrics: %w", err)
-	}
 	return nil
 }
 
@@ -125,7 +122,6 @@ func setupRoutes(s *Server) {
 	api.POST("/config/reload/", s.HandleReload)
 	api.GET("/health_check/", s.HandleHealthCheck)
 	api.GET("/node_metrics/", s.GetNodeMetrics)
-	api.GET("/rule_metrics/", s.GetRuleMetrics)
 	api.GET("/overview", s.Overview)
 	api.GET("/version", s.Version)
 	api.GET("/update/check", s.UpdateCheck)

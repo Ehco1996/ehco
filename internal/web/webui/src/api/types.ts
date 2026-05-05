@@ -54,24 +54,6 @@ export interface QueryNodeMetricsResp {
   data: NodeMetric[];
 }
 
-export interface RuleMetric {
-  timestamp: number;
-  label: string;
-  remote: string;
-  ping_latency: number;
-  tcp_connection_count: number;
-  tcp_handshake_duration: number;
-  tcp_network_transmit_bytes: number;
-  udp_connection_count: number;
-  udp_handshake_duration: number;
-  udp_network_transmit_bytes: number;
-}
-
-export interface QueryRuleMetricsResp {
-  total: number;
-  data: RuleMetric[];
-}
-
 export interface HealthCheckResp {
   error_code: number;
   msg: string;
@@ -174,14 +156,11 @@ export interface DBHealth {
   db_page_size: number;
   db_freelist_pages: number;
   node_metrics_rows: number;
-  rule_metrics_rows: number;
-  last_rule_write_ts: number;
   stats: Record<string, OpStatsSnapshot>;
 }
 
 export interface DBMaintenanceResult {
   node_deleted?: number;
-  rule_deleted?: number;
   bytes_before?: number;
   bytes_after?: number;
   duration_ms: number;

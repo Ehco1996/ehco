@@ -17,15 +17,12 @@ type DBHealth struct {
 	PageSize        int64                      `json:"db_page_size"`
 	FreelistPages   int64                      `json:"db_freelist_pages"`
 	NodeMetricsRows int64                      `json:"node_metrics_rows"`
-	RuleMetricsRows int64                      `json:"rule_metrics_rows"`
-	LastRuleWriteTs int64                      `json:"last_rule_write_ts"`
 	Stats           map[string]OpStatsSnapshot `json:"stats"`
 }
 
 func (ms *MetricsStore) Health(ctx context.Context) (*DBHealth, error) {
 	h := &DBHealth{
 		NodeMetricsRows: ms.nodeRows.Load(),
-		RuleMetricsRows: ms.ruleRows.Load(),
 		Stats:           ms.stats.Snapshot(),
 	}
 	if fi, err := os.Stat(ms.dbPath); err == nil {
@@ -40,12 +37,6 @@ func (ms *MetricsStore) Health(ctx context.Context) (*DBHealth, error) {
 	if err := ms.db.QueryRowContext(ctx, "PRAGMA freelist_count").Scan(&h.FreelistPages); err != nil {
 		return nil, err
 	}
-	// COALESCE keeps the JSON shape (always int64) even when the table
-	// is empty — caller distinguishes "never written" via the 0 value.
-	if err := ms.db.QueryRowContext(ctx,
-		"SELECT COALESCE(MAX(timestamp), 0) FROM rule_metrics").Scan(&h.LastRuleWriteTs); err != nil {
-		return nil, err
-	}
 	return h, nil
 }
 
@@ -54,14 +45,13 @@ func (ms *MetricsStore) Health(ctx context.Context) (*DBHealth, error) {
 // fill in NodeDeleted, Cleanup doesn't fill in BytesBefore, etc.
 type MaintenanceResult struct {
 	NodeDeleted int64 `json:"node_deleted,omitempty"`
-	RuleDeleted int64 `json:"rule_deleted,omitempty"`
 	BytesBefore int64 `json:"bytes_before,omitempty"`
 	BytesAfter  int64 `json:"bytes_after,omitempty"`
 	DurationMs  int64 `json:"duration_ms"`
 }
 
-// CleanupOlderThan deletes rows older than `days` from both metrics
-// tables. days <= 0 falls back to the historical 30-day default.
+// CleanupOlderThan deletes rows older than `days` from node_metrics.
+// days <= 0 falls back to the historical 30-day default.
 func (ms *MetricsStore) CleanupOlderThan(ctx context.Context, days int) (*MaintenanceResult, error) {
 	defer track(&ms.stats.Cleanup)()
 	if days <= 0 {
@@ -69,14 +59,13 @@ func (ms *MetricsStore) CleanupOlderThan(ctx context.Context, days int) (*Mainte
 	}
 	start := time.Now()
 	cutoff := time.Now().AddDate(0, 0, -days).Unix()
-	nodeDel, ruleDel, err := ms.deleteOlderThan(cutoff)
+	nodeDel, err := ms.deleteOlderThan(cutoff)
 	if err != nil {
 		return nil, err
 	}
 	_ = ctx // ctx kept for symmetry; deleteOlderThan uses ms.db directly
 	return &MaintenanceResult{
 		NodeDeleted: nodeDel,
-		RuleDeleted: ruleDel,
 		DurationMs:  time.Since(start).Milliseconds(),
 	}, nil
 }
@@ -114,8 +103,8 @@ var ErrTruncateNotConfirmed = errors.New("truncate requires confirm=\"yes I am s
 // an explicit, typed phrase counts.
 const truncateConfirm = "yes I am sure"
 
-// Truncate empties both metrics tables and reclaims the freelist via
-// VACUUM. The confirm string must match truncateConfirm exactly.
+// Truncate empties node_metrics and reclaims the freelist via VACUUM.
+// The confirm string must match truncateConfirm exactly.
 func (ms *MetricsStore) Truncate(ctx context.Context, confirm string) (*MaintenanceResult, error) {
 	if confirm != truncateConfirm {
 		return nil, ErrTruncateNotConfirmed
@@ -124,11 +113,7 @@ func (ms *MetricsStore) Truncate(ctx context.Context, confirm string) (*Maintena
 	start := time.Now()
 	before := ms.dbFileSize()
 	nodeBefore := ms.nodeRows.Load()
-	ruleBefore := ms.ruleRows.Load()
 	if _, err := ms.db.ExecContext(ctx, "DELETE FROM node_metrics"); err != nil {
-		return nil, err
-	}
-	if _, err := ms.db.ExecContext(ctx, "DELETE FROM rule_metrics"); err != nil {
 		return nil, err
 	}
 	if _, err := ms.db.ExecContext(ctx, "VACUUM"); err != nil {
@@ -138,11 +123,9 @@ func (ms *MetricsStore) Truncate(ctx context.Context, confirm string) (*Maintena
 		return nil, err
 	}
 	after := ms.dbFileSize()
-	ms.l.Warnf("truncate: deleted node=%d rule=%d, %d -> %d bytes",
-		nodeBefore, ruleBefore, before, after)
+	ms.l.Warnf("truncate: deleted node=%d, %d -> %d bytes", nodeBefore, before, after)
 	return &MaintenanceResult{
 		NodeDeleted: nodeBefore,
-		RuleDeleted: ruleBefore,
 		BytesBefore: before,
 		BytesAfter:  after,
 		DurationMs:  time.Since(start).Milliseconds(),

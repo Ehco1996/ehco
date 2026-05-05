@@ -194,17 +194,14 @@ type UserPool struct {
 	remoteConfigURL string
 }
 
-func NewUserPool(remoteConfigURL, metricURL, apiToken string, proxyTags []string) *UserPool {
-	up := &UserPool{
+func NewUserPool(remoteConfigURL string, proxyTags []string) *UserPool {
+	return &UserPool{
 		l:               zap.L().Named("user_pool"),
 		users:           make(map[int]*User),
 		proxyTags:       proxyTags,
 		remoteConfigURL: remoteConfigURL,
+		br:              newBandwidthRecorder(),
 	}
-	if metricURL != "" {
-		up.br = NewBandwidthRecorder(metricURL, apiToken)
-	}
-	return up
 }
 
 // SetInboundManager wires the in-process xray inbound.Manager that the pool
@@ -358,26 +355,24 @@ func (up *UserPool) syncTrafficToServer(ctx context.Context) error {
 	}
 
 	req := &SyncTrafficReq{Data: tfs}
-	if up.br != nil {
-		// Bandwidth is best-effort: a failed /metrics/ fetch (e.g. web server
-		// not yet ready at boot, or a transient blip) shouldn't block the user
-		// traffic upload. Report 0 for this cycle and try again next tick.
-		uploadIncr, downloadIncr, err := up.br.RecordOnce(ctx)
-		if err != nil {
-			up.l.Sugar().Warnf("bandwidth fetch failed (will retry next tick): %v", err)
-		} else {
-			ub := up.br.GetUploadBandwidth()
-			req.UploadBandwidth = int64(ub)
-			db := up.br.GetDownloadBandwidth()
-			req.DownloadBandwidth = int64(db)
-			up.l.Sugar().Debug(
-				"Upload Bandwidth :", bytes.PrettyByteSize(ub),
-				"Download Bandwidth :", bytes.PrettyByteSize(db),
-				"Total Bandwidth :", bytes.PrettyByteSize(ub+db),
-				"Total Increment By BR", bytes.PrettyByteSize(uploadIncr+downloadIncr),
-				"Total Increment Per User :", bytes.PrettyByteSize(float64(req.GetTotalTraffic())),
-			)
-		}
+	// Bandwidth is best-effort: a transient gopsutil error shouldn't
+	// block the user traffic upload. Report 0 for this cycle and try
+	// again next tick.
+	uploadIncr, downloadIncr, err := up.br.RecordOnce(ctx)
+	if err != nil {
+		up.l.Sugar().Warnf("bandwidth sample failed (will retry next tick): %v", err)
+	} else {
+		ub := up.br.GetUploadBandwidth()
+		req.UploadBandwidth = int64(ub)
+		db := up.br.GetDownloadBandwidth()
+		req.DownloadBandwidth = int64(db)
+		up.l.Sugar().Debug(
+			"Upload Bandwidth :", bytes.PrettyByteSize(ub),
+			"Download Bandwidth :", bytes.PrettyByteSize(db),
+			"Total Bandwidth :", bytes.PrettyByteSize(ub+db),
+			"Total Increment By BR", bytes.PrettyByteSize(uploadIncr+downloadIncr),
+			"Total Increment Per User :", bytes.PrettyByteSize(float64(req.GetTotalTraffic())),
+		)
 	}
 	if payload, err := json.Marshal(req); err == nil {
 		up.l.Sugar().Infof("syncTrafficToServer payload: %s", payload)

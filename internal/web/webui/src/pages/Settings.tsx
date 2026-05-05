@@ -92,7 +92,7 @@ export default function Settings() {
       () => api.dbCleanup(cleanupDays()),
       (r) => {
         const m = r as DBMaintenanceResult;
-        return `pruned node=${m.node_deleted ?? 0} rule=${m.rule_deleted ?? 0} in ${m.duration_ms}ms`;
+        return `pruned node=${m.node_deleted ?? 0} in ${m.duration_ms}ms`;
       },
     );
 
@@ -127,7 +127,7 @@ export default function Settings() {
       () => api.dbTruncate(got),
       (r) => {
         const m = r as DBMaintenanceResult;
-        return `wiped node=${m.node_deleted ?? 0} rule=${m.rule_deleted ?? 0}`;
+        return `wiped node=${m.node_deleted ?? 0}`;
       },
     );
   };
@@ -259,14 +259,6 @@ function StorageCard(props: { h: DBHealth }) {
     const pc = props.h.db_page_count;
     return pc > 0 ? (props.h.db_freelist_pages / pc) * 100 : 0;
   };
-  const lastWriteText = () => {
-    if (!props.h.last_rule_write_ts) return "never";
-    const ageSec = Math.max(0, Date.now() / 1000 - props.h.last_rule_write_ts);
-    if (ageSec < 60) return `${Math.round(ageSec)}s ago`;
-    if (ageSec < 3600) return `${Math.round(ageSec / 60)}m ago`;
-    if (ageSec < 86400) return `${Math.round(ageSec / 3600)}h ago`;
-    return `${Math.round(ageSec / 86400)}d ago`;
-  };
   return (
     <Card>
       <CardHeader title="storage" subtitle="file size · pages · row counts" />
@@ -282,11 +274,6 @@ function StorageCard(props: { h: DBHealth }) {
             `${props.h.db_freelist_pages.toLocaleString()} (${fragPct().toFixed(1)}%)${fragPct() > 30 ? " — VACUUM recommended" : ""}`,
           ],
           ["node_metrics", `${props.h.node_metrics_rows.toLocaleString()} rows`],
-          [
-            "rule_metrics",
-            `${props.h.rule_metrics_rows.toLocaleString()} rows${props.h.rule_metrics_rows === 0 ? " — no data, check sync pipeline" : ""}`,
-          ],
-          ["last rule write", lastWriteText()],
         ]}
       />
     </Card>
