@@ -2,7 +2,6 @@ package updater
 
 import (
 	"testing"
-	"time"
 )
 
 func TestResolveChannel(t *testing.T) {
@@ -48,45 +47,23 @@ func TestCompareVersions(t *testing.T) {
 	}
 }
 
-func TestParseBuildTime(t *testing.T) {
+func TestShaMatchesRevision(t *testing.T) {
+	full := "1e0e74cabcdef0123456789abcdef0123456789a"
 	cases := []struct {
-		in   string
-		want bool
+		fullSHA, revision string
+		want              bool
 	}{
-		{"2026-05-04T23:10:16Z", true},                   // goreleaser
-		{"2026-05-04T23:10:16+08:00", true},              // RFC3339 w/ offset
-		{"2026-05-04-23:10:16", true},                    // Makefile
-		{"", false},
-		{"not-a-time", false},
+		{full, "1e0e74c", true},                    // goreleaser short
+		{full, "1E0E74C", true},                    // case-insensitive
+		{full, full, true},                         // Makefile full SHA
+		{full, "deadbee", false},                   // different commit
+		{full, "", false},                          // empty -> false (caller already guards)
+		{full, full + "x", false},                  // longer than full SHA
+		{"short", "shortish", false},               // revision longer than fullSHA
 	}
 	for _, c := range cases {
-		_, ok := parseBuildTime(c.in)
-		if ok != c.want {
-			t.Errorf("parseBuildTime(%q) ok=%v want %v", c.in, ok, c.want)
-		}
-	}
-}
-
-func TestNightlyRepublished(t *testing.T) {
-	built := "2026-05-04T23:10:16Z"
-	older := time.Date(2026, 5, 4, 22, 0, 0, 0, time.UTC)
-	newer := time.Date(2026, 5, 5, 6, 0, 0, 0, time.UTC)
-
-	cases := []struct {
-		name       string
-		rel        ghRelease
-		buildTime  string
-		want       bool
-	}{
-		{"prerelease republished after build", ghRelease{Prerelease: true, PublishedAt: newer}, built, true},
-		{"prerelease same/older than build", ghRelease{Prerelease: true, PublishedAt: older}, built, false},
-		{"stable release ignored", ghRelease{Prerelease: false, PublishedAt: newer}, built, false},
-		{"empty build time -> conservative false", ghRelease{Prerelease: true, PublishedAt: newer}, "", false},
-		{"unparseable build time -> false", ghRelease{Prerelease: true, PublishedAt: newer}, "garbage", false},
-	}
-	for _, c := range cases {
-		if got := nightlyRepublished(&c.rel, c.buildTime); got != c.want {
-			t.Errorf("%s: got %v want %v", c.name, got, c.want)
+		if got := shaMatchesRevision(c.fullSHA, c.revision); got != c.want {
+			t.Errorf("shaMatchesRevision(%q,%q)=%v want %v", c.fullSHA, c.revision, got, c.want)
 		}
 	}
 }

@@ -80,8 +80,9 @@ type ghRelease struct {
 }
 
 // Check resolves channel against currentVersion and queries GitHub.
-// currentBuildTime is the ldflag-injected constant.BuildTime; empty is fine.
-func Check(ctx context.Context, channel, currentVersion, currentBuildTime string) (*CheckResult, error) {
+// currentRevision is the ldflag-injected constant.GitRevision; empty is
+// tolerated (we'll just trust version-string equality in that case).
+func Check(ctx context.Context, channel, currentVersion, currentRevision string) (*CheckResult, error) {
 	resolved, rel, err := pickRelease(ctx, channel, currentVersion)
 	if err != nil {
 		return nil, err
@@ -98,7 +99,7 @@ func Check(ctx context.Context, channel, currentVersion, currentBuildTime string
 		PublishedAt:    rel.PublishedAt,
 	}
 	if latest == currentVersion {
-		res.UpdateAvailable = nightlyRepublished(rel, currentBuildTime)
+		res.UpdateAvailable = nightlyRepublished(ctx, rel, currentRevision)
 	} else {
 		res.UpdateAvailable = compareVersions(latest, currentVersion) > 0
 	}
@@ -111,7 +112,7 @@ func Check(ctx context.Context, channel, currentVersion, currentBuildTime string
 
 // Apply downloads + swaps + (optionally) restarts. Each phase is reported
 // to onState so the dashboard can render progress; CLI passes nil.
-func Apply(ctx context.Context, opts ApplyOptions, currentVersion, currentBuildTime string, log *zap.SugaredLogger, onState func(State)) error {
+func Apply(ctx context.Context, opts ApplyOptions, currentVersion, currentRevision string, log *zap.SugaredLogger, onState func(State)) error {
 	emit := func(s State) {
 		if onState != nil {
 			onState(s)
@@ -128,9 +129,9 @@ func Apply(ctx context.Context, opts ApplyOptions, currentVersion, currentBuildT
 
 	if !opts.Force {
 		if latest == currentVersion {
-			if nightlyRepublished(rel, currentBuildTime) {
-				log.Infof("nightly tag %s republished after local build (%s); reinstalling",
-					rel.TagName, currentBuildTime)
+			if nightlyRepublished(ctx, rel, currentRevision) {
+				log.Infof("nightly tag %s now points at a different commit than local %s; reinstalling",
+					rel.TagName, currentRevision)
 			} else {
 				log.Info("already up to date")
 				emit(StateDone)
@@ -269,30 +270,49 @@ func getJSON(ctx context.Context, url string, out any) error {
 }
 
 // nightlyRepublished reports whether a release whose tag matches the
-// running version is actually newer than the current binary. Nightly
-// uses a rolling tag (v1.1.7-next), so version-string equality alone
-// would mask republished builds. Only meaningful for prereleases; stable
-// tags don't roll.
-func nightlyRepublished(rel *ghRelease, currentBuildTime string) bool {
-	if !rel.Prerelease || currentBuildTime == "" {
+// running version actually points at a different commit than the
+// running binary. Nightly uses a rolling tag (v1.1.7-next), so
+// version-string equality alone would mask republished builds.
+//
+// We can't time-compare published_at vs BuildTime: goreleaser publishes
+// the release a few seconds after building the artifact, so the same
+// artifact would always look "older" than its own release. SHA is the
+// only reliable signal.
+//
+// Conservative on uncertainty: empty currentRevision (bare `go build`)
+// or GitHub fetch failure -> false (no spurious update prompts; user
+// can --force).
+func nightlyRepublished(ctx context.Context, rel *ghRelease, currentRevision string) bool {
+	if !rel.Prerelease || currentRevision == "" {
 		return false
 	}
-	built, ok := parseBuildTime(currentBuildTime)
-	if !ok {
+	sha, err := fetchTagCommitSHA(ctx, rel.TagName)
+	if err != nil || sha == "" {
 		return false
 	}
-	return rel.PublishedAt.After(built)
+	return !shaMatchesRevision(sha, currentRevision)
 }
 
-// parseBuildTime accepts both ldflag formats: goreleaser's RFC3339
-// ({{.Date}}) and the Makefile's "2006-01-02-15:04:05".
-func parseBuildTime(s string) (time.Time, bool) {
-	for _, layout := range []string{time.RFC3339, "2006-01-02-15:04:05"} {
-		if t, err := time.Parse(layout, s); err == nil {
-			return t, true
-		}
+// shaMatchesRevision compares the short revision baked into the binary
+// (goreleaser uses {{.ShortCommit}}, 7 chars; Makefile uses full SHA)
+// against the full SHA returned by GitHub. Prefix-match is enough.
+func shaMatchesRevision(fullSHA, currentRevision string) bool {
+	n := len(currentRevision)
+	if n == 0 || n > len(fullSHA) {
+		return false
 	}
-	return time.Time{}, false
+	return strings.EqualFold(fullSHA[:n], currentRevision)
+}
+
+func fetchTagCommitSHA(ctx context.Context, tag string) (string, error) {
+	var c struct {
+		SHA string `json:"sha"`
+	}
+	url := "https://api.github.com/repos/Ehco1996/ehco/commits/" + tag
+	if err := getJSON(ctx, url, &c); err != nil {
+		return "", err
+	}
+	return c.SHA, nil
 }
 
 // compareVersions returns -1/0/1 like semver.Compare. Falls back to
