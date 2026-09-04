@@ -107,15 +107,17 @@ func (s *Server) HandleReload(c echo.Context) error {
 	if s.Reloader == nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "reload not support")
 	}
-	err := s.Reloader.Reload(true)
-	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
-	}
-	if xr := s.xrayReloader.Load(); xr != nil && *xr != nil {
-		if err := (*xr).Reload(true); err != nil {
-			return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+
+	go func() {
+		if err := s.Reloader.Reload(true); err != nil {
+			s.l.Errorf("reload relay meet error: %v", err)
 		}
-	}
+		if xr := s.xrayReloader.Load(); xr != nil && *xr != nil {
+			if err := (*xr).Reload(true); err != nil {
+				s.l.Errorf("reload xray meet error: %v", err)
+			}
+		}
+	}()
 
 	if _, err := c.Response().Write([]byte("reload success")); err != nil {
 		s.l.Errorf("write response meet err=%v", err)

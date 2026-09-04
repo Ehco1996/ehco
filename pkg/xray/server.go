@@ -104,7 +104,8 @@ type XrayServer struct {
 
 	mainCtx context.Context
 
-	mu              sync.RWMutex
+	reloadMu        sync.Mutex
+	runningMu       sync.RWMutex
 	runningInbounds map[string]string
 }
 
@@ -195,9 +196,9 @@ func (xs *XrayServer) Setup() error {
 			running[inbound.Tag] = listenStr
 		}
 	}
-	xs.mu.Lock()
+	xs.runningMu.Lock()
 	xs.runningInbounds = running
-	xs.mu.Unlock()
+	xs.runningMu.Unlock()
 
 	return nil
 }
@@ -299,12 +300,12 @@ func (xs *XrayServer) needReload(newCfg *config.Config) (bool, error) {
 	if newCfg == nil || newCfg.XRayConfig == nil {
 		return false, nil
 	}
-	xs.mu.RLock()
+	xs.runningMu.RLock()
 	running := make(map[string]string, len(xs.runningInbounds))
 	for k, v := range xs.runningInbounds {
 		running[k] = v
 	}
-	xs.mu.RUnlock()
+	xs.runningMu.RUnlock()
 
 	if len(running) == 0 {
 		return true, nil
@@ -344,8 +345,8 @@ func (xs *XrayServer) needReload(newCfg *config.Config) (bool, error) {
 
 func (xs *XrayServer) Reload(force bool) error {
 	xs.l.Warn("Reload Xray Server now...")
-	xs.mu.Lock()
-	defer xs.mu.Unlock()
+	xs.reloadMu.Lock()
+	defer xs.reloadMu.Unlock()
 
 	if force && xs.cfg.NeedSyncFromServer() {
 		newCfg := config.NewConfig(xs.cfg.PATH)
