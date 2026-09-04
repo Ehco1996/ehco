@@ -111,6 +111,11 @@ func (s *Server) HandleReload(c echo.Context) error {
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
+	if xr := s.xrayReloader.Load(); xr != nil && *xr != nil {
+		if err := (*xr).Reload(true); err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+		}
+	}
 
 	if _, err := c.Response().Write([]byte("reload success")); err != nil {
 		s.l.Errorf("write response meet err=%v", err)

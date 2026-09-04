@@ -128,6 +128,7 @@ func MustStartComponents(mainCtx context.Context, cfg *config.Config) {
 		if webS != nil {
 			xrayS.RegisterRoutes(webS.APIGroup())
 			webS.SetXrayStatus(xrayS)
+			webS.SetXrayReloader(xrayS)
 		}
 		if err := xrayS.Start(mainCtx); err != nil {
 			cliLogger.Fatalf("Start XrayServer meet err=%v", err)
