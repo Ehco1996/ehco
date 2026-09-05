@@ -59,17 +59,22 @@ func buildXrayInstanceCfg(cfg *conf.Config) (*core.Config, error) {
 				}
 				continue
 			}
-			// Inject TLS certs for standard TLS inbounds
-			if err := tls.InitTlsCfg(); err != nil {
-				return nil, err
+			// Inject TLS certs for standard TLS inbounds if not provided by config
+			if inbound.StreamSetting.TLSSettings == nil {
+				inbound.StreamSetting.TLSSettings = &conf.TLSConfig{}
 			}
-			tlsConfigs := []*conf.TLSCertConfig{
-				{
-					CertStr: []string{string(tls.DefaultTLSConfigCertBytes)},
-					KeyStr:  []string{string(tls.DefaultTLSConfigKeyBytes)},
-				},
+			if len(inbound.StreamSetting.TLSSettings.Certs) == 0 {
+				if err := tls.InitTlsCfg(); err != nil {
+					return nil, err
+				}
+				tlsConfigs := []*conf.TLSCertConfig{
+					{
+						CertStr: []string{string(tls.DefaultTLSConfigCertBytes)},
+						KeyStr:  []string{string(tls.DefaultTLSConfigKeyBytes)},
+					},
+				}
+				inbound.StreamSetting.TLSSettings.Certs = tlsConfigs
 			}
-			inbound.StreamSetting.TLSSettings.Certs = tlsConfigs
 			if inbound.StreamSetting.SocketSettings != nil {
 				inbound.StreamSetting.SocketSettings.TcpMptcp = true
 			} else {
