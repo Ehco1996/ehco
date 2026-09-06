@@ -137,9 +137,12 @@ export interface OpStatsSnapshot {
 
 export interface DBHealth {
   db_file_bytes: number;
-  db_page_count: number;
-  db_page_size: number;
-  db_freelist_pages: number;
+  partitions?: number;
+  partition_duration?: string;
+  retention_days?: number;
+  db_page_count?: number;
+  db_page_size?: number;
+  db_freelist_pages?: number;
   node_metrics_rows: number;
   stats: Record<string, OpStatsSnapshot>;
 }

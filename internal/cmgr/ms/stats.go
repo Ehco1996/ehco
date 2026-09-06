@@ -61,22 +61,16 @@ func (s *opStats) snapshot() OpStatsSnapshot {
 // (*Stats).All, and the dashboard picks it up automatically.
 type Stats struct {
 	AddNode   opStats
-	AddRule   opStats
 	QueryNode opStats
-	QueryRule opStats
 	Cleanup   opStats
-	Vacuum    opStats
 	Truncate  opStats
 }
 
 func (s *Stats) all() []namedOp {
 	return []namedOp{
 		{"add_node", &s.AddNode},
-		{"add_rule", &s.AddRule},
 		{"query_node", &s.QueryNode},
-		{"query_rule", &s.QueryRule},
 		{"cleanup", &s.Cleanup},
-		{"vacuum", &s.Vacuum},
 		{"truncate", &s.Truncate},
 	}
 }

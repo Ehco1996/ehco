@@ -11,22 +11,26 @@ import (
 
 // DBHealth is the storage + latency snapshot the Settings page polls.
 type DBHealth struct {
-	FileBytes       int64                      `json:"db_file_bytes"`
-	PageCount       int64                      `json:"db_page_count"`
-	PageSize        int64                      `json:"db_page_size"`
-	FreelistPages   int64                      `json:"db_freelist_pages"`
-	NodeMetricsRows int64                      `json:"node_metrics_rows"`
-	Stats           map[string]OpStatsSnapshot `json:"stats"`
+	FileBytes         int64                      `json:"db_file_bytes"`
+	Partitions        int                        `json:"partitions"`
+	PartitionDuration string                     `json:"partition_duration"`
+	RetentionDays     int                        `json:"retention_days"`
+	PageCount         int64                      `json:"db_page_count,omitempty"`
+	PageSize          int64                      `json:"db_page_size,omitempty"`
+	FreelistPages     int64                      `json:"db_freelist_pages,omitempty"`
+	NodeMetricsRows   int64                      `json:"node_metrics_rows"`
+	Stats             map[string]OpStatsSnapshot `json:"stats"`
 }
 
 func (ms *MetricsStore) Health(ctx context.Context) (*DBHealth, error) {
+	partitions, _, totalBytes := ms.countPartitionsAndFiles()
 	h := &DBHealth{
-		FileBytes:       ms.dirFileSize(),
-		PageCount:       0,
-		PageSize:        0,
-		FreelistPages:   0,
-		NodeMetricsRows: ms.nodeRows.Load(),
-		Stats:           ms.stats.Snapshot(),
+		FileBytes:         totalBytes,
+		Partitions:        partitions,
+		PartitionDuration: "1h",
+		RetentionDays:     defaultRetentionDays,
+		NodeMetricsRows:   ms.nodeRows.Load(),
+		Stats:             ms.stats.Snapshot(),
 	}
 	return h, nil
 }
@@ -51,7 +55,6 @@ func (ms *MetricsStore) CleanupOlderThan(ctx context.Context, days int) (*Mainte
 
 // Vacuum reclaims storage. In TSDB there are no freelist pages or B-tree fragmentation.
 func (ms *MetricsStore) Vacuum(ctx context.Context) (*MaintenanceResult, error) {
-	defer track(&ms.stats.Vacuum)()
 	start := time.Now()
 	size := ms.dirFileSize()
 	return &MaintenanceResult{

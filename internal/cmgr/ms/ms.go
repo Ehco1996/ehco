@@ -51,6 +51,12 @@ func NewMetricsStore(dirPath string) (*MetricsStore, error) {
 		storage: storage,
 		l:       zap.S().Named("ms"),
 	}
+
+	// Initialize nodeRows from existing samples in storage if available
+	if pts, err := storage.Select("cpu_usage", nil, 0, time.Now().Unix()+3600); err == nil {
+		ms.nodeRows.Store(int64(len(pts)))
+	}
+
 	return ms, nil
 }
 
@@ -67,13 +73,34 @@ func (ms *MetricsStore) Close() error {
 	return err
 }
 
-func (ms *MetricsStore) dirFileSize() int64 {
-	var totalSize int64
-	_ = filepath.Walk(ms.dirPath, func(_ string, info os.FileInfo, err error) error {
-		if err == nil && !info.IsDir() {
-			totalSize += info.Size()
+func (ms *MetricsStore) countPartitionsAndFiles() (partitions int, files int, totalBytes int64) {
+	entries, err := os.ReadDir(ms.dirPath)
+	if err != nil {
+		return 0, 0, 0
+	}
+	for _, e := range entries {
+		if e.IsDir() {
+			partitions++
+			subEntries, _ := os.ReadDir(filepath.Join(ms.dirPath, e.Name()))
+			for _, se := range subEntries {
+				if !se.IsDir() {
+					files++
+					if fi, err := se.Info(); err == nil {
+						totalBytes += fi.Size()
+					}
+				}
+			}
+		} else {
+			files++
+			if fi, err := e.Info(); err == nil {
+				totalBytes += fi.Size()
+			}
 		}
-		return nil
-	})
-	return totalSize
+	}
+	return
+}
+
+func (ms *MetricsStore) dirFileSize() int64 {
+	_, _, totalBytes := ms.countPartitionsAndFiles()
+	return totalBytes
 }

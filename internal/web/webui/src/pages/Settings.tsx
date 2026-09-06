@@ -4,7 +4,6 @@ import {
   Copy,
   Check,
   Trash2,
-  HardDrive,
   AlertTriangle,
 } from "lucide-solid";
 import PageHeader from "../ui/PageHeader";
@@ -95,23 +94,6 @@ export default function Settings() {
         return `pruned node=${m.node_deleted ?? 0} in ${m.duration_ms}ms`;
       },
     );
-
-  const onVacuum = () => {
-    if (
-      !confirm(
-        "VACUUM rewrites the db file and locks all queries until done. Cheap on small dbs (~ms), seconds at GB scale. Proceed?",
-      )
-    )
-      return;
-    runMaint(
-      "vacuum",
-      () => api.dbVacuum(),
-      (r) => {
-        const m = r as DBMaintenanceResult;
-        return `${bytes(m.bytes_before)} → ${bytes(m.bytes_after)} in ${m.duration_ms}ms`;
-      },
-    );
-  };
 
   const onTruncate = () => {
     const got = prompt(
@@ -214,8 +196,8 @@ export default function Settings() {
 
       <Show when={health()}>
         <SectionTitle
-          title="database"
-          subtitle="local SQLite metrics store"
+          title="metrics storage"
+          subtitle="local embedded TSDB (tstorage)"
         />
         <div class="grid gap-3 lg:grid-cols-2">
           <StorageCard h={health()!} />
@@ -226,7 +208,6 @@ export default function Settings() {
             busyOp={busyOp()}
             status={maintStatus()}
             onCleanup={onCleanup}
-            onVacuum={onVacuum}
             onTruncate={onTruncate}
           />
         </div>
@@ -255,25 +236,21 @@ function SectionTitle(props: { title: string; subtitle?: string }) {
 }
 
 function StorageCard(props: { h: DBHealth }) {
-  const fragPct = () => {
-    const pc = props.h.db_page_count;
-    return pc > 0 ? (props.h.db_freelist_pages / pc) * 100 : 0;
-  };
   return (
     <Card>
-      <CardHeader title="storage" subtitle="file size · pages · row counts" />
+      <CardHeader title="storage" subtitle="disk usage · partitions · samples" />
       <DescList
         items={[
-          ["db file", bytes(props.h.db_file_bytes)],
+          ["disk usage", bytes(props.h.db_file_bytes)],
           [
-            "pages",
-            `${props.h.db_page_count.toLocaleString()} × ${props.h.db_page_size}B`,
+            "partitions",
+            `${(props.h.partitions ?? 0).toLocaleString()} chunks (${props.h.partition_duration ?? "1h"} / chunk)`,
           ],
           [
-            "freelist",
-            `${props.h.db_freelist_pages.toLocaleString()} (${fragPct().toFixed(1)}%)${fragPct() > 30 ? " — VACUUM recommended" : ""}`,
+            "retention",
+            `${props.h.retention_days ?? 30} days (auto-pruned)`,
           ],
-          ["node_metrics", `${props.h.node_metrics_rows.toLocaleString()} rows`],
+          ["samples", `${props.h.node_metrics_rows.toLocaleString()} points`],
         ]}
       />
     </Card>
@@ -340,14 +317,13 @@ function MaintenanceCard(props: {
   busyOp: string | null;
   status: ToneStatus;
   onCleanup: () => void;
-  onVacuum: () => void;
   onTruncate: () => void;
 }) {
   return (
     <Card class="lg:col-span-2">
       <CardHeader
         title="maintenance"
-        subtitle="prune · compact · wipe"
+        subtitle="prune partitions · wipe metrics"
         right={
           <Show when={props.status}>
             <Pill tone={props.status!.tone} dot>
@@ -377,16 +353,9 @@ function MaintenanceCard(props: {
             onClick={props.onCleanup}
             disabled={props.busyOp != null}
           >
-            Clean
+            Prune
           </Button>
         </label>
-        <Button
-          leadingIcon={<HardDrive size={13} />}
-          onClick={props.onVacuum}
-          disabled={props.busyOp != null}
-        >
-          VACUUM
-        </Button>
         <Button
           variant="danger"
           leadingIcon={<AlertTriangle size={13} />}
