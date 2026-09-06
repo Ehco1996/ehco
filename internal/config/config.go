@@ -145,6 +145,5 @@ func (c *Config) NeedStartRelayServer() bool {
 }
 
 func (c *Config) NeedStartCmgr() bool {
-	return c.RelaySyncURL != "" && c.RelaySyncInterval > 0
+	return (c.RelaySyncURL != "" && c.RelaySyncInterval > 0) || c.NeedStartWebServer()
 }
-

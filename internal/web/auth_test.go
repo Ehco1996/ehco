@@ -153,4 +153,3 @@ func TestSessionStore_Revoke(t *testing.T) {
 		t.Fatalf("revoked sid should not validate")
 	}
 }
-
