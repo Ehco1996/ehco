@@ -60,13 +60,13 @@ func (s *opStats) snapshot() OpStatsSnapshot {
 // Stats bundles every tracked op. Add a field here, register it in
 // (*Stats).All, and the dashboard picks it up automatically.
 type Stats struct {
-	AddNode    opStats
-	AddRule    opStats
-	QueryNode  opStats
-	QueryRule  opStats
-	Cleanup    opStats
-	Vacuum     opStats
-	Truncate   opStats
+	AddNode   opStats
+	AddRule   opStats
+	QueryNode opStats
+	QueryRule opStats
+	Cleanup   opStats
+	Vacuum    opStats
+	Truncate  opStats
 }
 
 func (s *Stats) all() []namedOp {

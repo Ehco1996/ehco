@@ -80,8 +80,8 @@ func NewCmgr(cfg *Config) (Cmgr, error) {
 		cmgr.ns = sampler.NewNodeSampler()
 
 		homeDir, _ := os.UserHomeDir()
-		dbPath := filepath.Join(homeDir, ".ehco", "metrics.db")
-		ms, err := ms.NewMetricsStore(dbPath)
+		dataDir := filepath.Join(homeDir, ".ehco", "metrics_ts")
+		ms, err := ms.NewMetricsStore(dataDir)
 		if err != nil {
 			return nil, err
 		}

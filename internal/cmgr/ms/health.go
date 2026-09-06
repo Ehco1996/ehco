@@ -5,12 +5,11 @@ import (
 	"errors"
 	"os"
 	"time"
+
+	"github.com/nakabonne/tstorage"
 )
 
 // DBHealth is the storage + latency snapshot the Settings page polls.
-// Sized small on purpose: every field is cheap (atomic load or one
-// PRAGMA), so the handler can re-run on every refresh without a full
-// COUNT(*) scan against the live tables.
 type DBHealth struct {
 	FileBytes       int64                      `json:"db_file_bytes"`
 	PageCount       int64                      `json:"db_page_count"`
@@ -22,27 +21,17 @@ type DBHealth struct {
 
 func (ms *MetricsStore) Health(ctx context.Context) (*DBHealth, error) {
 	h := &DBHealth{
+		FileBytes:       ms.dirFileSize(),
+		PageCount:       0,
+		PageSize:        0,
+		FreelistPages:   0,
 		NodeMetricsRows: ms.nodeRows.Load(),
 		Stats:           ms.stats.Snapshot(),
-	}
-	if fi, err := os.Stat(ms.dbPath); err == nil {
-		h.FileBytes = fi.Size()
-	}
-	if err := ms.db.QueryRowContext(ctx, "PRAGMA page_count").Scan(&h.PageCount); err != nil {
-		return nil, err
-	}
-	if err := ms.db.QueryRowContext(ctx, "PRAGMA page_size").Scan(&h.PageSize); err != nil {
-		return nil, err
-	}
-	if err := ms.db.QueryRowContext(ctx, "PRAGMA freelist_count").Scan(&h.FreelistPages); err != nil {
-		return nil, err
 	}
 	return h, nil
 }
 
-// MaintenanceResult is the common shape returned by every maintenance
-// op. Fields not relevant to a given op are left zero — Vacuum doesn't
-// fill in NodeDeleted, Cleanup doesn't fill in BytesBefore, etc.
+// MaintenanceResult is the common shape returned by maintenance ops.
 type MaintenanceResult struct {
 	NodeDeleted int64 `json:"node_deleted,omitempty"`
 	BytesBefore int64 `json:"bytes_before,omitempty"`
@@ -50,79 +39,64 @@ type MaintenanceResult struct {
 	DurationMs  int64 `json:"duration_ms"`
 }
 
-// CleanupOlderThan deletes rows older than `days` from node_metrics.
-// days <= 0 falls back to the historical 30-day default.
+// CleanupOlderThan triggers retention cleanup. In tstorage, retention is
+// handled automatically at the partition level.
 func (ms *MetricsStore) CleanupOlderThan(ctx context.Context, days int) (*MaintenanceResult, error) {
 	defer track(&ms.stats.Cleanup)()
-	if days <= 0 {
-		days = defaultRetentionDays
-	}
 	start := time.Now()
-	cutoff := time.Now().AddDate(0, 0, -days).Unix()
-	nodeDel, err := ms.deleteOlderThan(cutoff)
-	if err != nil {
-		return nil, err
-	}
-	_ = ctx // ctx kept for symmetry; deleteOlderThan uses ms.db directly
 	return &MaintenanceResult{
-		NodeDeleted: nodeDel,
-		DurationMs:  time.Since(start).Milliseconds(),
+		DurationMs: time.Since(start).Milliseconds(),
 	}, nil
 }
 
-// Vacuum reclaims free pages, blocking other queries for the duration.
-// Cheap when the db is small (current ~2.5MB → <100ms); when it grows
-// past ~1GB the lock window can stretch into multi-second territory —
-// the SPA documents this in the confirm copy.
+// Vacuum reclaims storage. In TSDB there are no freelist pages or B-tree fragmentation.
 func (ms *MetricsStore) Vacuum(ctx context.Context) (*MaintenanceResult, error) {
 	defer track(&ms.stats.Vacuum)()
 	start := time.Now()
-	before := ms.dbFileSize()
-	if _, err := ms.db.ExecContext(ctx, "VACUUM"); err != nil {
-		return nil, err
-	}
-	after := ms.dbFileSize()
-	if err := ms.recountRows(); err != nil {
-		return nil, err
-	}
-	ms.l.Infof("vacuum: %d -> %d bytes in %s", before, after, time.Since(start))
+	size := ms.dirFileSize()
 	return &MaintenanceResult{
-		BytesBefore: before,
-		BytesAfter:  after,
+		BytesBefore: size,
+		BytesAfter:  size,
 		DurationMs:  time.Since(start).Milliseconds(),
 	}, nil
 }
 
-// ErrTruncateNotConfirmed is returned by Truncate when the caller does
-// not pass the exact confirm literal. The handler turns this into a
-// 400 so a missing form value can never wipe live data.
 var ErrTruncateNotConfirmed = errors.New("truncate requires confirm=\"yes I am sure\"")
 
-// truncateConfirm is the literal the API requires. Plain string, not
-// boolean: a defaulted JSON field (`{}` → false) must not pass; only
-// an explicit, typed phrase counts.
 const truncateConfirm = "yes I am sure"
 
-// Truncate empties node_metrics and reclaims the freelist via VACUUM.
-// The confirm string must match truncateConfirm exactly.
+// Truncate empties all partitions.
 func (ms *MetricsStore) Truncate(ctx context.Context, confirm string) (*MaintenanceResult, error) {
 	if confirm != truncateConfirm {
 		return nil, ErrTruncateNotConfirmed
 	}
 	defer track(&ms.stats.Truncate)()
 	start := time.Now()
-	before := ms.dbFileSize()
+	before := ms.dirFileSize()
 	nodeBefore := ms.nodeRows.Load()
-	if _, err := ms.db.ExecContext(ctx, "DELETE FROM node_metrics"); err != nil {
+
+	ms.mu.Lock()
+	defer ms.mu.Unlock()
+
+	if ms.storage != nil {
+		_ = ms.storage.Close()
+	}
+	_ = os.RemoveAll(ms.dirPath)
+	_ = os.MkdirAll(ms.dirPath, 0o755)
+
+	storage, err := tstorage.NewStorage(
+		tstorage.WithDataPath(ms.dirPath),
+		tstorage.WithPartitionDuration(1*time.Hour),
+		tstorage.WithRetention(defaultRetentionDays*24*time.Hour),
+		tstorage.WithTimestampPrecision(tstorage.Seconds),
+	)
+	if err != nil {
 		return nil, err
 	}
-	if _, err := ms.db.ExecContext(ctx, "VACUUM"); err != nil {
-		return nil, err
-	}
-	if err := ms.recountRows(); err != nil {
-		return nil, err
-	}
-	after := ms.dbFileSize()
+	ms.storage = storage
+	ms.nodeRows.Store(0)
+
+	after := ms.dirFileSize()
 	ms.l.Warnf("truncate: deleted node=%d, %d -> %d bytes", nodeBefore, before, after)
 	return &MaintenanceResult{
 		NodeDeleted: nodeBefore,
@@ -132,16 +106,6 @@ func (ms *MetricsStore) Truncate(ctx context.Context, confirm string) (*Maintena
 	}, nil
 }
 
-// ResetStats zeroes every opStats counter. Operator escape hatch when a
-// one-off latency spike (e.g. cold start, paused process) has poisoned
-// the running max and the page is hard to read.
 func (ms *MetricsStore) ResetStats() {
 	ms.stats.Reset()
-}
-
-func (ms *MetricsStore) dbFileSize() int64 {
-	if fi, err := os.Stat(ms.dbPath); err == nil {
-		return fi.Size()
-	}
-	return 0
 }

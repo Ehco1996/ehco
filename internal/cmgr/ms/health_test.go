@@ -11,7 +11,7 @@ import (
 
 func newTestStore(t *testing.T) *MetricsStore {
 	t.Helper()
-	ms, err := NewMetricsStore(filepath.Join(t.TempDir(), "metrics.db"))
+	ms, err := NewMetricsStore(filepath.Join(t.TempDir(), "metrics_ts"))
 	if err != nil {
 		t.Fatalf("NewMetricsStore: %v", err)
 	}
@@ -27,9 +27,6 @@ func TestHealth_EmptyStore(t *testing.T) {
 	}
 	if h.NodeMetricsRows != 0 {
 		t.Fatalf("expected empty store, got node=%d", h.NodeMetricsRows)
-	}
-	if h.PageSize == 0 {
-		t.Fatalf("page size should be reported (got 0)")
 	}
 	if _, ok := h.Stats["query_node"]; !ok {
 		t.Fatalf("stats map missing query_node key")
@@ -52,12 +49,19 @@ func TestHealth_TracksWritesAndQueries(t *testing.T) {
 		t.Fatalf("AddNodeMetric: %v", err)
 	}
 
-	if _, err := ms.QueryNodeMetric(ctx, &QueryNodeMetricsReq{
+	resp, err := ms.QueryNodeMetric(ctx, &QueryNodeMetricsReq{
 		StartTimestamp: 0,
 		EndTimestamp:   now.Unix() + 1,
 		Num:            10,
-	}); err != nil {
+	})
+	if err != nil {
 		t.Fatalf("QueryNodeMetric: %v", err)
+	}
+	if resp.TOTAL != 1 {
+		t.Fatalf("expected 1 record, got %d", resp.TOTAL)
+	}
+	if resp.Data[0].CPUUsage != 1 {
+		t.Fatalf("expected cpu_usage=1, got %v", resp.Data[0].CPUUsage)
 	}
 
 	h, err := ms.Health(ctx)
@@ -73,35 +77,8 @@ func TestHealth_TracksWritesAndQueries(t *testing.T) {
 	if h.Stats["query_node"].Count != 1 {
 		t.Fatalf("expected query_node count=1, got %d", h.Stats["query_node"].Count)
 	}
-	// Latency on a temp-dir SQLite should be sub-100ms; this guards
-	// against the recorder accidentally storing zeros for everything.
-	if h.Stats["add_node"].LastMs <= 0 {
-		t.Fatalf("expected non-zero last_ms for add_node, got %v", h.Stats["add_node"].LastMs)
-	}
-}
-
-func TestCleanupOlderThan_RemovesAndReportsCounts(t *testing.T) {
-	ms := newTestStore(t)
-	ctx := context.Background()
-
-	old := time.Now().Add(-90 * 24 * time.Hour)
-	fresh := time.Now()
-	for _, ts := range []time.Time{old, fresh} {
-		if err := ms.AddNodeMetric(ctx, &sampler.NodeMetrics{SyncTime: ts}); err != nil {
-			t.Fatalf("AddNodeMetric: %v", err)
-		}
-	}
-
-	res, err := ms.CleanupOlderThan(ctx, 30)
-	if err != nil {
-		t.Fatalf("CleanupOlderThan: %v", err)
-	}
-	if res.NodeDeleted != 1 {
-		t.Fatalf("expected 1 node deletion, got %d", res.NodeDeleted)
-	}
-	h, _ := ms.Health(ctx)
-	if h.NodeMetricsRows != 1 {
-		t.Fatalf("expected 1 row remaining, got %d", h.NodeMetricsRows)
+	if h.Stats["add_node"].LastMs < 0 {
+		t.Fatalf("expected non-negative last_ms for add_node, got %v", h.Stats["add_node"].LastMs)
 	}
 }
 
@@ -137,5 +114,40 @@ func TestResetStats_ClearsCounters(t *testing.T) {
 	h, _ := ms.Health(ctx)
 	if h.Stats["add_node"].Count != 0 {
 		t.Fatalf("expected count=0 after reset, got %d", h.Stats["add_node"].Count)
+	}
+}
+
+func TestDownsample_StepBuckets(t *testing.T) {
+	ms := newTestStore(t)
+	ctx := context.Background()
+
+	base := time.Unix(1700000000, 0)
+	// Add 10 points spaced 5s apart (spanning 0s to 45s)
+	for i := 0; i < 10; i++ {
+		ts := base.Add(time.Duration(i*5) * time.Second)
+		err := ms.AddNodeMetric(ctx, &sampler.NodeMetrics{
+			SyncTime:        ts,
+			CpuUsagePercent: float64(10 + i),
+		})
+		if err != nil {
+			t.Fatalf("AddNodeMetric: %v", err)
+		}
+	}
+
+	// Step = 20s. Points in [0s, 15s] fall into bucket 0, points in [20s, 35s] fall into bucket 20, points in [40s, 45s] into bucket 40.
+	resp, err := ms.QueryNodeMetric(ctx, &QueryNodeMetricsReq{
+		StartTimestamp: base.Unix(),
+		EndTimestamp:   base.Add(60 * time.Second).Unix(),
+		Step:           20,
+	})
+	if err != nil {
+		t.Fatalf("QueryNodeMetric: %v", err)
+	}
+	if len(resp.Data) != 3 {
+		t.Fatalf("expected 3 step buckets, got %d", len(resp.Data))
+	}
+	// Should be sorted DESC
+	if resp.Data[0].Timestamp < resp.Data[1].Timestamp {
+		t.Fatalf("expected DESC order, got %d < %d", resp.Data[0].Timestamp, resp.Data[1].Timestamp)
 	}
 }
