@@ -1,4 +1,4 @@
-package ms
+package store
 
 import (
 	"context"
@@ -15,22 +15,19 @@ type DBHealth struct {
 	Partitions        int                        `json:"partitions"`
 	PartitionDuration string                     `json:"partition_duration"`
 	RetentionDays     int                        `json:"retention_days"`
-	PageCount         int64                      `json:"db_page_count,omitempty"`
-	PageSize          int64                      `json:"db_page_size,omitempty"`
-	FreelistPages     int64                      `json:"db_freelist_pages,omitempty"`
 	NodeMetricsRows   int64                      `json:"node_metrics_rows"`
 	Stats             map[string]OpStatsSnapshot `json:"stats"`
 }
 
-func (ms *MetricsStore) Health(ctx context.Context) (*DBHealth, error) {
-	partitions, _, totalBytes := ms.countPartitionsAndFiles()
+func (s *Store) Health(ctx context.Context) (*DBHealth, error) {
+	partitions, _, totalBytes := s.countPartitionsAndFiles()
 	h := &DBHealth{
 		FileBytes:         totalBytes,
 		Partitions:        partitions,
 		PartitionDuration: "1h",
 		RetentionDays:     defaultRetentionDays,
-		NodeMetricsRows:   ms.nodeRows.Load(),
-		Stats:             ms.stats.Snapshot(),
+		NodeMetricsRows:   s.countSamples(),
+		Stats:             s.stats.Snapshot(),
 	}
 	return h, nil
 }
@@ -44,22 +41,14 @@ type MaintenanceResult struct {
 }
 
 // CleanupOlderThan triggers retention cleanup. In tstorage, retention is
-// handled automatically at the partition level.
-func (ms *MetricsStore) CleanupOlderThan(ctx context.Context, days int) (*MaintenanceResult, error) {
-	defer track(&ms.stats.Cleanup)()
+// handled automatically by background partition pruning.
+func (s *Store) CleanupOlderThan(ctx context.Context, days int) (*MaintenanceResult, error) {
+	defer track(&s.stats.Cleanup)()
 	start := time.Now()
+	before := s.dirFileSize()
 	return &MaintenanceResult{
-		DurationMs: time.Since(start).Milliseconds(),
-	}, nil
-}
-
-// Vacuum reclaims storage. In TSDB there are no freelist pages or B-tree fragmentation.
-func (ms *MetricsStore) Vacuum(ctx context.Context) (*MaintenanceResult, error) {
-	start := time.Now()
-	size := ms.dirFileSize()
-	return &MaintenanceResult{
-		BytesBefore: size,
-		BytesAfter:  size,
+		BytesBefore: before,
+		BytesAfter:  s.dirFileSize(),
 		DurationMs:  time.Since(start).Milliseconds(),
 	}, nil
 }
@@ -68,27 +57,27 @@ var ErrTruncateNotConfirmed = errors.New("truncate requires confirm=\"yes I am s
 
 const truncateConfirm = "yes I am sure"
 
-// Truncate empties all partitions.
-func (ms *MetricsStore) Truncate(ctx context.Context, confirm string) (*MaintenanceResult, error) {
+// Truncate empties all partitions and reinitializes storage.
+func (s *Store) Truncate(ctx context.Context, confirm string) (*MaintenanceResult, error) {
 	if confirm != truncateConfirm {
 		return nil, ErrTruncateNotConfirmed
 	}
-	defer track(&ms.stats.Truncate)()
+	defer track(&s.stats.Truncate)()
 	start := time.Now()
-	before := ms.dirFileSize()
-	nodeBefore := ms.nodeRows.Load()
+	before := s.dirFileSize()
+	nodeBefore := s.countSamples()
 
-	ms.mu.Lock()
-	defer ms.mu.Unlock()
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
-	if ms.storage != nil {
-		_ = ms.storage.Close()
+	if s.storage != nil {
+		_ = s.storage.Close()
 	}
-	_ = os.RemoveAll(ms.dirPath)
-	_ = os.MkdirAll(ms.dirPath, 0o755)
+	_ = os.RemoveAll(s.dirPath)
+	_ = os.MkdirAll(s.dirPath, 0o755)
 
 	storage, err := tstorage.NewStorage(
-		tstorage.WithDataPath(ms.dirPath),
+		tstorage.WithDataPath(s.dirPath),
 		tstorage.WithPartitionDuration(1*time.Hour),
 		tstorage.WithRetention(defaultRetentionDays*24*time.Hour),
 		tstorage.WithTimestampPrecision(tstorage.Seconds),
@@ -96,11 +85,10 @@ func (ms *MetricsStore) Truncate(ctx context.Context, confirm string) (*Maintena
 	if err != nil {
 		return nil, err
 	}
-	ms.storage = storage
-	ms.nodeRows.Store(0)
+	s.storage = storage
 
-	after := ms.dirFileSize()
-	ms.l.Warnf("truncate: deleted node=%d, %d -> %d bytes", nodeBefore, before, after)
+	after := s.dirFileSize()
+	s.l.Warnf("truncate: deleted node=%d, %d -> %d bytes", nodeBefore, before, after)
 	return &MaintenanceResult{
 		NodeDeleted: nodeBefore,
 		BytesBefore: before,
@@ -109,6 +97,6 @@ func (ms *MetricsStore) Truncate(ctx context.Context, confirm string) (*Maintena
 	}, nil
 }
 
-func (ms *MetricsStore) ResetStats() {
-	ms.stats.Reset()
+func (s *Store) ResetStats() {
+	s.stats.Reset()
 }

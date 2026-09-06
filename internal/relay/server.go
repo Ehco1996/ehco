@@ -27,18 +27,8 @@ type Server struct {
 	Cmgr cmgr.Cmgr
 }
 
-func NewServer(cfg *config.Config) (*Server, error) {
+func NewServer(cfg *config.Config, cmgr cmgr.Cmgr) (*Server, error) {
 	l := zap.S().Named("relay-server")
-	cmgrCfg := &cmgr.Config{
-		SyncURL:       cfg.RelaySyncURL,
-		SyncInterval:  cfg.RelaySyncInterval,
-		EnableMetrics: cfg.NeedStartWebServer(),
-	}
-	cmgrCfg.Adjust()
-	cmgr, err := cmgr.NewCmgr(cmgrCfg)
-	if err != nil {
-		return nil, err
-	}
 	s := &Server{
 		cfg:      cfg,
 		l:        l,
@@ -78,11 +68,6 @@ func (s *Server) Start(ctx context.Context) error {
 	if s.cfg.PATH != "" && (s.cfg.ReloadInterval > 0) {
 		s.l.Infof("Start to watch relay config %s ", s.cfg.PATH)
 		go s.WatchAndReload(ctx)
-	}
-
-	// start Cmgr when need sync from server
-	if s.cfg.NeedStartCmgr() {
-		go s.Cmgr.Start(ctx, s.errCH)
 	}
 
 	select {

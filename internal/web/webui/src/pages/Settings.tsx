@@ -19,7 +19,7 @@ import { copyText } from "../util/clipboard";
 import UpdatesPanel from "./UpdatesPanel";
 
 // Wire-shape literal — must match the constant in
-// internal/cmgr/ms/health.go. The button label can change freely; what
+// internal/store/health.go. The button label can change freely; what
 // we POST cannot.
 const TRUNCATE_CONFIRM = "yes I am sure";
 

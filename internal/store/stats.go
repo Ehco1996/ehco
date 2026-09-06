@@ -1,4 +1,4 @@
-package ms
+package store
 
 import (
 	"sync/atomic"
@@ -6,7 +6,7 @@ import (
 )
 
 // opStats accumulates count + total + max + last latency for one named
-// SQL operation. Lifetime-since-process-start semantics; reset via
+// TSDB operation. Lifetime-since-process-start semantics; reset via
 // (*Stats).Reset to clear a one-off spike.
 type opStats struct {
 	count   atomic.Int64
@@ -57,8 +57,7 @@ func (s *opStats) snapshot() OpStatsSnapshot {
 	return out
 }
 
-// Stats bundles every tracked op. Add a field here, register it in
-// (*Stats).All, and the dashboard picks it up automatically.
+// Stats bundles every tracked op.
 type Stats struct {
 	AddNode   opStats
 	QueryNode opStats
@@ -101,11 +100,7 @@ func (s *Stats) Reset() {
 
 // track is the canonical instrumentation helper. Idiomatic use:
 //
-//	defer track(&ms.stats.QueryRule)()
-//
-// The returned closure captures the start time at the point of
-// invocation, so the deferred call records (now - start) regardless of
-// how the function unwinds.
+//	defer track(&s.stats.QueryNode)()
 func track(s *opStats) func() {
 	start := time.Now()
 	return func() { s.record(time.Since(start)) }

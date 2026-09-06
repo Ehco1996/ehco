@@ -1,20 +1,19 @@
-package ms
+package store
 
 import (
 	"os"
 	"path/filepath"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/nakabonne/tstorage"
 	"go.uber.org/zap"
 )
 
-// defaultRetentionDays mirrors the historical 30d window.
+// defaultRetentionDays mirrors the 30d window for metric retention.
 const defaultRetentionDays = 30
 
-type MetricsStore struct {
+type Store struct {
 	mu      sync.RWMutex
 	storage tstorage.Storage
 	dirPath string
@@ -25,13 +24,10 @@ type MetricsStore struct {
 	// method on this store. See stats.go.
 	stats Stats
 
-	// nodeRows is an in-memory sample-count tracker kept in sync with AddNodeMetric.
-	nodeRows atomic.Int64
-
 	closeOnce sync.Once
 }
 
-func NewMetricsStore(dirPath string) (*MetricsStore, error) {
+func NewStore(dirPath string) (*Store, error) {
 	if err := os.MkdirAll(dirPath, 0o755); err != nil {
 		return nil, err
 	}
@@ -46,42 +42,51 @@ func NewMetricsStore(dirPath string) (*MetricsStore, error) {
 		return nil, err
 	}
 
-	ms := &MetricsStore{
+	s := &Store{
 		dirPath: dirPath,
 		storage: storage,
-		l:       zap.S().Named("ms"),
+		l:       zap.S().Named("store"),
 	}
 
-	// Initialize nodeRows from existing samples in storage if available
-	if pts, err := storage.Select("cpu_usage", nil, 0, time.Now().Unix()+3600); err == nil {
-		ms.nodeRows.Store(int64(len(pts)))
-	}
-
-	return ms, nil
+	return s, nil
 }
 
-func (ms *MetricsStore) Close() error {
+func (s *Store) Close() error {
 	var err error
-	ms.closeOnce.Do(func() {
-		ms.mu.Lock()
-		defer ms.mu.Unlock()
-		if ms.storage != nil {
-			err = ms.storage.Close()
-			ms.storage = nil
+	s.closeOnce.Do(func() {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		if s.storage != nil {
+			err = s.storage.Close()
+			s.storage = nil
 		}
 	})
 	return err
 }
 
-func (ms *MetricsStore) countPartitionsAndFiles() (partitions int, files int, totalBytes int64) {
-	entries, err := os.ReadDir(ms.dirPath)
+func (s *Store) countSamples() int64 {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if s.storage == nil {
+		return 0
+	}
+	cutoff := time.Now().Add(-defaultRetentionDays * 24 * time.Hour).Unix()
+	pts, err := s.storage.Select(MetricCPUUsage, nil, cutoff, time.Now().Unix()+3600)
+	if err != nil {
+		return 0
+	}
+	return int64(len(pts))
+}
+
+func (s *Store) countPartitionsAndFiles() (partitions int, files int, totalBytes int64) {
+	entries, err := os.ReadDir(s.dirPath)
 	if err != nil {
 		return 0, 0, 0
 	}
 	for _, e := range entries {
 		if e.IsDir() {
 			partitions++
-			subEntries, _ := os.ReadDir(filepath.Join(ms.dirPath, e.Name()))
+			subEntries, _ := os.ReadDir(filepath.Join(s.dirPath, e.Name()))
 			for _, se := range subEntries {
 				if !se.IsDir() {
 					files++
@@ -100,7 +105,7 @@ func (ms *MetricsStore) countPartitionsAndFiles() (partitions int, files int, to
 	return
 }
 
-func (ms *MetricsStore) dirFileSize() int64 {
-	_, _, totalBytes := ms.countPartitionsAndFiles()
+func (s *Store) dirFileSize() int64 {
+	_, _, totalBytes := s.countPartitionsAndFiles()
 	return totalBytes
 }

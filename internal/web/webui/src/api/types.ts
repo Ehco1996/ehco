@@ -1,6 +1,6 @@
-// Shapes returned by ehco's admin API. Mirror the Go structs in
-// pkg/xray, internal/cmgr/ms, internal/web. Update both sides when wire
-// shapes change — there is no shared schema.
+// TypeScript shapes mirroring backend types in internal/config, pkg/xray,
+// internal/store, internal/web. Update both sides when wire
+// shapes change; this file is the frontend source of truth.
 
 export interface XrayConn {
   id: number;

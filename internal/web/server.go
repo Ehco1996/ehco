@@ -11,10 +11,10 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.uber.org/zap"
 
-	"github.com/Ehco1996/ehco/internal/cmgr"
 	"github.com/Ehco1996/ehco/internal/config"
 	"github.com/Ehco1996/ehco/internal/glue"
 	"github.com/Ehco1996/ehco/internal/metrics"
+	"github.com/Ehco1996/ehco/internal/store"
 )
 
 const (
@@ -32,7 +32,7 @@ type Server struct {
 	cfg  *config.Config
 	auth *authenticator
 
-	connMgr cmgr.Cmgr
+	store *store.Store
 
 	// xrayStatus is wired post-construction by cli boot once the
 	// XrayServer exists. Always read via Load() — may be nil when
@@ -53,7 +53,7 @@ func NewServer(
 	cfg *config.Config,
 	relayReloader glue.Reloader,
 	healthChecker glue.HealthChecker,
-	connMgr cmgr.Cmgr,
+	store *store.Store,
 ) (*Server, error) {
 	if err := validateConfig(cfg); err != nil {
 		return nil, fmt.Errorf("invalid configuration: %w", err)
@@ -73,12 +73,12 @@ func NewServer(
 		Reloader:      relayReloader,
 		HealthChecker: healthChecker,
 
-		e:       e,
-		l:       l,
-		cfg:     cfg,
-		auth:    auth,
-		connMgr: connMgr,
-		addr:    net.JoinHostPort(cfg.WebHost, fmt.Sprintf("%d", cfg.WebPort)),
+		e:     e,
+		l:     l,
+		cfg:   cfg,
+		auth:  auth,
+		store: store,
+		addr:  net.JoinHostPort(cfg.WebHost, fmt.Sprintf("%d", cfg.WebPort)),
 	}
 
 	setupRoutes(s)
@@ -126,13 +126,12 @@ func setupRoutes(s *Server) {
 	api.GET("/update/check", s.UpdateCheck)
 	api.POST("/update/apply", s.UpdateApply)
 
-	// Local SQLite store: read-side health snapshot + maintenance ops.
-	// All four mutations are auth-gated through the api group's
+	// Local TSDB store: read-side health snapshot + maintenance ops.
+	// Mutations are auth-gated through the api group's
 	// existing middleware — the /db/truncate confirm-string is a
 	// second line of defence, not a first.
 	api.GET("/db/health", s.GetDBHealth)
 	api.POST("/db/cleanup", s.PostDBCleanup)
-	api.POST("/db/vacuum", s.PostDBVacuum)
 	api.POST("/db/truncate", s.PostDBTruncate)
 	api.POST("/db/reset_stats", s.PostDBResetStats)
 

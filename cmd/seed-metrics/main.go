@@ -9,8 +9,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/Ehco1996/ehco/internal/cmgr/ms"
-	"github.com/Ehco1996/ehco/internal/cmgr/sampler"
+	"github.com/Ehco1996/ehco/internal/store"
 )
 
 func main() {
@@ -22,9 +21,9 @@ func main() {
 	fmt.Println("==========================================================")
 	fmt.Printf("数据存储路径: %s\n", targetDir)
 
-	store, err := ms.NewMetricsStore(targetDir)
+	st, err := store.NewStore(targetDir)
 	if err != nil {
-		fmt.Printf("初始化 MetricsStore 失败: %v\n", err)
+		fmt.Printf("初始化 Store 失败: %v\n", err)
 		return
 	}
 
@@ -62,8 +61,8 @@ func main() {
 		netIn := math.Max(1024, (5*1024*1024)*diurnal+r.Float64()*1024*1024)
 		netOut := math.Max(1024, (8*1024*1024)*diurnal+r.Float64()*1024*1024)
 
-		nm := &sampler.NodeMetrics{
-			SyncTime:                 curTime,
+		s := &store.Sample{
+			Timestamp:                curTime.Unix(),
 			CpuUsagePercent:          cpu,
 			MemoryUsagePercent:       mem,
 			DiskUsagePercent:         disk,
@@ -71,7 +70,7 @@ func main() {
 			NetworkTransmitBytesRate: netOut,
 		}
 
-		if err := store.AddNodeMetric(ctx, nm); err != nil {
+		if err := st.AddNodeMetric(ctx, s); err != nil {
 			fmt.Printf("写入失败 (i=%d): %v\n", i, err)
 			return
 		}
@@ -90,7 +89,7 @@ func main() {
 
 	// 刷新持久化并统计文件大小
 	fmt.Println("\n[2/4] 检查磁盘持久化与空间占用...")
-	_ = store.Close()
+	_ = st.Close()
 
 	var totalBytes int64
 	var fileCount int
@@ -117,16 +116,16 @@ func main() {
 
 	// 重新打开并进行查询测试
 	fmt.Println("\n[3/4] 重新加载存储并执行前端典型查询测试...")
-	store2, err := ms.NewMetricsStore(targetDir)
+	st2, err := store.NewStore(targetDir)
 	if err != nil {
 		fmt.Printf("重新打开失败: %v\n", err)
 		return
 	}
-	defer store2.Close()
+	defer st2.Close()
 
 	// 场景 1: 轮询最新状态 (overview 15s 轮询，Num=1)
 	t1 := time.Now()
-	rLatest, err := store2.QueryNodeMetric(ctx, &ms.QueryNodeMetricsReq{
+	rLatest, err := st2.QueryNodeMetric(ctx, &store.QueryNodeMetricsReq{
 		StartTimestamp: now.Add(-5 * time.Minute).Unix(),
 		EndTimestamp:   now.Unix(),
 		Num:            1,
@@ -145,7 +144,7 @@ func main() {
 
 	// 场景 2: 最近 1 小时原始点查询 (720 个原始点)
 	t2 := time.Now()
-	r1h, err := store2.QueryNodeMetric(ctx, &ms.QueryNodeMetricsReq{
+	r1h, err := st2.QueryNodeMetric(ctx, &store.QueryNodeMetricsReq{
 		StartTimestamp: now.Add(-1 * time.Hour).Unix(),
 		EndTimestamp:   now.Unix(),
 		Num:            -1,
@@ -160,7 +159,7 @@ func main() {
 
 	// 场景 3: 最近 24 小时监控 (降采样 step=60s，理论 1440 点)
 	t3 := time.Now()
-	r24h, err := store2.QueryNodeMetric(ctx, &ms.QueryNodeMetricsReq{
+	r24h, err := st2.QueryNodeMetric(ctx, &store.QueryNodeMetricsReq{
 		StartTimestamp: now.Add(-24 * time.Hour).Unix(),
 		EndTimestamp:   now.Unix(),
 		Num:            -1,
@@ -175,7 +174,7 @@ func main() {
 
 	// 场景 4: 最近 7 天大跨度监控 (降采样 step=300s，理论 2016 点)
 	t4 := time.Now()
-	r7d, err := store2.QueryNodeMetric(ctx, &ms.QueryNodeMetricsReq{
+	r7d, err := st2.QueryNodeMetric(ctx, &store.QueryNodeMetricsReq{
 		StartTimestamp: now.Add(-7 * 24 * time.Hour).Unix(),
 		EndTimestamp:   now.Unix(),
 		Num:            -1,
@@ -190,12 +189,13 @@ func main() {
 
 	// 场景 5: Settings 健康检查 API
 	fmt.Println("\n[4/4] 验证前端 Settings 页面指标接口 (DBHealth)...")
-	health, err := store2.Health(ctx)
+	health, err := st2.Health(ctx)
 	if err != nil {
 		fmt.Printf("Health 检查失败: %v\n", err)
 	} else {
 		fmt.Printf("  DBHealth: 物理磁盘大小 = %.2f MB\n", float64(health.FileBytes)/(1024*1024))
-		fmt.Printf("  DBHealth: 碎片率 (freelist) = %d (完全为零，无碎片)\n", health.FreelistPages)
+		fmt.Printf("  DBHealth: 分区数 = %d\n", health.Partitions)
+		fmt.Printf("  DBHealth: 样本总数 = %d\n", health.NodeMetricsRows)
 		for k, v := range health.Stats {
 			fmt.Printf("  Stat [%s]: 次数=%d, 最近耗时=%.2fms, 最大耗时=%.2fms\n", k, v.Count, v.LastMs, v.MaxMs)
 		}

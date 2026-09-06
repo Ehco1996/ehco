@@ -143,7 +143,3 @@ func (c *Config) NeedStartXrayServer() bool {
 func (c *Config) NeedStartRelayServer() bool {
 	return len(c.RelayConfigs) > 0
 }
-
-func (c *Config) NeedStartCmgr() bool {
-	return (c.RelaySyncURL != "" && c.RelaySyncInterval > 0) || c.NeedStartWebServer()
-}
