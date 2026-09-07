@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/Ehco1996/ehco/internal/config"
@@ -59,17 +60,22 @@ func buildXrayInstanceCfg(cfg *conf.Config) (*core.Config, error) {
 				}
 				continue
 			}
-			// Inject TLS certs for standard TLS inbounds
-			if err := tls.InitTlsCfg(); err != nil {
-				return nil, err
+			// Inject TLS certs for standard TLS inbounds if not provided by config
+			if inbound.StreamSetting.TLSSettings == nil {
+				inbound.StreamSetting.TLSSettings = &conf.TLSConfig{}
 			}
-			tlsConfigs := []*conf.TLSCertConfig{
-				{
-					CertStr: []string{string(tls.DefaultTLSConfigCertBytes)},
-					KeyStr:  []string{string(tls.DefaultTLSConfigKeyBytes)},
-				},
+			if len(inbound.StreamSetting.TLSSettings.Certs) == 0 {
+				if err := tls.InitTlsCfg(); err != nil {
+					return nil, err
+				}
+				tlsConfigs := []*conf.TLSCertConfig{
+					{
+						CertStr: []string{string(tls.DefaultTLSConfigCertBytes)},
+						KeyStr:  []string{string(tls.DefaultTLSConfigKeyBytes)},
+					},
+				}
+				inbound.StreamSetting.TLSSettings.Certs = tlsConfigs
 			}
-			inbound.StreamSetting.TLSSettings.Certs = tlsConfigs
 			if inbound.StreamSetting.SocketSettings != nil {
 				inbound.StreamSetting.SocketSettings.TcpMptcp = true
 			} else {
@@ -97,13 +103,18 @@ type XrayServer struct {
 	instance *core.Instance
 
 	mainCtx context.Context
+
+	reloadMu        sync.Mutex
+	runningMu       sync.RWMutex
+	runningInbounds map[string]string
 }
 
 func NewXrayServer(cfg *config.Config) *XrayServer {
 	return &XrayServer{
-		l:       zap.L().Named("xray"),
-		cfg:     cfg,
-		tracker: newConnTracker(),
+		l:               zap.L().Named("xray"),
+		cfg:             cfg,
+		tracker:         newConnTracker(),
+		runningInbounds: make(map[string]string),
 	}
 }
 
@@ -177,6 +188,18 @@ func (xs *XrayServer) Setup() error {
 	if err := om.AddHandler(context.Background(), newMeteredOutbound(xs.tracker, xs.up)); err != nil {
 		return fmt.Errorf("register metered outbound: %w", err)
 	}
+
+	running := make(map[string]string)
+	for _, inbound := range xs.cfg.XRayConfig.InboundConfigs {
+		if InProxyTags(inbound.Tag) {
+			listenStr := fmt.Sprintf("%s,%s", inbound.ListenOn.Address.String(), inbound.PortList.Build().String())
+			running[inbound.Tag] = listenStr
+		}
+	}
+	xs.runningMu.Lock()
+	xs.runningInbounds = running
+	xs.runningMu.Unlock()
+
 	return nil
 }
 
@@ -192,25 +215,30 @@ func (xs *XrayServer) Stop() {
 		if err := xs.instance.Close(); err != nil {
 			xs.l.Error("stop instance meet error", zap.Error(err))
 		}
+		xs.instance = nil
 	}
 	if xs.fallBack != nil {
 		if err := xs.fallBack.Close(); err != nil {
 			xs.l.Error("stop fallback server meet error", zap.Error(err))
 		}
+		xs.fallBack = nil
 	}
 	if xs.up != nil {
 		xs.up.Stop()
+		xs.up = nil
 	}
 }
 
-func (xs *XrayServer) Start(ctx context.Context) error {
-	xs.l.Info("Start Xray Server now...")
+func (xs *XrayServer) startInstance(ctx context.Context) error {
+	if xs.instance == nil {
+		return errors.New("xray instance is nil, call Setup first")
+	}
 	if err := xs.instance.Start(); err != nil {
 		return err
 	}
 	if xs.fallBack != nil {
 		go func() {
-			if err := xs.fallBack.ListenAndServe(); err != nil {
+			if err := xs.fallBack.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 				xs.l.Error("fallback server meet error", zap.Error(err))
 			}
 		}()
@@ -220,6 +248,18 @@ func (xs *XrayServer) Start(ctx context.Context) error {
 		if err := xs.up.Start(ctx); err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+func (xs *XrayServer) Start(ctx context.Context) error {
+	xs.l.Info("Start Xray Server now...")
+	if xs.mainCtx == nil {
+		xs.mainCtx = ctx
+	}
+
+	if err := xs.startInstance(ctx); err != nil {
+		return err
 	}
 
 	if xs.cfg.ReloadInterval > 0 {
@@ -233,86 +273,95 @@ func (xs *XrayServer) Start(ctx context.Context) error {
 				case <-ticker.C:
 					newCfg := config.NewConfig(xs.cfg.PATH)
 					if err := newCfg.LoadConfig(false); err != nil {
-						// TODO refine
 						xs.l.Error("Reload Config meet error will retry in next loop", zap.Error(err))
 						continue
 					}
-					if needReload, err := xs.needReload(newCfg); err != nil {
+					needReload, err := xs.needReload(newCfg)
+					if err != nil {
 						xs.l.Error("check need reload meet error", zap.Error(err))
-					} else {
-						if needReload {
-							xs.cfg = newCfg
-							if err := xs.Reload(); err != nil {
-								xs.l.Error("Reload Xray Server meet error", zap.Error(err))
-							}
-							xs.l.Info("Reload Xray Server Once success")
-							return
+						continue
+					}
+					if needReload {
+						xs.cfg = newCfg
+						if err := xs.Reload(false); err != nil {
+							xs.l.Error("Reload Xray Server meet error will retry in next loop", zap.Error(err))
+							continue
 						}
+						xs.l.Info("Reload Xray Server success")
 					}
 				}
 			}
 		}()
 	}
-	if xs.mainCtx == nil {
-		xs.mainCtx = ctx
-	}
 	return nil
 }
 
 func (xs *XrayServer) needReload(newCfg *config.Config) (bool, error) {
-	// xs.cfg is shared with relay's reloader; LoadConfig nils c.XRayConfig
-	// before the (possibly slow) HTTP fetch + Unmarshal. Snapshot the pointer
-	// so we don't deref a freshly-nil'd field mid-evaluation, and skip the
-	// tick if either side isn't ready — next tick re-evaluates after the
-	// concurrent reload settles.
-	var oldXC, newXC *conf.Config
-	if xs.cfg != nil {
-		oldXC = xs.cfg.XRayConfig
-	}
-	if newCfg != nil {
-		newXC = newCfg.XRayConfig
-	}
-	if oldXC == nil || newXC == nil {
-		xs.l.Warn("skip needReload: xray config not ready (concurrent reload in progress?)")
+	if newCfg == nil || newCfg.XRayConfig == nil {
 		return false, nil
 	}
-	oldCfgM := make(map[string]conf.InboundDetourConfig)
-	for _, inbound := range oldXC.InboundConfigs {
-		if InProxyTags(inbound.Tag) {
-			oldCfgM[inbound.Tag] = inbound
-		}
+	xs.runningMu.RLock()
+	running := make(map[string]string, len(xs.runningInbounds))
+	for k, v := range xs.runningInbounds {
+		running[k] = v
 	}
-	for _, newInbound := range newXC.InboundConfigs {
+	xs.runningMu.RUnlock()
+
+	if len(running) == 0 {
+		return true, nil
+	}
+
+	newCfgM := make(map[string]string)
+	for _, newInbound := range newCfg.XRayConfig.InboundConfigs {
 		if !InProxyTags(newInbound.Tag) {
 			continue
 		}
-		oldInbound, ok := oldCfgM[newInbound.Tag]
+		newListen := fmt.Sprintf("%s,%s", newInbound.ListenOn.Address.String(), newInbound.PortList.Build().String())
+		newCfgM[newInbound.Tag] = newListen
+	}
+
+	if len(running) != len(newCfgM) {
+		xs.l.Info("inbound count changed, need restart instance",
+			zap.Int("running", len(running)), zap.Int("new", len(newCfgM)))
+		return true, nil
+	}
+
+	for tag, runListen := range running {
+		newListen, ok := newCfgM[tag]
 		if !ok {
-			xs.l.Info("find new inbound config, need restart instance", zap.String("tag", newInbound.Tag))
+			xs.l.Info("find inbound tag removed, need restart instance", zap.String("tag", tag))
 			return true, nil
 		}
-		oldListen := fmt.Sprintf("%s,%s", oldInbound.ListenOn.Address.String(), oldInbound.PortList.Build().String())
-		newListen := fmt.Sprintf("%s,%s", newInbound.ListenOn.Address.String(), newInbound.PortList.Build().String())
-		xs.l.Debug("check listen port",
-			zap.String("old", oldListen), zap.String("new", newListen), zap.String("tag", newInbound.Tag))
-		if oldListen != newListen {
+		if runListen != newListen {
 			xs.l.Warn("find listener changed reload inbound now...",
-				zap.String("old", oldListen),
+				zap.String("old", runListen),
 				zap.String("new", newListen),
-				zap.String("tag", newInbound.Tag))
+				zap.String("tag", tag))
 			return true, nil
 		}
 	}
 	return false, nil
 }
 
-func (xs *XrayServer) Reload() error {
+func (xs *XrayServer) Reload(force bool) error {
 	xs.l.Warn("Reload Xray Server now...")
+	xs.reloadMu.Lock()
+	defer xs.reloadMu.Unlock()
+
+	if force && xs.cfg.NeedSyncFromServer() {
+		newCfg := config.NewConfig(xs.cfg.PATH)
+		if err := newCfg.LoadConfig(true); err != nil {
+			xs.l.Error("Reload Xray Server load config error", zap.Error(err))
+			return err
+		}
+		xs.cfg = newCfg
+	}
+
 	xs.Stop()
 	if err := xs.Setup(); err != nil {
 		return err
 	}
-	if err := xs.Start(xs.mainCtx); err != nil {
+	if err := xs.startInstance(xs.mainCtx); err != nil {
 		return err
 	}
 	return nil

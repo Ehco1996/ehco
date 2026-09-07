@@ -521,17 +521,15 @@ func realityClientFactory(pubKey, shortID, serverName, userUUID string) func(*te
 	}
 }
 
-func defaultCertSha256(t *testing.T) string {
-	t.Helper()
-	if err := ehcoTls.InitTlsCfg(); err != nil {
-		t.Fatalf("InitTlsCfg: %v", err)
+func getPinnedCertHash(t *testing.T) string {
+	if ehcoTls.DefaultTLSConfigCertBytes == nil {
+		if err := ehcoTls.InitTlsCfg(); err != nil {
+			t.Fatalf("init tls: %v", err)
+		}
 	}
 	block, _ := pem.Decode(ehcoTls.DefaultTLSConfigCertBytes)
-	if block == nil {
-		t.Fatalf("failed to decode default TLS cert PEM")
-	}
-	h := sha256.Sum256(block.Bytes)
-	return hex.EncodeToString(h[:])
+	hash := sha256.Sum256(block.Bytes)
+	return hex.EncodeToString(hash[:])
 }
 
 func plainOutboundJSON(t *testing.T, p e2eParams, inboundPort int) string {
@@ -542,13 +540,13 @@ func plainOutboundJSON(t *testing.T, p e2eParams, inboundPort int) string {
 			"protocol": "trojan",
 			"settings": {"servers": [{"address": "127.0.0.1", "port": %d, "password": %q}]},
 			"streamSettings": {"network": "tcp", "security": "tls", "tlsSettings": {"pinnedPeerCertSha256": %q}}
-		}`, inboundPort, p.password, defaultCertSha256(t))
+		}`, inboundPort, p.password, getPinnedCertHash(t))
 	case ProtocolVless:
 		return fmt.Sprintf(`{
 			"protocol": "vless",
 			"settings": {"vnext": [{"address": "127.0.0.1", "port": %d, "users": [{"id": %q, "encryption": "none"}]}]},
 			"streamSettings": {"network": "tcp", "security": "tls", "tlsSettings": {"pinnedPeerCertSha256": %q}}
-		}`, inboundPort, p.password, defaultCertSha256(t))
+		}`, inboundPort, p.password, getPinnedCertHash(t))
 	case ProtocolSS:
 		// Multi-user 2022 client password format is "<server_key>:<user_key>".
 		clientKey := ssServerKey + ":" + ssUserKey

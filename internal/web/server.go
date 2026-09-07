@@ -38,6 +38,10 @@ type Server struct {
 	// XrayServer exists. Always read via Load() — may be nil when
 	// xray sync is disabled. Atomic pointer keeps it lock-free.
 	xrayStatus atomic.Pointer[glue.XrayStatus]
+
+	// xrayReloader allows HandleReload to trigger an immediate reload on Xray
+	// alongside RelayServer.
+	xrayReloader atomic.Pointer[glue.Reloader]
 }
 
 // SetXrayStatus is called by cli boot once the XrayServer is
@@ -47,6 +51,15 @@ func (s *Server) SetXrayStatus(p glue.XrayStatus) {
 		return
 	}
 	s.xrayStatus.Store(&p)
+}
+
+// SetXrayReloader is called by cli boot once the XrayServer is
+// constructed. HandleReload uses it to reload Xray alongside Relay.
+func (s *Server) SetXrayReloader(r glue.Reloader) {
+	if r == nil {
+		return
+	}
+	s.xrayReloader.Store(&r)
 }
 
 func NewServer(
