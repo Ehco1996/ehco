@@ -42,11 +42,11 @@ func (c *Collector) Start(ctx context.Context) {
 	}
 }
 
-func (c *Collector) sampleOnce(ctx context.Context) {
+func (c *Collector) SampleOnce(ctx context.Context) error {
 	nm, err := c.sampler.Sample(ctx)
 	if err != nil {
 		c.l.Debugf("sample node metrics failed: %v", err)
-		return
+		return err
 	}
 	sample := &store.Sample{
 		Timestamp:                nm.SyncTime.Unix(),
@@ -58,5 +58,11 @@ func (c *Collector) sampleOnce(ctx context.Context) {
 	}
 	if err := c.store.AddNodeMetric(ctx, sample); err != nil {
 		c.l.Errorf("persist node metric failed: %v", err)
+		return err
 	}
+	return nil
+}
+
+func (c *Collector) sampleOnce(ctx context.Context) {
+	_ = c.SampleOnce(ctx)
 }
