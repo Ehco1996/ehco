@@ -8,9 +8,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/Ehco1996/ehco/internal/cmgr"
-	"github.com/Ehco1996/ehco/internal/cmgr/ms"
 	"github.com/Ehco1996/ehco/internal/glue"
+	"github.com/Ehco1996/ehco/internal/store"
 	"github.com/labstack/echo/v4"
 )
 
@@ -64,15 +63,18 @@ func parseTimestamp(s string) (int64, error) {
 }
 
 func (s *Server) GetNodeMetrics(c echo.Context) error {
+	if s.store == nil {
+		return echo.NewHTTPError(http.StatusServiceUnavailable, "metrics store disabled")
+	}
 	params, err := parseQueryParams(c)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
-	req := &ms.QueryNodeMetricsReq{StartTimestamp: params.startTS, EndTimestamp: params.endTS, Num: -1, Step: params.step}
+	req := &store.QueryNodeMetricsReq{StartTimestamp: params.startTS, EndTimestamp: params.endTS, Num: -1, Step: params.step}
 	if params.latest {
 		req.Num = 1
 	}
-	metrics, err := s.connMgr.QueryNodeMetrics(c.Request().Context(), req)
+	metrics, err := s.store.QueryNodeMetric(c.Request().Context(), req)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
@@ -132,7 +134,7 @@ func (s *Server) HandleReload(c echo.Context) error {
 // disabled (xray-less deployments, no host sampler yet).
 type OverviewResp struct {
 	Xray  *glue.XraySnapshot `json:"xray,omitempty"`
-	Host  *ms.NodeMetrics    `json:"host,omitempty"`
+	Host  *store.NodeMetrics `json:"host,omitempty"`
 	Rules int                `json:"rules"`
 	// LastReloadAt is the wall-clock timestamp of the most recent config
 	// reload attempt (file or HTTP). The freshness signal for routing
@@ -154,14 +156,14 @@ func (s *Server) Overview(c echo.Context) error {
 		out.Xray = &snap
 	}
 
-	if s.connMgr != nil {
+	if s.store != nil {
 		now := time.Now()
-		req := &ms.QueryNodeMetricsReq{
+		req := &store.QueryNodeMetricsReq{
 			StartTimestamp: now.Add(-5 * time.Minute).Unix(),
 			EndTimestamp:   now.Unix(),
 			Num:            1,
 		}
-		if resp, err := s.connMgr.QueryNodeMetrics(c.Request().Context(), req); err == nil && len(resp.Data) > 0 {
+		if resp, err := s.store.QueryNodeMetric(c.Request().Context(), req); err == nil && len(resp.Data) > 0 {
 			h := resp.Data[0]
 			out.Host = &h
 		}
@@ -170,14 +172,12 @@ func (s *Server) Overview(c echo.Context) error {
 	return c.JSON(http.StatusOK, out)
 }
 
-// dbMaintenanceErr maps domain errors from the cmgr/ms layer onto echo
+// dbMaintenanceErr maps domain errors from the store layer onto echo
 // HTTP errors. Centralised so every db/* handler treats the same error
 // the same way.
 func dbMaintenanceErr(err error) *echo.HTTPError {
 	switch {
-	case errors.Is(err, cmgr.ErrMetricsDisabled):
-		return echo.NewHTTPError(http.StatusServiceUnavailable, err.Error())
-	case errors.Is(err, ms.ErrTruncateNotConfirmed):
+	case errors.Is(err, store.ErrTruncateNotConfirmed):
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	default:
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
@@ -185,7 +185,10 @@ func dbMaintenanceErr(err error) *echo.HTTPError {
 }
 
 func (s *Server) GetDBHealth(c echo.Context) error {
-	h, err := s.connMgr.DBHealth(c.Request().Context())
+	if s.store == nil {
+		return echo.NewHTTPError(http.StatusServiceUnavailable, "metrics store disabled")
+	}
+	h, err := s.store.Health(c.Request().Context())
 	if err != nil {
 		return dbMaintenanceErr(err)
 	}
@@ -197,19 +200,14 @@ type dbCleanupReq struct {
 }
 
 func (s *Server) PostDBCleanup(c echo.Context) error {
+	if s.store == nil {
+		return echo.NewHTTPError(http.StatusServiceUnavailable, "metrics store disabled")
+	}
 	var req dbCleanupReq
 	if err := c.Bind(&req); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
-	res, err := s.connMgr.DBCleanup(c.Request().Context(), req.OlderThanDays)
-	if err != nil {
-		return dbMaintenanceErr(err)
-	}
-	return c.JSON(http.StatusOK, res)
-}
-
-func (s *Server) PostDBVacuum(c echo.Context) error {
-	res, err := s.connMgr.DBVacuum(c.Request().Context())
+	res, err := s.store.CleanupOlderThan(c.Request().Context(), req.OlderThanDays)
 	if err != nil {
 		return dbMaintenanceErr(err)
 	}
@@ -221,11 +219,14 @@ type dbTruncateReq struct {
 }
 
 func (s *Server) PostDBTruncate(c echo.Context) error {
+	if s.store == nil {
+		return echo.NewHTTPError(http.StatusServiceUnavailable, "metrics store disabled")
+	}
 	var req dbTruncateReq
 	if err := c.Bind(&req); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
-	res, err := s.connMgr.DBTruncate(c.Request().Context(), req.Confirm)
+	res, err := s.store.Truncate(c.Request().Context(), req.Confirm)
 	if err != nil {
 		return dbMaintenanceErr(err)
 	}
@@ -233,9 +234,10 @@ func (s *Server) PostDBTruncate(c echo.Context) error {
 }
 
 func (s *Server) PostDBResetStats(c echo.Context) error {
-	if err := s.connMgr.DBResetStats(); err != nil {
-		return dbMaintenanceErr(err)
+	if s.store == nil {
+		return echo.NewHTTPError(http.StatusServiceUnavailable, "metrics store disabled")
 	}
+	s.store.ResetStats()
 	return c.NoContent(http.StatusNoContent)
 }
 

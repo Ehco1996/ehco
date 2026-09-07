@@ -3,12 +3,17 @@ package cli
 import (
 	"context"
 	"os"
+	"path/filepath"
 
+	"github.com/Ehco1996/ehco/internal/cmgr"
 	"github.com/Ehco1996/ehco/internal/config"
 	"github.com/Ehco1996/ehco/internal/constant"
 	"github.com/Ehco1996/ehco/internal/metrics"
 	"github.com/Ehco1996/ehco/internal/relay"
 	"github.com/Ehco1996/ehco/internal/relay/conf"
+	"github.com/Ehco1996/ehco/internal/sampler"
+	"github.com/Ehco1996/ehco/internal/store"
+	"github.com/Ehco1996/ehco/internal/syncer"
 	"github.com/Ehco1996/ehco/internal/web"
 	"github.com/Ehco1996/ehco/pkg/buffer"
 	"github.com/Ehco1996/ehco/pkg/log"
@@ -89,8 +94,11 @@ func InitConfigAndComponents() (*config.Config, error) {
 func MustStartComponents(mainCtx context.Context, cfg *config.Config) {
 	cliLogger.Infof("Start ehco with version:%s", constant.Version)
 
+	needSync := cfg.RelaySyncURL != "" && cfg.RelaySyncInterval > 0
+	cmgrInstance := cmgr.NewCmgr(needSync)
+
 	// start relay server
-	rs, err := relay.NewServer(cfg)
+	rs, err := relay.NewServer(cfg, cmgrInstance)
 	if err != nil {
 		cliLogger.Fatalf("NewRelayServer meet err=%s", err.Error())
 	}
@@ -102,12 +110,37 @@ func MustStartComponents(mainCtx context.Context, cfg *config.Config) {
 		}
 	}()
 
-	var webS *web.Server
+	var (
+		webS          *web.Server
+		storeInstance *store.Store
+		nodeSampler   *sampler.NodeSampler
+	)
+
 	if cfg.NeedStartWebServer() {
-		webS, err = web.NewServer(cfg, rs, rs, rs.Cmgr)
+		nodeSampler = sampler.NewNodeSampler()
+
+		homeDir, _ := os.UserHomeDir()
+		dataDir := filepath.Join(homeDir, ".ehco", "metrics_ts")
+		storeInstance, err = store.NewStore(dataDir)
+		if err != nil {
+			cliLogger.Fatalf("NewStore meet err=%v", err)
+		}
+
+		collector := sampler.NewCollector(storeInstance, nodeSampler)
+		go collector.Start(mainCtx)
+
+		webS, err = web.NewServer(cfg, rs, rs, storeInstance)
 		if err != nil {
 			cliLogger.Fatalf("NewWebServer meet err=%s", err.Error())
 		}
+	}
+
+	if needSync {
+		if nodeSampler == nil {
+			nodeSampler = sampler.NewNodeSampler()
+		}
+		syncInstance := syncer.NewSyncer(cfg.RelaySyncURL, cfg.RelaySyncInterval, cmgrInstance, nodeSampler)
+		go syncInstance.Start(mainCtx)
 	}
 
 	// Web server must come up before xray: the xray UserPool's first sync

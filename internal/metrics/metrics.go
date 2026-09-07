@@ -2,6 +2,7 @@ package metrics
 
 import (
 	"os"
+	"sync"
 	"time"
 
 	"github.com/Ehco1996/ehco/internal/config"
@@ -84,19 +85,22 @@ var (
 	}, []string{"label", "conn_type", "flow", "remote"})
 )
 
+var registerOnce sync.Once
+
 func RegisterEhcoMetrics(cfg *config.Config) error {
-	// traffic
-	prometheus.MustRegister(EhcoAlive)
-	prometheus.MustRegister(CurConnectionCount)
-	prometheus.MustRegister(NetWorkTransmitBytes)
-	prometheus.MustRegister(HandShakeDurationMilliseconds)
+	registerOnce.Do(func() {
+		prometheus.MustRegister(EhcoAlive)
+		prometheus.MustRegister(CurConnectionCount)
+		prometheus.MustRegister(NetWorkTransmitBytes)
+		prometheus.MustRegister(HandShakeDurationMilliseconds)
+	})
 
 	EhcoAlive.Set(EhcoAliveStateInit)
 
 	// ping
 	if cfg.EnablePing {
 		pg := NewPingGroup(cfg)
-		prometheus.MustRegister(PingResponseDurationMilliseconds)
+		_ = prometheus.Register(PingResponseDurationMilliseconds)
 		go pg.Run()
 	}
 	return nil
