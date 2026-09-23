@@ -85,6 +85,11 @@ func (xs *XrayServer) TrafficSync() glue.SyncStatus {
 // RecentEvents satisfies glue.XrayStatus.
 func (xs *XrayServer) RecentEvents() []glue.RuntimeEvent { return xs.events.list() }
 
+// Counters satisfies glue.XrayStatus: the flat since-start registry. The
+// live conn gauge is not duplicated here — it is already `xray.conns`
+// (XraySnapshot) in the same payload.
+func (xs *XrayServer) Counters() map[string]int64 { return xs.counters.snapshot() }
+
 func (xs *XrayServer) listConns(c echo.Context) error {
 	userID := 0
 	if v := c.QueryParam("user"); v != "" {

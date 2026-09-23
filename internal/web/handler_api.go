@@ -151,6 +151,9 @@ type OverviewResp struct {
 	ConfigSync   glue.SyncStatus     `json:"config_sync"`
 	TrafficSync  glue.SyncStatus     `json:"traffic_sync"`
 	RecentEvents []glue.RuntimeEvent `json:"recent_events,omitempty"`
+	// Counters is the flat since-start registry (conn_total,
+	// config_fetch_fail, reload_fail, ...). In-memory: resets on restart.
+	Counters map[string]int64 `json:"counters,omitempty"`
 }
 
 func (s *Server) Overview(c echo.Context) error {
@@ -169,6 +172,7 @@ func (s *Server) Overview(c echo.Context) error {
 		out.ConfigSync = (*p).ConfigSync()
 		out.TrafficSync = (*p).TrafficSync()
 		out.RecentEvents = (*p).RecentEvents()
+		out.Counters = (*p).Counters()
 	}
 
 	if s.connMgr != nil {

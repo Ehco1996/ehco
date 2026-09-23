@@ -62,6 +62,8 @@ export interface OverviewResp {
   config_sync?: SyncStatus;
   traffic_sync?: SyncStatus;
   recent_events?: RuntimeEvent[];
+  // Flat since-start counter registry (conn_total, reload_fail, ...).
+  counters?: Record<string, number>;
 }
 
 export interface SyncStatus {

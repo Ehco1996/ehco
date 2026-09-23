@@ -196,6 +196,7 @@ export default function Home() {
         drift={overview()?.drift ?? false}
         configSync={overview()?.config_sync}
         trafficSync={overview()?.traffic_sync}
+        counters={overview()?.counters ?? {}}
         reloading={reloading()}
         onReload={doReload}
       />
@@ -374,10 +375,13 @@ function RuntimeAnchor(props: {
   drift: boolean;
   configSync?: SyncStatus;
   trafficSync?: SyncStatus;
+  counters: Record<string, number>;
   reloading: boolean;
   onReload: () => void;
 }) {
   const listeners = () => Object.entries(props.running);
+  const counters = () =>
+    Object.entries(props.counters).sort(([a], [b]) => a.localeCompare(b));
   return (
     <Card padded={false} class="mt-3">
       <div class="flex items-center justify-between gap-3 border-b border-zinc-200 px-4 py-2.5 dark:border-zinc-800">
@@ -432,6 +436,20 @@ function RuntimeAnchor(props: {
         <SyncCell label="config" sync={props.configSync} />
         <SyncCell label="traffic" sync={props.trafficSync} />
       </div>
+      <Show when={counters().length > 0}>
+        <div class="flex flex-wrap gap-x-4 gap-y-1 border-t border-zinc-200 px-4 py-2 font-mono text-[11px] text-zinc-500 dark:border-zinc-800">
+          <For each={counters()}>
+            {([name, value]) => (
+              <span>
+                {name}{" "}
+                <span class="font-semibold tabular-nums text-zinc-800 dark:text-zinc-200">
+                  {value}
+                </span>
+              </span>
+            )}
+          </For>
+        </div>
+      </Show>
     </Card>
   );
 }

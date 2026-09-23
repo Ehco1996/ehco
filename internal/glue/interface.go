@@ -32,6 +32,9 @@ type XrayStatus interface {
 	TrafficSync() SyncStatus
 	// RecentEvents is the in-memory lifecycle log, oldest first.
 	RecentEvents() []RuntimeEvent
+	// Counters is the flat since-start counter registry (HAProxy
+	// `show stat` / nginx stub_status shape): name -> value.
+	Counters() map[string]int64
 }
 
 type XraySnapshot struct {

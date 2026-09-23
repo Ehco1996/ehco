@@ -21,13 +21,19 @@ import (
 // (for kill API) and accumulate per-user byte counts in the local UserPool
 // (replacing xray's gRPC StatsService).
 type meteredOutbound struct {
-	tracker *connTracker
-	pool    *UserPool
-	l       *zap.Logger
+	tracker  *connTracker
+	pool     *UserPool
+	counters *counters
+	l        *zap.Logger
 }
 
-func newMeteredOutbound(tracker *connTracker, pool *UserPool) *meteredOutbound {
-	return &meteredOutbound{tracker: tracker, pool: pool, l: zap.L().Named("xray_outbound")}
+func newMeteredOutbound(tracker *connTracker, pool *UserPool, counters *counters) *meteredOutbound {
+	return &meteredOutbound{
+		tracker:  tracker,
+		pool:     pool,
+		counters: counters,
+		l:        zap.L().Named("xray_outbound"),
+	}
 }
 
 func (h *meteredOutbound) Tag() string                          { return "" }
@@ -65,6 +71,7 @@ func (h *meteredOutbound) Dispatch(ctx context.Context, link *transport.Link) {
 
 	rawConn, err := internet.DialSystem(dialCtx, target, nil)
 	if err != nil {
+		h.counters.connDialFail.Add(1)
 		h.l.Debug("dial failed",
 			zap.String("target", target.NetAddr()),
 			zap.String("email", email),
@@ -75,7 +82,7 @@ func (h *meteredOutbound) Dispatch(ctx context.Context, link *transport.Link) {
 		return
 	}
 
-	// pool may be nil if SyncTrafficEndPoint wasn't configured; counters disabled.
+	// pool may be nil if SyncTrafficEndPoint wasn't configured; per-user metering disabled.
 	var user *User
 	if h.pool != nil && userID > 0 {
 		user, _ = h.pool.GetUser(userID)
@@ -95,6 +102,7 @@ func (h *meteredOutbound) Dispatch(ctx context.Context, link *transport.Link) {
 		}
 	}
 
+	h.counters.connTotal.Add(1)
 	connID := h.tracker.Register(inb, ob, rawConn, cancel)
 	defer h.tracker.Unregister(connID)
 	defer rawConn.Close()

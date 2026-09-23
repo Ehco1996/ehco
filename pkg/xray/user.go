@@ -194,17 +194,20 @@ type UserPool struct {
 	cancel          context.CancelFunc
 	remoteConfigURL string
 
-	// lastSync is the outcome of the most recent user/traffic sync cycle.
+	// lastSync is the outcome of the most recent user/traffic sync cycle;
+	// counters is the shared registry (owned by XrayServer).
 	lastSync syncStatus
+	counters *counters
 }
 
-func NewUserPool(remoteConfigURL string, proxyTags []string) *UserPool {
+func NewUserPool(remoteConfigURL string, proxyTags []string, counters *counters) *UserPool {
 	return &UserPool{
 		l:               zap.L().Named("user_pool"),
 		users:           make(map[int]*User),
 		proxyTags:       proxyTags,
 		remoteConfigURL: remoteConfigURL,
 		br:              newBandwidthRecorder(),
+		counters:        counters,
 	}
 }
 
@@ -464,7 +467,14 @@ func (up *UserPool) Start(ctx context.Context) error {
 	}
 
 	syncOnce := func() (err error) {
-		defer func() { up.lastSync.record(err) }()
+		defer func() {
+			up.lastSync.record(err)
+			if err != nil {
+				up.counters.syncFail.Add(1)
+			} else {
+				up.counters.syncOK.Add(1)
+			}
+		}()
 		for _, tag := range up.proxyTags {
 			if err = up.syncUserConfigsFromServer(ctx, tag); err != nil {
 				up.l.Sugar().Errorf("Sync User Configs From Server Error: %v", err)
