@@ -11,11 +11,11 @@ import Chart from "../ui/Chart";
 import Segmented from "../ui/Segmented";
 import RefreshPicker from "../ui/RefreshPicker";
 import { api } from "../api/client";
-import { bytes, bytesShort, pct, rate, relTime, pickStep } from "../util/format";
+import { bytes, bytesShort, pct, rate, relTime, uptime, pickStep } from "../util/format";
 import { ipKind, ipKindLabel, ipKindTone } from "../util/ip";
 import { usePolling } from "../util/polling";
 import { recordUserSnapshot, userSamples } from "../store/userTrafficHistory";
-import type { XrayUser } from "../api/types";
+import type { XrayUser, SyncStatus, RuntimeEvent } from "../api/types";
 
 const TOP_N = 8;
 
@@ -38,6 +38,7 @@ export default function Home() {
   const [windowSec, setWindowSec] = createSignal<number>(WINDOWS[1].value);
 
   const [overview, { refetch: rcOverview }] = createResource(() => api.overview());
+  const [ver, { refetch: rcVer }] = createResource(() => api.version());
   const [users, { refetch: rcUsers }] = createResource(() => api.xrayUsers());
   const [conns, { refetch: rcConns }] = createResource(() => api.xrayConns());
   const [history, { refetch: rcHistory }] = createResource(
@@ -55,12 +56,20 @@ export default function Home() {
   const poll = usePolling(
     () => {
       rcOverview();
+      rcVer();
       rcUsers();
       rcConns();
       rcHistory();
     },
     { defaultSec: 15 },
   );
+
+  // Build + uptime line under the title.
+  const buildLine = () => {
+    const v = ver();
+    if (!v) return "live state of this relay box";
+    return `${v.version} · ${v.git_revision.slice(0, 7)} · up ${uptime(v.start_time)}`;
+  };
 
   const [reloading, setReloading] = createSignal(false);
   const doReload = async () => {
@@ -149,7 +158,7 @@ export default function Home() {
     <>
       <PageHeader
         title="status"
-        subtitle="live state of this relay box"
+        subtitle={buildLine()}
         actions={
           <>
             <Segmented
@@ -182,12 +191,17 @@ export default function Home() {
         lastReload={lastReload()}
       />
 
-      <ListenersAnchor
+      <RuntimeAnchor
         running={overview()?.running_inbounds ?? {}}
         drift={overview()?.drift ?? false}
+        configSync={overview()?.config_sync}
+        trafficSync={overview()?.traffic_sync}
+        counters={overview()?.counters ?? {}}
         reloading={reloading()}
         onReload={doReload}
       />
+
+      <EventsAnchor events={overview()?.recent_events ?? []} />
 
       <ChartCard
         class="mt-3"
@@ -356,20 +370,22 @@ function ListHeader(props: { title: string; subtitle: string; linkTo: string }) 
   );
 }
 
-function ListenersAnchor(props: {
+function RuntimeAnchor(props: {
   running: Record<string, string>;
   drift: boolean;
+  configSync?: SyncStatus;
+  trafficSync?: SyncStatus;
+  counters: Record<string, number>;
   reloading: boolean;
   onReload: () => void;
 }) {
-  const entries = () => Object.entries(props.running);
+  const listeners = () => Object.entries(props.running);
+  const counters = () =>
+    Object.entries(props.counters).sort(([a], [b]) => a.localeCompare(b));
   return (
     <Card padded={false} class="mt-3">
       <div class="flex items-center justify-between gap-3 border-b border-zinc-200 px-4 py-2.5 dark:border-zinc-800">
-        <CardHeader
-          title="listeners"
-          subtitle="xray runtime · live listen ports"
-        />
+        <CardHeader title="runtime" subtitle="xray listeners · control plane" />
         <div class="flex items-center gap-2">
           <Pill tone={props.drift ? "error" : "ok"} dot pulse={props.drift}>
             {props.drift ? "drift" : "in sync"}
@@ -386,7 +402,7 @@ function ListenersAnchor(props: {
         </div>
       </div>
       <Show
-        when={entries().length > 0}
+        when={listeners().length > 0}
         fallback={
           <EmptyState
             icon={<ServerCog size={24} />}
@@ -396,7 +412,7 @@ function ListenersAnchor(props: {
         }
       >
         <ul class="divide-y divide-zinc-100 dark:divide-zinc-800/70">
-          <For each={entries()}>
+          <For each={listeners()}>
             {([tag, listen]) => {
               const [host, port] = listen.split(",");
               return (
@@ -413,6 +429,99 @@ function ListenersAnchor(props: {
                 </li>
               );
             }}
+          </For>
+        </ul>
+      </Show>
+      <div class="grid grid-cols-2 divide-x divide-zinc-100 border-t border-zinc-200 dark:divide-zinc-800/70 dark:border-zinc-800">
+        <SyncCell label="config" sync={props.configSync} />
+        <SyncCell label="traffic" sync={props.trafficSync} />
+      </div>
+      <Show when={counters().length > 0}>
+        <div class="flex flex-wrap gap-x-4 gap-y-1 border-t border-zinc-200 px-4 py-2 font-mono text-[11px] text-zinc-500 dark:border-zinc-800">
+          <For each={counters()}>
+            {([name, value]) => (
+              <span>
+                {name}{" "}
+                <span class="font-semibold tabular-nums text-zinc-800 dark:text-zinc-200">
+                  {value}
+                </span>
+              </span>
+            )}
+          </For>
+        </div>
+      </Show>
+    </Card>
+  );
+}
+
+// SyncCell shows one upstream round-trip: ok/error, when, and the error.
+function SyncCell(props: { label: string; sync?: SyncStatus }) {
+  const sync = () => props.sync;
+  const at = () => sync()?.at;
+  return (
+    <div class="min-w-0 px-4 py-2">
+      <div class="flex items-center gap-2">
+        <span class="text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-500">
+          {props.label}
+        </span>
+        <Pill tone={!at() ? "neutral" : sync()!.ok ? "ok" : "error"} dot>
+          {!at() ? "never" : sync()!.ok ? "ok" : "error"}
+        </Pill>
+        <Show when={at()}>
+          <span class="text-[11px] text-zinc-500">{relTime(at()!)}</span>
+        </Show>
+      </div>
+      <Show when={sync()?.error}>
+        <div
+          class="mt-0.5 truncate font-mono text-[11px] text-rose-500"
+          title={sync()!.error}
+        >
+          {sync()!.error}
+        </div>
+      </Show>
+    </div>
+  );
+}
+
+function EventsAnchor(props: { events: RuntimeEvent[] }) {
+  // The server already bounds this list; render whatever it sends,
+  // newest first.
+  const recent = () => [...props.events].reverse();
+  const tone = (kind: string) =>
+    kind.endsWith("_error") ? "error" : kind === "reload_ok" ? "ok" : "neutral";
+  return (
+    <Card padded={false} class="mt-3">
+      <div class="flex items-center justify-between gap-3 border-b border-zinc-200 px-4 py-2.5 dark:border-zinc-800">
+        <CardHeader
+          title="recent events"
+          subtitle="this process · clears on restart"
+        />
+      </div>
+      <Show
+        when={recent().length > 0}
+        fallback={
+          <EmptyState
+            title="No events yet"
+            hint="config loads, drift and reloads show up here"
+          />
+        }
+      >
+        <ul class="divide-y divide-zinc-100 dark:divide-zinc-800/70">
+          <For each={recent()}>
+            {(e) => (
+              <li class="flex items-center gap-2 px-4 py-1.5">
+                <span class="w-16 shrink-0 text-right text-[11px] text-zinc-500">
+                  {relTime(e.at)}
+                </span>
+                <Pill tone={tone(e.kind)}>{e.kind}</Pill>
+                <span
+                  class="min-w-0 flex-1 truncate font-mono text-[11px] text-zinc-500"
+                  title={e.detail}
+                >
+                  {e.detail}
+                </span>
+              </li>
+            )}
           </For>
         </ul>
       </Show>
