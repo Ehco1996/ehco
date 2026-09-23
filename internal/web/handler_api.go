@@ -139,6 +139,12 @@ type OverviewResp struct {
 	// rules / xray inbounds — distinct from boot time, which is
 	// surfaced on the settings page.
 	LastReloadAt time.Time `json:"last_reload_at,omitempty"`
+	// RunningInbounds maps proxy inbound tag -> "listen,port" for the
+	// listeners xray is actually on; Drift is true when the newest
+	// config has not been applied yet. The desired side lives in
+	// /api/v1/config (xray's own xray_config.inbounds).
+	RunningInbounds map[string]string `json:"running_inbounds,omitempty"`
+	Drift           bool              `json:"drift,omitempty"`
 }
 
 func (s *Server) Overview(c echo.Context) error {
@@ -152,6 +158,8 @@ func (s *Server) Overview(c echo.Context) error {
 	if p := s.xrayStatus.Load(); p != nil && *p != nil {
 		snap := (*p).Snapshot()
 		out.Xray = &snap
+		out.RunningInbounds = (*p).RunningInbounds()
+		out.Drift = (*p).Drifted()
 	}
 
 	if s.connMgr != nil {

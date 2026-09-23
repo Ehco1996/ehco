@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/Ehco1996/ehco/internal/config"
@@ -104,9 +105,17 @@ type XrayServer struct {
 
 	mainCtx context.Context
 
-	reloadMu        sync.Mutex
-	runningMu       sync.RWMutex
+	reloadMu  sync.Mutex
+	runningMu sync.RWMutex
+	// runningInbounds is the last set of proxy inbounds handed to xray,
+	// keyed by tag ("listen,port"). Written by Setup (under runningMu),
+	// read by the reload check and the admin runtime view.
 	runningInbounds map[string]string
+	// drift is set when the newest config differs from what is running
+	// (a reload is pending or has failed), and cleared on a successful
+	// reload. Surfaces on /overview so a stuck port is visible without
+	// digging through logs.
+	drift atomic.Bool
 }
 
 func NewXrayServer(cfg *config.Config) *XrayServer {
@@ -192,7 +201,7 @@ func (xs *XrayServer) Setup() error {
 	running := make(map[string]string)
 	for _, inbound := range xs.cfg.XRayConfig.InboundConfigs {
 		if InProxyTags(inbound.Tag) {
-			listenStr := fmt.Sprintf("%s,%s", inbound.ListenOn.Address.String(), inbound.PortList.Build().String())
+			listenStr := fmt.Sprintf("%s,%s", inbound.ListenOn.Address.String(), inbound.PortList.String())
 			running[inbound.Tag] = listenStr
 		}
 	}
@@ -308,6 +317,7 @@ func (xs *XrayServer) needReload(newCfg *config.Config) (bool, error) {
 	xs.runningMu.RUnlock()
 
 	if len(running) == 0 {
+		xs.drift.Store(true)
 		return true, nil
 	}
 
@@ -316,13 +326,14 @@ func (xs *XrayServer) needReload(newCfg *config.Config) (bool, error) {
 		if !InProxyTags(newInbound.Tag) {
 			continue
 		}
-		newListen := fmt.Sprintf("%s,%s", newInbound.ListenOn.Address.String(), newInbound.PortList.Build().String())
+		newListen := fmt.Sprintf("%s,%s", newInbound.ListenOn.Address.String(), newInbound.PortList.String())
 		newCfgM[newInbound.Tag] = newListen
 	}
 
 	if len(running) != len(newCfgM) {
 		xs.l.Info("inbound count changed, need restart instance",
 			zap.Int("running", len(running)), zap.Int("new", len(newCfgM)))
+		xs.drift.Store(true)
 		return true, nil
 	}
 
@@ -330,6 +341,7 @@ func (xs *XrayServer) needReload(newCfg *config.Config) (bool, error) {
 		newListen, ok := newCfgM[tag]
 		if !ok {
 			xs.l.Info("find inbound tag removed, need restart instance", zap.String("tag", tag))
+			xs.drift.Store(true)
 			return true, nil
 		}
 		if runListen != newListen {
@@ -337,6 +349,7 @@ func (xs *XrayServer) needReload(newCfg *config.Config) (bool, error) {
 				zap.String("old", runListen),
 				zap.String("new", newListen),
 				zap.String("tag", tag))
+			xs.drift.Store(true)
 			return true, nil
 		}
 	}
@@ -344,6 +357,14 @@ func (xs *XrayServer) needReload(newCfg *config.Config) (bool, error) {
 }
 
 func (xs *XrayServer) Reload(force bool) error {
+	err := xs.reload(force)
+	// A successful reload just reset runningInbounds to the desired
+	// config; a failure leaves whatever was running in place.
+	xs.drift.Store(err != nil)
+	return err
+}
+
+func (xs *XrayServer) reload(force bool) error {
 	xs.l.Warn("Reload Xray Server now...")
 	xs.reloadMu.Lock()
 	defer xs.reloadMu.Unlock()
