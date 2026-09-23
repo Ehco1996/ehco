@@ -10,6 +10,9 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
+// Compile-time proof the admin surface provides what web/ consumes.
+var _ glue.XrayStatus = (*XrayServer)(nil)
+
 // Snapshot satisfies glue.XrayStatus — read by the web admin's
 // /api/v1/overview aggregate. Locks each subsystem briefly; safe to
 // call from any goroutine.
@@ -51,6 +54,22 @@ func (xs *XrayServer) RegisterRoutes(g *echo.Group) {
 	g.DELETE("/xray/conns", xs.killUserConns)
 	g.GET("/xray/users", xs.listUsers)
 }
+
+// RunningInbounds satisfies glue.XrayStatus: proxy tag -> "listen,port"
+// for the listeners xray is currently on. A copy, so callers can't race
+// with a reload swapping the map.
+func (xs *XrayServer) RunningInbounds() map[string]string {
+	xs.runningMu.RLock()
+	defer xs.runningMu.RUnlock()
+	out := make(map[string]string, len(xs.runningInbounds))
+	for tag, listen := range xs.runningInbounds {
+		out[tag] = listen
+	}
+	return out
+}
+
+// Drifted satisfies glue.XrayStatus.
+func (xs *XrayServer) Drifted() bool { return xs.drift.Load() }
 
 func (xs *XrayServer) listConns(c echo.Context) error {
 	userID := 0

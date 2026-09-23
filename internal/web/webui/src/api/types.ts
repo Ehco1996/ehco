@@ -50,6 +50,13 @@ export interface OverviewResp {
   // RFC3339; zero-value omitted by the server. Time of last config
   // reload attempt (file or remote HTTP).
   last_reload_at?: string;
+  // Proxy inbound tag -> "listen,port" for the listeners xray is
+  // actually on. The desired side comes from /api/v1/config
+  // (xray_config.inbounds, xray's own shape).
+  running_inbounds?: Record<string, string>;
+  // True when the newest config has not been applied yet (a reload is
+  // pending or has failed). Details are in the Logs page / journal.
+  drift?: boolean;
 }
 
 export interface QueryNodeMetricsResp {
@@ -159,3 +166,4 @@ export interface LogFrame {
   msg: string;
   [k: string]: unknown;
 }
+

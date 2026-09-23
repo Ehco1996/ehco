@@ -1,9 +1,10 @@
 import { JSX, createEffect, createMemo, createResource, createSignal, For, Show } from "solid-js";
 import { useNavigate } from "@solidjs/router";
-import { Cable, Users as UsersIcon, ArrowRight, Activity } from "lucide-solid";
+import { Cable, Users as UsersIcon, ArrowRight, Activity, RotateCw, ServerCog } from "lucide-solid";
 import PageHeader from "../ui/PageHeader";
 import { Card, CardHeader } from "../ui/Card";
 import { Pill } from "../ui/Pill";
+import Button from "../ui/Button";
 import Sparkline from "../ui/Sparkline";
 import EmptyState from "../ui/EmptyState";
 import Chart from "../ui/Chart";
@@ -60,6 +61,23 @@ export default function Home() {
     },
     { defaultSec: 15 },
   );
+
+  const [reloading, setReloading] = createSignal(false);
+  const doReload = async () => {
+    if (
+      !confirm(
+        "Force xray reload? Active connections may drop if listeners changed.",
+      )
+    )
+      return;
+    setReloading(true);
+    try {
+      await api.reload();
+    } finally {
+      setReloading(false);
+      rcOverview();
+    }
+  };
 
   createEffect(() => {
     const u = users();
@@ -162,6 +180,13 @@ export default function Home() {
         lifetimeIn={xray()?.upload_total ?? 0}
         lifetimeOut={xray()?.download_total ?? 0}
         lastReload={lastReload()}
+      />
+
+      <ListenersAnchor
+        running={overview()?.running_inbounds ?? {}}
+        drift={overview()?.drift ?? false}
+        reloading={reloading()}
+        onReload={doReload}
       />
 
       <ChartCard
@@ -328,6 +353,70 @@ function ListHeader(props: { title: string; subtitle: string; linkTo: string }) 
         all <ArrowRight size={12} />
       </button>
     </div>
+  );
+}
+
+function ListenersAnchor(props: {
+  running: Record<string, string>;
+  drift: boolean;
+  reloading: boolean;
+  onReload: () => void;
+}) {
+  const entries = () => Object.entries(props.running);
+  return (
+    <Card padded={false} class="mt-3">
+      <div class="flex items-center justify-between gap-3 border-b border-zinc-200 px-4 py-2.5 dark:border-zinc-800">
+        <CardHeader
+          title="listeners"
+          subtitle="xray runtime · live listen ports"
+        />
+        <div class="flex items-center gap-2">
+          <Pill tone={props.drift ? "error" : "ok"} dot pulse={props.drift}>
+            {props.drift ? "drift" : "in sync"}
+          </Pill>
+          <Button
+            size="sm"
+            variant="secondary"
+            loading={props.reloading}
+            leadingIcon={<RotateCw size={12} />}
+            onClick={props.onReload}
+          >
+            Reload
+          </Button>
+        </div>
+      </div>
+      <Show
+        when={entries().length > 0}
+        fallback={
+          <EmptyState
+            icon={<ServerCog size={24} />}
+            title="No xray inbounds"
+            hint="xray sync is disabled or not configured"
+          />
+        }
+      >
+        <ul class="divide-y divide-zinc-100 dark:divide-zinc-800/70">
+          <For each={entries()}>
+            {([tag, listen]) => {
+              const [host, port] = listen.split(",");
+              return (
+                <li class="flex items-center gap-2 px-4 py-2">
+                  <span class="w-28 shrink-0 truncate font-mono text-[12px] text-zinc-500">
+                    {tag}
+                  </span>
+                  <span class="flex-1 truncate font-mono text-[13px] tabular-nums">
+                    {host}:
+                    <span class="font-semibold text-emerald-600 dark:text-emerald-400">
+                      {port}
+                    </span>
+                  </span>
+                </li>
+              );
+            }}
+          </For>
+        </ul>
+      </Show>
+    </Card>
   );
 }
 
