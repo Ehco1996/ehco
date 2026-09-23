@@ -116,6 +116,10 @@ type XrayServer struct {
 	// reload. Surfaces on /overview so a stuck port is visible without
 	// digging through logs.
 	drift atomic.Bool
+	// configSync is the last upstream config fetch; events is this
+	// process's bounded lifecycle log. Both in-memory by design.
+	configSync syncStatus
+	events     eventRing
 }
 
 func NewXrayServer(cfg *config.Config) *XrayServer {
@@ -281,10 +285,13 @@ func (xs *XrayServer) Start(ctx context.Context) error {
 					return
 				case <-ticker.C:
 					newCfg := config.NewConfig(xs.cfg.PATH)
-					if err := newCfg.LoadConfig(false); err != nil {
-						xs.l.Error("Reload Config meet error will retry in next loop", zap.Error(err))
+					if loadErr := newCfg.LoadConfig(false); loadErr != nil {
+						xs.configSync.record(loadErr)
+						xs.events.add("config_error", loadErr.Error())
+						xs.l.Error("Reload Config meet error will retry in next loop", zap.Error(loadErr))
 						continue
 					}
+					xs.configSync.record(nil)
 					needReload, err := xs.needReload(newCfg)
 					if err != nil {
 						xs.l.Error("check need reload meet error", zap.Error(err))
@@ -317,7 +324,7 @@ func (xs *XrayServer) needReload(newCfg *config.Config) (bool, error) {
 	xs.runningMu.RUnlock()
 
 	if len(running) == 0 {
-		xs.drift.Store(true)
+		xs.markDrift("no running inbounds")
 		return true, nil
 	}
 
@@ -333,7 +340,7 @@ func (xs *XrayServer) needReload(newCfg *config.Config) (bool, error) {
 	if len(running) != len(newCfgM) {
 		xs.l.Info("inbound count changed, need restart instance",
 			zap.Int("running", len(running)), zap.Int("new", len(newCfgM)))
-		xs.drift.Store(true)
+		xs.markDrift(fmt.Sprintf("inbound count %d -> %d", len(running), len(newCfgM)))
 		return true, nil
 	}
 
@@ -341,7 +348,7 @@ func (xs *XrayServer) needReload(newCfg *config.Config) (bool, error) {
 		newListen, ok := newCfgM[tag]
 		if !ok {
 			xs.l.Info("find inbound tag removed, need restart instance", zap.String("tag", tag))
-			xs.drift.Store(true)
+			xs.markDrift("removed " + tag)
 			return true, nil
 		}
 		if runListen != newListen {
@@ -349,11 +356,21 @@ func (xs *XrayServer) needReload(newCfg *config.Config) (bool, error) {
 				zap.String("old", runListen),
 				zap.String("new", newListen),
 				zap.String("tag", tag))
-			xs.drift.Store(true)
+			xs.markDrift(fmt.Sprintf("%s %s -> %s", tag, runListen, newListen))
 			return true, nil
 		}
 	}
 	return false, nil
+}
+
+// markDrift flags the running config as out of sync. The lifecycle log
+// gets one entry per episode: repeated ticks while a reload keeps
+// failing add noise without new information (the reload events cover
+// those).
+func (xs *XrayServer) markDrift(detail string) {
+	if !xs.drift.Swap(true) {
+		xs.events.add("drift", detail)
+	}
 }
 
 func (xs *XrayServer) Reload(force bool) error {
@@ -361,6 +378,15 @@ func (xs *XrayServer) Reload(force bool) error {
 	// A successful reload just reset runningInbounds to the desired
 	// config; a failure leaves whatever was running in place.
 	xs.drift.Store(err != nil)
+	if err != nil {
+		xs.events.add("reload_error", err.Error())
+	} else {
+		reason := "config change"
+		if force {
+			reason = "manual"
+		}
+		xs.events.add("reload_ok", reason)
+	}
 	return err
 }
 
@@ -371,9 +397,11 @@ func (xs *XrayServer) reload(force bool) error {
 
 	if force && xs.cfg.NeedSyncFromServer() {
 		newCfg := config.NewConfig(xs.cfg.PATH)
-		if err := newCfg.LoadConfig(true); err != nil {
-			xs.l.Error("Reload Xray Server load config error", zap.Error(err))
-			return err
+		loadErr := newCfg.LoadConfig(true)
+		xs.configSync.record(loadErr)
+		if loadErr != nil {
+			xs.l.Error("Reload Xray Server load config error", zap.Error(loadErr))
+			return loadErr
 		}
 		xs.cfg = newCfg
 	}

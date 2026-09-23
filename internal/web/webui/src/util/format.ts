@@ -20,6 +20,19 @@ export function relTime(iso: string): string {
   return `${Math.floor(diff / 86400)}d ago`;
 }
 
+// uptime renders a start timestamp as a compact "3d 4h" / "12m".
+export function uptime(iso: string): string {
+  const t = new Date(iso).getTime();
+  if (!Number.isFinite(t)) return "—";
+  const s = Math.max(0, (Date.now() - t) / 1000);
+  const d = Math.floor(s / 86400);
+  const h = Math.floor((s % 86400) / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  if (d > 0) return `${d}d ${h}h`;
+  if (h > 0) return `${h}h ${m}m`;
+  return `${m}m`;
+}
+
 export function pct(n: number | undefined): string {
   if (n == null || !Number.isFinite(n)) return "—";
   return `${n.toFixed(1)}%`;

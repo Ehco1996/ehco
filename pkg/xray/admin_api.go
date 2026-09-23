@@ -71,6 +71,20 @@ func (xs *XrayServer) RunningInbounds() map[string]string {
 // Drifted satisfies glue.XrayStatus.
 func (xs *XrayServer) Drifted() bool { return xs.drift.Load() }
 
+// ConfigSync satisfies glue.XrayStatus.
+func (xs *XrayServer) ConfigSync() glue.SyncStatus { return xs.configSync.get() }
+
+// TrafficSync satisfies glue.XrayStatus.
+func (xs *XrayServer) TrafficSync() glue.SyncStatus {
+	if xs.up == nil {
+		return glue.SyncStatus{}
+	}
+	return xs.up.LastSync()
+}
+
+// RecentEvents satisfies glue.XrayStatus.
+func (xs *XrayServer) RecentEvents() []glue.RuntimeEvent { return xs.events.list() }
+
 func (xs *XrayServer) listConns(c echo.Context) error {
 	userID := 0
 	if v := c.QueryParam("user"); v != "" {

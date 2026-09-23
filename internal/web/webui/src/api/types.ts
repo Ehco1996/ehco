@@ -57,6 +57,23 @@ export interface OverviewResp {
   // True when the newest config has not been applied yet (a reload is
   // pending or has failed). Details are in the Logs page / journal.
   drift?: boolean;
+  // Last upstream round-trips and the in-memory lifecycle log. All
+  // three reset when the process restarts.
+  config_sync?: SyncStatus;
+  traffic_sync?: SyncStatus;
+  recent_events?: RuntimeEvent[];
+}
+
+export interface SyncStatus {
+  ok: boolean;
+  at?: string; // RFC3339; omitted when it never ran
+  error?: string;
+}
+
+export interface RuntimeEvent {
+  at: string; // RFC3339
+  kind: string; // config_error | drift | reload_ok | reload_error
+  detail?: string;
 }
 
 export interface QueryNodeMetricsResp {

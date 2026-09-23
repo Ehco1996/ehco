@@ -145,6 +145,12 @@ type OverviewResp struct {
 	// /api/v1/config (xray's own xray_config.inbounds).
 	RunningInbounds map[string]string `json:"running_inbounds,omitempty"`
 	Drift           bool              `json:"drift,omitempty"`
+	// ConfigSync / TrafficSync are the last upstream round-trips;
+	// RecentEvents is the in-memory lifecycle log (oldest first). All
+	// three go stale on restart by design.
+	ConfigSync   glue.SyncStatus     `json:"config_sync"`
+	TrafficSync  glue.SyncStatus     `json:"traffic_sync"`
+	RecentEvents []glue.RuntimeEvent `json:"recent_events,omitempty"`
 }
 
 func (s *Server) Overview(c echo.Context) error {
@@ -160,6 +166,9 @@ func (s *Server) Overview(c echo.Context) error {
 		out.Xray = &snap
 		out.RunningInbounds = (*p).RunningInbounds()
 		out.Drift = (*p).Drifted()
+		out.ConfigSync = (*p).ConfigSync()
+		out.TrafficSync = (*p).TrafficSync()
+		out.RecentEvents = (*p).RecentEvents()
 	}
 
 	if s.connMgr != nil {

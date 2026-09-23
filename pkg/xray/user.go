@@ -10,6 +10,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/Ehco1996/ehco/internal/glue"
 	"github.com/Ehco1996/ehco/pkg/bytes"
 	myhttp "github.com/Ehco1996/ehco/pkg/http"
 	"github.com/xtls/xray-core/common/protocol"
@@ -192,6 +193,9 @@ type UserPool struct {
 	proxyTags       []string
 	cancel          context.CancelFunc
 	remoteConfigURL string
+
+	// lastSync is the outcome of the most recent user/traffic sync cycle.
+	lastSync syncStatus
 }
 
 func NewUserPool(remoteConfigURL string, proxyTags []string) *UserPool {
@@ -459,15 +463,16 @@ func (up *UserPool) Start(ctx context.Context) error {
 		return errors.New("UserPool: inbound manager not set; call SetInboundManager before Start")
 	}
 
-	syncOnce := func() error {
+	syncOnce := func() (err error) {
+		defer func() { up.lastSync.record(err) }()
 		for _, tag := range up.proxyTags {
-			if err := up.syncUserConfigsFromServer(ctx, tag); err != nil {
+			if err = up.syncUserConfigsFromServer(ctx, tag); err != nil {
 				up.l.Sugar().Errorf("Sync User Configs From Server Error: %v", err)
 				return err
 			}
 		}
 		// Traffic is pool-wide, so push once after all tags are reconciled.
-		if err := up.syncTrafficToServer(ctx); err != nil {
+		if err = up.syncTrafficToServer(ctx); err != nil {
 			up.l.Sugar().Errorf("Sync Traffic To Server Error: %v", err)
 			return err
 		}
@@ -502,3 +507,6 @@ func (up *UserPool) Stop() {
 		up.cancel()
 	}
 }
+
+// LastSync reports the outcome of the most recent user/traffic sync cycle.
+func (up *UserPool) LastSync() glue.SyncStatus { return up.lastSync.get() }
