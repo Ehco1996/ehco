@@ -88,8 +88,6 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ older_than_days }),
     }),
-  dbVacuum: () =>
-    request<DBMaintenanceResult>("/api/v1/db/vacuum", { method: "POST" }),
   dbTruncate: (confirm: string) =>
     request<DBMaintenanceResult>("/api/v1/db/truncate", {
       method: "POST",

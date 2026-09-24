@@ -53,13 +53,13 @@ func TestShaMatchesRevision(t *testing.T) {
 		fullSHA, revision string
 		want              bool
 	}{
-		{full, "1e0e74c", true},                    // goreleaser short
-		{full, "1E0E74C", true},                    // case-insensitive
-		{full, full, true},                         // Makefile full SHA
-		{full, "deadbee", false},                   // different commit
-		{full, "", false},                          // empty -> false (caller already guards)
-		{full, full + "x", false},                  // longer than full SHA
-		{"short", "shortish", false},               // revision longer than fullSHA
+		{full, "1e0e74c", true},      // goreleaser short
+		{full, "1E0E74C", true},      // case-insensitive
+		{full, full, true},           // Makefile full SHA
+		{full, "deadbee", false},     // different commit
+		{full, "", false},            // empty -> false (caller already guards)
+		{full, full + "x", false},    // longer than full SHA
+		{"short", "shortish", false}, // revision longer than fullSHA
 	}
 	for _, c := range cases {
 		if got := shaMatchesRevision(c.fullSHA, c.revision); got != c.want {

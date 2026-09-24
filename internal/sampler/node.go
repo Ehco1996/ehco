@@ -19,8 +19,7 @@ import (
 // node_exporter → /metrics → expfmt detour the project used to take when
 // the source and sink lived in the same Go process.
 //
-// Sample is not goroutine-safe; the caller (cmgr's tick loop) is expected
-// to invoke it serially.
+// Sample is not goroutine-safe; the caller is expected to invoke it serially.
 type NodeSampler struct {
 	last *NodeMetrics
 	l    *zap.SugaredLogger
