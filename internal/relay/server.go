@@ -24,7 +24,8 @@ type Server struct {
 	errCH    chan error    // once error happen, server will exit
 	reloadCH chan struct{} // reload config
 
-	Cmgr cmgr.Cmgr
+	Cmgr    cmgr.Cmgr
+	cmgrCfg *cmgr.Config
 }
 
 func NewServer(cfg *config.Config) (*Server, error) {
@@ -46,6 +47,7 @@ func NewServer(cfg *config.Config) (*Server, error) {
 		errCH:    make(chan error, 1),
 		reloadCH: make(chan struct{}, 1),
 		Cmgr:     cmgr,
+		cmgrCfg:  cmgrCfg,
 	}
 	return s, nil
 }
@@ -80,8 +82,12 @@ func (s *Server) Start(ctx context.Context) error {
 		go s.WatchAndReload(ctx)
 	}
 
-	// start Cmgr when need sync from server
-	if s.cfg.NeedStartCmgr() {
+	// Cmgr serves two jobs over one ticker: host metrics for the panel, and
+	// stats sync upstream. Ask the config the Cmgr was built from, so the loop
+	// is never gated on a narrower condition than the Cmgr itself applies —
+	// that mismatch used to stop host sampling on nodes whose web panel was on
+	// but relay_sync_interval was 0.
+	if s.cmgrCfg.NeedsStart() {
 		go s.Cmgr.Start(ctx, s.errCH)
 	}
 
